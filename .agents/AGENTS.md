@@ -18,3 +18,6 @@ Este repositorio contiene el proyecto de Revival de la serie de videojuegos Supe
 
 4. **Trato y Mención Personalizada al Usuario:**
    * Al iniciar cada nueva ejecución, respuesta o interacción, el agente debe obligatoriamente saludar y mencionar al usuario por su nombre (**Ignacio**).
+
+5. **Rutina de Checkpoints en Git (Conventional Commits):**
+   * Antes de iniciar cualquier modificación de código, refactorización o cambio sustancial en scripts, lógica o recursos, se debe generar obligatoriamente un commit de checkpoint siguiendo la especificación de *Conventional Commits* (ej. `chore(checkpoint): ...`), garantizando un estado base limpio y restaurable antes de experimentar.
