@@ -1,0 +1,7 @@
+{
+  "interaction": {
+    "type": "script",
+    "path": "/data/data/com.dalcomsoft.sslo/files/libscript.js",
+    "on_change": "resend"
+  }
+}

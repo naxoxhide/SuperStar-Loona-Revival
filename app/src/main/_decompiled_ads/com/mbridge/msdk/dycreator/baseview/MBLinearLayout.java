@@ -1,0 +1,248 @@
+package com.mbridge.msdk.dycreator.baseview;
+
+import android.content.Context;
+import android.util.AttributeSet;
+import android.view.MotionEvent;
+import android.widget.LinearLayout;
+import com.fyber.inneractive.sdk.external.InneractiveMediationDefs;
+import com.mbridge.msdk.dycreator.a.b;
+import com.mbridge.msdk.dycreator.baseview.inter.InterBase;
+import com.mbridge.msdk.dycreator.e.a;
+import com.mbridge.msdk.dycreator.e.c;
+import com.mbridge.msdk.foundation.entity.CampaignEx;
+import com.mbridge.msdk.foundation.same.report.s;
+import java.util.HashMap;
+import java.util.Map;
+
+/* JADX INFO: loaded from: classes2.dex */
+public class MBLinearLayout extends LinearLayout implements InterBase {
+    private float a;
+
+    /* JADX INFO: renamed from: b, reason: collision with root package name */
+    private float f1954b;
+    private Map<String, String> c;
+    private Map<String, Boolean> d;
+    private String e;
+
+    public MBLinearLayout(Context context) {
+        super(context);
+        this.e = "";
+    }
+
+    public MBLinearLayout(Context context, AttributeSet attributeSet) {
+        super(context);
+        this.e = "";
+        this.c = c.a(context, attributeSet);
+        a.a(this, attributeSet);
+        setLayoutParams(generateLayoutParams(attributeSet));
+        c.a(this.c, this);
+    }
+
+    public MBLinearLayout(Context context, AttributeSet attributeSet, int i) {
+        super(context, attributeSet, i);
+        this.e = "";
+    }
+
+    @Override // android.widget.LinearLayout, android.view.ViewGroup
+    public LinearLayout.LayoutParams generateLayoutParams(AttributeSet attributeSet) {
+        LinearLayout.LayoutParams layoutParamsGenerateDefaultLayoutParams = generateDefaultLayoutParams();
+        HashMap mapB = b.a().b();
+        int attributeCount = attributeSet.getAttributeCount();
+        for (int i = 0; i < attributeCount; i++) {
+            com.mbridge.msdk.dycreator.a.c cVar = (com.mbridge.msdk.dycreator.a.c) mapB.get(attributeSet.getAttributeName(i));
+            if (cVar != null) {
+                switch (AnonymousClass1.a[cVar.ordinal()]) {
+                    case 1:
+                        String attributeValue = attributeSet.getAttributeValue(i);
+                        if (attributeValue.startsWith(InneractiveMediationDefs.GENDER_FEMALE) || attributeValue.startsWith(InneractiveMediationDefs.GENDER_MALE)) {
+                            layoutParamsGenerateDefaultLayoutParams.width = -1;
+                        } else if (attributeValue.startsWith("wrap")) {
+                            layoutParamsGenerateDefaultLayoutParams.width = -2;
+                        } else {
+                            layoutParamsGenerateDefaultLayoutParams.width = b.a().b(attributeValue);
+                        }
+                        break;
+                    case 2:
+                        String attributeValue2 = attributeSet.getAttributeValue(i);
+                        if (attributeValue2.startsWith(InneractiveMediationDefs.GENDER_FEMALE) || attributeValue2.startsWith(InneractiveMediationDefs.GENDER_MALE)) {
+                            layoutParamsGenerateDefaultLayoutParams.height = -1;
+                        } else if (attributeValue2.startsWith("wrap")) {
+                            layoutParamsGenerateDefaultLayoutParams.height = -2;
+                        } else {
+                            layoutParamsGenerateDefaultLayoutParams.height = b.a().b(attributeValue2);
+                        }
+                        break;
+                    case 3:
+                        layoutParamsGenerateDefaultLayoutParams.gravity = 1;
+                        break;
+                    case 4:
+                        layoutParamsGenerateDefaultLayoutParams.gravity = 16;
+                        break;
+                    case 5:
+                        layoutParamsGenerateDefaultLayoutParams.weight = attributeSet.getAttributeFloatValue(i, 0.0f);
+                        break;
+                    case 6:
+                        setGravity(b.a().c(attributeSet.getAttributeValue(i)));
+                        break;
+                    case 7:
+                        int iB = b.a().b(attributeSet.getAttributeValue(i));
+                        layoutParamsGenerateDefaultLayoutParams.bottomMargin = iB;
+                        layoutParamsGenerateDefaultLayoutParams.leftMargin = iB;
+                        layoutParamsGenerateDefaultLayoutParams.rightMargin = iB;
+                        layoutParamsGenerateDefaultLayoutParams.topMargin = iB;
+                        break;
+                    case 8:
+                        layoutParamsGenerateDefaultLayoutParams.leftMargin = b.a().b(attributeSet.getAttributeValue(i));
+                        break;
+                    case 9:
+                        layoutParamsGenerateDefaultLayoutParams.rightMargin = b.a().b(attributeSet.getAttributeValue(i));
+                        break;
+                    case 10:
+                        layoutParamsGenerateDefaultLayoutParams.topMargin = b.a().b(attributeSet.getAttributeValue(i));
+                        break;
+                    case 11:
+                        layoutParamsGenerateDefaultLayoutParams.bottomMargin = b.a().b(attributeSet.getAttributeValue(i));
+                        break;
+                    case 12:
+                        layoutParamsGenerateDefaultLayoutParams.gravity = b.a().c(attributeSet.getAttributeValue(i));
+                        break;
+                }
+            }
+        }
+        return layoutParamsGenerateDefaultLayoutParams;
+    }
+
+    /* JADX INFO: renamed from: com.mbridge.msdk.dycreator.baseview.MBLinearLayout$1, reason: invalid class name */
+    static /* synthetic */ class AnonymousClass1 {
+        static final /* synthetic */ int[] a;
+
+        static {
+            int[] iArr = new int[com.mbridge.msdk.dycreator.a.c.values().length];
+            a = iArr;
+            try {
+                iArr[com.mbridge.msdk.dycreator.a.c.layout_width.ordinal()] = 1;
+            } catch (NoSuchFieldError unused) {
+            }
+            try {
+                a[com.mbridge.msdk.dycreator.a.c.layout_height.ordinal()] = 2;
+            } catch (NoSuchFieldError unused2) {
+            }
+            try {
+                a[com.mbridge.msdk.dycreator.a.c.layout_centerHorizontal.ordinal()] = 3;
+            } catch (NoSuchFieldError unused3) {
+            }
+            try {
+                a[com.mbridge.msdk.dycreator.a.c.layout_centerVertical.ordinal()] = 4;
+            } catch (NoSuchFieldError unused4) {
+            }
+            try {
+                a[com.mbridge.msdk.dycreator.a.c.layout_weight.ordinal()] = 5;
+            } catch (NoSuchFieldError unused5) {
+            }
+            try {
+                a[com.mbridge.msdk.dycreator.a.c.gravity.ordinal()] = 6;
+            } catch (NoSuchFieldError unused6) {
+            }
+            try {
+                a[com.mbridge.msdk.dycreator.a.c.layout_margin.ordinal()] = 7;
+            } catch (NoSuchFieldError unused7) {
+            }
+            try {
+                a[com.mbridge.msdk.dycreator.a.c.layout_marginLeft.ordinal()] = 8;
+            } catch (NoSuchFieldError unused8) {
+            }
+            try {
+                a[com.mbridge.msdk.dycreator.a.c.layout_marginRight.ordinal()] = 9;
+            } catch (NoSuchFieldError unused9) {
+            }
+            try {
+                a[com.mbridge.msdk.dycreator.a.c.layout_marginTop.ordinal()] = 10;
+            } catch (NoSuchFieldError unused10) {
+            }
+            try {
+                a[com.mbridge.msdk.dycreator.a.c.layout_marginBottom.ordinal()] = 11;
+            } catch (NoSuchFieldError unused11) {
+            }
+            try {
+                a[com.mbridge.msdk.dycreator.a.c.layout_gravity.ordinal()] = 12;
+            } catch (NoSuchFieldError unused12) {
+            }
+        }
+    }
+
+    @Override // android.view.ViewGroup
+    public boolean onInterceptTouchEvent(MotionEvent motionEvent) {
+        this.a = motionEvent.getRawX();
+        this.f1954b = motionEvent.getRawY();
+        return super.onInterceptTouchEvent(motionEvent);
+    }
+
+    public float getxInScreen() {
+        return this.a;
+    }
+
+    public float getyInScreen() {
+        return this.f1954b;
+    }
+
+    @Override // android.view.ViewGroup, android.view.View
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        Map<String, Boolean> map = this.d;
+        if (map != null && map.containsKey("mbridgeAttached") && this.d.get("mbridgeAttached").booleanValue()) {
+            new s.a("mbridgeAttached").a().a(this.e);
+        }
+    }
+
+    @Override // android.view.ViewGroup, android.view.View
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        Map<String, Boolean> map = this.d;
+        if (map != null && map.containsKey("mbridgeDetached") && this.d.get("mbridgeDetached").booleanValue()) {
+            new s.a("mbridgeDetached").a().a(this.e);
+        }
+    }
+
+    @Override // android.widget.LinearLayout, android.view.ViewGroup, android.view.View
+    protected void onLayout(boolean z, int i, int i2, int i3, int i4) {
+        super.onLayout(z, i, i2, i3, i4);
+    }
+
+    @Override // com.mbridge.msdk.dycreator.baseview.inter.InterBase
+    public String getBindDataDes() {
+        Map<String, String> map = this.c;
+        return (map == null || !map.containsKey("mbridgeData")) ? "" : this.c.get("mbridgeData");
+    }
+
+    @Override // com.mbridge.msdk.dycreator.baseview.inter.InterBase
+    public String getActionDes() {
+        Map<String, String> map = this.c;
+        return (map == null || !map.containsKey("mbridgeAction")) ? "" : this.c.get("mbridgeAction");
+    }
+
+    @Override // com.mbridge.msdk.dycreator.baseview.inter.InterBase
+    public String getStrategyDes() {
+        Map<String, String> map = this.c;
+        return (map == null || !map.containsKey("mbridgeStrategy")) ? "" : this.c.get("mbridgeStrategy");
+    }
+
+    @Override // com.mbridge.msdk.dycreator.baseview.inter.InterBase
+    public String getEffectDes() {
+        Map<String, String> map = this.c;
+        return (map == null || !map.containsKey("mbridgeEffect")) ? "" : this.c.get("mbridgeEffect");
+    }
+
+    @Override // com.mbridge.msdk.dycreator.baseview.inter.InterBase
+    public String getReportDes() {
+        Map<String, String> map = this.c;
+        return (map == null || !map.containsKey("mbridgeReport")) ? "" : this.c.get("mbridgeReport");
+    }
+
+    @Override // com.mbridge.msdk.dycreator.baseview.inter.InterBase
+    public void setDynamicReport(String str, CampaignEx campaignEx) {
+        this.d = c.a(str);
+        if (campaignEx != null) {
+            this.e = campaignEx.getCampaignUnitId();
+        }
+    }
+}

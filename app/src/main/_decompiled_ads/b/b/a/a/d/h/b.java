@@ -1,0 +1,33 @@
+package b.b.a.a.d.h;
+
+/* JADX INFO: compiled from: ExpressJsObjectInterface.java */
+/* JADX INFO: loaded from: classes.dex */
+public interface b {
+    void a(String str);
+
+    String adInfo();
+
+    String appInfo();
+
+    void b(String str);
+
+    void changeVideoState(String str);
+
+    void chooseAdResult(String str);
+
+    void clickEvent(String str);
+
+    void dynamicTrack(String str);
+
+    String getCurrentVideoState();
+
+    String getTemplateInfo();
+
+    void initRenderFinish();
+
+    void muteVideo(String str);
+
+    void renderDidFinish(String str);
+
+    void skipVideo();
+}

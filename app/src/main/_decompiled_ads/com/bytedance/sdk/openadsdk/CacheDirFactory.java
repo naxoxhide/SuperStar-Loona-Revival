@@ -1,0 +1,67 @@
+package com.bytedance.sdk.openadsdk;
+
+import android.text.TextUtils;
+import b.a.a.a.a.a.a.d.b;
+import b.a.a.a.a.a.b.b.b.a;
+import com.bytedance.sdk.component.utils.g;
+import com.bytedance.sdk.openadsdk.core.o;
+import java.io.File;
+
+/* JADX INFO: loaded from: classes2.dex */
+public class CacheDirFactory {
+    public static volatile b MEDIA_CACHE_DIR = null;
+    public static String ROOT_DIR = null;
+    public static final int SPLASH_USE_INTERNAL_STORAGE = 1;
+    private static String a = null;
+
+    /* JADX INFO: renamed from: b, reason: collision with root package name */
+    private static int f372b = 1;
+
+    private static b a() {
+        if (MEDIA_CACHE_DIR == null) {
+            synchronized (CacheDirFactory.class) {
+                if (MEDIA_CACHE_DIR == null) {
+                    MEDIA_CACHE_DIR = new a();
+                    MEDIA_CACHE_DIR.a(getRootDir());
+                    MEDIA_CACHE_DIR.c();
+                }
+            }
+        }
+        return MEDIA_CACHE_DIR;
+    }
+
+    public static int getCacheType() {
+        return f372b;
+    }
+
+    public static String getDiskCacheDirPath(String str) {
+        return getRootDir() + File.separator + str;
+    }
+
+    public static b getICacheDir(int i) {
+        return a();
+    }
+
+    public static String getImageCacheDir() {
+        if (a == null) {
+            a = getDiskCacheDirPath("image");
+        }
+        return a;
+    }
+
+    public static String getRootDir() {
+        if (!TextUtils.isEmpty(ROOT_DIR)) {
+            return ROOT_DIR;
+        }
+        File fileA = g.a(o.a(), com.bytedance.sdk.openadsdk.m.b.b(), "tt_ad");
+        if (fileA.isFile()) {
+            fileA.delete();
+        }
+        if (!fileA.exists()) {
+            fileA.mkdirs();
+        }
+        String absolutePath = fileA.getAbsolutePath();
+        ROOT_DIR = absolutePath;
+        return absolutePath;
+    }
+}

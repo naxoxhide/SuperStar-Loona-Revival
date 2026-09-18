@@ -1,0 +1,42 @@
+package com.google.android.gms.internal.ads;
+
+/* JADX INFO: compiled from: com.google.android.gms:play-services-ads@@22.5.0 */
+/* JADX INFO: loaded from: classes3.dex */
+public final class zzr {
+    private int zza;
+    private int zzb;
+    private int zzc;
+    private byte[] zzd;
+
+    public zzr() {
+        this.zza = -1;
+        this.zzb = -1;
+        this.zzc = -1;
+    }
+
+    /* synthetic */ zzr(zzs zzsVar, zzq zzqVar) {
+        this.zza = zzsVar.zzd;
+        this.zzb = zzsVar.zze;
+        this.zzc = zzsVar.zzf;
+        this.zzd = zzsVar.zzg;
+    }
+
+    public final zzr zza(int i) {
+        this.zzb = 1;
+        return this;
+    }
+
+    public final zzr zzb(int i) {
+        this.zza = 1;
+        return this;
+    }
+
+    public final zzr zzc(int i) {
+        this.zzc = i;
+        return this;
+    }
+
+    public final zzs zzd() {
+        return new zzs(this.zza, this.zzb, this.zzc, this.zzd);
+    }
+}

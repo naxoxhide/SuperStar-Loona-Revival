@@ -1,0 +1,63 @@
+{
+  "project_info": {
+    "project_number": "973332236207",
+    "firebase_url": "https://superstar-loona-default-rtdb.firebaseio.com",
+    "project_id": "superstar-loona",
+    "storage_bucket": "superstar-loona.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:973332236207:android:b00529d6884e19a297115a",
+        "android_client_info": {
+          "package_name": "com.dalcomsoft.sslo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "973332236207-d1h2b6iiq2aqmiut72e9gd94l531pf9g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dalcomsoft.sslo",
+            "certificate_hash": "d7f89a17839fe193ce6093b1b4a450bdb7ae77f3"
+          }
+        },
+        {
+          "client_id": "973332236207-ddvup4ndlil7gpbf8h79vpopskqmch8c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dalcomsoft.sslo",
+            "certificate_hash": "c676f5dc37c04916e22e6c57d07a39d3aa6c2dd1"
+          }
+        },
+        {
+          "client_id": "973332236207-utagpqhrv8e2q1kb4u96q93sb45lig81.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFzri_4TScaZNDqZWnIYv06Rn1B0MgzlY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "973332236207-utagpqhrv8e2q1kb4u96q93sb45lig81.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "973332236207-e2qhvjr5h93u3s72n0g5i3gn5qhp1lkt.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.dalcomsoft.sslo"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

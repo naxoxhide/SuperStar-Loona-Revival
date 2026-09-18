@@ -1,0 +1,44 @@
+package com.facebook.ads.redexgen.X;
+
+import android.os.Bundle;
+import java.util.ArrayList;
+import java.util.List;
+
+/* JADX INFO: loaded from: assets/audience_network.dex */
+public class ZI implements InterfaceC06553k {
+    public final /* synthetic */ EI A00;
+    public final /* synthetic */ C06533i A01;
+
+    public ZI(EI ei, C06533i c06533i) {
+        this.A00 = ei;
+        this.A01 = c06533i;
+    }
+
+    @Override // com.facebook.ads.redexgen.X.InterfaceC06553k
+    public final Object A4T(int i) {
+        C06513g compatInfo = this.A01.A00(i);
+        if (compatInfo == null) {
+            return null;
+        }
+        return compatInfo.A0M();
+    }
+
+    @Override // com.facebook.ads.redexgen.X.InterfaceC06553k
+    public final List<Object> A5c(String str, int i) {
+        List<C06513g> listA03 = this.A01.A03(str, i);
+        if (listA03 == null) {
+            return null;
+        }
+        ArrayList arrayList = new ArrayList();
+        int infoCount = listA03.size();
+        for (int i2 = 0; i2 < infoCount; i2++) {
+            arrayList.add(listA03.get(i2).A0M());
+        }
+        return arrayList;
+    }
+
+    @Override // com.facebook.ads.redexgen.X.InterfaceC06553k
+    public final boolean ADn(int i, int i2, Bundle bundle) {
+        return this.A01.A04(i, i2, bundle);
+    }
+}

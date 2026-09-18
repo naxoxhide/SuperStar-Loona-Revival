@@ -1,0 +1,15 @@
+package com.google.android.gms.internal.ads;
+
+import android.os.Handler;
+
+/* JADX INFO: compiled from: com.google.android.gms:play-services-ads@@22.5.0 */
+/* JADX INFO: loaded from: classes3.dex */
+final class zzue {
+    public final Handler zza;
+    public final zzug zzb;
+
+    public zzue(Handler handler, zzug zzugVar) {
+        this.zza = handler;
+        this.zzb = zzugVar;
+    }
+}

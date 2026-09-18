@@ -1,0 +1,66 @@
+package com.applovin.impl.sdk.c;
+
+import com.applovin.impl.sdk.utils.AppLovinSdkExtraParameterKey;
+import com.applovin.impl.sdk.utils.u;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+/* JADX INFO: loaded from: classes.dex */
+public class a<T> extends b<T> {
+    public static final b<String> aJa = d("afi", "");
+    public static final b<Long> aJb = d("afi_ms", Long.valueOf(TimeUnit.SECONDS.toMillis(5)));
+    public static final b<String> aJc = d("mediation_endpoint", "https://ms.applovin.com/");
+    public static final b<String> aJd = d("mediation_backup_endpoint", "https://ms.applvn.com/");
+    public static final b<Long> aJe = d("fetch_next_ad_retry_delay_ms", Long.valueOf(TimeUnit.SECONDS.toMillis(2)));
+    public static final b<Long> aJf = d("fetch_next_ad_timeout_ms", Long.valueOf(TimeUnit.SECONDS.toMillis(30)));
+    public static final b<Long> aJg = d("fetch_mediation_debugger_info_timeout_ms", Long.valueOf(TimeUnit.SECONDS.toMillis(7)));
+    public static final b<Boolean> aJh = d("auto_init_mediation_debugger", true);
+    public static final b<String> aJi = d("postback_macros", "{\"{MCODE}\":\"mcode\",\"{BCODE}\":\"bcode\",\"{ICODE}\":\"icode\",\"{SCODE}\":\"scode\"}");
+    public static final b<Long> aJj = d("max_signal_provider_latency_ms", Long.valueOf(TimeUnit.SECONDS.toMillis(30)));
+    public static final b<Long> aJk = d("default_adapter_timeout_ms", Long.valueOf(TimeUnit.SECONDS.toMillis(10)));
+    public static final b<Long> aJl = d("ad_refresh_ms", Long.valueOf(TimeUnit.SECONDS.toMillis(30)));
+    public static final b<Long> aJm = d("ad_load_failure_refresh_ms", Long.valueOf(TimeUnit.SECONDS.toMillis(30)));
+    public static final b<String> aJn = d("ad_load_failure_refresh_ignore_error_codes", "204");
+    public static final b<Long> aJo = d("refresh_ad_on_app_resume_elapsed_threshold_ms", 0L);
+    public static final b<Boolean> aJp = d("refresh_ad_view_timer_responds_to_background", true);
+    public static final b<Boolean> aJq = d("refresh_ad_view_timer_responds_to_store_kit", true);
+    public static final b<Boolean> aJr = d("refresh_ad_view_timer_responds_to_window_visibility_changed", false);
+    public static final b<Boolean> aJs = d("avrsponse", false);
+    public static final b<Boolean> aJt = d(AppLovinSdkExtraParameterKey.ALLOW_IMMEDIATE_AUTO_REFRESH_PAUSE, false);
+    public static final b<Long> aJu = d("fullscreen_display_delay_ms", 0L);
+    public static final b<Boolean> aJv = d("susaode", false);
+    public static final b<Long> aJw = d("ahdm", 500L);
+    public static final b<Long> aJx = d("ad_view_refresh_precache_request_viewability_undesired_flags", 246L);
+    public static final b<Boolean> aJy = d("ad_view_refresh_precache_request_enabled", true);
+    public static final b<Boolean> aJz = d("ssvaal", false);
+    public static final b<Boolean> aJA = d("fabsina", false);
+    public static final b<Boolean> aJB = d("fabsiaif", false);
+    public static final b<Long> aJC = d("famttl_ms", 0L);
+    public static final b<Long> aJD = d("ad_expiration_ms", Long.valueOf(TimeUnit.HOURS.toMillis(4)));
+    public static final b<Long> aJE = d("native_ad_expiration_ms", Long.valueOf(TimeUnit.HOURS.toMillis(4)));
+    public static final b<Boolean> aJF = d("rena", true);
+    public static final b<Boolean> aJG = d("native_downscale_icon_fix", false);
+    public static final b<Long> aJH = d("fullscreen_ad_displayed_timeout_ms", -1L);
+    public static final b<Long> aJI = d("freast_ms", -1L);
+    public static final b<Long> aJJ = d("ad_hidden_timeout_ms", -1L);
+    public static final b<Boolean> aJK = d("schedule_ad_hidden_on_ad_dismiss", false);
+    public static final b<Boolean> aJL = d("schedule_ad_hidden_on_single_task_app_relaunch", false);
+    public static final b<Long> aJM = d("ad_hidden_on_ad_dismiss_callback_delay_ms", Long.valueOf(TimeUnit.SECONDS.toMillis(1)));
+    public static final b<Boolean> aJN = d("proe", false);
+    public static final b<Integer> aJO = d("mute_state", 2);
+    public static final b<String> aJP = d("saf", "");
+    public static final b<String> aJQ = d("saui", "");
+    public static final b<Integer> aJR = d("mra", -1);
+    public static final b<String> aJS = d("mra_af", "INTER,REWARDED,REWARDED_INTER,BANNER,LEADER,MREC");
+    public static final b<Boolean> aJT = d("fadiafase", true);
+    public static final b<Boolean> aJU = d("fadwvcv", true);
+    public static final b<Boolean> aJV = d("bfarud", false);
+    public static final b<Boolean> aJW = d("inacc", Boolean.valueOf(u.N((List<String>) Arrays.asList("com.textmeinc.textme", "com.textmeinc.freetone", "com.textmeinc.textme3", "com.jaumo", "com.jaumo.casual", "com.pinkapp", "com.jaumo.mature", "com.jaumo.prime", "com.jaumo.gay", "com.jaumo.lesbian"))));
+    public static final b<String> aJX = d("pbataipaf", "");
+    public static final b<Long> aJY = d("bwt_ms", Long.valueOf(TimeUnit.SECONDS.toMillis(30)));
+    public static final b<Long> aJZ = d("twt_ms", Long.valueOf(TimeUnit.SECONDS.toMillis(30)));
+    public static final b<Long> aKa = d("adiets_sec", Long.valueOf(TimeUnit.MINUTES.toSeconds(1)));
+    public static final b<Boolean> aKb = d("fetch_mediated_ad_gzip", true);
+    public static final b<Boolean> aKc = d("max_postback_gzip", true);
+}

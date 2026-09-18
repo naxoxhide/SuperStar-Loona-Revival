@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:background="@android:color/black"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <ImageView
+        android:id="@+id/btn_close_ad"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:src="@drawable/adx_interstitial_close"
+        android:scaleType="center"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentRight="true"/>
+    <RelativeLayout
+        android:id="@+id/adfit_content_layout"
+        android:layout_width="300dp"
+        android:layout_height="250dp"
+        android:layout_centerInParent="true"/>
+</RelativeLayout>

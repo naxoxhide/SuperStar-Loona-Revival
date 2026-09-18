@@ -1,0 +1,187 @@
+package com.igaworks.adpopcorn.activity.layout.g;
+
+import android.content.Context;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
+import android.text.TextUtils;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
+import android.widget.TextView;
+import com.igaworks.adpopcorn.R;
+import com.igaworks.adpopcorn.cores.common.g;
+import com.igaworks.adpopcorn.cores.common.k;
+import com.igaworks.adpopcorn.style.ApStyleManager;
+
+/* JADX INFO: loaded from: classes2.dex */
+public class c extends RelativeLayout {
+    private Context a;
+
+    /* JADX INFO: renamed from: b, reason: collision with root package name */
+    private int f1601b;
+    private GradientDrawable c;
+    private GradientDrawable d;
+    private GradientDrawable e;
+
+    public c(Context context) {
+        super(context);
+        this.a = context;
+        this.f1601b = com.igaworks.adpopcorn.style.a.b().c(ApStyleManager.CustomStyle.TOP_BAR_HEIGHT);
+        RelativeLayout.LayoutParams layoutParams = new RelativeLayout.LayoutParams(-1, com.igaworks.adpopcorn.cores.common.d.a(context, this.f1601b));
+        layoutParams.bottomMargin = com.igaworks.adpopcorn.cores.common.d.a(context, 23);
+        setLayoutParams(layoutParams);
+        setBackgroundColor(Color.parseColor("#e6fcfcfc"));
+        GradientDrawable gradientDrawable = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{-1, -1});
+        this.e = gradientDrawable;
+        gradientDrawable.setShape(0);
+        this.e.setStroke(com.igaworks.adpopcorn.cores.common.d.a(context, 0.5f), Color.parseColor("#24000000"));
+        this.e.setCornerRadius(com.igaworks.adpopcorn.cores.common.d.a(context, 16.0f));
+        this.e.setGradientType(0);
+        GradientDrawable gradientDrawable2 = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{-394759, -394759});
+        this.c = gradientDrawable2;
+        gradientDrawable2.setShape(0);
+        this.c.setStroke(com.igaworks.adpopcorn.cores.common.d.a(context, 0.5f), Color.parseColor("#d4d4d4"));
+        this.c.setCornerRadius(com.igaworks.adpopcorn.cores.common.d.a(context, 3.0f));
+        this.c.setGradientType(0);
+        GradientDrawable gradientDrawable3 = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{-1, -526345, -460552});
+        this.d = gradientDrawable3;
+        gradientDrawable3.setShape(0);
+        this.d.setCornerRadii(new float[]{com.igaworks.adpopcorn.cores.common.d.a(context, 100.0f), com.igaworks.adpopcorn.cores.common.d.a(context, 100.0f), 0.0f, 0.0f, 0.0f, 0.0f, com.igaworks.adpopcorn.cores.common.d.a(context, 100.0f), com.igaworks.adpopcorn.cores.common.d.a(context, 100.0f)});
+        this.d.setGradientType(0);
+        a();
+    }
+
+    private void a() {
+        g gVarA = g.a();
+        LinearLayout linearLayout = new LinearLayout(this.a);
+        linearLayout.setLayoutParams(new LinearLayout.LayoutParams(-1, -1));
+        linearLayout.setOrientation(1);
+        LinearLayout linearLayout2 = new LinearLayout(this.a);
+        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(com.igaworks.adpopcorn.cores.common.d.a(this.a, 32), com.igaworks.adpopcorn.cores.common.d.a(this.a, 32));
+        layoutParams.topMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 12);
+        layoutParams.bottomMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 12);
+        layoutParams.leftMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 20);
+        linearLayout2.setLayoutParams(layoutParams);
+        linearLayout2.setGravity(17);
+        linearLayout2.setOrientation(0);
+        linearLayout2.setId(0);
+        linearLayout2.setBackgroundDrawable(this.e);
+        int i = Build.VERSION.SDK_INT;
+        if (i >= 21) {
+            linearLayout2.setElevation(com.igaworks.adpopcorn.cores.common.d.a(this.a, 2));
+        }
+        ImageView imageView = new ImageView(this.a);
+        LinearLayout.LayoutParams layoutParams2 = new LinearLayout.LayoutParams(com.igaworks.adpopcorn.cores.common.d.a(this.a, 14), com.igaworks.adpopcorn.cores.common.d.a(this.a, 12));
+        layoutParams2.gravity = 17;
+        imageView.setImageResource(R.drawable.tpmn_arrow);
+        imageView.setLayoutParams(layoutParams2);
+        linearLayout2.addView(imageView);
+        linearLayout.addView(linearLayout2);
+        LinearLayout linearLayout3 = new LinearLayout(this.a);
+        linearLayout3.setLayoutParams(new LinearLayout.LayoutParams(-1, com.igaworks.adpopcorn.cores.common.d.a(this.a, 74)));
+        linearLayout3.setOrientation(0);
+        linearLayout.addView(linearLayout3);
+        RelativeLayout relativeLayout = new RelativeLayout(this.a);
+        LinearLayout.LayoutParams layoutParams3 = new LinearLayout.LayoutParams(0, -1, 1.0f);
+        layoutParams3.leftMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 20);
+        layoutParams3.topMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 12);
+        relativeLayout.setLayoutParams(layoutParams3);
+        linearLayout3.addView(relativeLayout);
+        ImageView imageView2 = new ImageView(this.a);
+        RelativeLayout.LayoutParams layoutParams4 = new RelativeLayout.LayoutParams(com.igaworks.adpopcorn.cores.common.d.a(this.a, 80), com.igaworks.adpopcorn.cores.common.d.a(this.a, 19));
+        layoutParams4.addRule(9);
+        layoutParams4.rightMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 8);
+        imageView2.setLayoutParams(layoutParams4);
+        imageView2.setId(1);
+        imageView2.setImageResource(R.drawable.tpmn_berrypopcorn);
+        imageView2.setScaleType(ImageView.ScaleType.FIT_XY);
+        relativeLayout.addView(imageView2);
+        TextView textView = new TextView(this.a);
+        RelativeLayout.LayoutParams layoutParams5 = new RelativeLayout.LayoutParams(com.igaworks.adpopcorn.cores.common.d.a(this.a, 34), com.igaworks.adpopcorn.cores.common.d.a(this.a, 20));
+        layoutParams5.addRule(1, imageView2.getId());
+        textView.setLayoutParams(layoutParams5);
+        textView.setGravity(17);
+        textView.setBackgroundDrawable(this.c);
+        textView.setId(2);
+        k.b(textView, gVarA.p2, 9, Color.parseColor("#656565"), null, 0, 0, TextUtils.TruncateAt.END, false);
+        relativeLayout.addView(textView);
+        TextView textView2 = new TextView(this.a);
+        RelativeLayout.LayoutParams layoutParams6 = new RelativeLayout.LayoutParams(-2, -2);
+        layoutParams6.addRule(12);
+        layoutParams6.addRule(9);
+        textView2.setLayoutParams(layoutParams6);
+        textView2.setId(3);
+        k.b(textView2, gVarA.J, 9, Color.parseColor("#656565"), null, 0, 0, TextUtils.TruncateAt.END, false);
+        relativeLayout.addView(textView2);
+        TextView textView3 = new TextView(this.a);
+        RelativeLayout.LayoutParams layoutParams7 = new RelativeLayout.LayoutParams(com.igaworks.adpopcorn.cores.common.d.a(this.a, 1), com.igaworks.adpopcorn.cores.common.d.a(this.a, 12));
+        layoutParams7.addRule(12);
+        layoutParams7.addRule(1, textView2.getId());
+        layoutParams7.rightMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 6);
+        layoutParams7.leftMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 4);
+        textView3.setLayoutParams(layoutParams7);
+        textView3.setId(4);
+        textView3.setBackgroundColor(Color.parseColor("#656565"));
+        relativeLayout.addView(textView3);
+        TextView textView4 = new TextView(this.a);
+        RelativeLayout.LayoutParams layoutParams8 = new RelativeLayout.LayoutParams(-2, -2);
+        layoutParams8.addRule(12);
+        layoutParams8.addRule(1, textView3.getId());
+        textView4.setLayoutParams(layoutParams8);
+        textView4.setId(5);
+        k.b(textView4, gVarA.X, 9, Color.parseColor("#656565"), null, 0, 0, TextUtils.TruncateAt.END, false);
+        relativeLayout.addView(textView4);
+        RelativeLayout relativeLayout2 = new RelativeLayout(this.a);
+        LinearLayout.LayoutParams layoutParams9 = new LinearLayout.LayoutParams(com.igaworks.adpopcorn.cores.common.d.a(this.a, 199), com.igaworks.adpopcorn.cores.common.d.a(this.a, 70));
+        layoutParams9.leftMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 19);
+        layoutParams9.topMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 2);
+        relativeLayout2.setLayoutParams(layoutParams9);
+        relativeLayout2.setBackgroundDrawable(this.d);
+        linearLayout3.addView(relativeLayout2);
+        if (i >= 21) {
+            relativeLayout2.setElevation(com.igaworks.adpopcorn.cores.common.d.a(this.a, 2));
+        }
+        TextView textView5 = new TextView(this.a);
+        RelativeLayout.LayoutParams layoutParams10 = new RelativeLayout.LayoutParams(-2, -2);
+        layoutParams10.addRule(11);
+        layoutParams10.topMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 18);
+        layoutParams10.rightMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 20);
+        layoutParams10.bottomMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 5);
+        textView5.setLayoutParams(layoutParams10);
+        textView5.setGravity(17);
+        textView5.setId(6);
+        k.b(textView5, gVarA.t1, 10, Color.parseColor("#5d5d5d"), null, 0, 0, TextUtils.TruncateAt.END, false);
+        relativeLayout2.addView(textView5);
+        TextView textView6 = new TextView(this.a);
+        RelativeLayout.LayoutParams layoutParams11 = new RelativeLayout.LayoutParams(-2, com.igaworks.adpopcorn.cores.common.d.a(this.a, 18));
+        layoutParams11.addRule(11);
+        layoutParams11.addRule(3, textView5.getId());
+        layoutParams11.rightMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 20);
+        textView6.setLayoutParams(layoutParams11);
+        textView6.setGravity(17);
+        textView6.setId(7);
+        textView6.setSingleLine();
+        relativeLayout2.addView(textView6);
+        TextView textView7 = new TextView(this.a);
+        RelativeLayout.LayoutParams layoutParams12 = new RelativeLayout.LayoutParams(-2, com.igaworks.adpopcorn.cores.common.d.a(this.a, 18));
+        layoutParams12.addRule(0, textView6.getId());
+        layoutParams12.addRule(3, textView5.getId());
+        layoutParams12.leftMargin = com.igaworks.adpopcorn.cores.common.d.a(this.a, 4);
+        textView7.setLayoutParams(layoutParams12);
+        textView7.setGravity(17);
+        textView7.setId(8);
+        textView7.setMaxWidth(com.igaworks.adpopcorn.cores.common.d.a(this.a, 90));
+        textView7.setSingleLine();
+        relativeLayout2.addView(textView7);
+        ImageView imageView3 = new ImageView(this.a);
+        RelativeLayout.LayoutParams layoutParams13 = new RelativeLayout.LayoutParams(com.igaworks.adpopcorn.cores.common.d.a(this.a, 20), com.igaworks.adpopcorn.cores.common.d.a(this.a, 18));
+        layoutParams13.addRule(0, textView7.getId());
+        layoutParams13.addRule(3, textView5.getId());
+        imageView3.setLayoutParams(layoutParams13);
+        imageView3.setImageResource(R.drawable.tpmn_berricon);
+        imageView3.setScaleType(ImageView.ScaleType.FIT_XY);
+        relativeLayout2.addView(imageView3);
+        addView(linearLayout);
+    }
+}

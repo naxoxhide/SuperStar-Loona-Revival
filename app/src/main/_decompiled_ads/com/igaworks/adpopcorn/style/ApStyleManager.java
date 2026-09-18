@@ -1,0 +1,373 @@
+package com.igaworks.adpopcorn.style;
+
+import java.util.HashMap;
+
+/* JADX INFO: loaded from: classes2.dex */
+public class ApStyleManager {
+
+    public class CustomStyle {
+        public static final String ALWAYS_SHOW_OFFERWALL_TOP_BAR_SHADOW = "ALWAYS_SHOW_OFFERWALL_TOP_BAR_SHADOW";
+        public static final String ALWAYS_SHOW_SPLASH_DIALOG = "ALWAYS_SHOW_SPLASH_DIALOG";
+        public static final String BOTTOM_BAR_BG_COLOR = "BOTTOM_BAR_BG_COLOR";
+        public static final String BOTTOM_BAR_CLICKABLE_LINK_TEXT = "BOTTOM_BAR_CLICKABLE_LINK_TEXT";
+        public static final String BOTTOM_BAR_HEIGHT = "BOTTOM_BAR_HEIGHT";
+        public static final String BOTTOM_BAR_ICON_COLOR = "BOTTOM_BAR_ICON_COLOR";
+        public static final String BOTTOM_BAR_IGAWORKS_LINK_TEXT_COLOR = "BOTTOM_BAR_IGAWORKS_LINK_TEXT_COLOR";
+        public static final String BOTTOM_BAR_LINK_TEXT = "BOTTOM_BAR_LINK_TEXT";
+        public static final String BOTTOM_BAR_LINK_URL = "BOTTOM_BAR_LINK_URL";
+        public static final String BOTTOM_BAR_TEXT_BOLD = "BOTTOM_BAR_TEXT_BOLD";
+        public static final String BOTTOM_BAR_TEXT_COLOR = "BOTTOM_BAR_TEXT_COLOR";
+        public static final String BOTTOM_BAR_TEXT_DIVIDER_COLOR = "BOTTOM_BAR_TEXT_DIVIDER_COLOR";
+        public static final String BOTTOM_BAR_TEXT_SIZE_DP = "BOTTOM_BAR_TEXT_SIZE_DP";
+        public static final String CAMPAIGN_DIALOG_APP_ICON_SIZE = "CAMPAIGN_DIALOG_APP_ICON_SIZE";
+        public static final String CAMPAIGN_DIALOG_BADGE_SIZE = "CAMPAIGN_DIALOG_BADGE_SIZE";
+        public static final String CAMPAIGN_DIALOG_BADGE_TEXT_SIZE_DP = "CAMPAIGN_DIALOG_BADGE_TEXT_SIZE_DP";
+        public static final String CAMPAIGN_DIALOG_BOTTOM_DIVIDER_COLOR = "CAMPAIGN_DIALOG_BOTTOM_DIVIDER_COLOR";
+        public static final String CAMPAIGN_DIALOG_BOTTOM_LAYOUT_BG_COLOR = "CAMPAIGN_DIALOG_BOTTOM_LAYOUT_BG_COLOR";
+        public static final String CAMPAIGN_DIALOG_BTN_CORNER_ROUND_DP = "CAMPAIGN_DIALOG_BTN_CORNER_ROUND_DP";
+        public static final String CAMPAIGN_DIALOG_BTN_STROKE_DP = "CAMPAIGN_DIALOG_BTN_STROKE_DP";
+        public static final String CAMPAIGN_DIALOG_DESC_TEXT_COLOR = "CAMPAIGN_DIALOG_DESC_TEXT_COLOR";
+        public static final String CAMPAIGN_DIALOG_DESC_TEXT_SIZE_DP = "CAMPAIGN_DIALOG_DESC_TEXT_SIZE_DP";
+        public static final String CAMPAIGN_DIALOG_EXCHANGE_BTN_POSITION = "CAMPAIGN_DIALOG_EXCHANGE_BTN_POSITION";
+        public static final String CAMPAIGN_DIALOG_MIDDLE_LAYOUT_BG_COLOR = "CAMPAIGN_DIALOG_MIDDLE_LAYOUT_BG_COLOR";
+        public static final String CAMPAIGN_DIALOG_NEGATIVE_BTN_BG_COLOR = "CAMPAIGN_DIALOG_NEGATIVE_BTN_BG_COLOR";
+        public static final String CAMPAIGN_DIALOG_NEGATIVE_BTN_LINE_COLOR = "CAMPAIGN_DIALOG_NEGATIVE_BTN_LINE_COLOR";
+        public static final String CAMPAIGN_DIALOG_NEGATIVE_BTN_SIZE = "CAMPAIGN_DIALOG_NEGATIVE_BTN_SIZE";
+        public static final String CAMPAIGN_DIALOG_NEGATIVE_BTN_TEXT_COLOR = "CAMPAIGN_DIALOG_NEGATIVE_BTN_TEXT_COLOR";
+        public static final String CAMPAIGN_DIALOG_NEGATIVE_BTN_TEXT_SIZE_DP = "CAMPAIGN_DIALOG_NEGATIVE_BTN_TEXT_SIZE_DP";
+        public static final String CAMPAIGN_DIALOG_POSITIVE_BTN_BG_COLOR = "CAMPAIGN_DIALOG_POSITIVE_BTN_BG_COLOR";
+        public static final String CAMPAIGN_DIALOG_POSITIVE_BTN_SIZE = "CAMPAIGN_DIALOG_POSITIVE_BTN_SIZE";
+        public static final String CAMPAIGN_DIALOG_POSITIVE_BTN_TEXT_COLOR = "CAMPAIGN_DIALOG_POSITIVE_BTN_TEXT_COLOR";
+        public static final String CAMPAIGN_DIALOG_POSITIVE_BTN_TEXT_SIZE_DP = "CAMPAIGN_DIALOG_POSITIVE_BTN_TEXT_SIZE_DP";
+        public static final String CAMPAIGN_DIALOG_REWARD_VIEW_CORNER_ROUND_DP = "CAMPAIGN_DIALOG_REWARD_VIEW_CORNER_ROUND_DP";
+        public static final String CAMPAIGN_DIALOG_REWARD_VIEW_LINE_COLOR = "CAMPAIGN_DIALOG_REWARD_VIEW_LINE_COLOR";
+
+        @Deprecated
+        public static final String CAMPAIGN_DIALOG_REWARD_VIEW_SIZE = "CAMPAIGN_DIALOG_REWARD_VIEW_SIZE";
+        public static final String CAMPAIGN_DIALOG_REWARD_VIEW_STROKE_DP = "CAMPAIGN_DIALOG_REWARD_VIEW_STROKE_DP";
+        public static final String CAMPAIGN_DIALOG_REWARD_VIEW_TEXT_COLOR = "CAMPAIGN_DIALOG_REWARD_VIEW_TEXT_COLOR";
+        public static final String CAMPAIGN_DIALOG_REWARD_VIEW_TEXT_SIZE_DP = "CAMPAIGN_DIALOG_REWARD_VIEW_TEXT_SIZE_DP";
+        public static final String CAMPAIGN_DIALOG_TITLE_TEXT_COLOR = "CAMPAIGN_DIALOG_TITLE_TEXT_COLOR";
+        public static final String CAMPAIGN_DIALOG_TITLE_TEXT_SIZE_DP = "CAMPAIGN_DIALOG_TITLE_TEXT_SIZE_DP";
+        public static final String CAMPAIGN_DIALOG_TOP_LAYOUT_BG_COLOR = "CAMPAIGN_DIALOG_TOP_LAYOUT_BG_COLOR";
+        public static final String CAMPAIGN_LIST_APP_ICON_SIZE = "CAMPAIGN_LIST_APP_ICON_SIZE";
+        public static final String CAMPAIGN_LIST_BADGE_SIZE = "CAMPAIGN_LIST_BADGE_SIZE";
+        public static final String CAMPAIGN_LIST_BADGE_TEXT_SIZE_DP = "CAMPAIGN_LIST_BADGE_TEXT_SIZE_DP";
+        public static final String CAMPAIGN_LIST_BG_COLOR = "CAMPAIGN_LIST_BG_COLOR";
+        public static final String CAMPAIGN_LIST_COMING_SOON_BADGE_SIZE = "CAMPAIGN_LIST_COMING_SOON_BADGE_SIZE";
+        public static final String CAMPAIGN_LIST_COMING_SOON_REWARD_VIEW_OPACITY = "CAMPAIGN_LIST_COMING_SOON_REWARD_VIEW_OPACITY";
+        public static final String CAMPAIGN_LIST_CORNER_ROUND_DP = "CAMPAIGN_LIST_CORNER_ROUND_DP";
+        public static final String CAMPAIGN_LIST_DIVIDER_COLOR = "CAMPAIGN_LIST_DIVIDER_COLOR";
+        public static final String CAMPAIGN_LIST_FOOTER_MARGIN_DP = "CAMPAIGN_LIST_FOOTER_MARGIN_DP";
+        public static final String CAMPAIGN_LIST_REWARD_VIEW_CHECKED_TEXT_COLOR = "CAMPAIGN_LIST_REWARD_VIEW_CHECKED_TEXT_COLOR";
+        public static final String CAMPAIGN_LIST_REWARD_VIEW_CORNER_ROUND_DP = "CAMPAIGN_LIST_REWARD_VIEW_CORNER_ROUND_DP";
+        public static final String CAMPAIGN_LIST_REWARD_VIEW_LINE_COLOR = "CAMPAIGN_LIST_REWARD_VIEW_LINE_COLOR";
+        public static final String CAMPAIGN_LIST_REWARD_VIEW_SIZE = "CAMPAIGN_LIST_REWARD_VIEW_SIZE";
+        public static final String CAMPAIGN_LIST_REWARD_VIEW_STROKE_DP = "CAMPAIGN_LIST_REWARD_VIEW_STROKE_DP";
+        public static final String CAMPAIGN_LIST_REWARD_VIEW_TEXT_COLOR = "CAMPAIGN_LIST_REWARD_VIEW_TEXT_COLOR";
+        public static final String CAMPAIGN_LIST_REWARD_VIEW_TEXT_SIZE_DP = "CAMPAIGN_LIST_REWARD_VIEW_TEXT_SIZE_DP";
+        public static final String CAMPAIGN_LIST_TITLE_TEXT_COLOR = "CAMPAIGN_LIST_TITLE_TEXT_COLOR";
+        public static final String CAMPAIGN_LIST_TITLE_TEXT_SIZE_DP = "CAMPAIGN_LIST_TITLE_TEXT_SIZE_DP";
+        public static final String COMING_SOON_BADGE_COLOR = "COMING_SOON_BADGE_COLOR";
+        public static final String COMING_SOON_BADGE_DESC_TEXT_COLOR = "COMING_SOON_BADGE_DESC_TEXT_COLOR";
+        public static final String COMING_SOON_BADGE_DESC_TEXT_SIZE_DP = "COMING_SOON_BADGE_DESC_TEXT_SIZE_DP";
+        public static final String COMING_SOON_BADGE_LINE_COLOR = "COMING_SOON_BADGE_LINE_COLOR";
+        public static final String COMING_SOON_BADGE_TEXT_COLOR = "COMING_SOON_BADGE_TEXT_COLOR";
+        public static final String COMING_SOON_LAYOUT_BG_COLOR = "COMING_SOON_LAYOUT_BG_COLOR";
+        public static final String COMMON_DIALOG_BTN_CORNER_ROUND_DP = "COMMON_DIALOG_BTN_CORNER_ROUND_DP";
+        public static final String COMMON_DIALOG_BTN_STROKE_DP = "COMMON_DIALOG_BTN_STROKE_DP";
+        public static final String COMMON_DIALOG_CORNER_ROUND_DP = "COMMON_DIALOG_CORNER_ROUND_DP";
+        public static final String COMMON_DIALOG_MESSAGE_TEXT_COLOR = "COMMON_DIALOG_MESSAGE_TEXT_COLOR";
+        public static final String COMMON_DIALOG_MESSAGE_TEXT_SIZE_DP = "COMMON_DIALOG_MESSAGE_TEXT_SIZE_DP";
+        public static final String COMMON_DIALOG_NEGATIVE_BTN_BG_COLOR = "COMMON_DIALOG_NEGATIVE_BTN_BG_COLOR";
+        public static final String COMMON_DIALOG_NEGATIVE_BTN_LINE_COLOR = "COMMON_DIALOG_NEGATIVE_BTN_LINE_COLOR";
+        public static final String COMMON_DIALOG_NEGATIVE_BTN_SIZE = "COMMON_DIALOG_NEGATIVE_BTN_SIZE";
+        public static final String COMMON_DIALOG_NEGATIVE_BTN_TEXT_COLOR = "COMMON_DIALOG_NEGATIVE_BTN_TEXT_COLOR";
+        public static final String COMMON_DIALOG_NEGATIVE_BTN_TEXT_SIZE_DP = "COMMON_DIALOG_NEGATIVE_BTN_TEXT_SIZE_DP";
+        public static final String COMMON_DIALOG_POSITIVE_BTN_BG_COLOR = "COMMON_DIALOG_POSITIVE_BTN_BG_COLOR";
+        public static final String COMMON_DIALOG_POSITIVE_BTN_SIZE = "COMMON_DIALOG_POSITIVE_BTN_SIZE";
+        public static final String COMMON_DIALOG_POSITIVE_BTN_TEXT_COLOR = "COMMON_DIALOG_POSITIVE_BTN_TEXT_COLOR";
+        public static final String COMMON_DIALOG_POSITIVE_BTN_TEXT_SIZE_DP = "COMMON_DIALOG_POSITIVE_BTN_TEXT_SIZE_DP";
+        public static final String COMMON_DIALOG_TITLE_TEXT_COLOR = "COMMON_DIALOG_TITLE_TEXT_COLOR";
+        public static final String COMMON_DIALOG_TITLE_TEXT_SIZE_DP = "COMMON_DIALOG_TITLE_TEXT_SIZE_DP";
+        public static final String COMMON_LIST_DIALOG_DIVIDER_COLOR = "COMMON_LIST_DIALOG_DIVIDER_COLOR";
+        public static final String COMMON_LIST_DIALOG_RADIO_DOT_COLOR = "COMMON_LIST_DIALOG_RADIO_DOT_COLOR";
+        public static final String COMMON_LIST_DIALOG_TITLE_TEXT_COLOR = "COMMON_LIST_DIALOG_TITLE_TEXT_COLOR";
+        public static final String COMMON_LIST_DIALOG_TITLE_TEXT_SIZE_DP = "COMMON_LIST_DIALOG_TITLE_TEXT_SIZE_DP";
+        public static final String COMMON_POPUP_AD_DESC_TEXT_COLOR = "POPUP_AD_DESC_TEXT_COLOR";
+        public static final String COMMON_POPUP_AD_DESC_TEXT_SIZE_DP = "POPUP_AD_DESC_TEXT_SIZE_DP";
+        public static final String COMMON_POPUP_AD_REWARD_BTN_BG_COLOR = "POPUP_AD_REWARD_BTN_BG_COLOR";
+        public static final String COMMON_POPUP_AD_REWARD_BTN_TEXT_COLOR = "POPUP_AD_REWARD_BTN_TEXT_COLOR";
+        public static final String COMMON_POPUP_AD_TITLE_TEXT_COLOR = "POPUP_AD_TITLE_TEXT_COLOR";
+        public static final String COMMON_POPUP_AD_TITLE_TEXT_SIZE_DP = "POPUP_AD_TITLE_TEXT_SIZE_DP";
+        public static final String CS_DIALOG_ALL_LAYOUT_CORNER_ROUND_DP = "CS_DIALOG_ALL_LAYOUT_CORNER_ROUND_DP";
+        public static final String CS_DIALOG_CAMPAIGN_LAYOUT_BG_COLOR = "CS_DIALOG_CAMPAIGN_LAYOUT_BG_COLOR";
+        public static final String CS_DIALOG_CAMPAIGN_LAYOUT_STROKE_COLOR = "CS_DIALOG_CAMPAIGN_LAYOUT_STROKE_COLOR";
+        public static final String CS_DIALOG_CAMPAIGN_LAYOUT_STROKE_DP = "CS_DIALOG_CAMPAIGN_LAYOUT_STROKE_DP";
+        public static final String CS_DIALOG_DROP_DOWN_ICON_COLOR = "CS_DIALOG_DROP_DOWN_ICON_COLOR";
+        public static final String CS_DIALOG_EMAIL_LAYOUT_BG_COLOR = "CS_DIALOG_EMAIL_LAYOUT_BG_COLOR";
+        public static final String CS_DIALOG_EMAIL_LAYOUT_STROKE_COLOR = "CS_DIALOG_EMAIL_LAYOUT_STROKE_COLOR";
+        public static final String CS_DIALOG_EMAIL_LAYOUT_STROKE_DP = "CS_DIALOG_EMAIL_LAYOUT_STROKE_DP";
+        public static final String CS_DIALOG_FAQ_LAYOUT_BG_COLOR = "CS_DIALOG_FAQ_LAYOUT_BG_COLOR";
+        public static final String CS_DIALOG_FAQ_LAYOUT_STROKE_COLOR = "CS_DIALOG_FAQ_LAYOUT_STROKE_COLOR";
+        public static final String CS_DIALOG_FAQ_LAYOUT_STROKE_DP = "CS_DIALOG_FAQ_LAYOUT_STROKE_DP";
+        public static final String CS_DIALOG_LR_PADDING = "CS_DIALOG_LR_PADDING";
+        public static final String CS_DIALOG_MESSAGE_LAYOUT_BG_COLOR = "CS_DIALOG_MESSAGE_LAYOUT_BG_COLOR";
+        public static final String CS_DIALOG_MESSAGE_LAYOUT_STROKE_COLOR = "CS_DIALOG_MESSAGE_LAYOUT_STROKE_COLOR";
+        public static final String CS_DIALOG_MESSAGE_LAYOUT_STROKE_DP = "CS_DIALOG_MESSAGE_LAYOUT_STROKE_DP";
+        public static final String CS_DIALOG_NAME_PHONE_LAYOUT_BG_COLOR = "CS_DIALOG_NAME_PHONE_LAYOUT_BG_COLOR";
+        public static final String CS_DIALOG_NAME_PHONE_LAYOUT_STROKE_COLOR = "CS_DIALOG_NAME_PHONE_LAYOUT_STROKE_COLOR";
+        public static final String CS_DIALOG_NAME_PHONE_LAYOUT_STROKE_DP = "CS_DIALOG_NAME_PHONE_LAYOUT_STROKE_DP";
+        public static final String CS_DIALOG_SEND_BTN_BG_COLOR = "CS_DIALOG_SEND_BTN_BG_COLOR";
+        public static final String CS_DIALOG_SEND_BTN_CORNER_ROUND_DP = "CS_DIALOG_SEND_BTN_CORNER_ROUND_DP";
+        public static final String CS_DIALOG_SEND_BTN_SIZE = "CS_DIALOG_SEND_BTN_SIZE";
+        public static final String CS_DIALOG_SEND_BTN_TEXT_COLOR = "CS_DIALOG_SEND_BTN_TEXT_COLOR";
+        public static final String CS_DIALOG_SEND_BTN_TEXT_SIZE_DP = "CS_DIALOG_SEND_BTN_TEXT_SIZE_DP";
+        public static final String CS_DIALOG_TOP_PADDING = "CS_DIALOG_TOP_PADDING";
+        public static final String DEFAULT_LANGUAGE = "DEFAULT_LANGUAGE";
+        public static final String DIALOG_BG_OPACITY = "DIALOG_BG_OPACITY";
+        public static final String DIALOG_DIVIDER_LR_PADDING = "DIALOG_DIVIDER_LR_PADDING";
+        public static final String DISABLE_BOTTOM_BAR_ICON = "DISABLE_BOTTOM_BAR_ICON";
+        public static final String DISABLE_CAMPAIGN_BADGE = "DISABLE_CAMPAIGN_BADGE";
+        public static final String DISABLE_SPECIAL_OFFER = "DISABLE_SPECIAL_OFFER";
+        public static final String ENABLE_CS_DIALOG_TOP_BAR_SHADOW = "ENABLE_CS_DIALOG_TOP_BAR_SHADOW";
+        public static final String ENABLE_OFFERWALL_TOP_BAR_SHADOW = "ENABLE_OFFERWALL_TOP_BAR_SHADOW";
+        public static final String ENABLE_REWARD_HISTORY_DIALOG_TOP_BAR_SHADOW = "ENABLE_REWARD_HISTORY_DIALOG_TOP_BAR_SHADOW";
+        public static final String ENABLE_TOP_BAR_EXPAND_MENU = "ENABLE_TOP_BAR_EXPAND_MENU";
+        public static final String EXECUTE_TYPE_BADGE_COLOR = "EXECUTE_TYPE_BADGE_COLOR";
+        public static final String EXECUTE_TYPE_BADGE_TEXT_COLOR = "EXECUTE_TYPE_BADGE_TEXT_COLOR";
+        public static final String FEED_DETAIL_DIALOG_BTN_COLOR = "FEED_DETAIL_DIALOG_BTN_COLOR";
+        public static final String FEED_DETAIL_DIALOG_REWARD_ICON_COLOR = "FEED_DETAIL_DIALOG_REWARD_ICON_COLOR";
+        public static final String FEED_DETAIL_DIALOG_REWARD_ICON_RESOURCE_ID = "FEED_DETAIL_DIALOG_REWARD_ICON_RESOURCE_ID";
+        public static final String FEED_DETAIL_DIALOG_REWARD_ICON_RESOURCE_SIZE = "FEED_DETAIL_DIALOG_REWARD_ICON_RESOURCE_SIZE";
+        public static final String FEED_DETAIL_DIALOG_REWARD_INFO_TEXT_COLOR = "FEED_DETAIL_DIALOG_REWARD_INFO_TEXT_COLOR";
+        public static final String FEED_DETAIL_DIALOG_REWARD_TEXT_COLOR = "FEED_DETAIL_DIALOG_REWARD_TEXT_COLOR";
+        public static final String FEED_OFFERWALL_BTN_COLOR = "FEED_OFFERWALL_BTN_COLOR";
+        public static final String FEED_OFFERWALL_LIST_ITEM_CORNER_ROUND_DP = "FEED_OFFERWALL_LIST_ITEM_CORNER_ROUND_DP";
+        public static final String FEED_OFFERWALL_LIST_REWARD_ICON_COLOR = "FEED_OFFERWALL_LIST_REWARD_ICON_COLOR";
+        public static final String FEED_OFFERWALL_LIST_REWARD_ICON_RESOURCE_ID = "FEED_OFFERWALL_LIST_REWARD_ICON_RESOURCE_ID";
+        public static final String FEED_OFFERWALL_LIST_REWARD_ICON_RESOURCE_SIZE = "FEED_OFFERWALL_LIST_REWARD_ICON_RESOURCE_SIZE";
+        public static final String FEED_OFFERWALL_LIST_REWARD_TEXT_COLOR = "FEED_OFFERWALL_LIST_REWARD_TEXT_COLOR";
+        public static final String FEED_OFFERWALL_TOTAL_REWARD_ICON_COLOR = "FEED_OFFERWALL_TOTAL_REWARD_ICON_COLOR";
+        public static final String FEED_OFFERWALL_TOTAL_REWARD_ICON_RESOURCE_ID = "FEED_OFFERWALL_TOTAL_REWARD_ICON_RESOURCE_ID";
+        public static final String FEED_OFFERWALL_TOTAL_REWARD_ICON_RESOURCE_SIZE = "FEED_OFFERWALL_TOTAL_REWARD_ICON_RESOURCE_SIZE";
+        public static final String FEED_OFFERWALL_TOTAL_REWARD_PRE_TEXT_COLOR = "FEED_OFFERWALL_TOTAL_REWARD_PRE_TEXT_COLOR";
+        public static final String FEED_OFFERWALL_TOTAL_REWARD_TEXT_COLOR = "FEED_OFFERWALL_TOTAL_REWARD_TEXT_COLOR";
+        public static final String INSTALL_TYPE_BADGE_COLOR = "INSTALL_TYPE_BADGE_COLOR";
+        public static final String INSTALL_TYPE_BADGE_TEXT_COLOR = "INSTALL_TYPE_BADGE_TEXT_COLOR";
+        public static final String LANDSCAPE_POPUP_AD_REWARD_CONDITION_ICON_COLOR = "LANDSCAPE_POPUP_AD_REWARD_CONDITION_ICON_COLOR";
+        public static final String LANDSCAPE_POPUP_AD_REWARD_CONDITION_TEXT_COLOR = "LANDSCAPE_POPUP_AD_REWARD_CONDITION_TEXT_COLOR";
+        public static final String LOADING_BAR_COLOR = "LOADING_BAR_COLOR";
+        public static final String MATERIAL_STYLE_COMMON_DIALOG_TITLE_DIVIDER_COLOR = "MATERIAL_STYLE_COMMON_DIALOG_TITLE_DIVIDER_COLOR";
+        public static final String MATERIAL_STYLE_DIALOG_BTN_TEXT_COLOR = "MATERIAL_STYLE_DIALOG_BTN_TEXT_COLOR";
+        public static final String NATIVE_RCPM_AUTO_ROLLING_TRIGGER_TIME = "NATIVE_RCPM_AUTO_ROLLING_TRIGGER_TIME";
+        public static final String NATIVE_RCPM_CTA_BTN_COLOR = "NATIVE_RCPM_CTA_BTN_COLOR";
+        public static final String NATIVE_RCPM_CTA_BTN_LINE_TYPE = "NATIVE_RCPM_CTA_BTN_LINE_TYPE";
+        public static final String NATIVE_RCPM_CTA_COMPLETE_DEFAULT_TEXT = "NATIVE_RCPM_CTA_COMPLETE_DEFAULT_TEXT";
+        public static final String NATIVE_RCPM_CTA_DEFAULT_TEXT = "NATIVE_RCPM_CTA_DEFAULT_TEXT";
+        public static final String NATIVE_RCPM_CTA_REWARD_ICON_RESOURCE_ID = "NATIVE_RCPM_CTA_REWARD_ICON_RESOURCE_ID";
+        public static final String NATIVE_RCPM_CTA_REWARD_ICON_RESOURCE_SIZE = "NATIVE_RCPM_CTA_REWARD_ICON_RESOURCE_SIZE";
+        public static final String NATIVE_RCPM_CTA_TEXT_COLOR = "NATIVE_RCPM_CTA_TEXT_COLOR";
+        public static final String NATIVE_RCPM_DESC_TEXT_COLOR = "NATIVE_RCPM_DESC_TEXT_COLOR";
+        public static final String NATIVE_RCPM_DESC_TEXT_SIZE_DP = "NATIVE_RCPM_DESC_TEXT_SIZE_DP";
+        public static final String NATIVE_RCPM_ENABLE_AUTO_ROLLING = "NATIVE_RCPM_ENABLE_AUTO_ROLLING";
+        public static final String NATIVE_RCPM_ENABLE_OFFERWALL_SHORTCUT = "NATIVE_RCPM_ENABLE_OFFERWALL_SHORTCUT";
+        public static final String NATIVE_RCPM_ENABLE_TEXT_BOX_OUTLINE = "NATIVE_RCPM_ENABLE_TEXT_BOX_OUTLINE";
+        public static final String NATIVE_RCPM_HIDDEN_INDICATOR_AREA = "NATIVE_RCPM_HIDDEN_INDICATOR_AREA";
+        public static final String NATIVE_RCPM_HIDDEN_TOP_AREA = "NATIVE_RCPM_HIDDEN_TOP_AREA";
+        public static final String NATIVE_RCPM_INDICATOR_CURRENT_PAGE_TEXT_COLOR = "NATIVE_RCPM_INDICATOR_CURRENT_PAGE_TEXT_COLOR";
+        public static final String NATIVE_RCPM_INDICATOR_SELECTED_COLOR = "NATIVE_RCPM_INDICATOR_SELECTED_COLOR";
+        public static final String NATIVE_RCPM_INDICATOR_TEXT_MODE = "NATIVE_RCPM_INDICATOR_TEXT_MODE";
+        public static final String NATIVE_RCPM_INDICATOR_TOTAL_PAGE_TEXT_COLOR = "NATIVE_RCPM_INDICATOR_TOTAL_PAGE_TEXT_COLOR";
+        public static final String NATIVE_RCPM_INDICATOR_UNSELECTED_COLOR = "NATIVE_RCPM_INDICATOR_UNSELECTED_COLOR";
+        public static final String NATIVE_RCPM_NAME_TEXT = "NATIVE_RCPM_NAME_TEXT";
+        public static final String NATIVE_RCPM_NAME_TEXT_COLOR = "NATIVE_RCPM_NAME_TEXT_COLOR";
+        public static final String NATIVE_RCPM_OFFERWALL_SHORTCUT_LANDING_URL = "NATIVE_RCPM_OFFERWALL_SHORTCUT_LANDING_URL";
+        public static final String NATIVE_RCPM_OFFERWALL_SHORTCUT_TEXT = "NATIVE_RCPM_OFFERWALL_SHORTCUT_TEXT";
+        public static final String NATIVE_RCPM_OFFERWALL_SHORTCUT_TEXT_COLOR = "NATIVE_RCPM_OFFERWALL_SHORTCUT_TEXT_COLOR";
+        public static final String NATIVE_RCPM_TITLE_TEXT_COLOR = "NATIVE_RCPM_TITLE_TEXT_COLOR";
+        public static final String NATIVE_RCPM_TITLE_TEXT_SIZE_DP = "NATIVE_RCPM_TITLE_TEXT_SIZE_DP";
+        public static final String OFFERWALL_BG_COLOR = "OFFERWALL_BG_COLOR";
+        public static final String OFFERWALL_CUSTOM_MEDIA_MODE = "OFFERWALL_CUSTOM_MEDIA_MODE";
+        public static final String OFFERWALL_LIST_ITEM_DIVIDER_HEIGHT = "OFFERWALL_LIST_ITEM_DIVIDER_HEIGHT";
+        public static final String OFFERWALL_LIST_ITEM_HEIGHT = "OFFERWALL_LIST_ITEM_HEIGHT";
+        public static final String OFFERWALL_LR_PADDING = "OFFERWALL_LR_PADDING";
+        public static final String OFFERWALL_NAVIGATION_TOP_BAR_FAQ_BTN_ENABLE = "OFFERWALL_NAVIGATION_TOP_BAR_FAQ_BTN_ENABLE";
+        public static final String OFFERWALL_NAVIGATION_TOP_BAR_FAQ_BTN_TEXT = "OFFERWALL_NAVIGATION_TOP_BAR_FAQ_BTN_TEXT";
+        public static final String OFFERWALL_NAVIGATION_TOP_BAR_FAQ_BTN_TEXT_COLOR = "OFFERWALL_NAVIGATION_TOP_BAR_FAQ_BTN_TEXT_COLOR";
+        public static final String OFFERWALL_NAVIGATION_TOP_BAR_FAQ_BTN_TEXT_SIZE_DP = "OFFERWALL_NAVIGATION_TOP_BAR_FAQ_BTN_TEXT_SIZE_DP";
+        public static final String OFFERWALL_NAVIGATION_TOP_BAR_MODE = "OFFERWALL_NAVIGATION_TOP_BAR_MODE";
+        public static final String OFFERWALL_REWARD_SUMMARY_BAR_HEIGHT = "OFFERWALL_REWARD_SUMMARY_BAR_HEIGHT";
+        public static final String OFFERWALL_TAB_BAR_HEIGHT = "OFFERWALL_TAB_BAR_HEIGHT";
+        public static final String OFFERWALL_TAB_SELECT_LINE_COLOR = "OFFERWALL_TAB_SELECT_LINE_COLOR";
+        public static final String OFFERWALL_TAB_SELECT_TEXT_COLOR = "OFFERWALL_TAB_SELECT_TEXT_COLOR";
+        public static final String OFFERWALL_TAB_UNSELECT_LINE_COLOR = "OFFERWALL_TAB_UNSELECT_LINE_COLOR";
+        public static final String OFFERWALL_TAB_UNSELECT_TEXT_COLOR = "OFFERWALL_TAB_UNSELECT_TEXT_COLOR";
+        public static final String OFFERWALL_TEXTVIEW_FONT = "OFFERWALL_TEXTVIEW_FONT";
+        public static final String OFFERWALL_TEXTVIEW_LINE_SPACE = "OFFERWALL_TEXTVIEW_LINE_SPACE";
+        public static final String OFFERWALL_THEME_COLOR = "OFFERWALL_THEME_COLOR";
+        public static final String OFFERWALL_TITLE_LOGO_RESOURCE_ID = "OFFERWALL_TITLE_LOGO_RESOURCE_ID";
+        public static final String OFFERWALL_TITLE_LOGO_RESOURCE_SIZE = "OFFERWALL_TITLE_LOGO_RESOURCE_SIZE";
+        public static final String OFFERWALL_TITLE_TEXT = "OFFERWALL_TITLE_TEXT";
+        public static final String OFFERWALL_TOP_PADDING = "OFFERWALL_TOP_PADDING";
+        public static final String OFFERWALL_TOSS_MEDIA_MODE = "OFFERWALL_TOSS_MEDIA_MODE";
+        public static final String OTHER_TYPE_BADGE_COLOR = "OTHER_TYPE_BADGE_COLOR";
+        public static final String OTHER_TYPE_BADGE_TEXT_COLOR = "OTHER_TYPE_BADGE_TEXT_COLOR";
+        public static final String PASS_PARTICIPATE_EVENT = "PASS_PARTICIPATE_EVENT";
+        public static final String PORTRAIT_POPUP_AD_REWARD_CONDITION_ICON_COLOR = "PORTRAIT_POPUP_AD_REWARD_CONDITION_ICON_COLOR";
+        public static final String PORTRAIT_POPUP_AD_REWARD_CONDITION_TEXT_COLOR = "PORTRAIT_POPUP_AD_REWARD_CONDITION_TEXT_COLOR";
+        public static final String PRIVACY_POLICE_DIALOG_AGREE_BTN_COLOR = "PRIVACY_POLICE_DIALOG_AGREE_BTN_COLOR";
+        public static final String PRIVACY_POLICE_DIALOG_AGREE_BTN_TEXT_COLOR = "PRIVACY_POLICE_DIALOG_AGREE_BTN_TEXT_COLOR";
+        public static final String PRIVACY_POLICE_DIALOG_CHECKBOX_OFF_RESOURCE_ID = "PRIVACY_POLICE_DIALOG_NORMAL_CHECKBOX_RESOURCE_ID";
+        public static final String PRIVACY_POLICE_DIALOG_CHECKBOX_ON_RESOURCE_ID = "PRIVACY_POLICE_DIALOG_SELECT_CHECKBOX_RESOURCE_ID";
+        public static final String PRIVACY_POLICE_DIALOG_CHECKBOX_SIZE = "PRIVACY_POLICE_DIALOG_CHECKBOX_SIZE";
+        public static final String PRIVACY_POLICE_DIALOG_CUSTOM_TEXT = "PRIVACY_POLICE_DIALOG_CUSTOM_TEXT";
+        public static final String PRIVACY_POLICE_DIALOG_DESC_BACKGROUND_COLOR = "PRIVACY_POLICE_DIALOG_DESC_BACKGROUND_COLOR";
+        public static final String PRIVACY_POLICE_DIALOG_DESC_MESSAGE_TEXT_COLOR = "PRIVACY_POLICE_DIALOG_DESC_MESSAGE_TEXT_COLOR";
+        public static final String PRIVACY_POLICE_DIALOG_DESC_MESSAGE_TEXT_SIZE_DP = "PRIVACY_POLICE_DIALOG_DESC_MESSAGE_TEXT_SIZE_DP";
+        public static final String PRIVACY_POLICE_DIALOG_DESC_PADDING = "PRIVACY_POLICE_DIALOG_DESC_PADDING";
+        public static final String PRIVACY_POLICE_DIALOG_DESC_SUB_TITLE_SIZE_DP = "PRIVACY_POLICE_DIALOG_DESC_SUB_TITLE_SIZE_DP";
+        public static final String PRIVACY_POLICE_DIALOG_DESC_SUB_TITLE_TEXT_COLOR = "PRIVACY_POLICE_DIALOG_DESC_SUB_TITLE_TEXT_COLOR";
+        public static final String PRIVACY_POLICE_DIALOG_MAIN_TITLE_SIZE_DP = "PRIVACY_POLICE_DIALOG_MAIN_TITLE_SIZE_DP";
+        public static final String PRIVACY_POLICE_DIALOG_MAIN_TITLE_TEXT_COLOR = "PRIVACY_POLICE_DIALOG_MAIN_TITLE_TEXT_COLOR";
+        public static final String REWARD_HISTORY_BTN_CORNER_ROUND_DP = "REWARD_HISTORY_BTN__CORNER_ROUND_DP";
+        public static final String REWARD_HISTORY_BTN_LINE_COLOR = "REWARD_HISTORY_BTN_LINE_COLOR";
+        public static final String REWARD_HISTORY_BTN_SIZE = "REWARD_HISTORY_BTN_SIZE";
+        public static final String REWARD_HISTORY_BTN_TEXT_COLOR = "REWARD_HISTORY_BTN_TEXT_COLOR";
+        public static final String REWARD_HISTORY_BTN_TEXT_SIZE_DP = "REWARD_HISTORY_BTN_TEXT_SIZE_DP";
+        public static final String REWARD_HISTORY_DIALOG_LR_PADDING = "REWARD_HISTORY_DIALOG_LR_PADDING";
+        public static final String REWARD_HISTORY_DIALOG_TABLE_DIVIDER_COLOR = "REWARD_HISTORY_DIALOG_TABLE_DIVIDER_COLOR";
+        public static final String REWARD_HISTORY_DIALOG_TABLE_HEAD_BG_COLOR = "REWARD_HISTORY_DIALOG_TABLE_HEAD_BG_COLOR";
+        public static final String REWARD_HISTORY_DIALOG_TABLE_HEAD_TEXT_COLOR = "REWARD_HISTORY_DIALOG_TABLE_HEAD_TEXT_COLOR";
+        public static final String REWARD_HISTORY_DIALOG_TABLE_HEAD_TEXT_SIZE_DP = "REWARD_HISTORY_DIALOG_TABLE_HEAD_TEXT_SIZE_DP";
+        public static final String REWARD_HISTORY_DIALOG_TABLE_ROW_REWARD_TEXT_COLOR = "REWARD_HISTORY_DIALOG_TABLE_ROW_REWARD_TEXT_COLOR";
+        public static final String REWARD_HISTORY_DIALOG_TABLE_ROW_REWARD_TEXT_SIZE_DP = "REWARD_HISTORY_DIALOG_TABLE_ROW_REWARD_TEXT_SIZE_DP";
+        public static final String REWARD_HISTORY_DIALOG_TABLE_ROW_TEXT_COLOR = "REWARD_HISTORY_DIALOG_TABLE_ROW_TEXT_COLOR";
+        public static final String REWARD_HISTORY_DIALOG_TABLE_ROW_TEXT_SIZE_DP = "REWARD_HISTORY_DIALOG_TABLE_ROW_TEXT_SIZE_DP";
+        public static final String REWARD_HISTORY_DIALOG_TOP_PADDING = "REWARD_HISTORY_DIALOG_TOP_PADDING";
+
+        @Deprecated
+        public static final String REWARD_VIEW_CHECKED_TEXT_COLOR = "REWARD_VIEW_CHECKED_TEXT_COLOR";
+
+        @Deprecated
+        public static final String REWARD_VIEW_LINE_COLOR = "REWARD_VIEW_LINE_COLOR";
+
+        @Deprecated
+        public static final String REWARD_VIEW_TEXT_COLOR = "REWARD_VIEW_TEXT_COLOR";
+        public static final String SCHEDULE_CAMPAIGN_LIST_DIVIDER_COLOR = "SCHEDULE_CAMPAIGN_LIST_DIVIDER_COLOR";
+        public static final String SHADOW_BAR_HEIGHT_DP = "SHADOW_BAR_HEIGHT_DP";
+        public static final String SHADOW_BAR_RESOURCE_ID = "SHADOW_BAR_RESOURCE_ID";
+        public static final String SPECIAL_OFFER_BOTTOM_MARGIN_DP = "SPECIAL_OFFER_BOTTOM_MARGIN_DP";
+        public static final String SPECIAL_OFFER_TOP_ROUND_DP = "SPECIAL_OFFER_TOP_ROUND_DP";
+        public static final String SPLASH_DIALOG_PROGRESS_BAR_DRAWABLE_ID = "SPLASH_DIALOG_PROGRESS_BAR_DRAWABLE_ID";
+        public static final String SPLASH_DIALOG_TOTAL_REWARD_PRE_TEXT_COLOR = "SPLASH_DIALOG_TOTAL_REWARD_PRE_TEXT_COLOR";
+        public static final String SPLASH_DIALOG_TOTAL_REWARD_TEXT_COLOR = "SPLASH_DIALOG_TOTAL_REWARD_TEXT_COLOR";
+
+        @Deprecated
+        public static final String TERMS_OF_USE_OFFERWALL = "TERMS_OF_USE_OFFERWALL";
+        public static final String TOP_BAR_BACK_BTN_L_PADDING = "TOP_BAR_BACK_BTN_L_PADDING";
+        public static final String TOP_BAR_BACK_BTN_RESOURCE_ID = "TOP_BAR_BACK_BTN_RESOURCE_ID";
+        public static final String TOP_BAR_BACK_BTN_RESOURCE_SIZE = "TOP_BAR_BACK_BTN_RESOURCE_SIZE";
+        public static final String TOP_BAR_BACK_BTN_R_PADDING = "TOP_BAR_BACK_BTN_R_PADDING";
+        public static final String TOP_BAR_BG_COLOR = "TOP_BAR_BG_COLOR";
+
+        @Deprecated
+        public static final String TOP_BAR_CLOSE_BTN_RESOURCE_HEIGHT = "TOP_BAR_CLOSE_BTN_RESOURCE_HEIGHT";
+        public static final String TOP_BAR_CLOSE_BTN_RESOURCE_ID = "TOP_BAR_CLOSE_BTN_RESOURCE_ID";
+        public static final String TOP_BAR_CLOSE_BTN_RESOURCE_SIZE = "TOP_BAR_CLOSE_BTN_RESOURCE_SIZE";
+
+        @Deprecated
+        public static final String TOP_BAR_CLOSE_BTN_RESOURCE_WIDTH = "TOP_BAR_CLOSE_BTN_RESOURCE_WIDTH";
+        public static final String TOP_BAR_EXPAND_MENU_BG_COLOR = "TOP_BAR_EXPAND_MENU_BG_COLOR";
+        public static final String TOP_BAR_EXPAND_MENU_HEIGHT = "TOP_BAR_EXPAND_MENU_HEIGHT";
+        public static final String TOP_BAR_EXPAND_MENU_SUB_TEXT = "TOP_BAR_EXPAND_MENU_SUB_TEXT";
+        public static final String TOP_BAR_EXPAND_MENU_SUB_TEXT_COLOR = "TOP_BAR_EXPAND_MENU_SUB_TEXT_COLOR";
+        public static final String TOP_BAR_EXPAND_MENU_SUB_TEXT_LR_PADDING = "TOP_BAR_EXPAND_MENU_SUB_TEXT_LR_PADDING";
+        public static final String TOP_BAR_EXPAND_MENU_SUB_TEXT_SIZE_DP = "TOP_BAR_EXPAND_MENU_SUB_TEXT_SIZE_DP";
+        public static final String TOP_BAR_EXPAND_MENU_TITLE_TEXT = "TOP_BAR_EXPAND_MENU_TITLE_TEXT";
+        public static final String TOP_BAR_EXPAND_MENU_TITLE_TEXT_BOTTOM_PADDING = "TOP_BAR_EXPAND_MENU_TITLE_TEXT_BOTTOM_PADDING";
+        public static final String TOP_BAR_EXPAND_MENU_TITLE_TEXT_COLOR = "TOP_BAR_EXPAND_MENU_TITLE_TEXT_COLOR";
+        public static final String TOP_BAR_EXPAND_MENU_TITLE_TEXT_LR_PADDING = "TOP_BAR_EXPAND_MENU_TITLE_TEXT_LR_PADDING";
+        public static final String TOP_BAR_EXPAND_MENU_TITLE_TEXT_SIZE_DP = "TOP_BAR_EXPAND_MENU_TITLE_TEXT_SIZE_DP";
+        public static final String TOP_BAR_HEIGHT = "TOP_BAR_HEIGHT";
+
+        @Deprecated
+        public static final String TOP_BAR_SHADOW = "TOP_BAR_SHADOW";
+        public static final String TOP_BAR_TEXT_BOLD = "TOP_BAR_TEXT_BOLD";
+        public static final String TOP_BAR_TEXT_COLOR = "TOP_BAR_TEXT_COLOR";
+        public static final String TOP_BAR_TEXT_SIZE_DP = "TOP_BAR_TEXT_SIZE_DP";
+        public static final String USE_MATERIAL_STYLE_CAMPAIGN_DIALOG = "USE_MATERIAL_STYLE_CAMPAIGN_DIALOG";
+        public static final String USE_MATERIAL_STYLE_COMMON_DIALOG = "USE_MATERIAL_STYLE_COMMON_DIALOG";
+        public static final String USE_MULITI_LANGUAGE = "USE_MULITI_LANGUAGE";
+        public static final String USE_ONESTORE_COMMON_POINT = "USE_ONESTORE_COMMON_POINT";
+
+        public CustomStyle(ApStyleManager apStyleManager) {
+        }
+    }
+
+    public class Language {
+        public static final String EN = "en";
+        public static final String JA = "ja";
+        public static final String KO = "ko";
+
+        public Language(ApStyleManager apStyleManager) {
+        }
+    }
+
+    public class ThemeStyle {
+        public static final int BLUE_THEME = -12747601;
+        public static final int RED_THEME = -6478308;
+        public static final int YELLOW_THEME = -17917;
+
+        public ThemeStyle(ApStyleManager apStyleManager) {
+        }
+    }
+
+    public static void clearCustomOfferwallStyle() {
+        a.b().a();
+    }
+
+    public static void setCustomOfferwallStyle(HashMap<String, Object> map) {
+        a.b().a(map);
+    }
+
+    @Deprecated
+    public static void setOfferwallTitle(String str) {
+        HashMap<String, Object> map = new HashMap<>();
+        map.put(CustomStyle.OFFERWALL_TITLE_TEXT, str);
+        a.b().a(map);
+    }
+
+    @Deprecated
+    public static void setOfferwallTitleBackgroundColor(int i) {
+        HashMap<String, Object> map = new HashMap<>();
+        map.put(CustomStyle.TOP_BAR_BG_COLOR, Integer.valueOf(i));
+        map.put(CustomStyle.BOTTOM_BAR_BG_COLOR, Integer.valueOf(i));
+        a.b().a(map);
+    }
+
+    @Deprecated
+    public static void setOfferwallTitleColor(int i) {
+        HashMap<String, Object> map = new HashMap<>();
+        map.put(CustomStyle.TOP_BAR_TEXT_COLOR, Integer.valueOf(i));
+        a.b().a(map);
+    }
+
+    @Deprecated
+    public static void setOfferwallTitleLogo(int i) {
+        HashMap<String, Object> map = new HashMap<>();
+        map.put(CustomStyle.OFFERWALL_TITLE_LOGO_RESOURCE_ID, Integer.valueOf(i));
+        a.b().a(map);
+    }
+
+    public static void setTabCustomOfferwallStyle(HashMap<String, Object> map) {
+        a.b().b(map);
+    }
+
+    @Deprecated
+    public static void setThemeColor(int i) {
+        HashMap<String, Object> map = new HashMap<>();
+        map.put(CustomStyle.OFFERWALL_THEME_COLOR, Integer.valueOf(i));
+        a.b().a(map);
+    }
+}

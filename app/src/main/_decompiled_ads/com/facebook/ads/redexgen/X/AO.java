@@ -1,0 +1,25 @@
+package com.facebook.ads.redexgen.X;
+
+/* JADX INFO: loaded from: assets/audience_network.dex */
+public class AO implements Runnable {
+    public final /* synthetic */ AQ A00;
+    public final /* synthetic */ C0832Au A01;
+
+    public AO(AQ aq, C0832Au c0832Au) {
+        this.A00 = aq;
+        this.A01 = c0832Au;
+    }
+
+    @Override // java.lang.Runnable
+    public final void run() throws Throwable {
+        if (K0.A02(this)) {
+            return;
+        }
+        try {
+            this.A01.A00();
+            this.A00.A01.AAa(this.A01);
+        } catch (Throwable th) {
+            K0.A00(th, this);
+        }
+    }
+}
