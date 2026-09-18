@@ -2470,22 +2470,38 @@ function initIl2Cpp(module) {
                     }
                 }
 
-                var gradeFileMap = {
-                    "0_0": "1_c_l.i.bytes",
-                    "0_1": "1_c_s.i.bytes",
-                    "1_0": "1b_l.i.bytes",
-                    "1_1": "1b_s.i.bytes",
-                    "2_0": "1_a_l.i.bytes",
-                    "2_1": "1_a_s.i.bytes",
-                    "3_0": "1_s_l.i.bytes",
-                    "3_1": "1_s_s.i.bytes",
-                    "4_0": "1_r_l.i.bytes",
-                    "4_1": "1_r_s.i.bytes"
+                var accountOwnedCards = {
+                    1001: { grade: 4, level: 50 },
+                    1002: { grade: 4, level: 50 },
+                    1003: { grade: 4, level: 50 },
+                    1004: { grade: 4, level: 50 },
+                    1005: { grade: 4, level: 50 },
+                    1006: { grade: 4, level: 50 },
+                    1007: { grade: 4, level: 50 },
+                    1008: { grade: 4, level: 50 },
+                    1009: { grade: 4, level: 50 },
+                    1010: { grade: 4, level: 50 },
+                    1011: { grade: 4, level: 50 },
+                    1012: { grade: 4, level: 50 }
                 };
 
-                function getGradeFrameDownloadPath(grade, type) {
-                    var key = grade + "_" + type;
-                    var fname = gradeFileMap[key] || (type === 0 ? "1_r_l.i.bytes" : "1_r_s.i.bytes");
+                // grade: 0=C, 1=B, 2=A, 3=S, 4=R
+                // type: 0=Large (_l), 1=Small (_s), 2=Collection (_c)
+                function getGradeFrameDownloadPath(grade, type, isCollection) {
+                    var gStr = "0_c";
+                    if (grade === 1) gStr = "0b";
+                    else if (grade === 2) gStr = "0_a";
+                    else if (grade === 3) gStr = "0_s";
+                    else if (grade === 4) gStr = "0_r";
+
+                    var variant = "s";
+                    if (isCollection || type === 2) variant = "c";
+                    else if (type === 0) variant = "l";
+
+                    var fname = gStr + "_" + variant + ".i.bytes";
+                    if (grade === 1 && variant === "l") fname = "0b_l.i.bytes";
+                    else if (grade === 0 && variant === "l") fname = "0c_l.i.bytes";
+
                     return createDownloadPath("asiudgasg/asodhsg/aoeiwhslc/uhex/" + fname);
                 }
 
@@ -3480,20 +3496,19 @@ function initIl2Cpp(module) {
                             // 2. Set cardList cards
                             try {
                                 var cardList = view.add(0x60).readPointer();
-                                var cardParams = p.add(0x28).readPointer();
-                                if (!cardList.isNull() && !cardParams.isNull()) {
+                                if (!cardList.isNull()) {
                                     var cardCount = cardList.add(0x18).readS32();
-                                    var paramCount = cardParams.add(0x18).readS32();
                                     var cardItemsPtr = cardList.add(0x10).readPointer();
-                                    var paramItemsPtr = cardParams.add(0x10).readPointer();
-                                    var count = Math.min(cardCount, paramCount);
-                                    log("[🃏 GROUP_ITEM_VIEW] Rendering " + count + " cards in cardList...");
+                                    log("[🃏 GROUP_ITEM_VIEW] Populating " + cardCount + " cards in cardList directly...");
                                     var cardRefreshFn = new NativeFunction(baseAddr.add(0x137F570), "void", ["pointer", "pointer", "pointer"]);
-                                    for (var i = 0; i < count; i++) {
+                                    for (var i = 0; i < cardCount; i++) {
                                         var cardSmallView = cardItemsPtr.add(0x20 + i * 8).readPointer();
-                                        var cardParam = paramItemsPtr.add(0x20 + i * 8).readPointer();
-                                        if (!cardSmallView.isNull() && !cardParam.isNull()) {
-                                            cardRefreshFn(cardSmallView, cardParam, NULL);
+                                        if (!cardSmallView.isNull()) {
+                                            var cId = 1001 + (i % 12);
+                                            var cardParam = createMockSmallCardParams(cId, 4, 50);
+                                            if (cardParam && !cardParam.isNull()) {
+                                                cardRefreshFn(cardSmallView, cardParam, NULL);
+                                            }
                                         }
                                     }
                                 }
@@ -3530,6 +3545,29 @@ function initIl2Cpp(module) {
                                 }
                             } catch (eTt) {}
 
+                            // 6. Clear & hide summary texts for LOONA OT12 (removes "Summary Summary Summary")
+                            try {
+                                var summaryArr = view.add(0x68).readPointer();
+                                if (!summaryArr.isNull()) {
+                                    var sLen = summaryArr.add(0x18).readS32();
+                                    var emptyStr = createIl2CppString("");
+                                    var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                    var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                                    for (var si = 0; si < sLen; si++) {
+                                        var txtObj = summaryArr.add(0x20 + si * 8).readPointer();
+                                        if (!txtObj.isNull()) {
+                                            var textVTable = txtObj.readPointer();
+                                            var setTextFn = new NativeFunction(textVTable.add(0x5E8).readPointer(), "void", ["pointer", "pointer", "pointer"]);
+                                            setTextFn(txtObj, emptyStr, textVTable.add(0x5F0).readPointer());
+                                            var txtGo = getGoFn(txtObj, NULL);
+                                            if (!txtGo.isNull()) {
+                                                setActiveFn(txtGo, 0, NULL);
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (eSum) {}
+
                             log("[✅ GROUP_ITEM_VIEW] Safe Refresh completed successfully!");
                         } catch (eGiv) {
                             log("[-] Error in InvenGroupItemView.Refresh replacement: " + eGiv.message);
@@ -3538,6 +3576,167 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on InvenGroupItemView.Refresh (0xF23954)!");
                 } catch (eSdh) {
                     log("[-] Error replacing Refresh: " + eSdh.message);
+                }
+
+                // 10. URLsControl.SetCdnTexture (0x163A9E8) -> Native Texture2D loader with disk cache
+                var loadedTextureCache = {};
+
+                function loadLocalTexture2D(relPath) {
+                    if (loadedTextureCache[relPath]) {
+                        return loadedTextureCache[relPath];
+                    }
+                    try {
+                        var basePath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/";
+                        var fullPath = basePath + relPath;
+
+                        var readAllBytesMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllBytes", 1);
+                        var fileExistsMethod = findMethod("mscorlib", "System.IO", "File", "Exists", 1);
+                        if (!readAllBytesMethod || readAllBytesMethod.isNull()) return NULL;
+
+                        var args1 = Memory.alloc(Process.pointerSize);
+                        var exc = Memory.alloc(Process.pointerSize);
+                        exc.writePointer(NULL);
+
+                        // Try primary path
+                        args1.writePointer(createIl2CppString(fullPath));
+                        var existsObj = il2cpp_runtime_invoke(fileExistsMethod, NULL, args1, exc);
+                        var exists = (!existsObj.isNull()) ? existsObj.add(0x10).readU8() : 0;
+
+                        if (!exists) {
+                            fullPath = fullPath + ".png";
+                            args1.writePointer(createIl2CppString(fullPath));
+                            existsObj = il2cpp_runtime_invoke(fileExistsMethod, NULL, args1, exc);
+                            exists = (!existsObj.isNull()) ? existsObj.add(0x10).readU8() : 0;
+                        }
+
+                        if (!exists && relPath.indexOf(".i.bytes") !== -1) {
+                            fullPath = basePath + relPath.replace(".i.bytes", ".png");
+                            args1.writePointer(createIl2CppString(fullPath));
+                            existsObj = il2cpp_runtime_invoke(fileExistsMethod, NULL, args1, exc);
+                            exists = (!existsObj.isNull()) ? existsObj.add(0x10).readU8() : 0;
+                        }
+
+                        if (!exists) {
+                            return NULL;
+                        }
+
+                        var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
+                        if (!bytesObj || bytesObj.isNull()) return NULL;
+
+                        // Create Texture2D(2, 2)
+                        var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
+                        var texObj = il2cpp_object_new(tex2dClass);
+                        var texCtor = findMethod("UnityEngine.CoreModule", "UnityEngine", "Texture2D", ".ctor", 2);
+                        var pWidth = Memory.alloc(4);
+                        pWidth.writeInt(2);
+                        var pHeight = Memory.alloc(4);
+                        pHeight.writeInt(2);
+                        var argsCtor = Memory.alloc(Process.pointerSize * 2);
+                        argsCtor.writePointer(pWidth);
+                        argsCtor.add(Process.pointerSize).writePointer(pHeight);
+                        il2cpp_runtime_invoke(texCtor, texObj, argsCtor, exc);
+
+                        // ImageConversion.LoadImage(texObj, bytesObj)
+                        var loadImagePtr = baseAddr.add(0x25B3E90);
+                        var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
+                        var ok = loadImageFn(texObj, bytesObj);
+                        if (ok) {
+                            loadedTextureCache[relPath] = texObj;
+                            log("[🖼️ TEXTURE] Loaded and cached: " + relPath);
+                            return texObj;
+                        }
+                    } catch (eLt) {
+                        log("[-] Error in loadLocalTexture2D for " + relPath + ": " + eLt.message);
+                    }
+                    return NULL;
+                }
+
+                try {
+                    var setCdnTextureAddr = baseAddr.add(0x163A9E8);
+                    Interceptor.replace(setCdnTextureAddr, new NativeCallback(function (target, path, emptyTexture, handleResult, autoSize, autoEnabled, processing, methodInfo) {
+                        try {
+                            if (target.isNull()) return NULL;
+                            if (path.isNull()) {
+                                if (!emptyTexture.isNull()) {
+                                    var setTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                                    setTexFn(target, emptyTexture, NULL);
+                                }
+                                return NULL;
+                            }
+
+                            // Read relative path from DownloadPath offset 0x18
+                            var fpPtr = path.add(0x18).readPointer();
+                            var relPath = "";
+                            if (!fpPtr.isNull()) {
+                                var len = fpPtr.add(0x10).readS32();
+                                if (len > 0) {
+                                    relPath = fpPtr.add(0x14).readUtf16String(len);
+                                }
+                            }
+                            if (!relPath || relPath.length === 0) {
+                                var urlPtr = path.add(0x10).readPointer();
+                                if (!urlPtr.isNull()) {
+                                    var uLen = urlPtr.add(0x10).readS32();
+                                    if (uLen > 0) {
+                                        var fullUrl = urlPtr.add(0x14).readUtf16String(uLen);
+                                        var idx = fullUrl.indexOf("asiudgasg/");
+                                        if (idx !== -1) relPath = fullUrl.substring(idx);
+                                    }
+                                }
+                            }
+
+                            if (!relPath || relPath.length === 0) return NULL;
+
+                            // Ownership Check: wadceg vs sdhgauwehdnu
+                            if (relPath.indexOf("wadceg/") !== -1 || relPath.indexOf("sdhgauwehdnu/") !== -1) {
+                                var match = relPath.match(/(\d+)_([sl])\.i\.bytes/);
+                                if (match) {
+                                    var cId = parseInt(match[1]);
+                                    var sz = match[2];
+                                    if (accountOwnedCards[cId]) {
+                                        relPath = "asiudgasg/asodhsg/wadceg/" + cId + "_" + sz + ".i.bytes";
+                                    } else {
+                                        relPath = "asiudgasg/asodhsg/sdhgauwehdnu/" + cId + "_" + sz + ".i.bytes";
+                                    }
+                                }
+                            }
+
+                            // Load texture from disk or cache
+                            var tex = loadLocalTexture2D(relPath);
+                            if (!tex || tex.isNull()) {
+                                if (!emptyTexture.isNull()) tex = emptyTexture;
+                            }
+
+                            if (tex && !tex.isNull()) {
+                                // RawImage.set_texture(target, tex)
+                                var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                                setTextureFn(target, tex, NULL);
+
+                                // Activate RawImage GameObject
+                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                var targetGo = getGoFn(target, NULL);
+                                if (!targetGo.isNull()) {
+                                    var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                                    setActiveFn(targetGo, 1, NULL);
+                                }
+
+                                // Trigger handleResult callback: <OnRefresh>b__47_0 (PhotoVisible) / b__47_1 (TierVisible)
+                                if (!handleResult.isNull()) {
+                                    var cbPtr = handleResult.add(0x18).readPointer();
+                                    if (!cbPtr.isNull()) {
+                                        var cbFn = new NativeFunction(cbPtr, "void", ["pointer", "int", "pointer", "pointer"]);
+                                        cbFn(handleResult.add(0x10).readPointer(), 1, tex, NULL);
+                                    }
+                                }
+                            }
+                        } catch (eSct) {
+                            log("[-] Error in SetCdnTexture replacement: " + eSct.message);
+                        }
+                        return NULL;
+                    }, "pointer", ["pointer", "pointer", "pointer", "pointer", "int", "int", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on URLsControl.SetCdnTexture (0x163A9E8)!");
+                } catch (eHsct) {
+                    log("[-] Error replacing SetCdnTexture: " + eHsct.message);
                 }
 
                 // CardBook Stabilization Patches
