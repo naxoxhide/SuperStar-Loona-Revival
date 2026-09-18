@@ -1,0 +1,29 @@
+[
+  {
+    "code": 1,
+    "rewardQuantityShow1": true,
+    "rewardQuantity5": 1,
+    "rewardQuantityShow2": true,
+    "rewardQuantity4": 2000,
+    "rewardQuantity3": 2,
+    "rewardQuantity2": 1000,
+    "rewardQuantityShow5": true,
+    "rewardQuantityShow6": true,
+    "rewardQuantityShow3": true,
+    "rewardQuantityShow4": true,
+    "rewardQuantity6": 3000,
+    "rewardQuantity1": 1,
+    "runningTime1": 5,
+    "runningTime2": 10,
+    "runningTime3": 20,
+    "rewardIcon1": 1509,
+    "rewardIcon3": 1509,
+    "rewardIcon2": 1501,
+    "runningTime4": 30,
+    "rewardIcon5": 1508,
+    "rewardIcon4": 1501,
+    "runningTime5": 40,
+    "runningTime6": 60,
+    "rewardIcon6": 1501
+  }
+]

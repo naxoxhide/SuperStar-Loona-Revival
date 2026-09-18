@@ -1,0 +1,28 @@
+[
+  {
+    "goodsValue1": 3,
+    "code": 0,
+    "goodsValue2": 3,
+    "resetPrice1": 0,
+    "storeMenuID": 6000,
+    "icon5": 608,
+    "goodsValue3": 0,
+    "resetPrice2": 30,
+    "icon3": 608,
+    "resetPrice3": 50,
+    "icon4": 608,
+    "icon1": 608,
+    "resetPrice4": 70,
+    "icon2": 608,
+    "resetPrice5": 100,
+    "resetlimited": 10,
+    "descLocale": 181600009,
+    "resetPaymentType5": 2,
+    "resetPaymentType2": 2,
+    "sellStartAt": 1610686800000,
+    "resetPaymentType1": 2,
+    "resetPaymentType4": 2,
+    "resetPaymentType3": 2,
+    "sellEndAt": 1640962799000
+  }
+]

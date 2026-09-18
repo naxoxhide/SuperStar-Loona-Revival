@@ -1,0 +1,750 @@
+[
+  {
+    "code": 0,
+    "artist": 1001,
+    "voiceUltrarave": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-07.ogg?v=22101401"
+    ],
+    "voiceShop": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-17.ogg?v=22101401"
+    ],
+    "voiceGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-101.ogg?v=22101402"
+    ],
+    "UIReadyBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_heejin_ready_330x72.png?v=22112403",
+    "voicePreview": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-01.ogg?v=22101401"
+    ],
+    "voiceExit": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-14.ogg?v=22101401"
+    ],
+    "voiceMissionClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-20.ogg?v=22101401"
+    ],
+    "voiceChallGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-11.ogg?v=22101401"
+    ],
+    "voiceChallRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-13.ogg?v=22101401"
+    ],
+    "UIStartBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_heejin_start_330x72.png?v=22112403",
+    "UIMusicSeletBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_heejin_music_select_330x72.png?v=22112403",
+    "voiceUse": true,
+    "voiceAttendance": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-19.ogg?v=22101401"
+    ],
+    "voiceStart": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-04.ogg?v=22101401"
+    ],
+    "voiceClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-08.ogg?v=22101401"
+    ],
+    "voiceRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-12.ogg?v=22101401"
+    ],
+    "voiceUpgrade": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-16.ogg?v=22101401"
+    ],
+    "voiceTierUp": null,
+    "voiceIngame": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-05.ogg?v=22101401"
+    ],
+    "voiceReady": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-03.ogg?v=22101401"
+    ],
+    "voiceMiss": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-06.ogg?v=22101401"
+    ],
+    "voiceChallFailed": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-18.ogg?v=22101401"
+    ],
+    "playType": 2,
+    "voiceChallClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-091.ogg?v=22101402"
+    ],
+    "signatureUse": true,
+    "voicePowerUp": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/1-15.ogg?v=22101401"
+    ]
+  },
+  {
+    "code": 1,
+    "artist": 1002,
+    "voiceUltrarave": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-07.ogg?v=22101401"
+    ],
+    "voiceShop": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-17.ogg?v=22101401"
+    ],
+    "voiceGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-10.ogg?v=22101401"
+    ],
+    "UIReadyBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_hyunjin_ready_330x72.png?v=22112403",
+    "voicePreview": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-01.ogg?v=22101401"
+    ],
+    "voiceExit": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-14.ogg?v=22101401"
+    ],
+    "voiceMissionClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-20.ogg?v=22101401"
+    ],
+    "voiceChallGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-12.ogg?v=22101401"
+    ],
+    "voiceChallRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-13.ogg?v=22101401"
+    ],
+    "UIStartBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_hyunjin_start_330x72.png?v=22112403",
+    "UIMusicSeletBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_hyunjin_music_select_330x72.png?v=22112403",
+    "voiceUse": true,
+    "voiceAttendance": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-19.ogg?v=22101401"
+    ],
+    "voiceStart": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-04.ogg?v=22101401"
+    ],
+    "voiceClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-08.ogg?v=22101401"
+    ],
+    "voiceRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-11.ogg?v=22101401"
+    ],
+    "voiceUpgrade": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-16.ogg?v=22101401"
+    ],
+    "voiceTierUp": null,
+    "voiceIngame": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-05.ogg?v=22101401"
+    ],
+    "voiceReady": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-03.ogg?v=22101401"
+    ],
+    "voiceMiss": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-06.ogg?v=22101401"
+    ],
+    "voiceChallFailed": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-18.ogg?v=22101401"
+    ],
+    "playType": 2,
+    "voiceChallClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-09.ogg?v=22101401"
+    ],
+    "signatureUse": true,
+    "voicePowerUp": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/2-15.ogg?v=22101401"
+    ]
+  },
+  {
+    "code": 2,
+    "artist": 1003,
+    "voiceUltrarave": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-07.ogg?v=22101401"
+    ],
+    "voiceShop": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-17.ogg?v=22101401"
+    ],
+    "voiceGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-10.ogg?v=22101401"
+    ],
+    "UIReadyBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_haseul_ready_330x72.png?v=22112403",
+    "voicePreview": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-01.ogg?v=22101401"
+    ],
+    "voiceExit": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-14.ogg?v=22101401"
+    ],
+    "voiceMissionClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-20.ogg?v=22101401"
+    ],
+    "voiceChallGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-11.ogg?v=22101401"
+    ],
+    "voiceChallRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-13.ogg?v=22101401"
+    ],
+    "UIStartBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_haseul_start_330x72.png?v=22112403",
+    "UIMusicSeletBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_haseul_music_select_330x72.png?v=22112403",
+    "voiceUse": true,
+    "voiceAttendance": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-19.ogg?v=22101401"
+    ],
+    "voiceStart": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-04.ogg?v=22101401"
+    ],
+    "voiceClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-08.ogg?v=22101401"
+    ],
+    "voiceRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-12.ogg?v=22101401"
+    ],
+    "voiceUpgrade": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-16.ogg?v=22101401"
+    ],
+    "voiceTierUp": null,
+    "voiceIngame": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-05.ogg?v=22101401"
+    ],
+    "voiceReady": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-03.ogg?v=22101401"
+    ],
+    "voiceMiss": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-06.ogg?v=22101401"
+    ],
+    "voiceChallFailed": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-18.ogg?v=22101401"
+    ],
+    "playType": 2,
+    "voiceChallClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-99.ogg?v=22101402"
+    ],
+    "signatureUse": true,
+    "voicePowerUp": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/3-15.ogg?v=22101401"
+    ]
+  },
+  {
+    "code": 3,
+    "artist": 1004,
+    "voiceUltrarave": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-07.ogg?v=22101401"
+    ],
+    "voiceShop": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-17.ogg?v=22101401"
+    ],
+    "voiceGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-10.ogg?v=22101401"
+    ],
+    "UIReadyBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_yeojin_ready_330x72.png?v=22112403",
+    "voicePreview": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-01.ogg?v=22101401"
+    ],
+    "voiceExit": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-14.ogg?v=22101401"
+    ],
+    "voiceMissionClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-20.ogg?v=22101401"
+    ],
+    "voiceChallGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-11.ogg?v=22101401"
+    ],
+    "voiceChallRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-13.ogg?v=22101401"
+    ],
+    "UIStartBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_yeojin_start_330x72.png?v=22112403",
+    "UIMusicSeletBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_yeojin_music_select_330x72.png?v=22112403",
+    "voiceUse": true,
+    "voiceAttendance": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-19.ogg?v=22101401"
+    ],
+    "voiceStart": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-04.ogg?v=22101401"
+    ],
+    "voiceClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-08.ogg?v=22101401"
+    ],
+    "voiceRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-12.ogg?v=22101401"
+    ],
+    "voiceUpgrade": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-16.ogg?v=22101401"
+    ],
+    "voiceTierUp": null,
+    "voiceIngame": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-05.ogg?v=22101401"
+    ],
+    "voiceReady": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-03.ogg?v=22101401"
+    ],
+    "voiceMiss": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-06.ogg?v=22101401"
+    ],
+    "voiceChallFailed": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-18.ogg?v=22101401"
+    ],
+    "playType": 2,
+    "voiceChallClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-09.ogg?v=22101401"
+    ],
+    "signatureUse": true,
+    "voicePowerUp": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/4-15.ogg?v=22101401"
+    ]
+  },
+  {
+    "code": 4,
+    "artist": 1005,
+    "voiceUltrarave": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-07.ogg?v=22101401"
+    ],
+    "voiceShop": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-17.ogg?v=22101401"
+    ],
+    "voiceGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-10.ogg?v=22101401"
+    ],
+    "UIReadyBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_vivi_ready_330x72.png?v=22112403",
+    "voicePreview": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-01.ogg?v=22101401"
+    ],
+    "voiceExit": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-14.ogg?v=22101401"
+    ],
+    "voiceMissionClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-20.ogg?v=22101401"
+    ],
+    "voiceChallGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-11.ogg?v=22101401"
+    ],
+    "voiceChallRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-13.ogg?v=22101401"
+    ],
+    "UIStartBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_vivi_start_330x72.png?v=22112403",
+    "UIMusicSeletBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_vivi_music_select_330x72.png?v=22112403",
+    "voiceUse": true,
+    "voiceAttendance": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-19.ogg?v=22101401"
+    ],
+    "voiceStart": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-04.ogg?v=22101401"
+    ],
+    "voiceClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-08.ogg?v=22101401"
+    ],
+    "voiceRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-12.ogg?v=22101401"
+    ],
+    "voiceUpgrade": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-16.ogg?v=22101401"
+    ],
+    "voiceTierUp": null,
+    "voiceIngame": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-05.ogg?v=22101401"
+    ],
+    "voiceReady": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-03.ogg?v=22101401"
+    ],
+    "voiceMiss": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-06.ogg?v=22101401"
+    ],
+    "voiceChallFailed": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-18.ogg?v=22101401"
+    ],
+    "playType": 2,
+    "voiceChallClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-009.ogg?v=22101402"
+    ],
+    "signatureUse": true,
+    "voicePowerUp": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/5-15.ogg?v=22101401"
+    ]
+  },
+  {
+    "code": 5,
+    "artist": 1006,
+    "voiceUltrarave": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-07.ogg?v=22101401"
+    ],
+    "voiceShop": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-17.ogg?v=22101401"
+    ],
+    "voiceGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-10.ogg?v=22101401"
+    ],
+    "UIReadyBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_kim_lip_ready_330x72.png?v=22112403",
+    "voicePreview": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-01.ogg?v=22101401"
+    ],
+    "voiceExit": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-14.ogg?v=22101401"
+    ],
+    "voiceMissionClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-20.ogg?v=22101401"
+    ],
+    "voiceChallGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-11.ogg?v=22101401"
+    ],
+    "voiceChallRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-13.ogg?v=22101401"
+    ],
+    "UIStartBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_kim_lip_start_330x72.png?v=22112403",
+    "UIMusicSeletBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_kim_lip_music_select_330x72.png?v=22112403",
+    "voiceUse": true,
+    "voiceAttendance": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-19.ogg?v=22101401"
+    ],
+    "voiceStart": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-04.ogg?v=22101401"
+    ],
+    "voiceClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-08.ogg?v=22101401"
+    ],
+    "voiceRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-12.ogg?v=22101401"
+    ],
+    "voiceUpgrade": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-16.ogg?v=22101401"
+    ],
+    "voiceTierUp": null,
+    "voiceIngame": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-05.ogg?v=22101401"
+    ],
+    "voiceReady": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-03.ogg?v=22101401"
+    ],
+    "voiceMiss": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-06.ogg?v=22101401"
+    ],
+    "voiceChallFailed": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-18.ogg?v=22101401"
+    ],
+    "playType": 2,
+    "voiceChallClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-09.ogg?v=22101401"
+    ],
+    "signatureUse": true,
+    "voicePowerUp": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/6-15.ogg?v=22101401"
+    ]
+  },
+  {
+    "code": 6,
+    "artist": 1007,
+    "voiceUltrarave": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-07.ogg?v=22101401"
+    ],
+    "voiceShop": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-17.ogg?v=22101401"
+    ],
+    "voiceGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-10.ogg?v=22101401"
+    ],
+    "UIReadyBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_jinsoul_ready_330x72.png?v=22112403",
+    "voicePreview": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-01.ogg?v=22101401"
+    ],
+    "voiceExit": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-14.ogg?v=22101401"
+    ],
+    "voiceMissionClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-20.ogg?v=22101401"
+    ],
+    "voiceChallGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-11.ogg?v=22101401"
+    ],
+    "voiceChallRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-13.ogg?v=22101401"
+    ],
+    "UIStartBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_jinsoul_start_330x72.png?v=22112403",
+    "UIMusicSeletBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_jinsoul_music_select_330x72.png?v=22112403",
+    "voiceUse": true,
+    "voiceAttendance": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-19.ogg?v=22101401"
+    ],
+    "voiceStart": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-04.ogg?v=22101401"
+    ],
+    "voiceClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-08.ogg?v=22101401"
+    ],
+    "voiceRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-12.ogg?v=22101401"
+    ],
+    "voiceUpgrade": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-16.ogg?v=22101401"
+    ],
+    "voiceTierUp": null,
+    "voiceIngame": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-05.ogg?v=22101401"
+    ],
+    "voiceReady": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-03.ogg?v=22101401"
+    ],
+    "voiceMiss": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-06.ogg?v=22101401"
+    ],
+    "voiceChallFailed": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-18.ogg?v=22101401"
+    ],
+    "playType": 2,
+    "voiceChallClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-09.ogg?v=22101401"
+    ],
+    "signatureUse": true,
+    "voicePowerUp": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/7-15.ogg?v=22101401"
+    ]
+  },
+  {
+    "code": 7,
+    "artist": 1009,
+    "voiceUltrarave": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-07.ogg?v=22101401"
+    ],
+    "voiceShop": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-17.ogg?v=22101401"
+    ],
+    "voiceGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-10.ogg?v=22101401"
+    ],
+    "UIReadyBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_yves_ready_330x72.png?v=22112403",
+    "voicePreview": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-01.ogg?v=22101401"
+    ],
+    "voiceExit": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-14.ogg?v=22101401"
+    ],
+    "voiceMissionClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-20.ogg?v=22101401"
+    ],
+    "voiceChallGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-11.ogg?v=22101401"
+    ],
+    "voiceChallRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-13.ogg?v=22101401"
+    ],
+    "UIStartBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_yves_start_330x72.png?v=22112403",
+    "UIMusicSeletBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_yves_music_select_330x72.png?v=22112403",
+    "voiceUse": true,
+    "voiceAttendance": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-19.ogg?v=22101401"
+    ],
+    "voiceStart": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-04.ogg?v=22101401"
+    ],
+    "voiceClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-08.ogg?v=22101401"
+    ],
+    "voiceRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-12.ogg?v=22101401"
+    ],
+    "voiceUpgrade": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-16.ogg?v=22101401"
+    ],
+    "voiceTierUp": null,
+    "voiceIngame": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-05.ogg?v=22101401"
+    ],
+    "voiceReady": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-03.ogg?v=22101401"
+    ],
+    "voiceMiss": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-06.ogg?v=22101401"
+    ],
+    "voiceChallFailed": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-18.ogg?v=22101401"
+    ],
+    "playType": 2,
+    "voiceChallClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-09.ogg?v=22101401"
+    ],
+    "signatureUse": true,
+    "voicePowerUp": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/8-15.ogg?v=22101401"
+    ]
+  },
+  {
+    "code": 8,
+    "artist": 1010,
+    "voiceUltrarave": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-07.ogg?v=22101401"
+    ],
+    "voiceShop": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-17.ogg?v=22101401"
+    ],
+    "voiceGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-10.ogg?v=22101401"
+    ],
+    "UIReadyBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_go_won_ready_330x72.png?v=22112403",
+    "voicePreview": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-01.ogg?v=22101401"
+    ],
+    "voiceExit": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-14.ogg?v=22101401"
+    ],
+    "voiceMissionClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-20.ogg?v=22101401"
+    ],
+    "voiceChallGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-11.ogg?v=22101401"
+    ],
+    "voiceChallRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-13.ogg?v=22101401"
+    ],
+    "UIStartBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_go_won_start_330x72.png?v=22112403",
+    "UIMusicSeletBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_go_won_music_select_330x72.png?v=22112403",
+    "voiceUse": true,
+    "voiceAttendance": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-19.ogg?v=22101401"
+    ],
+    "voiceStart": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-04.ogg?v=22101401"
+    ],
+    "voiceClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-08.ogg?v=22101401"
+    ],
+    "voiceRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-12.ogg?v=22101401"
+    ],
+    "voiceUpgrade": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-16.ogg?v=22101401"
+    ],
+    "voiceTierUp": null,
+    "voiceIngame": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-05.ogg?v=22101401"
+    ],
+    "voiceReady": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-03.ogg?v=22101401"
+    ],
+    "voiceMiss": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-06.ogg?v=22101401"
+    ],
+    "voiceChallFailed": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-18.ogg?v=22101401"
+    ],
+    "playType": 2,
+    "voiceChallClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-09.ogg?v=22101401"
+    ],
+    "signatureUse": true,
+    "voicePowerUp": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/9-15.ogg?v=22101401"
+    ]
+  },
+  {
+    "code": 9,
+    "artist": 1011,
+    "voiceUltrarave": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-07.ogg?v=22101401"
+    ],
+    "voiceShop": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-17.ogg?v=22101401"
+    ],
+    "voiceGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-10.ogg?v=22101401"
+    ],
+    "UIReadyBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_olivia_hye_ready_330x72.png?v=22112403",
+    "voicePreview": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-01.ogg?v=22101401"
+    ],
+    "voiceExit": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-14.ogg?v=22101401"
+    ],
+    "voiceMissionClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-20.ogg?v=22101401"
+    ],
+    "voiceChallGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-11.ogg?v=22101401"
+    ],
+    "voiceChallRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-13.ogg?v=22101401"
+    ],
+    "UIStartBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_olivia_hye_start_330x72.png?v=22112403",
+    "UIMusicSeletBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1124/artistpack/btn_olivia_hye_music_select_330x72.png?v=22112403",
+    "voiceUse": true,
+    "voiceAttendance": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-19.ogg?v=22101401"
+    ],
+    "voiceStart": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-04.ogg?v=22101401"
+    ],
+    "voiceClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-08.ogg?v=22101401"
+    ],
+    "voiceRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-12.ogg?v=22101401"
+    ],
+    "voiceUpgrade": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-16.ogg?v=22101401"
+    ],
+    "voiceTierUp": null,
+    "voiceIngame": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-05.ogg?v=22101401"
+    ],
+    "voiceReady": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-03.ogg?v=22101401"
+    ],
+    "voiceMiss": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-06.ogg?v=22101401"
+    ],
+    "voiceChallFailed": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-18.ogg?v=22101401"
+    ],
+    "playType": 2,
+    "voiceChallClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-09.ogg?v=22101401"
+    ],
+    "signatureUse": true,
+    "voicePowerUp": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1014/artistpack/10-15.ogg?v=22101401"
+    ]
+  },
+  {
+    "code": 10,
+    "artist": 1008,
+    "voiceUltrarave": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-07.ogg?v=22122204"
+    ],
+    "voiceShop": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-18.ogg?v=22122204"
+    ],
+    "voiceGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/image/Choerry-09.ogg?v=22122205"
+    ],
+    "UIReadyBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/image/btn_330x72_ready_choerry.png?v=22122201",
+    "voicePreview": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-01.ogg?v=22122202"
+    ],
+    "voiceExit": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-15.ogg?v=22122204"
+    ],
+    "voiceMissionClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-20.ogg?v=22122204"
+    ],
+    "voiceChallGameover": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-12.ogg?v=22122204"
+    ],
+    "voiceChallRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-13.ogg?v=22122204"
+    ],
+    "UIStartBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/image/btn_330x72_start_choerry.png?v=22122201",
+    "UIMusicSeletBT": "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/image/btn_330x72_music_select_choerry.png?v=22122202",
+    "voiceUse": true,
+    "voiceAttendance": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-19.ogg?v=22122204"
+    ],
+    "voiceStart": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-04.ogg?v=22122204"
+    ],
+    "voiceClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-08.ogg?v=22122204"
+    ],
+    "voiceRetry": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-10.ogg?v=22122204"
+    ],
+    "voiceUpgrade": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-17.ogg?v=22122204"
+    ],
+    "voiceTierUp": null,
+    "voiceIngame": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-05.ogg?v=22122204"
+    ],
+    "voiceReady": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-03.ogg?v=22122204"
+    ],
+    "voiceMiss": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-06.ogg?v=22122204"
+    ],
+    "voiceChallFailed": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-14.ogg?v=22122204"
+    ],
+    "playType": 2,
+    "voiceChallClear": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-11.ogg?v=22122204"
+    ],
+    "signatureUse": true,
+    "voicePowerUp": [
+      "http://d3exy8s96shf22.cloudfront.net/resources/live/2022/1222/basic2/artistpack/choerryartpacksound/choerry-16.ogg?v=22122204"
+    ]
+  }
+]

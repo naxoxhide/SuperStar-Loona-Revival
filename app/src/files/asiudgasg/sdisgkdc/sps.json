@@ -1,0 +1,90 @@
+[
+  {
+    "passEndAt": 1668142800000,
+    "analyticsData": "Fresher_스타패스_220322",
+    "code": 0,
+    "passMaxTier": 60,
+    "passStartAt": 1665716400000,
+    "tierPrice": 100
+  },
+  {
+    "passEndAt": 1672894800000,
+    "analyticsData": "Christmas_StarPass",
+    "code": 1,
+    "passMaxTier": 50,
+    "passStartAt": 1671080400000,
+    "tierPrice": 100
+  },
+  {
+    "passEndAt": 1677128400000,
+    "analyticsData": "Valentine_StarPass",
+    "code": 2,
+    "passMaxTier": 40,
+    "passStartAt": 1675918800000,
+    "tierPrice": 100
+  },
+  {
+    "passEndAt": 1680757200000,
+    "analyticsData": "23Spirng_StarPass",
+    "code": 3,
+    "passMaxTier": 30,
+    "passStartAt": 1679547600000,
+    "tierPrice": 100
+  },
+  {
+    "passEndAt": 1683781200000,
+    "analyticsData": "23_SpirngFestival_StarPass",
+    "code": 4,
+    "passMaxTier": 40,
+    "passStartAt": 1682571600000,
+    "tierPrice": 100
+  },
+  {
+    "passEndAt": 1685595600000,
+    "analyticsData": "23_Family Month_StarPass",
+    "code": 5,
+    "passMaxTier": 30,
+    "passStartAt": 1684386000000,
+    "tierPrice": 100
+  },
+  {
+    "passEndAt": 1690434000000,
+    "analyticsData": "23_Summer_StarPass",
+    "code": 6,
+    "passMaxTier": 50,
+    "passStartAt": 1688619600000,
+    "tierPrice": 100
+  },
+  {
+    "passEndAt": 1696482000000,
+    "analyticsData": "23_Chuseok_StarPass",
+    "code": 7,
+    "passMaxTier": 50,
+    "passStartAt": 1694667600000,
+    "tierPrice": 100
+  },
+  {
+    "passEndAt": 1697691600000,
+    "analyticsData": "23_1st_Daily_StarPass",
+    "code": 8,
+    "passMaxTier": 30,
+    "passStartAt": 1696482000000,
+    "tierPrice": 100
+  },
+  {
+    "passEndAt": 1697691600000,
+    "analyticsData": "23_1st_StarPass",
+    "code": 9,
+    "passMaxTier": 30,
+    "passStartAt": 1696482000000,
+    "tierPrice": 100
+  },
+  {
+    "passEndAt": 1699506000000,
+    "analyticsData": "23_Halloween_StarPass",
+    "code": 10,
+    "passMaxTier": 50,
+    "passStartAt": 1697691600000,
+    "tierPrice": 100
+  }
+]

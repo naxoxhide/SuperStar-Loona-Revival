@@ -1,0 +1,1822 @@
+[
+  {
+    "stringValue": null,
+    "code": 0,
+    "floatValue": null,
+    "integerValue": 30,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 1,
+    "floatValue": null,
+    "integerValue": 1000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 2,
+    "floatValue": null,
+    "integerValue": 0,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 3,
+    "floatValue": null,
+    "integerValue": 1200000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 4,
+    "floatValue": null,
+    "integerValue": 200,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 5,
+    "floatValue": null,
+    "integerValue": 2500,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 6,
+    "floatValue": null,
+    "integerValue": 20,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 7,
+    "floatValue": null,
+    "integerValue": 50,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 8,
+    "floatValue": null,
+    "integerValue": 5,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@0",
+    "code": 9,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10,
+    "floatValue": null,
+    "integerValue": 20,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 11,
+    "floatValue": null,
+    "integerValue": 7,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@1",
+    "code": 12,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@2",
+    "code": 13,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 14,
+    "floatValue": null,
+    "integerValue": 2,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15,
+    "floatValue": null,
+    "integerValue": 2,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 16,
+    "floatValue": null,
+    "integerValue": 100000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 17,
+    "floatValue": null,
+    "integerValue": 20,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 18,
+    "floatValue": null,
+    "integerValue": 1800000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@3",
+    "code": 19,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@4",
+    "code": 20,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@5",
+    "code": 21,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@6",
+    "code": 22,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@7",
+    "code": 23,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@8",
+    "code": 24,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 25,
+    "floatValue": null,
+    "integerValue": 20,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 26,
+    "floatValue": null,
+    "integerValue": 10,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 27,
+    "floatValue": null,
+    "integerValue": 15,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 28,
+    "floatValue": null,
+    "integerValue": 5,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 29,
+    "floatValue": null,
+    "integerValue": 9999,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@9",
+    "code": 30,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 31,
+    "floatValue": 7.0,
+    "integerValue": 30,
+    "booleanValue": true
+  },
+  {
+    "stringValue": null,
+    "code": 32,
+    "floatValue": null,
+    "integerValue": 0,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 33,
+    "floatValue": 1.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 34,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": false
+  },
+  {
+    "stringValue": null,
+    "code": 35,
+    "floatValue": null,
+    "integerValue": 30,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 36,
+    "floatValue": 320.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 37,
+    "floatValue": null,
+    "integerValue": 500,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "[0,0,0,3,6,9,12,15,18,21,24,27,30]",
+    "code": 38,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 39,
+    "floatValue": null,
+    "integerValue": 3000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 40,
+    "floatValue": null,
+    "integerValue": 3,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 41,
+    "floatValue": null,
+    "integerValue": 3,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 42,
+    "floatValue": 3.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 43,
+    "floatValue": 2.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 50,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": true
+  },
+  {
+    "stringValue": null,
+    "code": 51,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": true
+  },
+  {
+    "stringValue": null,
+    "code": 52,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": true
+  },
+  {
+    "stringValue": null,
+    "code": 101,
+    "floatValue": 1000.0,
+    "integerValue": 30000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 102,
+    "floatValue": null,
+    "integerValue": 10000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 103,
+    "floatValue": null,
+    "integerValue": 5000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 104,
+    "floatValue": null,
+    "integerValue": 3000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 105,
+    "floatValue": null,
+    "integerValue": 1000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 106,
+    "floatValue": null,
+    "integerValue": 14,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 200,
+    "floatValue": null,
+    "integerValue": 20,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 201,
+    "floatValue": null,
+    "integerValue": 10,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 202,
+    "floatValue": null,
+    "integerValue": 5,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 203,
+    "floatValue": null,
+    "integerValue": 3,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 204,
+    "floatValue": null,
+    "integerValue": 1,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 205,
+    "floatValue": null,
+    "integerValue": 20,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 206,
+    "floatValue": null,
+    "integerValue": 10,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 207,
+    "floatValue": null,
+    "integerValue": 5,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 208,
+    "floatValue": null,
+    "integerValue": 3,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 209,
+    "floatValue": null,
+    "integerValue": 1,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@11",
+    "code": 1001,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@12",
+    "code": 1002,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@13",
+    "code": 1003,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@14",
+    "code": 1004,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@43003046",
+    "code": 1019,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@43003047",
+    "code": 1020,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@43003048",
+    "code": 1021,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@43003049",
+    "code": 1022,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "[0.6,0.3,0.1]",
+    "code": 2001,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 2002,
+    "floatValue": null,
+    "integerValue": 6200000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 3001,
+    "floatValue": null,
+    "integerValue": 10,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 3002,
+    "floatValue": null,
+    "integerValue": 20,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 3003,
+    "floatValue": null,
+    "integerValue": 30,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 3004,
+    "floatValue": null,
+    "integerValue": 3,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 4001,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": true
+  },
+  {
+    "stringValue": null,
+    "code": 5000,
+    "floatValue": null,
+    "integerValue": 50,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10101,
+    "floatValue": null,
+    "integerValue": 5,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10102,
+    "floatValue": null,
+    "integerValue": 50,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10103,
+    "floatValue": null,
+    "integerValue": 3,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10201,
+    "floatValue": null,
+    "integerValue": 2,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10202,
+    "floatValue": null,
+    "integerValue": 12,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10203,
+    "floatValue": null,
+    "integerValue": 6,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10204,
+    "floatValue": null,
+    "integerValue": 20,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10205,
+    "floatValue": null,
+    "integerValue": 6,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10206,
+    "floatValue": null,
+    "integerValue": 20,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10301,
+    "floatValue": null,
+    "integerValue": 6,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10302,
+    "floatValue": null,
+    "integerValue": 20,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10401,
+    "floatValue": null,
+    "integerValue": 100,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10402,
+    "floatValue": null,
+    "integerValue": 10,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10403,
+    "floatValue": null,
+    "integerValue": 864000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10404,
+    "floatValue": null,
+    "integerValue": 1800,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10406,
+    "floatValue": null,
+    "integerValue": 1800,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10801,
+    "floatValue": null,
+    "integerValue": 99,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10802,
+    "floatValue": null,
+    "integerValue": 99,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10901,
+    "floatValue": null,
+    "integerValue": 100,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10902,
+    "floatValue": null,
+    "integerValue": 199,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 10903,
+    "floatValue": null,
+    "integerValue": 10,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 11001,
+    "floatValue": null,
+    "integerValue": 5,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 11101,
+    "floatValue": null,
+    "integerValue": 0,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 11201,
+    "floatValue": null,
+    "integerValue": 10,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 11202,
+    "floatValue": null,
+    "integerValue": 300,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 11203,
+    "floatValue": null,
+    "integerValue": 104857600,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 11204,
+    "floatValue": null,
+    "integerValue": 4,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 11205,
+    "floatValue": null,
+    "integerValue": 25,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 11206,
+    "floatValue": null,
+    "integerValue": 14,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "*",
+    "code": 11401,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 11501,
+    "floatValue": null,
+    "integerValue": 5,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 13001,
+    "floatValue": null,
+    "integerValue": 60,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15001,
+    "floatValue": 0.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15002,
+    "floatValue": 0.5,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15003,
+    "floatValue": 1.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15004,
+    "floatValue": 2.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15005,
+    "floatValue": 0.2,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15006,
+    "floatValue": 0.2,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15007,
+    "floatValue": 0.2,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15008,
+    "floatValue": 0.0001,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15009,
+    "floatValue": 0.45,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15010,
+    "floatValue": 0.65,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15101,
+    "floatValue": null,
+    "integerValue": 3,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15102,
+    "floatValue": null,
+    "integerValue": 10000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15103,
+    "floatValue": 0.8,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15104,
+    "floatValue": 0.9,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15105,
+    "floatValue": 1.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15201,
+    "floatValue": 0.3,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15202,
+    "floatValue": 0.5,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15203,
+    "floatValue": 0.7,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15204,
+    "floatValue": 0.9,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15301,
+    "floatValue": 8.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15302,
+    "floatValue": 8.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15303,
+    "floatValue": 9.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15304,
+    "floatValue": 10.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15305,
+    "floatValue": 11.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15306,
+    "floatValue": 12.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15401,
+    "floatValue": null,
+    "integerValue": 165,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15402,
+    "floatValue": null,
+    "integerValue": 15000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15403,
+    "floatValue": null,
+    "integerValue": 18,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15404,
+    "floatValue": null,
+    "integerValue": 45,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15405,
+    "floatValue": null,
+    "integerValue": 90,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15501,
+    "floatValue": 100.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15601,
+    "floatValue": 10.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15602,
+    "floatValue": 1.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15603,
+    "floatValue": 0.015,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15604,
+    "floatValue": 0.1,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15611,
+    "floatValue": 12.5,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15612,
+    "floatValue": 0.7,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15613,
+    "floatValue": 0.015,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15614,
+    "floatValue": 0.1,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15621,
+    "floatValue": 16.6,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15622,
+    "floatValue": 0.4,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15623,
+    "floatValue": 0.015,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15624,
+    "floatValue": 0.1,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15701,
+    "floatValue": 0.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15702,
+    "floatValue": 0.5,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15703,
+    "floatValue": 1.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15801,
+    "floatValue": null,
+    "integerValue": 1,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15802,
+    "floatValue": null,
+    "integerValue": 2,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15803,
+    "floatValue": null,
+    "integerValue": 3,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15901,
+    "floatValue": null,
+    "integerValue": 0,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15902,
+    "floatValue": null,
+    "integerValue": 5000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15903,
+    "floatValue": null,
+    "integerValue": 15000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15904,
+    "floatValue": null,
+    "integerValue": 25000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15905,
+    "floatValue": null,
+    "integerValue": 5000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15906,
+    "floatValue": null,
+    "integerValue": 10000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15907,
+    "floatValue": null,
+    "integerValue": 30000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15908,
+    "floatValue": null,
+    "integerValue": 50000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15909,
+    "floatValue": null,
+    "integerValue": 10000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15910,
+    "floatValue": null,
+    "integerValue": 20000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15911,
+    "floatValue": null,
+    "integerValue": 60000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15912,
+    "floatValue": null,
+    "integerValue": 100000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15913,
+    "floatValue": null,
+    "integerValue": 15000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15914,
+    "floatValue": null,
+    "integerValue": 30000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15915,
+    "floatValue": null,
+    "integerValue": 90000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15916,
+    "floatValue": null,
+    "integerValue": 150000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15917,
+    "floatValue": null,
+    "integerValue": 25000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15918,
+    "floatValue": null,
+    "integerValue": 50000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15919,
+    "floatValue": null,
+    "integerValue": 150000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15920,
+    "floatValue": null,
+    "integerValue": 250000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15921,
+    "floatValue": null,
+    "integerValue": 50000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15922,
+    "floatValue": null,
+    "integerValue": 100000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15923,
+    "floatValue": null,
+    "integerValue": 300000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 15924,
+    "floatValue": null,
+    "integerValue": 500000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 16100,
+    "floatValue": null,
+    "integerValue": 1000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "[901,902,903,904]",
+    "code": 17002,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "force_clear_01",
+    "code": 18001,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "立即完成",
+    "code": 18002,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Qiángzhì qīngchú",
+    "code": 18003,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 18004,
+    "floatValue": null,
+    "integerValue": 1,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 18008,
+    "floatValue": null,
+    "integerValue": 2,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 19001,
+    "floatValue": null,
+    "integerValue": 25,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 19002,
+    "floatValue": null,
+    "integerValue": 50,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 19003,
+    "floatValue": null,
+    "integerValue": 75,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 19004,
+    "floatValue": null,
+    "integerValue": 100,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 20001,
+    "floatValue": null,
+    "integerValue": 20,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 21001,
+    "floatValue": null,
+    "integerValue": 300,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 22001,
+    "floatValue": null,
+    "integerValue": 4,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 22002,
+    "floatValue": null,
+    "integerValue": 1,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 23001,
+    "floatValue": null,
+    "integerValue": 221,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 23002,
+    "floatValue": null,
+    "integerValue": 301,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 24001,
+    "floatValue": null,
+    "integerValue": 2,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 24002,
+    "floatValue": null,
+    "integerValue": 12,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 24003,
+    "floatValue": null,
+    "integerValue": 60,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 24004,
+    "floatValue": null,
+    "integerValue": 10,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 24005,
+    "floatValue": null,
+    "integerValue": 20,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "2.6.1",
+    "code": 25001,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "2.6.1",
+    "code": 25002,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 26001,
+    "floatValue": null,
+    "integerValue": 86400000,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 27001,
+    "floatValue": null,
+    "integerValue": 16,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 27002,
+    "floatValue": 5.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 27003,
+    "floatValue": null,
+    "integerValue": 4,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 27007,
+    "floatValue": null,
+    "integerValue": 1,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 28001,
+    "floatValue": null,
+    "integerValue": 120,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 29001,
+    "floatValue": null,
+    "integerValue": 20,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 12001,
+    "floatValue": 2.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 12002,
+    "floatValue": null,
+    "integerValue": 100,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 12003,
+    "floatValue": 10.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 12004,
+    "floatValue": null,
+    "integerValue": 2,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 12005,
+    "floatValue": null,
+    "integerValue": 50,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 12006,
+    "floatValue": null,
+    "integerValue": 100,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 12007,
+    "floatValue": null,
+    "integerValue": 16,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 12008,
+    "floatValue": null,
+    "integerValue": 1,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 12009,
+    "floatValue": null,
+    "integerValue": 5,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 12010,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": false
+  },
+  {
+    "stringValue": null,
+    "code": 12011,
+    "floatValue": null,
+    "integerValue": 10,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 17001,
+    "floatValue": null,
+    "integerValue": -1,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 30001,
+    "floatValue": null,
+    "integerValue": 300,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 31001,
+    "floatValue": null,
+    "integerValue": 1204,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 31002,
+    "floatValue": null,
+    "integerValue": 1203,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 40001,
+    "floatValue": null,
+    "integerValue": 702,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 40002,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "https://twitter.com/SuperStar_GL",
+    "code": 50001,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 60001,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": true
+  },
+  {
+    "stringValue": "2020-08-05 14:00:00",
+    "code": 60002,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": true
+  },
+  {
+    "stringValue": null,
+    "code": 60004,
+    "floatValue": 5.0,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 60005,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": true
+  },
+  {
+    "stringValue": "2020-08-05 14:00:00",
+    "code": 60006,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": true
+  },
+  {
+    "stringValue": "[1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,1011]",
+    "code": 60007,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 60008,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": true
+  },
+  {
+    "stringValue": null,
+    "code": 60009,
+    "floatValue": null,
+    "integerValue": 5,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 60010,
+    "floatValue": null,
+    "integerValue": 11,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 60011,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": true
+  },
+  {
+    "stringValue": null,
+    "code": 60012,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": true
+  },
+  {
+    "stringValue": null,
+    "code": 60013,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": true
+  },
+  {
+    "stringValue": null,
+    "code": 60014,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": true
+  },
+  {
+    "stringValue": null,
+    "code": 60015,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": true
+  },
+  {
+    "stringValue": null,
+    "code": 60016,
+    "floatValue": null,
+    "integerValue": 15,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 60017,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": false
+  },
+  {
+    "stringValue": null,
+    "code": 60018,
+    "floatValue": null,
+    "integerValue": 5,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 60019,
+    "floatValue": null,
+    "integerValue": 1504,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 60020,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": false
+  },
+  {
+    "stringValue": "[\n{\"p\":2,\"q\":50,\"b\":0}\n]",
+    "code": 70001,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@17",
+    "code": 70002,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@18",
+    "code": 70003,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 70004,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": false
+  },
+  {
+    "stringValue": "Locale@19",
+    "code": 70005,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "Locale@20",
+    "code": 70006,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": "[\n{\"p\":90500,\"q\":1,\"b\":0}\n]",
+    "code": 70007,
+    "floatValue": null,
+    "integerValue": null,
+    "booleanValue": null
+  },
+  {
+    "stringValue": null,
+    "code": 80000,
+    "floatValue": null,
+    "integerValue": 1101,
+    "booleanValue": null
+  }
+]

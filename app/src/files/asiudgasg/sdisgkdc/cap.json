@@ -1,0 +1,38 @@
+[
+  {
+    "code": 0,
+    "pointValue": 1,
+    "cardGrade": null,
+    "collectionPointType": 0
+  },
+  {
+    "code": 1,
+    "pointValue": 3,
+    "cardGrade": 0,
+    "collectionPointType": 1
+  },
+  {
+    "code": 2,
+    "pointValue": 5,
+    "cardGrade": 1,
+    "collectionPointType": 1
+  },
+  {
+    "code": 3,
+    "pointValue": 7,
+    "cardGrade": 2,
+    "collectionPointType": 1
+  },
+  {
+    "code": 4,
+    "pointValue": 10,
+    "cardGrade": 3,
+    "collectionPointType": 1
+  },
+  {
+    "code": 5,
+    "pointValue": 15,
+    "cardGrade": 4,
+    "collectionPointType": 1
+  }
+]

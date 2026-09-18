@@ -1,0 +1,50 @@
+[
+  {
+    "playtimeAttendanceCode": null,
+    "attendanceType": 0,
+    "EndAt": 1666882799000,
+    "code": 1,
+    "StartAt": 1665543600000,
+    "description": 70020007,
+    "attendanceGroup": 1,
+    "attendanceTitleLocale": 70020005,
+    "eventPeriod": null,
+    "attendanceDescripLocale": 70020006
+  },
+  {
+    "playtimeAttendanceCode": 1,
+    "attendanceType": 3,
+    "EndAt": 4102325999000,
+    "code": 2,
+    "StartAt": 1665543600000,
+    "description": 70020010,
+    "attendanceGroup": null,
+    "attendanceTitleLocale": 70020008,
+    "eventPeriod": null,
+    "attendanceDescripLocale": 70020009
+  },
+  {
+    "playtimeAttendanceCode": null,
+    "attendanceType": 1,
+    "EndAt": 1672412399000,
+    "code": 3,
+    "StartAt": 1641265200000,
+    "description": 70020012,
+    "attendanceGroup": 2,
+    "attendanceTitleLocale": 70020004,
+    "eventPeriod": 14,
+    "attendanceDescripLocale": 70020011
+  },
+  {
+    "playtimeAttendanceCode": null,
+    "attendanceType": 0,
+    "EndAt": 1697727599000,
+    "code": 4,
+    "StartAt": 1696482000000,
+    "description": 70020018,
+    "attendanceGroup": 3,
+    "attendanceTitleLocale": 70020016,
+    "eventPeriod": null,
+    "attendanceDescripLocale": 70020017
+  }
+]

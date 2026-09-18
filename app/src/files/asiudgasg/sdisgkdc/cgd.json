@@ -1,0 +1,42 @@
+[
+  {
+    "gradeValue": 0.0,
+    "code": 0,
+    "cardBookValue": 1,
+    "maxGradeValue": 0.5,
+    "minGradeValue": -1.0,
+    "abilityValue": 10000
+  },
+  {
+    "gradeValue": 1.0,
+    "code": 1,
+    "cardBookValue": 2,
+    "maxGradeValue": 1.5,
+    "minGradeValue": 0.5,
+    "abilityValue": 20000
+  },
+  {
+    "gradeValue": 2.5,
+    "code": 2,
+    "cardBookValue": 3,
+    "maxGradeValue": 2.5,
+    "minGradeValue": 1.5,
+    "abilityValue": 30000
+  },
+  {
+    "gradeValue": 4.0,
+    "code": 3,
+    "cardBookValue": 4,
+    "maxGradeValue": 4.0,
+    "minGradeValue": 2.5,
+    "abilityValue": 50000
+  },
+  {
+    "gradeValue": 5.0,
+    "code": 4,
+    "cardBookValue": 0,
+    "maxGradeValue": -1.0,
+    "minGradeValue": 4.0,
+    "abilityValue": 100000
+  }
+]

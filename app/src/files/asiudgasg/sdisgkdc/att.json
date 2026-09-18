@@ -1,0 +1,34 @@
+[
+  {
+    "cardAppearType": 0,
+    "code": 1,
+    "equipType": true,
+    "viewType": 0,
+    "cardUseType": true,
+    "cardBookScoreType": 0
+  },
+  {
+    "cardAppearType": 1,
+    "code": 2,
+    "equipType": true,
+    "viewType": 1,
+    "cardUseType": true,
+    "cardBookScoreType": 1
+  },
+  {
+    "cardAppearType": 2,
+    "code": 3,
+    "equipType": true,
+    "viewType": 1,
+    "cardUseType": true,
+    "cardBookScoreType": 1
+  },
+  {
+    "cardAppearType": 2,
+    "code": 4,
+    "equipType": false,
+    "viewType": 2,
+    "cardUseType": false,
+    "cardBookScoreType": 2
+  }
+]

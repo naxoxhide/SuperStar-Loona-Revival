@@ -1,0 +1,42 @@
+[
+  {
+    "code": 1,
+    "min": "0x0020",
+    "max": "0x007E"
+  },
+  {
+    "code": 3,
+    "min": "0xFF01",
+    "max": "0xFF01"
+  },
+  {
+    "code": 4,
+    "min": "0xFF1F",
+    "max": "0xFF1F"
+  },
+  {
+    "code": 5,
+    "min": "0x3001",
+    "max": "0x3003"
+  },
+  {
+    "code": 101,
+    "min": "0x1100",
+    "max": "0x11FF"
+  },
+  {
+    "code": 102,
+    "min": "0xAC00",
+    "max": "0xD7AF"
+  },
+  {
+    "code": 103,
+    "min": "0x3130",
+    "max": "0x318F"
+  },
+  {
+    "code": 104,
+    "min": "0xAC40",
+    "max": "0xAC70"
+  }
+]

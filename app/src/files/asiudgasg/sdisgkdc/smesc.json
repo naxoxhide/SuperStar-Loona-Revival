@@ -1,0 +1,149 @@
+[
+  {
+    "code": 30001,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/images/icon/353x232/cardselector_event_R.png?v=22083001",
+    "name": 181710001,
+    "cardType": 0,
+    "description": 181720001
+  },
+  {
+    "code": 2034,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/04/0427/promotion/starpass/cardselector_event_A.png?v=23042701",
+    "name": 181710004,
+    "cardType": 2,
+    "description": 181720004
+  },
+  {
+    "code": 30030,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/04/0427/promotion/starpass/cardselector_event_A.png?v=23042701",
+    "name": 181710004,
+    "cardType": 2,
+    "description": 181720005
+  },
+  {
+    "code": 30031,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/04/0427/promotion/starpass/cardselector_event_A.png?v=23042701",
+    "name": 181710004,
+    "cardType": 2,
+    "description": 181720006
+  },
+  {
+    "code": 30038,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/04/0427/promotion/starpass/cardselector_event_A.png?v=23042701",
+    "name": 181710004,
+    "cardType": 2,
+    "description": 181720007
+  },
+  {
+    "code": 30039,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/04/0427/promotion/starpass/cardselector_event_A.png?v=23042701",
+    "name": 181710004,
+    "cardType": 2,
+    "description": 181720007
+  },
+  {
+    "code": 30047,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/04/0427/promotion/starpass/cardselector_event_A.png?v=23042701",
+    "name": 181710004,
+    "cardType": 2,
+    "description": 181720008
+  },
+  {
+    "code": 30048,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/04/0427/promotion/starpass/cardselector_event_A.png?v=23042701",
+    "name": 181710004,
+    "cardType": 2,
+    "description": 181720008
+  },
+  {
+    "code": 30049,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/04/0427/promotion/starpass/cardselector_event_A.png?v=23042701",
+    "name": 181710004,
+    "cardType": 2,
+    "description": 181720009
+  },
+  {
+    "code": 30051,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/04/0427/promotion/starpass/cardselector_event_A.png?v=23042701",
+    "name": 181710004,
+    "cardType": 2,
+    "description": 181720010
+  },
+  {
+    "code": 30052,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/04/0427/promotion/starpass/cardselector_event_A.png?v=23042701",
+    "name": 181710004,
+    "cardType": 2,
+    "description": 181720011
+  },
+  {
+    "code": 30053,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/10/1005/Promotion/starpass/RSelector.png?v=23100501",
+    "name": 181710005,
+    "cardType": 2,
+    "description": 181720012
+  },
+  {
+    "code": 30055,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/10/1005/Promotion/starpass/RSelector.png?v=23100501",
+    "name": 181710005,
+    "cardType": 2,
+    "description": 181720009
+  },
+  {
+    "code": 30058,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/04/0427/promotion/starpass/cardselector_event_A.png?v=23042701",
+    "name": 181710004,
+    "cardType": 2,
+    "description": 181720013
+  },
+  {
+    "code": 30059,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/04/0427/promotion/starpass/cardselector_event_A.png?v=23042701",
+    "name": 181710004,
+    "cardType": 2,
+    "description": 181720015
+  },
+  {
+    "code": 30060,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/10/1019/Promotion/store_Connect/cardselector_event_B.png?v=23101901",
+    "name": 181710006,
+    "cardType": 2,
+    "description": 181720014
+  },
+  {
+    "code": 30061,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/04/0427/promotion/starpass/cardselector_event_A.png?v=23042701",
+    "name": 181710004,
+    "cardType": 2,
+    "description": 181720014
+  },
+  {
+    "code": 30062,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/10/1019/Promotion/store_Connect/cardselector_event_S.png?v=23101901",
+    "name": 181710007,
+    "cardType": 2,
+    "description": 181720014
+  },
+  {
+    "code": 30063,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/10/1005/Promotion/starpass/RSelector.png?v=23100501",
+    "name": 181710005,
+    "cardType": 2,
+    "description": 181720014
+  },
+  {
+    "code": 30072,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/10/1005/Promotion/starpass/RSelector.png?v=23100501",
+    "name": 181710008,
+    "cardType": 0,
+    "description": 181720016
+  },
+  {
+    "code": 30073,
+    "productImage": "http://d3exy8s96shf22.cloudfront.net/resources/live/2023/04/0427/promotion/starpass/cardselector_event_A.png?v=23042701",
+    "name": 181710004,
+    "cardType": 2,
+    "description": 181720017
+  }
+]
