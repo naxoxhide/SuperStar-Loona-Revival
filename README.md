@@ -6,15 +6,25 @@
 
 ## 📌 Visión General
 
-Tras el cierre de los servidores oficiales de la franquicia SuperStar, este proyecto tiene como objetivo restaurar la funcionalidad completa del cliente de juego, permitiendo la ejecución offline y local a través de una arquitectura compuesta por:
+> [!IMPORTANT]
+> **Enfoque Primordial: 100% Standalone Offline (On-Device)**  
+> El objetivo central y directriz técnica obligatoria del proyecto es convertir a **SuperStar LOONA** en un juego **completamente autónomo y offline**, eliminando cualquier dependencia de servidores remotos en la nube, APIs externas o conexión a internet obligatoria.  
+> Toda la lógica de autenticación, perfil del jugador, inventario, equipamiento de cartas, álbum CardBook y gameplay rítmico se resuelve y procesa directamente en el cliente mediante instrumentación en memoria (IL2CPP / Frida Gadget) y almacenamiento local.
 
-1. **Mock Server Local:** Emulación de las rutas API REST/JSON y endpoints binarios de Dalcomsoft (Autenticación, Sesiones de Miembro, Lobby, Inventario, Catálogo de Canciones/MSD, y CardBook).
-2. **Motor de Criptografía de Datos Dalcomsoft:** Decodificación y re-serialización del formato propietario binario `.bin` (AES-128-CBC con ofuscación por bloques y validación de hash) para archivos de configuración como `msd.bin`, `lbg.bin`, `cdd.bin`, etc.
-3. **Parches de Cliente e Instrumentación IL2CPP:**
+Tras el cierre definitivo de los servidores oficiales de Dalcomsoft, este proyecto restaura la jugabilidad completa del cliente a través de una arquitectura integral:
+
+1. **Modo Standalone Offline en Cliente (Core):**
+   - Intercepción de llamadas de red internas (`BestHTTP`, `URLsControl`, `WWWFile`) para suministrar respuestas simuladas en memoria y cargar texturas directamente desde el almacenamiento local (`wadceg`, `aoeiwhslc/uhex`).
+   - Gestión y persistencia del estado de usuario (cartas obtenidas, inventario OT12, cartas equipadas, canciones desbloqueadas) sin depender de backend externo.
+2. **Mock Server Local (Herramienta de Desarrollo y Pruebas):**
+   - Emulación de rutas API REST/JSON y endpoints de Dalcomsoft en Python para investigación de payloads, extracción de modelos y soporte durante el desarrollo.
+3. **Motor de Criptografía de Datos Dalcomsoft:**
+   - Decodificación y re-serialización del formato propietario binario `.bin` (AES-128-CBC con ofuscación por bloques y validación de hash) para archivos de configuración como `msd.bin`, `lbg.bin`, `cdd.bin`, `ttd.bin`, `url_shared_map.bin`, etc.
+4. **Parches de Cliente e Instrumentación IL2CPP:**
    - Desensamblado y mapeo de símbolos en ARM64 / ARMv7 mediante Il2CppDumper, Ghidra e IDA Pro.
-   - Scripts de instrumentación con Frida para bypass de SSL Pinning en BestHTTP, redirección de tráfico de red y parches de memoria en tiempo de ejecución.
-   - Neutralización de excepciones nulas en navegación de escenas (`LobbyScene` [3] ⇄ `InventoryScene` [4] ⇄ `CardBookScene` [5]).
-4. **Reconstrucción del Cliente Android:** Proyecto Gradle estructurado para compilar, firmar y empaquetar el APK modificado con soporte para depuración y parches nativos.
+   - Inyección de Frida Gadget para bypass de SSL Pinning, bypass de caídas de futex/deadlock, inyección de texturas nativas con `SetNativeSize`, y neutralización de excepciones de ciclo de vida (`LobbyScene` [3] ⇄ `InventoryScene` [4] ⇄ `CardBookScene` [5] ⇄ `IngameScene` [10]).
+5. **Reconstrucción del Cliente Android:**
+   - Proyecto Gradle estructurado para compilar, firmar y empaquetar el APK modificado con librerías nativas integradas y scripts autónomos.
 
 ---
 

@@ -1275,5 +1275,15 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
   - **Grados A, S, R:** Nombrados simétricamente `{theme}_{grade}_{variant}.i.bytes.png` (ej. `0_a_s`, `0_s_s`, `0_r_s`).
 - **Conclusión:** No faltan archivos ni variantes. Todos los grados (C, B, A, S, R) en los 69 temas cuentan con sus tres variantes completas (`_s`, `_c`, `_l`). La fórmula universal implementada en `getGradeFrameDownloadPath` resuelve el 100% de los 1035 archivos sin excepciones.
 
+---
+
+## 🎯 Directriz Estratégica: Enfoque 100% Standalone Offline (On-Device) (2026-09-19)
+
+Por requerimiento y directriz definida por **Ignacio**:
+- **Objetivo Primordial:** La ejecución del cliente debe ser **100% standalone y offline**, garantizando la preservación permanente del videojuego sin depender de servidores remotos, conexiones de red externas ni infraestructura en la nube.
+- **Autonomía On-Device:** Toda la lógica de autenticación simulada, cuenta de usuario, inventario de cartas, equipamiento por canción, álbum CardBook y ejecución rítmica se resuelve directamente en memoria y almacenamiento local del dispositivo mediante instrumentación IL2CPP / Frida Gadget.
+- **Rol del Mock Server:** El servidor en Python (`server/`) se mantiene como entorno auxiliar de desarrollo, pruebas y análisis de payloads, pero el cliente APK final está diseñado para funcionar de manera completamente desacoplada y autónoma.
+
+
 
 
