@@ -2487,20 +2487,26 @@ function initIl2Cpp(module) {
 
                 // grade: 0=C, 1=B, 2=A, 3=S, 4=R
                 // type: 0=Large (_l), 1=Small (_s), 2=Collection (_c)
-                function getGradeFrameDownloadPath(grade, type, isCollection) {
-                    var gStr = "0_c";
-                    if (grade === 1) gStr = "0b";
-                    else if (grade === 2) gStr = "0_a";
-                    else if (grade === 3) gStr = "0_s";
-                    else if (grade === 4) gStr = "0_r";
+                function getGradeFrameDownloadPath(grade, type, isCollection, themeCode) {
+                    var tc = (themeCode !== undefined && themeCode !== null) ? themeCode : 0;
+                    var g = "c";
+                    if (grade === 1) g = "b";
+                    else if (grade === 2) g = "a";
+                    else if (grade === 3) g = "s";
+                    else if (grade === 4) g = "r";
 
                     var variant = "s";
                     if (isCollection || type === 2) variant = "c";
                     else if (type === 0) variant = "l";
 
-                    var fname = gStr + "_" + variant + ".i.bytes";
-                    if (grade === 1 && variant === "l") fname = "0b_l.i.bytes";
-                    else if (grade === 0 && variant === "l") fname = "0c_l.i.bytes";
+                    var fname = "";
+                    if (g === "b") {
+                        fname = tc + "b_" + variant + ".i.bytes";
+                    } else if (g === "c" && variant === "l") {
+                        fname = tc + "c_l.i.bytes";
+                    } else {
+                        fname = tc + "_" + g + "_" + variant + ".i.bytes";
+                    }
 
                     return createDownloadPath("asiudgasg/asodhsg/aoeiwhslc/uhex/" + fname);
                 }
@@ -2938,7 +2944,16 @@ function initIl2Cpp(module) {
                 // Replace ThemeTypeControl.Data.GetGradeImagePath (0xC8ADD8)
                 try {
                     Interceptor.replace(baseAddr.add(0xC8ADD8), new NativeCallback(function (thisPtr, grade, type, methodInfo) {
-                        return getGradeFrameDownloadPath(grade, type);
+                        var tc = 0;
+                        try {
+                            if (thisPtr && !thisPtr.isNull()) {
+                                var model = thisPtr.add(0x10).readPointer();
+                                if (!model.isNull()) {
+                                    tc = model.add(0x10).readS32();
+                                }
+                            }
+                        } catch (eTc) {}
+                        return getGradeFrameDownloadPath(grade, type, false, tc);
                     }, "pointer", ["pointer", "int", "int", "pointer"]));
                     log("[+] Interceptor.replace installed on ThemeTypeControl.Data.GetGradeImagePath (0xC8ADD8)!");
                 } catch (eGgi) {
@@ -3712,6 +3727,16 @@ function initIl2Cpp(module) {
                                 var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
                                 setTextureFn(target, tex, NULL);
 
+                                // If autoSize is true, resize target to texture native dimensions (RawImage.SetNativeSize 0x194C1C8)
+                                if (autoSize !== 0) {
+                                    try {
+                                        var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
+                                        setNativeSizeFn(target, NULL);
+                                    } catch (eSns) {
+                                        log("[-] Error calling SetNativeSize on target: " + eSns.message);
+                                    }
+                                }
+
                                 // Activate RawImage GameObject
                                 var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                                 var targetGo = getGoFn(target, NULL);
@@ -4063,16 +4088,6 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on ThemeTypeControl.Data.get_Code (0xC8AC94)!");
                 } catch (eTtcCode) {
                     log("[-] Error replacing ThemeTypeControl.Data.get_Code: " + eTtcCode.message);
-                }
-
-                // Hook ThemeTypeControl.Data.GetGradeImagePath (0xC8ADD8)
-                try {
-                    Interceptor.replace(baseAddr.add(0xC8ADD8), new NativeCallback(function (thisPtr, grade, type, methodInfo) {
-                        return getGradeFrameDownloadPath(grade, type);
-                    }, "pointer", ["pointer", "int", "int", "pointer"]));
-                    log("[+] Interceptor.replace installed on ThemeTypeControl.Data.GetGradeImagePath (0xC8ADD8)!");
-                } catch (eGgip) {
-                    log("[-] Error replacing ThemeTypeControl.Data.GetGradeImagePath: " + eGgip.message);
                 }
 
                 // Hook ThemeTypeControl.Data.get_BackgroundImagePath (0xC8BD30)

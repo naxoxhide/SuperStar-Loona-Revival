@@ -1191,4 +1191,89 @@ Se realizó el análisis inverso de las texturas de marcos (*card edges*) en `ap
   - Grado S: `0_s_s.i.bytes` (Small) / `0_s_c.i.bytes` (Collection) / `0_s_l.i.bytes` (Large)
   - Grado R: `0_r_s.i.bytes` (Small) / `0_r_c.i.bytes` (Collection) / `0_r_l.i.bytes` (Large)
 
+---
+
+### 6. Análisis Exhaustivo de Variantes de Tier (`_s.i`, `_c.i`, `_l.i`) y Resolución de Dimensionamiento de Marcos (2026-09-19)
+
+#### 6.1. Desensamblado y Mapeo Canónico por Escena en el Motor Dalcomsoft
+A partir del análisis de ingeniería inversa en [dump/dump.cs](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs) y desensamblado directo con Capstone ARM64 en [app/src/main/lib/arm64-v8a/libil2cpp.so](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/lib/arm64-v8a/libil2cpp.so), se identificó el enum `ThemeTypeControl.TYPE` (TypeDefIndex: 14225):
+- `ThemeTypeControl.TYPE.Large` = `0` (sufijo `_Large.png` → `_l.i.bytes`)
+- `ThemeTypeControl.TYPE.Small` = `1` (sufijo `_Small.png` → `_s.i.bytes`)
+- `ThemeTypeControl.TYPE.Collection` = `2` (sufijo `_Collection.png` → `_c.i.bytes`)
+- `ThemeTypeControl.TYPE.Zoom` = `3` (sufijo `_Zoom.png`)
+
+La invocación canónica de `ThemeTypeControl.Data.GetGradeImagePath(CardGrade grade, ThemeTypeControl.TYPE type)` (RVA `0xC8ADD8`) se mapea en el juego según la vista:
+
+1. **Vista en Detalle de Carta (`CardLargeView` / `CardDetail` / Modal Zoom):**
+   - **Método:** `ViewControl.GetLargeCardViewData` (RVA `0xABE5FC`).
+   - **Instrucciones ARM64:**
+     ```arm64
+     0xabe6ec: mov w1, w0       ; w1 = CardGrade (grade)
+     0xabe6f0: mov x0, x21      ; x0 = ThemeTypeControl.Data
+     0xabe6f4: mov w2, wzr      ; w2 = 0 = ThemeTypeControl.TYPE.Large !!
+     0xabe6fc: bl #0xc8add8     ; GetGradeImagePath(grade, Large)
+     ```
+   - **Texturas:**
+     - Foto: `wadceg/{id}_l.i.bytes` (`226 x 318` px).
+     - Marco de Rango: `aoeiwhslc/uhex/{theme}_{grade}_l.i.bytes` (`226 x 318` px).
+     - Relación de aspecto 1:1 exacta, calzando pixel a pixel sobre la foto.
+
+2. **Vista de Inventario y Slots Equipados en Canción (`CardSmallView` / `InventoryScene`):**
+   - **Método:** `ViewControl.GetSmallCardViewData` (RVA `0xABEB30`).
+   - **Instrucciones ARM64:**
+     ```arm64
+     0xabec60: mov w1, w0       ; w1 = CardGrade (grade)
+     0xabec64: mov w2, #1       ; w2 = 1 = ThemeTypeControl.TYPE.Small !!
+     0xabec68: mov x0, x22      ; x0 = ThemeTypeControl.Data
+     0xabec70: bl #0xc8add8     ; GetGradeImagePath(grade, Small)
+     ```
+   - **Texturas:**
+     - Foto: `wadceg/{id}_s.i.bytes` (`85 x 120` px).
+     - Marco de Rango: `aoeiwhslc/uhex/{theme}_{grade}_s.i.bytes` (`116 x 156` px).
+     - El marco posee 11px de margen transparente horizontal y 12px vertical, además del rebaje inferior diseñado para alojar el badge del nivel (`NumberBox`) y las estrellas (`starLevel`).
+
+3. **Gameplay de Ritmo / Cuando se Juega la Canción (`Ingame` / Scene 10):**
+   - **Método:** `IngameLoadingScene.<OnLoading_0_CardTexture_Request>d__30.MoveNext` (RVA `0xED76C4`).
+   - **Instrucciones ARM64:**
+     - En `0xed7b68`: llama a `CardControl.Data.get_SmallImagePath()` (RVA `0xE43844`) cargando `{id}_s.i.bytes` (`85 x 120` px).
+     - En `0xed7d8c`: `mov w2, #1; bl #0xc8add8` (solicita `ThemeTypeControl.TYPE.Small` = 1, cargando `{theme}_{grade}_s.i.bytes`, `116 x 156` px).
+     - En `IngameLoadingScene.<OnLoading_2_CardTexture_WaitAndBind>` (RVA `0xEDA6AC`), el motor genera un atlas unificado (`cardAtlasTexture`) fusionando la foto pequeña (`cardW`=85, `cardH`=120) y el marco de rango (`gradeW`=116, `gradeH`=156) para alimentar `IngameCardObject` durante la pulsación de notas y fiebre (Fever).
+
+4. **Álbum de Colección (`CardCollectionView` / `CardBookScene`):**
+   - **Método:** `CardBookControl.GetCollectionCardViewData` (RVA `0x11D204C`).
+   - **Instrucciones ARM64:**
+     ```arm64
+     0x11d2104: mov w1, w0       ; w1 = CardGrade (grade)
+     0x11d2108: mov w2, #2       ; w2 = 2 = ThemeTypeControl.TYPE.Collection !!
+     0x11d210c: mov x0, x22      ; x0 = ThemeTypeControl.Data
+     0x11d2114: bl #0xc8add8     ; GetGradeImagePath(grade, Collection)
+     ```
+   - **Texturas:**
+     - Foto: `wadceg/{id}_s.i.bytes` (`85 x 120` px).
+     - Marco de Rango: `aoeiwhslc/uhex/{theme}_{grade}_c.i.bytes` (`116 x 156` px).
+     - A diferencia de `_s`, la versión `_c` presenta un marco perimetral cerrado y limpio sin recorte inferior para nivel de carta, optimizado para catálogo estático.
+
+#### 6.2. Causa Raíz del Desajuste de Tamaño en el Walkthrough
+Al desensamblar `CardView.OnRefresh` (RVA `0x13889F0`), se descubrió la llamada a `URLsControl.SetCdnTexture` (RVA `0x163A9E8`):
+- Para la foto (`photo`): se envía `autoSize = false` (`0`), pues la foto debe ajustarse al contenedor rect del prefab de Unity.
+- Para el marco de rango (`tier`): **el motor envía obligatoriamente `autoSize = true` (`1`)**:
+  ```arm64
+  0x1388b44: mov w4, #1       ; w4 = autoSize = 1 (TRUE) para tier
+  0x1388b48: mov w5, #1       ; w5 = autoEnabled = 1
+  0x1388b4c: mov x0, x21      ; x0 = tier (RawImage)
+  0x1388b64: bl #0x163a9e8   ; URLsControl.SetCdnTexture
+  ```
+- En `URLsControl.<SetCdnTexture>b__0` (RVA `0x20D4ADC`), si `autoSize != 0`, el motor ejecuta el método virtual `RawImage.SetNativeSize()` (RVA `0x194C1C8`).
+- **Problema previo:** En nuestro hook de Frida en [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js), no se llamaba a `SetNativeSize(target)`. El `RawImage tier` permanecía con las dimensiones por defecto del prefab o distorsionado.
+- **Solución implementada:** Se integró la invocación a `RawImage.SetNativeSize(target)` (`0x194C1C8`) cada vez que `autoSize !== 0`, permitiendo que el marco de 116x156 se expanda y centre automáticamente sobre la carta de 85x120.
+
+#### 6.3. Desmitificación de la Estructura de Archivos en `aoeiwhslc/uhex`
+Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/asodhsg/aoeiwhslc/uhex/` (69 temas x 5 rangos x 3 variantes):
+- Dalcomsoft empleó convenciones asimétricas en los nombres de archivo:
+  - **Grado B:** Nombrado `{theme}b_{variant}.i.bytes.png` (sin guión bajo tras el número de tema, ej. `0b_s`, `0b_c`, `0b_l`, `67b_s`).
+  - **Grado C:** Nombrado `{theme}_c_{variant}.i.bytes.png` para `_s` y `_c`, pero la versión Large fue nombrada `{theme}c_l.i.bytes.png` (sin guión bajo, ej. `0c_l`, `10c_l`, `67c_l`).
+  - **Grados A, S, R:** Nombrados simétricamente `{theme}_{grade}_{variant}.i.bytes.png` (ej. `0_a_s`, `0_s_s`, `0_r_s`).
+- **Conclusión:** No faltan archivos ni variantes. Todos los grados (C, B, A, S, R) en los 69 temas cuentan con sus tres variantes completas (`_s`, `_c`, `_l`). La fórmula universal implementada en `getGradeFrameDownloadPath` resuelve el 100% de los 1035 archivos sin excepciones.
+
+
 
