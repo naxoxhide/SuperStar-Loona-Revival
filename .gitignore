@@ -1,0 +1,120 @@
+# ====================================================================
+# SuperStar LOONA Revival - .gitignore
+# ====================================================================
+
+# --------------------------------------------------------------------
+# 1. AI Agents, LLM IDEs & Local Workspaces (Buenas Prácticas)
+# --------------------------------------------------------------------
+# Logs de transcripciones, sesiones y conversaciones del agente
+*.transcript
+*.transcripts/
+transcript.jsonl
+transcript_full.jsonl
+conversation_history/
+*.chat
+
+# Caches locales y configuraciones de IDEs con IA (Gemini, Antigravity, Cursor, Windsurf, Claude)
+.gemini/
+.antigravity/
+.cursor/
+.cursorrules.local
+.cursorindexing/
+.claude/
+.continue/
+.copilot/
+
+# Directorios de trabajo temporal del agente y capturas de pantalla de testing
+scratch/
+agent_scratch/
+*.agent_tmp
+.system_generated/
+screen_*.png
+screen_*.jpg
+screenshot*.png
+
+# Exclusiones de caches internos en .agents/ (se preservan AGENTS.md y skills/)
+.agents/**/.cache/
+.agents/**/.history/
+.agents/**/scratch/
+.agents/**/*.tmp
+
+# --------------------------------------------------------------------
+# 2. Android & Gradle Build System
+# --------------------------------------------------------------------
+.gradle/
+build/
+app/build/
+*/build/
+bin/
+gen/
+out/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Rutas locales específicas de máquina y SDK
+local.properties
+
+# Paquetes y binarios compilados de Android
+*.apk
+*.ap_
+*.aab
+*.dex
+
+# Firmas digitales, certificados privados y keystores
+*.keystore
+*.jks
+*.key
+*.p12
+
+# --------------------------------------------------------------------
+# 3. Python & Server Runtime
+# --------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so.bak
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Logs del servidor y procesos
+*.log
+server.log
+server/*.log
+
+# Bases de datos SQLite y temporales generadas en tiempo de ejecución
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+
+# Empaquetado y pruebas de Python
+*.egg-info/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --------------------------------------------------------------------
+# 4. Sistema Operativo y Editores
+# --------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Configuraciones de editor locales
+.idea/
+.vscode/
+*.swp
+*~
+*.bak
