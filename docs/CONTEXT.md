@@ -1100,3 +1100,95 @@ Se realizaron pruebas exhaustivas de navegación cruzada en el emulador Android 
 - **Rama:** `feat/card-ui`
 - **Propósito:** Desarrollo, estabilización y refinamiento de la interfaz gráfica y visualización de cartas (`CardSmallView`, `CardLargeView`, `InventoryScene`, `CardBookScene`, resolución de vistas de integrantes de LOONA y overlays gráficos).
 - **Publicación:** Rama publicada en `origin/feat/card-ui`.
+
+---
+
+## 🃏 Investigación Técnica de UI de Cartas: Escenas, Texturas y Assets (2026-09-19)
+
+### 1. Arquitectura y Desmitificación de Escenas: `InventoryScene` vs `CardBookScene` vs `SelectMusicScene`
+A partir del análisis inverso de `dump/dump.cs` y los desensamblados de `libil2cpp.so` (ARM64), se clarificó la relación exacta de las escenas presentes en la interfaz del juego (capturas de referencia):
+
+```
+                       [ LobbyScene (ID: 3) ]
+                                 ▲
+                                 │
+                                 ▼
+                     [ SelectMusicScene (ID: 7) ]
+                       (Canciones y Beatmaps)
+                                 ▲
+                                 │ (botón "MUSIC" / tap en cartas)
+                                 ▼
+                     [ InventoryScene (ID: 4) ]  ◄── (Escena en las capturas)
+                       (Equipamiento de cartas por grupo/canción)
+                                 │
+                                 │ (botón lateral "Card Book" / btnMyCollection)
+                                 ▼
+                     [ CardBookScene (ID: 5) ]
+                       (Álbum coleccionista de temas y cartas globales)
+```
+
+1. **La escena de las imágenes adjuntas es `InventoryScene` (Scene ID: 4):**
+   - Corresponde a la clase `com.dalcomsoft.project.app.scene.InventoryScene` y su vista principal `InventoryView` (`0x106056C`).
+   - El botón superior izquierdo dentro del panel central con el texto **"MUSIC"** (o "Music") está enlazado a `InvenGroupItemView.selectMusicText` (offset `0x100`). Al pulsarlo, el juego regresa o transiciona a `SelectMusicScene` (Scene ID: 7) para jugar las canciones del grupo activo (ej. LOONA).
+   - El botón lateral con el icono de medalla/cinta es **`btnMyCollection`** (offset `0xA8` en `InventoryView`), el cual dispara el método `OnMyCollection()` (`0x105DE08`) abriendo de manera inmediata **`CardBookScene` (Scene ID: 5)**.
+   - Por ende, la escena donde se ven las cartas equipadas es la **pantalla de Inventario y Equipamiento de Canción/Grupo**, no el CardBook, actuando como el puente directo entre la música y la colección.
+
+### 2. Análisis Causa Raíz: ¿Por qué la carta actual se ve vacía con barra gris y texto "Summary"? (Imagen 1 vs Imagen 2)
+Al desensamblar `CardView.OnRefresh` (`0x13889F0`), `CardSmallView.OnRefresh` (`0x139061C`) y `URLsControl.SetCdnTexture` (`0x163A9E8` → `0xCD5380`):
+1. **Fallo en la resolución asíncrona de CDN (`WWWFile.Load`):**
+   - `CardView` posee dos componentes clave tipo `RawImage`:
+     - `photo` (offset `0x58`): Foto de la integrante.
+     - `tier` (offset `0x68`): Marco metálico ornamental del rango (R, S, A, B, C).
+   - En `CardView.OnRefresh`:
+     ```arm64
+     0x1388af8: bl #0x163a9e8   ; URLsControl.SetCdnTexture(photo, photoPath, photoTexture, <OnRefresh>b__47_0, ...)
+     ...
+     0x1388b48: bl #0x163a9e8   ; URLsControl.SetCdnTexture(tier, tierPath, tierTexture, <OnRefresh>b__47_1, ...)
+     ```
+   - Al no contar con el CDN real o fallar la cola de hilos de `WWWFile`, los callbacks de cierre nunca se invocan:
+     - `<OnRefresh>b__47_0` (`0x1394904`): `mov w1, #1; b #0x138f3a0` (ejecuta `CardView.set_PhotoVisible(true)`).
+     - `<OnRefresh>b__47_1` (`0x139490C`): `mov w1, #1; b #0x1393aac` (ejecuta `CardView.set_TierVisible(true)`).
+   - Al quedar ambos `RawImage` desactivados y sin textura, la carta muestra el fondo blanco plano del prefab de Unity y expone el `GaugeFrame` (la barra plateada horizontal central de nivel/experiencia por defecto).
+2. **Textos residuales "Summary Summary Summary":**
+   - Provienen del arreglo `InvenGroupItemView.summary` (`Text[]` en offset `0x68`). En unidades de 3 miembros (como JinSoul en Imagen 2), estos textos corresponden a las etiquetas "Vocal", "Dance", "Rhythm". Para grupos de 12 integrantes (LOONA), estas etiquetas deben limpiarse a cadena vacía `""` o desactivarse para evitar que se renderice el texto por defecto del prefab de Unity.
+
+### 3. Resolución de Assets: `_s` vs `_l` y `wadceg` vs `sdhgauwehdnu`
+Se verificó la estructura interna de los archivos binarios de texturas `.i.bytes` (los cuales son archivos estándar con firma PNG `\x89PNG\r\n\x1a\n`):
+
+| Tipo de Asset | Sufijo | Ubicación Relativa | Resolución / Peso | Uso en Arquitectura |
+| :--- | :--- | :--- | :--- | :--- |
+| **Carta Posesión Pequeña** | `_s.i.bytes` | `asiudgasg/asodhsg/wadceg/{id}_s.i.bytes` | ~180x250 (~24 KB) | **`CardBookScene` (Grilla de álbumes y temas)**, Bandeja inferior de `InventoryScene` (`CardSmallView`), y slots equipados de LOONA OT12. |
+| **Carta Posesión Grande** | `_l.i.bytes` | `asiudgasg/asodhsg/wadceg/{id}_l.i.bytes` | ~600x900 (~135 KB) | Popup de inspección (`CardDetail`), Zoom, unidades de 3 miembros en vista amplia (`CardLargeView`) y animaciones de Gacha. |
+| **Silueta / Vacía Pequeña** | `_s.i.bytes` | `asiudgasg/asodhsg/sdhgauwehdnu/{id}_s.i.bytes` | ~180x250 (~18 KB) | **`CardBookScene` (Cartas no obtenidas/faltantes en el álbum)** y slots vacíos en inventario. |
+| **Silueta / Vacía Grande** | `_l.i.bytes` | `asiudgasg/asodhsg/sdhgauwehdnu/{id}_l.i.bytes` | ~600x900 (~85 KB) | Detalle de cartas bloqueadas en CardBook. |
+| **Marco Ornamental (Tier)** | `_s.i.bytes` | `asiudgasg/asodhsg/aoeiwhslc/uhex/1_{grade}_s.i.bytes` | Variable (~25 KB) | Overlay del rango (R, S, A, B, C) con estrellas en `CardSmallView`. |
+
+### 4. Detección de Cartas en la Cuenta del Usuario
+- Se establece una tabla de inventario del usuario (`accountOwnedCards`) que define las cartas en posesión:
+  - Cartas `1001` a `1012` (LOONA OT12, Rango R, Nivel 50).
+- **Lógica de Decisión Dinámica en Frida:**
+  1. Si `cardId` ∈ `accountOwnedCards`:
+     - Utilizar `asiudgasg/asodhsg/wadceg/{cardId}_s.i.bytes` (o `_l.i.bytes` según el tamaño requerido).
+  2. Si `cardId` ∉ `accountOwnedCards`:
+     - Utilizar `asiudgasg/asodhsg/sdhgauwehdnu/{cardId}_s.i.bytes` (silueta oscura).
+  3. Cargar directamente el Texture2D en memoria vía `ImageConversion.LoadImage` (`0x25B3E90`) e inyectarlo en `RawImage.set_texture` (`0x194C074`), activando los GameObjects y ejecutando los callbacks de visibilidad.
+
+### 5. Arquitectura y Mapeo de Marcos de Rango (*Tier Frames*) en `aoeiwhslc/uhex`
+Se realizó el análisis inverso de las texturas de marcos (*card edges*) en `app/src/files/asiudgasg/asodhsg/aoeiwhslc/uhex/` a partir de `url_shared_map.json`:
+- **Nomenclatura Dalcomsoft:** `{TemaPrefix}_{Grade}_{Variante}.i.bytes`
+  - **Grados (`Grade`):** `c` (C), `b` (B, ej. `0b_...`), `a` (A), `s` (S), `r` (R).
+  - **Variantes de Escena (`Variante`):**
+    - `_s.i.bytes` (`Small`): Utilizado para `CardSmallView` en `InventoryScene` (slots superiores de equipamiento y cartas en la bandeja de inventario).
+    - `_c.i.bytes` (`Collection`): Utilizado para `CardCollectionView` en `CardBookScene` (diseñado exclusivamente para la cuadrícula del álbum de temas).
+    - `_l.i.bytes` (`Large`): Utilizado para `CardLargeView` (inspección detallada a pantalla completa / zoom).
+  - **Prefijos de Tema:**
+    - `0_` (o `0b_`, `0c_`): Marcos básicos estándar (`ced_basic`).
+    - `1_`, `2_`, `3_`...: Marcos temáticos de eventos limitados (*Pale Blue Dot*, *Be Honest*, *Why Not*, etc.).
+- **Tabla de Marcos Básicos Estándar (`ced_basic`):**
+  - Grado C: `0_c_s.i.bytes` (Small) / `0_c_c.i.bytes` (Collection) / `0c_l.i.bytes` (Large)
+  - Grado B: `0b_s.i.bytes` (Small) / `0b_c.i.bytes` (Collection) / `0b_l.i.bytes` (Large)
+  - Grado A: `0_a_s.i.bytes` (Small) / `0_a_c.i.bytes` (Collection) / `0_a_l.i.bytes` (Large)
+  - Grado S: `0_s_s.i.bytes` (Small) / `0_s_c.i.bytes` (Collection) / `0_s_l.i.bytes` (Large)
+  - Grado R: `0_r_s.i.bytes` (Small) / `0_r_c.i.bytes` (Collection) / `0_r_l.i.bytes` (Large)
+
+
