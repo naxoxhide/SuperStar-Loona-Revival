@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "conventional-commit": {
+      "source": "rlespinasse/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/conventional-commit/SKILL.md",
+      "computedHash": "b91f9c12851a115f8d38d19caef76d1a0f5b7063dbd04ebaea5b9ac4f6bf3272"
+    }
+  }
+}

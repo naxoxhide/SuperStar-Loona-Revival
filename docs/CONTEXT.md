@@ -1086,3 +1086,12 @@ Se realizaron pruebas exhaustivas de navegación cruzada en el emulador Android 
   5. Volcados y símbolos IL2CPP (`dump/`, `cdd.json`).
   6. Proyecto cliente Android reconstruido (`build.gradle`, `app/src/main/`).
   7. Paquetes completos de datos binarios Dalcomsoft, beatmaps `.seq`, audios y catálogo de cartas (11.927 assets en `app/src/files/`).
+
+### Actualización de Identidad Git y Adopción de Conventional Commits (2026-09-19)
+- **Identidad Git Configurada:**
+  - `user.name`: `naxoxhide`
+  - `user.email`: `irojasangel@gmail.com`
+  - Se reescribió la autoría del historial completo de commits del proyecto para que la atribución en GitHub corresponda unívocamente a `naxoxhide`.
+- **Instalación de Skill de Agente:**
+  - Se instaló la skill oficial `conventional-commit` desde `https://github.com/rlespinasse/agent-skills` en [.agents/skills/conventional-commit/SKILL.md](file:///Users/ignaciorojas/Documents/repos/sslo_apk/.agents/skills/conventional-commit/SKILL.md) junto con su archivo de manifiesto `skills-lock.json`.
+  - Esta skill estandariza el formato y mejores prácticas para mensajes de commit (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, etc.).
