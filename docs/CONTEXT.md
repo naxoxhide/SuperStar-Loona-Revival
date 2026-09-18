@@ -1078,4 +1078,11 @@ Se realizaron pruebas exhaustivas de navegación cruzada en el emulador Android 
     2. **Android & Gradle:** Exclusión de caches (`.gradle/`, `build/`, `app/build/`), rutas locales de SDK con información del host (`local.properties`), binarios finales (`*.apk`, `*.dex`), y certificados de firma (`*.keystore`, `*.jks`).
     3. **Python & Mock Server:** Exclusión de entornos virtuales (`.venv/`, `venv/`), archivos de bytecode compilado (`__pycache__/`, `*.pyc`), logs de ejecución (`server.log`), y bases de datos SQLite en caliente (`*.db`, `*.sqlite3`).
     4. **Sistema Operativo & Editores:** Exclusión de artefactos de macOS (`.DS_Store`, `._*`) y carpetas locales de editores (`.vscode/`, `.idea/`).
-- **Estado de Sincronización:** Repositorio local inicializado, rama `main` vinculada con upstream remoto (`origin/main`) y primer commit base publicado exitosamente.
+- **Estado de Sincronización:** Repositorio completamente sincronizado con `origin/main` (commit `28e04799`). Se estructuró la subida en 13 commits atómicos y lotes optimizados para evitar sobrepasar los límites de búfer HTTP de GitHub, cubriendo:
+  1. Configuración de repositorio (`.gitignore`, `README.md`).
+  2. Documentación técnica y directrices de agentes (`docs/`, `.agents/`).
+  3. Utilidades de criptografía y scripts de corrección APK (`tools/`, `fix_*.py`, `deploy_card_assets.py`).
+  4. Servidor mock local y recursos estáticos (`server/`).
+  5. Volcados y símbolos IL2CPP (`dump/`, `cdd.json`).
+  6. Proyecto cliente Android reconstruido (`build.gradle`, `app/src/main/`).
+  7. Paquetes completos de datos binarios Dalcomsoft, beatmaps `.seq`, audios y catálogo de cartas (11.927 assets en `app/src/files/`).
