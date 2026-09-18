@@ -1095,3 +1095,8 @@ Se realizaron pruebas exhaustivas de navegación cruzada en el emulador Android 
 - **Instalación de Skill de Agente:**
   - Se instaló la skill oficial `conventional-commit` desde `https://github.com/rlespinasse/agent-skills` en [.agents/skills/conventional-commit/SKILL.md](file:///Users/ignaciorojas/Documents/repos/sslo_apk/.agents/skills/conventional-commit/SKILL.md) junto con su archivo de manifiesto `skills-lock.json`.
   - Esta skill estandariza el formato y mejores prácticas para mensajes de commit (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, etc.).
+
+### Creación de Rama de Trabajo para UI de Cartas (2026-09-19)
+- **Rama:** `feat/card-ui`
+- **Propósito:** Desarrollo, estabilización y refinamiento de la interfaz gráfica y visualización de cartas (`CardSmallView`, `CardLargeView`, `InventoryScene`, `CardBookScene`, resolución de vistas de integrantes de LOONA y overlays gráficos).
+- **Publicación:** Rama publicada en `origin/feat/card-ui`.
