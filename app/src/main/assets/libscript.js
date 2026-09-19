@@ -3307,7 +3307,7 @@ function initIl2Cpp(module) {
                         var p = il2cpp_object_new(csvParamsKlass);
                         if (!p || p.isNull()) return NULL;
 
-                        var photoDp = createDownloadPath("asiudgasg/asodhsg/wadceg/" + cardId + "_s.i.bytes");
+                        var photoDp = createDownloadPath("asiudgasg/asodhsg/wadceg/" + cardId + "_l.i.bytes");
                         var tierDp = getGradeFrameDownloadPath(grade, 1);
 
                         p.add(0x10).writePointer(photoDp || NULL);
@@ -3323,7 +3323,7 @@ function initIl2Cpp(module) {
                         p.add(0x48).writeS32(level);
                         p.add(0x4C).writeU8(0);
                         p.add(0x4E).writeS16(0);
-                        p.add(0x50).writeU8(isEquip ? 1 : 0); // isEquip dynamic
+                        p.add(0x50).writeU8(isEquip ? 1 : 0); // isEquip dynamic (controls blue checkmark)
                         p.add(0x51).writeU8(0);
                         p.add(0x52).writeU8(0);
                         p.add(0x53).writeU8(0);
@@ -3345,7 +3345,7 @@ function initIl2Cpp(module) {
                         var p = il2cpp_object_new(csvParamsKlass);
                         if (!p || p.isNull()) return NULL;
 
-                        var photoDp = createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/" + cardId + "_s.i.bytes");
+                        var photoDp = createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/" + cardId + "_l.i.bytes");
 
                         p.add(0x10).writePointer(photoDp || NULL);
                         p.add(0x18).writePointer(NULL); // tierPath = null
@@ -3429,10 +3429,25 @@ function initIl2Cpp(module) {
                                 if (cardItem && !cardItem.isNull()) {
                                     var raw = cardItem.add(0x10).readPointer();
                                     if (!raw.isNull()) {
+                                        var objIdStr = raw.add(0x10).readU64().toString();
                                         cId = raw.add(0x20).readS32();
                                         gr = raw.add(0x24).readS32();
                                         lvl = raw.add(0x1C).readS16();
-                                        isEq = (raw.add(0x28).readU8() === 1);
+                                        var profile = loadPlayerProfile();
+                                        if (profile && profile.inventoryCards) {
+                                            var found = profile.inventoryCards.find(function(c) {
+                                                return c.objectID && c.objectID.toString() === objIdStr;
+                                            });
+                                            if (found) {
+                                                isEq = !!found.isEquip;
+                                                gr = (found.grade !== undefined) ? found.grade : gr;
+                                                lvl = found.level || lvl;
+                                            } else {
+                                                isEq = (raw.add(0x28).readU8() === 1);
+                                            }
+                                        } else {
+                                            isEq = (raw.add(0x28).readU8() === 1);
+                                        }
                                     }
                                 }
                             } catch (e) {}
@@ -4734,7 +4749,7 @@ function initIl2Cpp(module) {
                                 var c = profile.inventoryCards[i];
                                 var cMember = ((c.cardID - 1001) % 12);
                                 if (cMember === memberIdx) {
-                                    if (c.objectID == objId || c.cardID == cardId) {
+                                    if (c.objectID.toString() === objId.toString() || c.cardID === cardId) {
                                         c.isEquip = true;
                                     } else {
                                         c.isEquip = false;
@@ -4764,7 +4779,8 @@ function initIl2Cpp(module) {
                                 var cid = r.add(0x20).readS32();
                                 var mIdx = ((cid - 1001) % 12);
                                 if (mIdx === memberIdx) {
-                                    if (itm.equals(newCardItem)) {
+                                    var oid = r.add(0x10).readU64().toString();
+                                    if (itm.equals(newCardItem) || oid === objId.toString() || cid === cardId) {
                                         r.add(0x28).writeU8(1);
                                     } else {
                                         r.add(0x28).writeU8(0);
@@ -4784,16 +4800,6 @@ function initIl2Cpp(module) {
                                 var mIdx = ((cid - 1001) % 12);
                                 var isEq = (r.add(0x28).readU8() === 1);
                                 if (isEq && !memberFilled[mIdx]) {
-                                    loonaEquippedCards.push(itm);
-                                    memberFilled[mIdx] = true;
-                                }
-                            }
-                            for (var k = 0; k < loonaCardItems.length && loonaEquippedCards.length < 12; k++) {
-                                var itm = loonaCardItems[k];
-                                var r = itm.add(0x10).readPointer();
-                                var cid = r.add(0x20).readS32();
-                                var mIdx = ((cid - 1001) % 12);
-                                if (!memberFilled[mIdx]) {
                                     loonaEquippedCards.push(itm);
                                     memberFilled[mIdx] = true;
                                 }
@@ -4827,13 +4833,13 @@ function initIl2Cpp(module) {
                         if (profile && profile.inventoryCards) {
                             for (var i = 0; i < profile.inventoryCards.length; i++) {
                                 var c = profile.inventoryCards[i];
-                                if (c.objectID == objId || c.cardID == cardId) {
+                                if (c.objectID.toString() === objId.toString() || c.cardID === cardId) {
                                     c.isEquip = false;
                                 }
                             }
                             if (profile.equipedCards && profile.equipedCards["1001"]) {
                                 profile.equipedCards["1001"] = profile.equipedCards["1001"].filter(function(id) {
-                                    return id != objId;
+                                    return id.toString() !== objId.toString();
                                 });
                             }
                             savePlayerProfile(profile);
@@ -4846,8 +4852,8 @@ function initIl2Cpp(module) {
                                 var itm = loonaCardItems[k];
                                 var r = itm.add(0x10).readPointer();
                                 var cid = r.add(0x20).readS32();
-                                var oid = r.add(0x10).readU64();
-                                if (oid == objId || cid == cardId) {
+                                var oid = r.add(0x10).readU64().toString();
+                                if (oid === objId.toString() || cid === cardId) {
                                     r.add(0x28).writeU8(0);
                                 }
                             }
@@ -4919,8 +4925,8 @@ function initIl2Cpp(module) {
                                 var itm = loonaCardItems[k];
                                 var r = itm.add(0x10).readPointer();
                                 var cid = r.add(0x20).readS32();
-                                var oid = r.add(0x10).readU64();
-                                var isE = newEqList.indexOf(oid) !== -1;
+                                var oid = r.add(0x10).readU64().toString();
+                                var isE = newEqList.some(function(id) { return id.toString() === oid; });
                                 r.add(0x28).writeU8(isE ? 1 : 0);
                             }
                         }
@@ -4976,7 +4982,7 @@ function initIl2Cpp(module) {
                             }
                         }
 
-                        // FastArray with empty list or placeholders
+                        // FastArray with empty list
                         loonaCardListFastArray = createFastArray([], 'card');
                         if (loonaGroupItemObj && !loonaGroupItemObj.isNull()) {
                             loonaGroupItemObj.add(0x28).writePointer(loonaCardListFastArray);
