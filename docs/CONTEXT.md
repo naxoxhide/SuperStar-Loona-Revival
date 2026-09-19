@@ -1356,4 +1356,10 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
    - **Bandeja Inferior (`InvenCardView`):** Las cartas en reserva (HeeJin Grado A Lv 1 y HyunJin Grado S Lv 1) se muestran sin recuadro azul (sin checkmark). Las 12 cartas equipadas (HeeJin a Olivia Hye Grado R Lv 50) muestran el checkmark azul (✓) y su marco R con estrella 50.
    - **Cabecera de Tema (`InvenGroupItemView`):** Sincronizada al 100% con los datos de `player_profile.json`, manteniendo Group Grade `R +500.000` y `⚡ ULTRA RAVE Lv 3 Hi High`.
 
+### 16.5. Política de Archivo de Walkthroughs y Evidencia Visual en el Repositorio
+- Por diseño del IDE, los artefactos volátiles residen en `~/.gemini/antigravity-ide/brain/<conversation-id>/`.
+- Para garantizar persistencia histórica, trazabilidad y acceso directo en el repositorio Git, los reportes de *Walkthrough* e hitos visuales se sincronizan y archivan permanentemente en `docs/walkthroughs/`, respaldados por sus capturas en `docs/walkthroughs/media/`.
+
+
+
 
