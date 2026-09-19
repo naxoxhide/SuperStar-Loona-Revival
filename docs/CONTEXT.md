@@ -1388,8 +1388,47 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
    - **Desequipar Todo:** Al pulsar el botón "Unequip All" (x=1620, y=590), `InventoryScene.OnAllUnequip` (RVA `0x105C158`) guarda `"equipedCards": { "1001": [] }` en el JSON y la bandeja inferior limpia todos los checkmarks azules al instante.
    - **Auto-Equipar:** Al pulsar el botón "Auto Equip" (x=1620, y=460), `InventoryScene.OnAutoEquip` (RVA `0x105C024`) evalúa los 12 miembros, equipa las cartas de mayor grado y nivel (Grado R Lv 50) y restaura los checkmarks y la cabecera del tema.
 
+### 16.8. Perfeccionamiento del Ciclo de Vida Equipar/Desequipar y Renderizado de Siluetas Vacías (Placeholders en Alta Definición)
 
+1. **Arquitectura y Renderizado de Siluetas Vacías en `InvenGroupItemView`:**
+   - **Ruta de Texturas Canónicas:** Cuando un slot del tema carece de carta equipada, se generan parámetros mediante `createMockEmptySmallCardParams(cardId)` que apuntan a `asiudgasg/asodhsg/sdhgauwehdnu/<cardId>_l.i.bytes` (resolución completa de alta fidelidad, en lugar de `_s.i.bytes`).
+   - **Preservación de Directorio en `URLsControl.SetCdnTexture` (RVA `0x163A9E8`):** Se ajustó la intercepción para respetar de forma estricta el subdirectorio `sdhgauwehdnu/`, evitando que los placeholders vacíos retrocedieran al folder de cartas equipadas `wadceg/`.
+   - **Ocultamiento de Elementos de Interfaz en Slots Vacíos:**
+     - `setTierVis(0)`: Desactiva el `RawImage` del marco del grado (R, S, A, B, C).
+     - `setStarVis(0)`: Desactiva el icono de estrella (`Image star`).
+     - `setNumVis(0)`: Desactiva el texto numérico del nivel (`Text num`).
+     - El nombre del miembro correspondiente (`Text name`) se mantiene visible y nítido sobre la silueta gris oficial.
 
+2. **Ingeniería Inversa de `InvenCardEquipView` e `InventoryScene.OnEquip`:**
+   - **Desensamblado de `InventoryScene.OnChange` (RVA `0x105A61C`):**
+     - Al pulsar el botón de cambio (`btnChange`) en `InvenCardMainView`, Dalcomsoft traslada los punteros:
+       - `[x19, #0x90]` almacena la carta seleccionada para equipar (`newCardItem`).
+       - `[x19, #0x88]` almacena la carta previamente equipada en dicho slot (`beforeCardItem`), o `NULL` si el slot estaba vacío.
+   - **Causa Raíz del Bloqueo al Equipar en Slots Vacíos:**
+     - En el método original `InventoryScene.OnEquip` (RVA `0x105AFC8`), la instrucción en `0x105B088` (`cbz x8, 0x105b194`) ejecutaba un retorno inmediato (`ret`) si `[x19, #0x90]` o el contexto comparativo no detectaba una carta previamente equipada.
+     - Al desequipar todas las cartas, el intento subsiguiente de equipar una carta individual quedaba bloqueado por esta guarda nativa de Dalcomsoft.
+   - **Solución Nativa mediante Interceptor:**
+     - Se reemplazó `InventoryScene.OnEquip` (RVA `0x105AFC8`) para extraer limpiamente `newCardItem` de `[0x90]` (o fallback a `[0x88]`), invocar `handleCardEquipOffline(beforeCard, newCard)`, actualizar `player_profile.json` y retornar ordenadamente a la vista de inventario mediante `SetStateDefault(sceneThis, 1, 0)` (RVA `0x1053B88`).
 
+3. **Corrección Categórica de Identidad de Cartas (`objectID` vs `cardID`):**
+   - **Problema Detectado:** En las rutinas `handleCardEquipOffline` y `handleCardUnequipOffline`, la condición previa `c.objectID == objId || c.cardID == cardId` provocaba que todas las cartas pertenecientes a una misma integrante (ej. HeeJin Grado R y HeeJin Grado A, ambas con `cardID: 1001`) se marcaran simultáneamente con `isEquip: true`.
+   - **Corrección:** Se eliminó la evaluación por `cardID` genérico, restringiendo la mutación a `c.objectID.toString() === objId.toString()`. Cada instancia de carta posee un identificador único en el inventario, garantizando que una integrante sólo tenga equipada su carta elegida.
 
+4. **Verificación Integral en Emulador (`emulator-5554`):**
+   - **Desequipar Todo ("Unequip All"):**
+     - Cabecera: Todos los 12 slots muestran la silueta gris de `sdhgauwehdnu/` sin marcos ni estrellas. `Group Grade: S - / Collect All Cards`, `Group Theme: No Theme`.
+     - Bandeja inferior: Todos los checkmarks azules (`✓`) eliminados.
+   - **Equipamiento Individual de HeeJin Grado A:**
+     - Slot 0 se actualiza a HeeJin Grado A con marco morado. Slots 1 a 11 se mantienen como siluetas vacías.
+     - Bandeja inferior: Únicamente la carta HeeJin Grado A adquiere el checkmark azul (`✓`).
+   - **Equipamiento Individual de HyunJin Grado S:**
+     - Slot 1 se actualiza a HyunJin Grado S con marco dorado. Slots 2 a 11 se mantienen como siluetas vacías.
+     - Bandeja inferior: HeeJin Grado A y HyunJin Grado S muestran sus respectivos checkmarks azules.
+   - **Desequipamiento Individual:**
+     - Al pulsar la carta equipada y tocar el botón de desequipar en el modal, Slot 0 regresa a silueta vacía y su checkmark es removido.
+   - **Auto-Equipar ("Auto Equip"):**
+     - Los 12 slots se restauran instantáneamente a Grado R Nivel 50 con marco dorado R y 5 estrellas.
+     - Se reactiva `Group Grade R (+500.000)` y `⚡ ULTRA RAVE Lv 3 Hi High`.
+     - Las 12 cartas Grado R recuperan su checkmark azul en la bandeja inferior.
+   - **Persistencia en Disco:** Sincronización continua y verificación en `/sdcard/Android/data/com.dalcomsoft.sslo/files/player_profile.json`.
 

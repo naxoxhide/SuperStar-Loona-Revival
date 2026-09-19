@@ -4749,7 +4749,7 @@ function initIl2Cpp(module) {
                                 var c = profile.inventoryCards[i];
                                 var cMember = ((c.cardID - 1001) % 12);
                                 if (cMember === memberIdx) {
-                                    if (c.objectID.toString() === objId.toString() || c.cardID === cardId) {
+                                    if (c.objectID.toString() === objId.toString()) {
                                         c.isEquip = true;
                                     } else {
                                         c.isEquip = false;
@@ -4780,7 +4780,7 @@ function initIl2Cpp(module) {
                                 var mIdx = ((cid - 1001) % 12);
                                 if (mIdx === memberIdx) {
                                     var oid = r.add(0x10).readU64().toString();
-                                    if (itm.equals(newCardItem) || oid === objId.toString() || cid === cardId) {
+                                    if (itm.equals(newCardItem) || oid === objId.toString()) {
                                         r.add(0x28).writeU8(1);
                                     } else {
                                         r.add(0x28).writeU8(0);
@@ -4833,7 +4833,7 @@ function initIl2Cpp(module) {
                         if (profile && profile.inventoryCards) {
                             for (var i = 0; i < profile.inventoryCards.length; i++) {
                                 var c = profile.inventoryCards[i];
-                                if (c.objectID.toString() === objId.toString() || c.cardID === cardId) {
+                                if (c.objectID.toString() === objId.toString()) {
                                     c.isEquip = false;
                                 }
                             }
@@ -4853,7 +4853,7 @@ function initIl2Cpp(module) {
                                 var r = itm.add(0x10).readPointer();
                                 var cid = r.add(0x20).readS32();
                                 var oid = r.add(0x10).readU64().toString();
-                                if (oid === objId.toString() || cid === cardId) {
+                                if (oid === objId.toString()) {
                                     r.add(0x28).writeU8(0);
                                 }
                             }
@@ -5061,6 +5061,53 @@ function initIl2Cpp(module) {
                     log("[+] Replaced InventoryScene.OnAllUnequip (0x105C158) successfully!");
                 } catch (eOau) {
                     log("[-] Error replacing InventoryScene.OnAllUnequip: " + eOau.message);
+                }
+
+                // Hook InvenCardEquipView.OnEquip (0xF21D7C) & InventoryScene.OnEquip (0x105AFC8)
+                try {
+                    Interceptor.attach(baseAddr.add(0xF21D7C), {
+                        onEnter: function (args) {
+                            log("[🔘 EQUIP_VIEW] InvenCardEquipView.OnEquip clicked! view=" + args[0]);
+                        }
+                    });
+                    log("[+] Hooked InvenCardEquipView.OnEquip (0xF21D7C) successfully!");
+                } catch (eEqv) {
+                    log("[-] Error hooking InvenCardEquipView.OnEquip: " + eEqv.message);
+                }
+
+                try {
+                    Interceptor.replace(baseAddr.add(0x105AFC8), new NativeCallback(function (sceneThis, methodInfo) {
+                        log("[🗃️ EQUIP] InventoryScene.OnEquip entered! scene=" + sceneThis);
+                        try {
+                            var selectedCardItem = sceneThis.add(0x88).readPointer();
+                            var equippedCardItem = sceneThis.add(0x90).readPointer();
+                            log("[🗃️ EQUIP] [0x88]=" + selectedCardItem + ", [0x90]=" + equippedCardItem);
+                            
+                            // In OnChange, Dalcom stored:
+                            // [0x90] = card selected to equip (newCardItem)
+                            // [0x88] = card previously equipped (beforeCardItem, or null if empty)
+                            var newCard = equippedCardItem;
+                            var beforeCard = selectedCardItem;
+                            
+                            // If newCard is null, try fallback
+                            if (newCard.isNull() && !beforeCard.isNull()) {
+                                newCard = beforeCard;
+                                beforeCard = NULL;
+                            }
+                            
+                            handleCardEquipOffline(beforeCard, newCard);
+                            
+                            // Return to default inventory state
+                            var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
+                            setStateDefaultFn(sceneThis, 1, 0, NULL);
+                            log("[🗃️ EQUIP] Returned to SetStateDefault successfully!");
+                        } catch (eEq) {
+                            log("[-] Error in InventoryScene.OnEquip: " + eEq.message);
+                        }
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Replaced InventoryScene.OnEquip (0x105AFC8) successfully!");
+                } catch (eOeq) {
+                    log("[-] Error replacing InventoryScene.OnEquip: " + eOeq.message);
                 }
 
                 // --- Hook CardBookScene.OnOpen (0x11CDD64) ---
