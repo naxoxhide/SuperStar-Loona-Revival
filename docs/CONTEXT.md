@@ -1432,3 +1432,54 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
      - Las 12 cartas Grado R recuperan su checkmark azul en la bandeja inferior.
    - **Persistencia en Disco:** Sincronización continua y verificación en `/sdcard/Android/data/com.dalcomsoft.sslo/files/player_profile.json`.
 
+### 16.9. Arquitectura de IU del Inventario: Textos de Botones, Localización e Integración del Contador de Cartas
+
+1. **Ingeniería Inversa del Contador de Cartas (`133 / 200`):**
+   - **Componente de Vista (`InvenCardView`, TypeDefIndex: 12386):**
+     - Campo `Text count`: offset `0x38`.
+     - `get_Count()`: RVA `0xF231B0`.
+     - `set_Count(string value)`: RVA `0xF23260` (invoca virtualmente `Text.set_text` en RVA `0x21A5FC4`).
+   - **Función Nativa que Alimenta el Contador (`InventoryScene.OnUpdateCardCount`, RVA `0x1054BB4`):**
+     - Desensamblado verificado en `libil2cpp.so` (ARM64):
+       - `0x1054C78: bl #0xAB1C1C`: Invoca `UserData.get_CardInvenMaxCount()` (obtiene el límite de ranuras del jugador, offset `player.cardInvenMax` = `0x48`, ej. 200).
+       - `0x1054CB8: bl #0xCF1064`: Invoca `LanguageControl.GetString(0x3072969)` (obtiene el formato de cadena `"{0} / {1}"`).
+       - `0x1054CE8: bl #0xF275E8`: Invoca `InventoryControl.get_CardMapCount()` (obtiene el número actual de cartas en posesión desde `CardMap.Count`).
+       - `0x1054D04` / `0x1054D18`: Empaqueta (`Box Int32`) los dos enteros.
+       - `0x1054D2C: bl #0x2205FC4`: Ejecuta `System.String.Format("{0} / {1}", cardMapCount, cardInvenMaxCount)`.
+       - `0x1054D40: bl #0xF23260`: Invoca `InvenCardView.set_Count(formattedString)`.
+     - Es la **única** función en todo el binario que contiene un `BL` hacia `InvenCardView.set_Count`.
+
+2. **Ingeniería Inversa de Textos Faltantes en Botones de `InventoryView` (TypeDefIndex: 12200):**
+   - `btnStore` (offset `0x90`): Icono de Carrito (Tienda).
+     - RVA de asignación en `OnOpen`: `0x1052C10` -> `LanguageControl.GetString(0x2FC86C1)`.
+     - Texto oficial: `"Shop"`.
+     - Invoca `ButtonCache.set_Text(btnStore, "Shop")` (RVA `0xE9B7B0`).
+   - `btnSellBundle` (offset `0x98`): Botón sobre el clasificador.
+     - RVA de asignación en `OnOpen`: `0x1052C40` -> `LanguageControl.GetString(0x30423FA)`.
+     - Texto oficial: `"Sell All"`.
+     - Invoca `ButtonCache.set_Text(btnSellBundle, "Sell All")` (RVA `0xE9B7B0`).
+   - `btnSelectGroup` (offset `0xA0`): Botón lateral derecho.
+     - RVA de asignación en `OnOpen`: `0x1052D34` -> `LanguageControl.GetString(0xAD02876)`.
+     - Texto oficial: `"Choose Group"`.
+     - Invoca `ButtonCache.set_Text(btnSelectGroup, "Choose Group")` (RVA `0xE9B7B0`).
+   - `btnMyCollection` (offset `0xA8`): Icono de Medalla/Cinta (Colección).
+     - RVA de asignación en `OnOpen`: `0x1052DC8` -> `LanguageControl.GetString(0x1D9405D)` / `0x1D94064`.
+     - Texto oficial: `"Card Book"`.
+     - Invoca `ButtonCache.set_Text(btnMyCollection, "Card Book")` (RVA `0xE9B7B0`).
+   - `InvenGroupView.count` (offset `0x38`): Contador de páginas de grupos (`1 / 1`).
+     - Función nativa: `InventoryScene.SetGroupViewCount` (RVA `0x1053E18`) -> `InvenGroupView.set_Count` (RVA `0xF24F7C`).
+     - Clave de localización: `LanguageControl.GetString(0x3072D51)` -> `"{0} / {1}"`.
+   - `InvenSortView` (offset `0x80`): Vista del botón de ordenamiento (`InvenSortView`, TypeDefIndex: 12405).
+     - Campo `sortText`: `Text` en offset `0x40`.
+     - Textos de filtro y ordenamiento en `InvenSortView.Init` (RVA `0xF25D6C`):
+       - `0x2FE0979`: `"New"` (orden por adquisición).
+       - `0x14B1DA9`: `"High"` (orden por grado alto).
+       - `0x2FE097D`: `"Low"` (orden por grado bajo).
+       - `0x2FE097C`: `"Prism"` (filtro de cartas prismáticas).
+       - `0x2FE097B`: `"Group"` (filtro por grupo).
+       - `0x2FE097A`: `"Material Card"` (filtro de cartas de material).
+       - `0x2FE097E`: `"Lock"` (filtro de cartas bloqueadas).
+
+3. **Estrategia de Implementación Standalone:**
+   - **Hook en `LanguageControl.GetString(int code32)` (RVA `0xCF1064`):** Proveer un diccionario de respaldo offline con todos los IDs de texto identificados (`Shop`, `Sell All`, `Choose Group`, `Card Book`, `High`, `New`, `Low`, `Prism`, `Group`, `Material Card`, `Lock`, `"{0} / {1}"`), garantizando que cualquier componente nativo de Dalcomsoft obtenga sus textos oficiales automáticamente.
+   - **Actualización Activa en `InventoryScene.OnOpen` y Ciclos de Equipamiento:** Invocar explícitamente `InvenCardView.set_Count(cardView, countStr)`, `InvenGroupView.set_Count(groupView, "1 / 1")`, y los setters de texto en `ButtonCache` para asegurar reactividad inmediata en pantalla.
