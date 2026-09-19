@@ -1337,7 +1337,15 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
      - `leaderCard`: Carta principal del perfil.
      - Monedas y recursos: `diamond`, `rhythmPoint`, `headphone`, `dalcomCoin`, etc.
 
-### 16.2. Estado Actual de Renderizado vs. Persistencia
-- **Estado Actual en Memoria:** Durante las fases recientes de estabilización gráfica y diseño de UI (`InventoryScene` y `CardBookScene`), los parámetros de las cartas equipadas en pantalla fueron inyectados directamente en memoria mediante Frida ([app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js)) a través de `accountOwnedCards` y `createMockSmallCardParams(cId, 4, 50)`.
-- **Evolución hacia Persistencia Standalone Offline Total:** La infraestructura de lectura/escritura de [`player_profile.json`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L479-L480) ya se encuentra implementada en `libscript.js`. El siguiente paso es conectar los hooks de `GetGroupViewData`, `InvenGroupItemView.Refresh` y la obtención de cartas en el CardBook para que lean y serialicen directamente desde y hacia `player_profile.json` en tiempo real.
+### 16.3. Sincronización entre Cartas Equipadas (Tema) e Inventario General
+1. **Diagnóstico de la Discrepancia Visual:**
+   - **Panel Superior (`InvenGroupItemView`):** Mostraba 12 cartas fijas en Grado R Nivel 50 debido a que `GetGroupViewData` e `InvenGroupItemView.Refresh` tenían forzado `createMockSmallCardParams(cardId, 4, 50)`.
+   - **Barra Inferior de Inventario (`InvenCardView`):** Es renderizada nativamente por Dalcomsoft a través de `ViewControl.GetSmallCardViewData` (RVA `0xABEB30`), que consulta directamente las instancias `CardItem` de `CardMap` pobladas desde `player_profile.json` (que contenía datos de prueba heterogéneos: 1 B, 3 A, 4 S, 4 R ordenados por grado).
+   - **Checkmarks Azules (✓):** Se mostraban erróneamente en todas las cartas del inventario inferior debido a que `createMockSmallCardParams` tenía codificado de forma estática `isEquip = 1` en el offset `0x50` de `CardSmallView.Params`.
+2. **Modelo Unificado de Persistencia Standalone Offline:**
+   - **Fuente Única de Verdad:** `player_profile.json` (`inventoryCards` y `equipedCards`).
+   - Las cartas equipadas para el grupo LOONA (12 slots) se definen con `isEquip: true`, `grade: 4` (R), `level: 50` (o el grado que corresponda a las cartas equipadas en el tema).
+   - `createMockSmallCardParams(cardId, grade, level, isEquip)` recibe el flag dinámicamente: sólo las cartas con `isEquip: true` reciben el checkmark.
+   - `GetGroupViewData` e `InvenGroupItemView.Refresh` leen los datos de `player_profile.json`, garantizando congruencia del 100% entre las cartas equipadas en la cabecera y las cartas marcadas en la bandeja inferior de inventario.
+
 
