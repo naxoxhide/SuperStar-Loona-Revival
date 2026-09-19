@@ -1317,3 +1317,27 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
    - **Filtros de GPU en `loadLocalTexture2D`:** Se aplica `Texture.set_filterMode(texObj, 2)` (Trilinear) vía RVA `0x181A580` y `Texture.set_anisoLevel(texObj, 8)` vía RVA `0x181A610`.
    - **Upgrade Dinámico de Calidad en `SetCdnTexture`:** Cuando el motor solicita `wadceg/{id}_s.i.bytes`, el interceptor comprueba la existencia de la variante `_l.i.bytes`. Al estar disponible para el 100% de las cartas del juego, carga la versión de 226x318 px.
    - El downsampling en GPU de 226x318 al tamaño del slot produce retratos nítidos, limpios y con calidad retina (Retina Display Ready), sin impacto perceptible en rendimiento.
+
+## 16. Arquitectura de Almacenamiento y Persistencia de Cartas
+
+### 16.1. Separación entre Catálogo Estático y Datos del Jugador
+1. **Catálogo Maestro de Juego (`cdd.bin` / `cdd.json`):**
+   - Corresponde al archivo estático *Card Data Dictionary*.
+   - Define las 1.462+ cartas del juego (metadatos inmutables: `code`, `groupID`, `artistID`, `theme`, `prism`, rutas de imagen CDN `cardImageSmall` / `cardImageLarge`).
+   - Es de sólo lectura y empaqueta las definiciones oficiales del juego.
+
+2. **Inventario del Jugador y Persistencia Offline (`player_profile.json`):**
+   - Ubicación en el almacenamiento local del dispositivo:
+     - Primaria: `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/player_profile.json`
+     - Fallback: `/data/data/com.dalcomsoft.sslo/files/player_profile.json`
+   - Campos de inventario:
+     - `inventoryCards`: Lista serializada de cartas poseídas por el jugador. Cada elemento contiene:
+       `{ objectID, cardID, grade, level, energy, score, isEquip, isLock, isPrism }`.
+     - `equipedCards`: Diccionario con las cartas asignadas/equipadas por grupo o canción.
+     - `leaderCard`: Carta principal del perfil.
+     - Monedas y recursos: `diamond`, `rhythmPoint`, `headphone`, `dalcomCoin`, etc.
+
+### 16.2. Estado Actual de Renderizado vs. Persistencia
+- **Estado Actual en Memoria:** Durante las fases recientes de estabilización gráfica y diseño de UI (`InventoryScene` y `CardBookScene`), los parámetros de las cartas equipadas en pantalla fueron inyectados directamente en memoria mediante Frida ([app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js)) a través de `accountOwnedCards` y `createMockSmallCardParams(cId, 4, 50)`.
+- **Evolución hacia Persistencia Standalone Offline Total:** La infraestructura de lectura/escritura de [`player_profile.json`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L479-L480) ya se encuentra implementada en `libscript.js`. El siguiente paso es conectar los hooks de `GetGroupViewData`, `InvenGroupItemView.Refresh` y la obtención de cartas en el CardBook para que lean y serialicen directamente desde y hacia `player_profile.json` en tiempo real.
+
