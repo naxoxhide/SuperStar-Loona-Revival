@@ -4709,10 +4709,7 @@ function initIl2Cpp(module) {
                         },
                         onLeave: function (retval) {
                             if (offlineLocaleStrings[this.code32] !== undefined) {
-                                var currentStr = readIl2CppString(retval);
-                                if (!currentStr || currentStr.trim() === "") {
-                                    retval.replace(createIl2CppString(offlineLocaleStrings[this.code32]));
-                                }
+                                retval.replace(createIl2CppString(offlineLocaleStrings[this.code32]));
                             }
                         }
                     });
@@ -4720,116 +4717,6 @@ function initIl2Cpp(module) {
                 } catch (eLg) {
                     log("[-] Error hooking LanguageControl.GetString: " + eLg.message);
                 }
-
-                var updateInventoryUIElements = function() {
-                    try {
-                        if (!activeInventorySceneInstance || activeInventorySceneInstance.isNull()) {
-                            try {
-                                var sceneSlot = baseAddr.add(0x3106D50).readPointer();
-                                if (!sceneSlot.isNull()) {
-                                    var sFields = sceneSlot.readPointer();
-                                    if (!sFields.isNull()) {
-                                        var curSceneId = sFields.add(0x18).readS32();
-                                        if (curSceneId === 4) {
-                                            activeInventorySceneInstance = sFields.add(0x20).readPointer();
-                                        }
-                                    }
-                                }
-                            } catch (eFind) {}
-                        }
-                        if (!activeInventorySceneInstance || activeInventorySceneInstance.isNull()) return;
-
-                        var sceneView = activeInventorySceneInstance.add(0x48).readPointer();
-                        if (sceneView.isNull()) return;
-
-                        var setBtnTextFn = new NativeFunction(baseAddr.add(0xE9B7B0), "void", ["pointer", "pointer", "pointer"]);
-                        var setCardCountFn = new NativeFunction(baseAddr.add(0xF23260), "void", ["pointer", "pointer", "pointer"]);
-                        var setGroupCountFn = new NativeFunction(baseAddr.add(0xF24F7C), "void", ["pointer", "pointer", "pointer"]);
-                        var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
-
-                        // 1. btnStore (0x90) -> "Shop"
-                        var btnStore = sceneView.add(0x90).readPointer();
-                        if (!btnStore.isNull()) {
-                            setBtnTextFn(btnStore, createIl2CppString("Shop"), NULL);
-                        }
-
-                        // 2. btnMyCollection (0xA8) -> "Card Book"
-                        var btnMyCollection = sceneView.add(0xA8).readPointer();
-                        if (!btnMyCollection.isNull()) {
-                            setBtnTextFn(btnMyCollection, createIl2CppString("Card Book"), NULL);
-                        }
-
-                        // 3. btnSellBundle (0x98) -> "Sell All"
-                        var btnSellBundle = sceneView.add(0x98).readPointer();
-                        if (!btnSellBundle.isNull()) {
-                            setBtnTextFn(btnSellBundle, createIl2CppString("Sell All"), NULL);
-                        }
-
-                        // 4. btnSelectGroup (0xA0) -> "Choose Group"
-                        var btnSelectGroup = sceneView.add(0xA0).readPointer();
-                        if (!btnSelectGroup.isNull()) {
-                            setBtnTextFn(btnSelectGroup, createIl2CppString("Choose Group"), NULL);
-                        }
-
-                        // 5. InvenGroupView (0x70) count -> "1 / 1"
-                        var groupView = sceneView.add(0x70).readPointer();
-                        if (!groupView.isNull()) {
-                            setGroupCountFn(groupView, createIl2CppString("1 / 1"), NULL);
-                        }
-
-                        // 6. InvenSortView (0x80) sortText (0x40) -> "High"
-                        var sortView = sceneView.add(0x80).readPointer();
-                        if (!sortView.isNull()) {
-                            var sortText = sortView.add(0x40).readPointer();
-                            if (!sortText.isNull()) {
-                                setTextFn(sortText, createIl2CppString("High"), NULL);
-                            }
-                        }
-
-                        // 7. InvenCardView (0x78) count -> "X / 200"
-                        var cardView = sceneView.add(0x78).readPointer();
-                        if (!cardView.isNull()) {
-                            var profile = loadPlayerProfile();
-                            var totalCards = (profile && profile.inventoryCards) ? profile.inventoryCards.length : 0;
-                            var maxSlots = (profile && profile.cardInvenMax) ? profile.cardInvenMax : 200;
-                            var countStr = totalCards + " / " + maxSlots;
-                            setCardCountFn(cardView, createIl2CppString(countStr), NULL);
-
-                            var countTextObj = cardView.add(0x38).readPointer();
-                            log("[📊 INVENTORY] Card count updated: " + countStr + " | countTextObj: " + countTextObj);
-
-                            if (!countTextObj.isNull()) {
-                                try {
-                                    var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer"]);
-                                    var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
-                                    var getActiveInHierarchyFn = new NativeFunction(baseAddr.add(0x1DBAE84), "int", ["pointer"]);
-                                    var getTextFn = new NativeFunction(baseAddr.add(0x21A5FBC), "pointer", ["pointer"]);
-                                    var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer"]);
-                                    var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer"]);
-                                    var getTransFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer"]);
-
-                                    var go = getGoFn(countTextObj);
-                                    if (!go.isNull()) {
-                                        setActiveFn(go, 1, NULL);
-                                        var inHier = getActiveInHierarchyFn(go);
-                                        setTextFn(countTextObj, createIl2CppString(countStr), NULL);
-                                        var curTxt = readIl2CppString(getTextFn(countTextObj));
-                                        var countTrans = getTransFn(countTextObj);
-                                        var countName = readIl2CppString(getNameFn(countTextObj));
-                                        var parentTrans = getParentFn(countTrans);
-                                        var parentName = !parentTrans.isNull() ? readIl2CppString(getNameFn(parentTrans)) : "none";
-                                        
-                                        log("[📊 INVENTORY] countText name: '" + countName + "' | parent: '" + parentName + "' | text: '" + curTxt + "' | activeInHier: " + inHier);
-                                    }
-                                } catch (eInspect) {
-                                    log("[-] Error inspecting countText hierarchy: " + eInspect.message);
-                                }
-                            }
-                        }
-                    } catch (eUi) {
-                        log("[-] Error updating inventory UI elements: " + eUi.message);
-                    }
-                };
 
                 // --- Protect UserData.get_CardInvenMaxCount (0xAB1C1C) & InventoryControl.get_CardMapCount (0xF275E8) ---
                 try {
@@ -4848,6 +4735,69 @@ function initIl2Cpp(module) {
                     log("[🛡️ INVENTORY] InventoryControl.get_CardMapCount safely protected!");
                 } catch (eCmc) {}
 
+                // --- Hook InventoryView.ShowDefaultLayout (0x1055ED0) for safe post-layout UI updates ---
+                try {
+                    Interceptor.attach(baseAddr.add(0x1055ED0), {
+                        onLeave: function (retval) {
+                            log("[🗃️ INVENTORY VIEW] ShowDefaultLayout completed! Updating UI texts and card count...");
+                            try {
+                                if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                    // 1. Native OnUpdateCardCount (0x1054BB4)
+                                    var onUpdateCardCountFn = new NativeFunction(baseAddr.add(0x1054BB4), "void", ["pointer", "pointer"]);
+                                    onUpdateCardCountFn(activeInventorySceneInstance, NULL);
+
+                                    // 2. Native SetGroupViewCount (0x1053E18)
+                                    var setGroupViewCountFn = new NativeFunction(baseAddr.add(0x1053E18), "void", ["pointer"]);
+                                    setGroupViewCountFn(activeInventorySceneInstance);
+
+                                    // 3. Sort text "High" on InvenSortView
+                                    var sceneView = activeInventorySceneInstance.add(0x48).readPointer();
+                                    if (!sceneView.isNull()) {
+                                        var sortView = sceneView.add(0x80).readPointer();
+                                        if (!sortView.isNull()) {
+                                            var sortText = sortView.add(0x40).readPointer();
+                                            if (!sortText.isNull()) {
+                                                var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                                setTextFn(sortText, createIl2CppString("High"), NULL);
+                                            }
+                                        }
+
+                                        // Inspect Card Count & Group Count Text GameObjects
+                                        var getTextFn = new NativeFunction(baseAddr.add(0x21A5FBC), "pointer", ["pointer"]);
+                                        var getActiveAndEnabledFn = new NativeFunction(baseAddr.add(0x1DB3D4C), "int", ["pointer"]);
+                                        var getFontSizeFn = new NativeFunction(baseAddr.add(0x21A6394), "int", ["pointer"]);
+
+                                        var cardView = sceneView.add(0x78).readPointer();
+                                        if (!cardView.isNull()) {
+                                            var cardCountText = cardView.add(0x38).readPointer();
+                                            if (!cardCountText.isNull()) {
+                                                var cTxt = readIl2CppString(getTextFn(cardCountText));
+                                                var isAE = getActiveAndEnabledFn(cardCountText);
+                                                var fSize = getFontSizeFn(cardCountText);
+                                                log("[📊 CARD COUNT INSPECT] cardCountText=" + cardCountText + " | text: '" + cTxt + "' | isActiveAndEnabled: " + isAE + " | fontSize: " + fSize);
+                                            }
+                                        }
+
+                                        var groupView = sceneView.add(0x70).readPointer();
+                                        if (!groupView.isNull()) {
+                                            var groupCountText = groupView.add(0x38).readPointer();
+                                            if (!groupCountText.isNull()) {
+                                                var gTxt = readIl2CppString(getTextFn(groupCountText));
+                                                var gIsAE = getActiveAndEnabledFn(groupCountText);
+                                                var gFSize = getFontSizeFn(groupCountText);
+                                                log("[📊 GROUP COUNT INSPECT] groupCountText=" + groupCountText + " | text: '" + gTxt + "' | isActiveAndEnabled: " + gIsAE + " | fontSize: " + gFSize);
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (eSdl) {
+                                log("[-] Error in ShowDefaultLayout post-update: " + eSdl.message);
+                            }
+                        }
+                    });
+                    log("[+] Hooked InventoryView.ShowDefaultLayout (0x1055ED0) successfully!");
+                } catch (eSdlHook) {}
+
                 // --- Hook InventoryScene.OnOpen (0x1051604) ---
                 try {
                     Interceptor.attach(baseAddr.add(0x1051604), {
@@ -4855,6 +4805,12 @@ function initIl2Cpp(module) {
                             activeInventorySceneInstance = args[0];
                             log("[🗃️ INVENTORY SCENE] InventoryScene.OnOpen entered! instance: " + args[0]);
                             try {
+                                var getIsOpenedFn = new NativeFunction(baseAddr.add(0xF274B8), "int", ["pointer"]);
+                                if (getIsOpenedFn(NULL) === 0) {
+                                    log("[🗃️ INVENTORY SCENE] InventoryControl not opened yet! Calling Open(NULL)...");
+                                    var invenOpenFn = new NativeFunction(baseAddr.add(0xF27AA0), "void", ["pointer"]);
+                                    invenOpenFn(NULL);
+                                }
                                 populateOfflineInventoryCards();
                             } catch (ie) {
                                 log("[-] Error checking/opening inventory in InventoryScene: " + ie.message);
@@ -4862,7 +4818,6 @@ function initIl2Cpp(module) {
                         },
                         onLeave: function (retval) {
                             log("[🗃️ INVENTORY SCENE] InventoryScene.OnOpen completed!");
-                            updateInventoryUIElements();
                         }
                     });
                     log("[+] Hooked InventoryScene.OnOpen (0x1051604) successfully!");
@@ -4906,7 +4861,9 @@ function initIl2Cpp(module) {
                             var updateDisplayFn = new NativeFunction(baseAddr.add(0x10542F4), "void", ["pointer", "int", "int", "int", "pointer"]);
                             updateDisplayFn(activeInventorySceneInstance, 1, 0, 1, NULL);
                             log("[🔄 INVENTORY] UpdateDisplayCardList triggered successfully!");
-                            updateInventoryUIElements();
+
+                            var onUpdateCardCountFn = new NativeFunction(baseAddr.add(0x1054BB4), "void", ["pointer", "pointer"]);
+                            onUpdateCardCountFn(activeInventorySceneInstance, NULL);
                         }
                     } catch (eUd) {
                         log("[-] Error refreshing display card list: " + eUd.message);
