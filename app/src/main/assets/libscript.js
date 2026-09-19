@@ -3979,39 +3979,79 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing GetMainViewData: " + eRepGmv.message);
                 }
 
-                // 9b2. InvenCardMainView.Refresh (0xF227B4) -> Forces button texts directly on ButtonCache
+                // 9b2. InvenCardMainView.Refresh (0xF227B4) -> Bulletproof replacement to prevent any NullReferenceException
                 try {
                     var invenCardMainViewRefreshAddr = baseAddr.add(0xF227B4);
-                    Interceptor.attach(invenCardMainViewRefreshAddr, {
-                        onEnter: function (args) {
-                            this.view = args[0];
-                            this.params = args[1];
-                        },
-                        onLeave: function (retval) {
-                            try {
-                                if (this.view && !this.view.isNull()) {
-                                    var btnInfo = this.view.add(0x40).readPointer();
-                                    var btnChange = this.view.add(0x48).readPointer();
-                                    var btnIntensify = this.view.add(0x50).readPointer();
-                                    var setBtnTextFn = new NativeFunction(baseAddr.add(0xE9B7B0), "void", ["pointer", "pointer", "pointer"]);
+                    Interceptor.replace(invenCardMainViewRefreshAddr, new NativeCallback(function (viewThis, p, methodInfo) {
+                        try {
+                            if (viewThis.isNull() || p.isNull()) return;
 
-                                    if (!btnInfo.isNull()) setBtnTextFn(btnInfo, createIl2CppString("Information"), NULL);
+                            var btnExchange = viewThis.add(0x38).readPointer();
+                            var btnInfo = viewThis.add(0x40).readPointer();
+                            var btnChange = viewThis.add(0x48).readPointer();
+                            var btnIntensify = viewThis.add(0x50).readPointer();
+                            var btnIntensifyEvent = viewThis.add(0x58).readPointer();
+                            var numberExchange = viewThis.add(0x60).readPointer();
 
-                                    var isEq = false;
-                                    if (this.params && !this.params.isNull()) {
-                                        isEq = (this.params.add(0x12).readU8() === 1);
-                                    }
-                                    if (!btnChange.isNull()) setBtnTextFn(btnChange, createIl2CppString(isEq ? "Unequip" : "Equip"), NULL);
-                                    if (!btnIntensify.isNull()) setBtnTextFn(btnIntensify, createIl2CppString("Level Up"), NULL);
-                                }
-                            } catch (eMvr) {
-                                log("[-] Error in InvenCardMainView.Refresh post-processing: " + eMvr.message);
+                            var setBtnTextFn = new NativeFunction(baseAddr.add(0xE9B7B0), "void", ["pointer", "pointer", "pointer"]);
+                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+
+                            // 1. btnInfo (0x40)
+                            if (!btnInfo.isNull()) {
+                                try {
+                                    setBtnTextFn(btnInfo, createIl2CppString("Information"), NULL);
+                                } catch (eBi) {}
                             }
+
+                            // 2. btnChange (0x48) -> "Equip" or "Unequip"
+                            var isEq = false;
+                            try {
+                                isEq = (p.add(0x12).readU8() === 1);
+                            } catch (eIe) {}
+                            if (!btnChange.isNull()) {
+                                try {
+                                    setBtnTextFn(btnChange, createIl2CppString(isEq ? "Unequip" : "Equip"), NULL);
+                                } catch (eBc) {}
+                            }
+
+                            // 3. btnIntensify (0x50) -> "Level Up" or "Power Up"
+                            var isMax = false;
+                            try {
+                                isMax = (p.add(0x11).readU8() === 1);
+                            } catch (eIm) {}
+                            var btnIntensifyStr = isMax ? "MAX" : "Level Up";
+                            if (!btnIntensify.isNull()) {
+                                try {
+                                    var biGo = btnIntensify.add(0x10).readPointer();
+                                    if (!biGo.isNull()) setActiveFn(biGo, 1, NULL);
+                                    setBtnTextFn(btnIntensify, createIl2CppString(btnIntensifyStr), NULL);
+                                } catch (eBi) {}
+                            }
+
+                            // 4. btnIntensifyEvent (0x58) -> Deactivate if present
+                            if (!btnIntensifyEvent.isNull()) {
+                                try {
+                                    var bieGo = getGoFn(btnIntensifyEvent, NULL);
+                                    if (!bieGo.isNull()) setActiveFn(bieGo, 0, NULL);
+                                } catch (eBie) {}
+                            }
+
+                            // 5. btnExchange (0x38)
+                            if (!btnExchange.isNull()) {
+                                try {
+                                    setBtnTextFn(btnExchange, createIl2CppString("Exchange"), NULL);
+                                } catch (eBe) {}
+                            }
+
+                            log("[✅ MAIN_VIEW] InvenCardMainView.Refresh safely completed!");
+                        } catch (eMvr) {
+                            log("[-] Error in safe InvenCardMainView.Refresh: " + eMvr.message);
                         }
-                    });
-                    log("[+] Interceptor.attach installed on InvenCardMainView.Refresh (0xF227B4)!");
+                    }, "void", ["pointer", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InvenCardMainView.Refresh (0xF227B4)!");
                 } catch (eHicmr) {
-                    log("[-] Error attaching InvenCardMainView.Refresh: " + eHicmr.message);
+                    log("[-] Error replacing InvenCardMainView.Refresh: " + eHicmr.message);
                 }
 
                 // 9c. InventoryScene.GetSelectViewData (0x10572AC) -> Bulletproof replacement
@@ -4095,31 +4135,148 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing GetSelectViewData: " + eRepGsv.message);
                 }
 
-                // 9c2. InvenCardSelectView.Refresh (0xF22C34) -> Forces Theme header text directly on Text component
+                // 9c2. InvenCardSelectView.Refresh (0xF22C34) -> Bulletproof replacement to prevent any NullReferenceException
                 try {
                     var invenCardSelectViewRefreshAddr = baseAddr.add(0xF22C34);
-                    Interceptor.attach(invenCardSelectViewRefreshAddr, {
-                        onEnter: function (args) {
-                            this.view = args[0];
-                            this.params = args[1];
-                        },
-                        onLeave: function (retval) {
-                            try {
-                                if (this.view && !this.view.isNull()) {
-                                    var themeHeader = this.view.add(0x58).readPointer();
-                                    if (!themeHeader.isNull()) {
-                                        var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
-                                        setTextFn(themeHeader, createIl2CppString("Theme"), NULL);
-                                    }
-                                }
-                            } catch (eSvr) {
-                                log("[-] Error in InvenCardSelectView.Refresh post-processing: " + eSvr.message);
+                    Interceptor.replace(invenCardSelectViewRefreshAddr, new NativeCallback(function (viewThis, p, methodInfo) {
+                        try {
+                            if (viewThis.isNull() || p.isNull()) return;
+
+                            // 1. card (0x38)
+                            var card = viewThis.add(0x38).readPointer();
+                            var cardParams = p.add(0x10).readPointer();
+                            if (!card.isNull() && !cardParams.isNull()) {
+                                try {
+                                    var cardRefreshFn = new NativeFunction(baseAddr.add(0x137F570), "void", ["pointer", "pointer", "pointer"]);
+                                    cardRefreshFn(card, cardParams, NULL);
+                                } catch (eC) {}
                             }
+
+                            // 2. groupName (0x40)
+                            var groupName = viewThis.add(0x40).readPointer();
+                            var groupNameStr = p.add(0x18).readPointer();
+                            if (!groupName.isNull() && !groupNameStr.isNull()) {
+                                try {
+                                    var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                    setTextFn(groupName, groupNameStr, NULL);
+                                } catch (eG) {}
+                            }
+
+                            // 3. artistName (0x48)
+                            var artistName = viewThis.add(0x48).readPointer();
+                            var artistNameStr = p.add(0x20).readPointer();
+                            if (!artistName.isNull() && !artistNameStr.isNull()) {
+                                try {
+                                    var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                    setTextFn(artistName, artistNameStr, NULL);
+                                } catch (eA) {}
+                            }
+
+                            // 4. stat (0x50)
+                            var stat = viewThis.add(0x50).readPointer();
+                            var statParams = p.add(0x28).readPointer();
+                            if (!stat.isNull() && !statParams.isNull()) {
+                                try {
+                                    var statRefreshFn = new NativeFunction(baseAddr.add(0x1390F48), "void", ["pointer", "pointer", "pointer"]);
+                                    statRefreshFn(stat, statParams, NULL);
+                                } catch (eS) {}
+                            }
+
+                            // 5. themeHeader (0x58)
+                            var themeHeader = viewThis.add(0x58).readPointer();
+                            if (!themeHeader.isNull()) {
+                                try {
+                                    var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                    setTextFn(themeHeader, createIl2CppString("Theme"), NULL);
+                                } catch (eTh) {}
+                            }
+
+                            // 6. themeName (0x60)
+                            var themeName = viewThis.add(0x60).readPointer();
+                            var themeNameStr = p.add(0x40).readPointer();
+                            if (!themeName.isNull() && !themeNameStr.isNull()) {
+                                try {
+                                    var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                    setTextFn(themeName, themeNameStr, NULL);
+                                } catch (eTn) {}
+                            }
+
+                            // 7. theme (0x68)
+                            var theme = viewThis.add(0x68).readPointer();
+                            var themeParams = p.add(0x48).readPointer();
+                            if (!theme.isNull() && !themeParams.isNull()) {
+                                try {
+                                    var themeRefreshFn = new NativeFunction(baseAddr.add(0x1393510), "void", ["pointer", "pointer", "pointer"]);
+                                    themeRefreshFn(theme, themeParams, NULL);
+                                } catch (eThm) {}
+                            }
+
+                            var isEq = (p.add(0x50).readU8() === 1);
+                            var isSell = (p.add(0x51).readU8() === 1);
+                            var isLeader = (p.add(0x52).readU8() === 1);
+                            var isLk = (p.add(0x53).readU8() === 1);
+
+                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+
+                            // 8. equipIcon (0x70)
+                            var equipIcon = viewThis.add(0x70).readPointer();
+                            if (!equipIcon.isNull()) {
+                                try {
+                                    var eqGo = getGoFn(equipIcon, NULL);
+                                    if (!eqGo.isNull()) setActiveFn(eqGo, isEq ? 1 : 0, NULL);
+                                } catch (eEqGo) {}
+                            }
+
+                            // 9. btnSell (0x80)
+                            var btnSell = viewThis.add(0x80).readPointer();
+                            if (!btnSell.isNull()) {
+                                try {
+                                    var bsGo = btnSell.add(0x10).readPointer();
+                                    if (!bsGo.isNull()) setActiveFn(bsGo, (!isEq && isSell) ? 1 : 0, NULL);
+                                } catch (eBsGo) {}
+                            }
+
+                            // 10. leaderIcon (0x78)
+                            var leaderIcon = viewThis.add(0x78).readPointer();
+                            if (!leaderIcon.isNull()) {
+                                try {
+                                    setActiveFn(leaderIcon, isLeader ? 1 : 0, NULL);
+                                } catch (eLi) {}
+                            }
+
+                            // 11. leaderOnObj (0x90)
+                            var leaderOnObj = viewThis.add(0x90).readPointer();
+                            if (!leaderOnObj.isNull()) {
+                                try {
+                                    setActiveFn(leaderOnObj, isLeader ? 1 : 0, NULL);
+                                } catch (eLio) {}
+                            }
+
+                            // 12. lockOnObj (0xA0)
+                            var lockOnObj = viewThis.add(0xA0).readPointer();
+                            if (!lockOnObj.isNull()) {
+                                try {
+                                    setActiveFn(lockOnObj, isLk ? 1 : 0, NULL);
+                                } catch (eLko) {}
+                            }
+
+                            // 13. lockOffObj (0xA8)
+                            var lockOffObj = viewThis.add(0xA8).readPointer();
+                            if (!lockOffObj.isNull()) {
+                                try {
+                                    setActiveFn(lockOffObj, isLk ? 0 : 1, NULL);
+                                } catch (eLkoff) {}
+                            }
+
+                            log("[✅ SELECT_VIEW] InvenCardSelectView.Refresh safely completed!");
+                        } catch (eR) {
+                            log("[-] Error in safe InvenCardSelectView.Refresh: " + eR.message);
                         }
-                    });
-                    log("[+] Interceptor.attach installed on InvenCardSelectView.Refresh (0xF22C34)!");
+                    }, "void", ["pointer", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InvenCardSelectView.Refresh (0xF22C34)!");
                 } catch (eHicsr) {
-                    log("[-] Error attaching InvenCardSelectView.Refresh: " + eHicsr.message);
+                    log("[-] Error replacing InvenCardSelectView.Refresh: " + eHicsr.message);
                 }
 
                 // 9d. ViewControl.GetCardStatInfoViewData (0xABFCD0) -> Ensures exact score & energy from cbd.json
@@ -4150,38 +4307,325 @@ function initIl2Cpp(module) {
                     log("[-] Error attaching GetCardStatInfoViewData: " + eHgcs.message);
                 }
 
-                // 9e. InventoryScene.OnCardItem (0x105CEE8) -> Crash guard against out-of-range index
+                // 9e. InventoryScene.OnCardItem (0x105CEE8) -> Trace and monitor card clicks safely with Interceptor.attach
                 try {
                     var onCardItemAddr = baseAddr.add(0x105CEE8);
-                    var origOnCardItem = new NativeFunction(onCardItemAddr, "void", ["pointer", "pointer", "pointer"]);
-                    Interceptor.replace(onCardItemAddr, new NativeCallback(function (sceneThis, go, methodInfo) {
-                        try {
-                            if (sceneThis.isNull() || go.isNull()) return;
-                            var dclPtr = sceneThis.add(0x58).readPointer();
-                            if (!dclPtr.isNull()) {
-                                var listSize = dclPtr.add(0x18).readS32();
-                                var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
-                                var namePtr = getNameFn(go, NULL);
-                                if (!namePtr.isNull()) {
-                                    var len = namePtr.add(0x10).readS32();
-                                    if (len > 0) {
-                                        var nameStr = namePtr.add(0x14).readUtf16String(len);
-                                        var idx = parseInt(nameStr, 10);
-                                        if (!isNaN(idx) && (idx < 0 || idx >= listSize)) {
-                                            log("[-] OnCardItem: Prevented out-of-range index " + idx + " (size: " + listSize + ")");
-                                            return;
+                    Interceptor.attach(onCardItemAddr, {
+                        onEnter: function (args) {
+                            var sceneThis = args[0];
+                            var go = args[1];
+                            log("[🃏 ON_CARD_ITEM] OnCardItem entered! scene=" + sceneThis + ", go=" + go);
+                            try {
+                                if (!sceneThis.isNull() && !go.isNull()) {
+                                    var dclPtr = sceneThis.add(0x58).readPointer();
+                                    if (!dclPtr.isNull()) {
+                                        var listSize = dclPtr.add(0x18).readS32();
+                                        var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                                        var namePtr = getNameFn(go, NULL);
+                                        if (!namePtr.isNull()) {
+                                            var len = namePtr.add(0x10).readS32();
+                                            if (len > 0) {
+                                                var nameStr = namePtr.add(0x14).readUtf16String(len);
+                                                log("[🃏 ON_CARD_ITEM] Clicked card item name: " + nameStr + " (listSize: " + listSize + ")");
+                                            }
                                         }
                                     }
                                 }
+                            } catch (eOci) {
+                                log("[-] Error in OnCardItem onEnter: " + eOci.message);
                             }
-                            origOnCardItem(sceneThis, go, methodInfo);
-                        } catch (eOci) {
-                            log("[-] Handled exception in OnCardItem guard: " + eOci.message);
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on InventoryScene.OnCardItem (0x105CEE8)!");
+                } catch (eHoci) {
+                    log("[-] Error attaching OnCardItem: " + eHoci.message);
+                }
+
+                // 9f. InventoryControl.CheckIntensifyEvent (0xF2C14C) -> Safe offline stub to prevent NullRef in SetStateMain
+                try {
+                    var checkIntensifyEventAddr = baseAddr.add(0xF2C14C);
+                    Interceptor.replace(checkIntensifyEventAddr, new NativeCallback(function (cardData, probRatePtr, priceRatePtr, methodInfo) {
+                        if (!probRatePtr.isNull()) probRatePtr.writeDouble(1.0);
+                        if (!priceRatePtr.isNull()) priceRatePtr.writeDouble(1.0);
+                    }, "void", ["pointer", "pointer", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryControl.CheckIntensifyEvent (0xF2C14C)!");
+                } catch (eCie) {
+                    log("[-] Error replacing CheckIntensifyEvent: " + eCie.message);
+                }
+
+                // 9g. CardThemeInfoView.Refresh (0x1393510) -> Patch null check at 0x1393598 to return safely
+                try {
+                    Memory.protect(baseAddr.add(0x1393598), 4, "rwx");
+                    baseAddr.add(0x1393598).writeByteArray([0xf4, 0x14, 0x00, 0xb4]); // cbz x20, #0x1393834 (ret instead of null ref throw)
+                    log("[+] Patched CardThemeInfoView.Refresh (0x1393598) null check to safe ret!");
+                } catch (ePct) {
+                    log("[-] Error patching CardThemeInfoView.Refresh: " + ePct.message);
+                }
+
+                // 9h. InventoryScene.GetEquipViewData (0x10577DC) -> Bulletproof replacement
+                try {
+                    var getEquipViewDataAddr = baseAddr.add(0x10577DC);
+                    var equipParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "InvenCardEquipView/Params");
+                    Interceptor.replace(getEquipViewDataAddr, new NativeCallback(function (sceneThis, cardItem, artistData, otherCardItem, methodInfo) {
+                        try {
+                            if (!equipParamsKlass || equipParamsKlass.isNull()) return NULL;
+                            var p = il2cpp_object_new(equipParamsKlass);
+                            if (!p || p.isNull()) return NULL;
+
+                            var cId = 1001;
+                            var gr = 4;
+                            var lvl = 50;
+                            var isPrism = false;
+                            var isEq = false;
+                            var isLk = false;
+
+                            if (cardItem && !cardItem.isNull()) {
+                                var raw = cardItem.add(0x10).readPointer();
+                                if (!raw.isNull()) {
+                                    cId = raw.add(0x20).readS32();
+                                    gr = raw.add(0x24).readS32();
+                                    lvl = raw.add(0x1C).readS16();
+                                    isEq = (raw.add(0x28).readU8() === 1);
+                                    isLk = (raw.add(0x29).readU8() === 1);
+                                    isPrism = (raw.add(0x2A).readU8() === 1);
+                                }
+                            }
+
+                            var isR = (gr === 4);
+                            var isMax = (isR && lvl >= 50) || (!isR && lvl >= 5);
+
+                            var meta = getCardMetadata(cId);
+                            var aId = (meta && meta.artistID) ? meta.artistID : 1001;
+                            var tId = (meta && meta.theme) ? meta.theme : 1001;
+
+                            var aName = artistNamesMap[aId] || "HeeJin";
+                            var tName = themeNamesMap[tId] || "Hi High";
+
+                            // Large card params
+                            var cardParams = createMockLargeCardParams(cId, gr, lvl, isPrism);
+                            p.add(0x10).writePointer(cardParams || NULL);
+                            p.add(0x18).writePointer(createIl2CppString("LOONA"));
+                            p.add(0x20).writePointer(createIl2CppString(aName));
+
+                            // Stat params (0xABFCD0)
+                            try {
+                                if (cardItem && !cardItem.isNull()) {
+                                    var getStatFn = new NativeFunction(baseAddr.add(0xABFCD0), "pointer", ["pointer", "pointer"]);
+                                    var statParams = getStatFn(cardItem, NULL);
+                                    p.add(0x28).writePointer(statParams || NULL);
+                                }
+                            } catch (eStp) {}
+
+                            // Delta stats
+                            var deltaScore = 0;
+                            var deltaEnergy = 0;
+                            var curStats = getCardBaseStats(gr, lvl, isPrism);
+                            if (otherCardItem && !otherCardItem.isNull()) {
+                                try {
+                                    var oRaw = otherCardItem.add(0x10).readPointer();
+                                    if (!oRaw.isNull()) {
+                                        var oGr = oRaw.add(0x24).readS32();
+                                        var oLvl = oRaw.add(0x1C).readS16();
+                                        var oIsPrism = (oRaw.add(0x2A).readU8() === 1);
+                                        var oStats = getCardBaseStats(oGr, oLvl, oIsPrism);
+                                        deltaScore = curStats.score - oStats.score;
+                                        deltaEnergy = curStats.energy - oStats.energy;
+                                    }
+                                } catch (eDelta) {}
+                            } else {
+                                deltaScore = curStats.score;
+                                deltaEnergy = curStats.energy;
+                            }
+
+                            p.add(0x30).writeS32(deltaScore);
+                            p.add(0x34).writeS32(deltaEnergy);
+                            p.add(0x38).writePointer(createIl2CppString("Theme"));
+                            p.add(0x40).writePointer(createIl2CppString(tName));
+
+                            // Theme params (0xABFF78)
+                            try {
+                                if (cardItem && !cardItem.isNull()) {
+                                    var getThemeFn = new NativeFunction(baseAddr.add(0xABFF78), "pointer", ["pointer", "pointer"]);
+                                    var themeParams = getThemeFn(cardItem, NULL);
+                                    p.add(0x48).writePointer(themeParams || NULL);
+                                }
+                            } catch (eThp) {}
+
+                            p.add(0x50).writePointer(createIl2CppString("Equip"));
+                            p.add(0x58).writePointer(createIl2CppString("Cancel"));
+                            p.add(0x60).writeU8(0); // isLeader
+                            p.add(0x61).writeU8(isLk ? 1 : 0);
+                            p.add(0x62).writeU8(isR ? 1 : 0);
+                            p.add(0x63).writeU8(isMax ? 1 : 0);
+                            p.add(0x64).writeU8(isEq ? 1 : 0);
+                            p.add(0x68).writePointer(createIl2CppString("MAX"));
+                            p.add(0x70).writePointer(createIl2CppString("Level Up"));
+                            p.add(0x78).writePointer(createIl2CppString("Level Up"));
+                            p.add(0x80).writePointer(createIl2CppString("Power Up"));
+
+                            // Read ratingupSprite / powerupSprite from sceneView.btnBoxSprites if available
+                            try {
+                                if (!sceneThis.isNull()) {
+                                    var sv = sceneThis.add(0x48).readPointer();
+                                    if (!sv.isNull()) {
+                                        var bbs = sv.add(0xC0).readPointer();
+                                        if (!bbs.isNull()) {
+                                            var getSpriteFn = new NativeFunction(baseAddr.add(0xD0CAB8), "pointer", ["pointer", "int", "pointer"]);
+                                            p.add(0x88).writePointer(getSpriteFn(bbs, 1, NULL)); // ratingupSprite
+                                            p.add(0x90).writePointer(getSpriteFn(bbs, 0, NULL)); // powerupSprite
+                                        }
+                                    }
+                                }
+                            } catch (eBbs) {}
+
+                            p.add(0x98).writePointer(createIl2CppString("Exchange"));
+                            p.add(0xA0).writePointer(createIl2CppString("Information"));
+                            p.add(0xA8).writePointer(createIl2CppString("Equip"));
+                            p.add(0xB0).writePointer(createIl2CppString("Unequip"));
+                            p.add(0xB8).writeU8(0); // isEvent
+
+                            return p;
+                        } catch (eGevR) {
+                            log("[-] Error in safe GetEquipViewData replacement: " + eGevR.message);
+                            return NULL;
+                        }
+                    }, "pointer", ["pointer", "pointer", "pointer", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.GetEquipViewData (0x10577DC)!");
+                } catch (eRepGev) {
+                    log("[-] Error replacing GetEquipViewData: " + eRepGev.message);
+                }
+
+                // 9i. InvenCardEquipView.Refresh (0xF219B4) -> Bulletproof replacement to prevent any NullReferenceException
+                try {
+                    var invenCardEquipViewRefreshAddr = baseAddr.add(0xF219B4);
+                    Interceptor.replace(invenCardEquipViewRefreshAddr, new NativeCallback(function (viewThis, p, methodInfo) {
+                        try {
+                            if (viewThis.isNull() || p.isNull()) return;
+
+                            // 1. card (0x38)
+                            var card = viewThis.add(0x38).readPointer();
+                            var cardParams = p.add(0x10).readPointer();
+                            if (!card.isNull() && !cardParams.isNull()) {
+                                try {
+                                    var cardRefreshFn = new NativeFunction(baseAddr.add(0x137F570), "void", ["pointer", "pointer", "pointer"]);
+                                    cardRefreshFn(card, cardParams, NULL);
+                                } catch (eC) {}
+                            }
+
+                            // 2. groupName (0x40)
+                            var groupName = viewThis.add(0x40).readPointer();
+                            var groupNameStr = p.add(0x18).readPointer();
+                            if (!groupName.isNull() && !groupNameStr.isNull()) {
+                                try {
+                                    var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                    setTextFn(groupName, groupNameStr, NULL);
+                                } catch (eG) {}
+                            }
+
+                            // 3. artistName (0x48)
+                            var artistName = viewThis.add(0x48).readPointer();
+                            var artistNameStr = p.add(0x20).readPointer();
+                            if (!artistName.isNull() && !artistNameStr.isNull()) {
+                                try {
+                                    var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                    setTextFn(artistName, artistNameStr, NULL);
+                                } catch (eA) {}
+                            }
+
+                            // 4. stat (0x50)
+                            var stat = viewThis.add(0x50).readPointer();
+                            var statParams = p.add(0x28).readPointer();
+                            if (!stat.isNull() && !statParams.isNull()) {
+                                try {
+                                    var statRefreshFn = new NativeFunction(baseAddr.add(0x1390F48), "void", ["pointer", "pointer", "pointer"]);
+                                    statRefreshFn(stat, statParams, NULL);
+                                } catch (eS) {}
+                            }
+
+                            // 5. themeHeader (0x58)
+                            var themeHeader = viewThis.add(0x58).readPointer();
+                            if (!themeHeader.isNull()) {
+                                try {
+                                    var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                    setTextFn(themeHeader, createIl2CppString("Theme"), NULL);
+                                } catch (eTh) {}
+                            }
+
+                            // 6. themeName (0x60)
+                            var themeName = viewThis.add(0x60).readPointer();
+                            var themeNameStr = p.add(0x40).readPointer();
+                            if (!themeName.isNull() && !themeNameStr.isNull()) {
+                                try {
+                                    var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                    setTextFn(themeName, themeNameStr, NULL);
+                                } catch (eTn) {}
+                            }
+
+                            // 7. theme (0x68)
+                            var theme = viewThis.add(0x68).readPointer();
+                            var themeParams = p.add(0x48).readPointer();
+                            if (!theme.isNull() && !themeParams.isNull()) {
+                                try {
+                                    var themeRefreshFn = new NativeFunction(baseAddr.add(0x1393510), "void", ["pointer", "pointer", "pointer"]);
+                                    themeRefreshFn(theme, themeParams, NULL);
+                                } catch (eThm) {}
+                            }
+
+                            // 8. Buttons (btnEquip 0x78, btnCancel 0x80, btnIntensify 0xB0)
+                            var btnEquip = viewThis.add(0x78).readPointer();
+                            var btnCancel = viewThis.add(0x80).readPointer();
+                            var btnIntensify = viewThis.add(0xB0).readPointer();
+                            var setBtnTextFn = new NativeFunction(baseAddr.add(0xE9B7B0), "void", ["pointer", "pointer", "pointer"]);
+                            if (!btnEquip.isNull()) setBtnTextFn(btnEquip, createIl2CppString("Equip"), NULL);
+                            if (!btnCancel.isNull()) setBtnTextFn(btnCancel, createIl2CppString("Cancel"), NULL);
+                            if (!btnIntensify.isNull()) setBtnTextFn(btnIntensify, createIl2CppString("Level Up"), NULL);
+
+                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+
+                            var isLeader = (p.add(0x60).readU8() === 1);
+                            var isLk = (p.add(0x61).readU8() === 1);
+
+                            // 9. leaderIcon (0x70)
+                            var leaderIcon = viewThis.add(0x70).readPointer();
+                            if (!leaderIcon.isNull()) {
+                                try {
+                                    setActiveFn(leaderIcon, isLeader ? 1 : 0, NULL);
+                                } catch (eLi) {}
+                            }
+
+                            // 10. leaderOnObj (0x90)
+                            var leaderOnObj = viewThis.add(0x90).readPointer();
+                            if (!leaderOnObj.isNull()) {
+                                try {
+                                    setActiveFn(leaderOnObj, isLeader ? 1 : 0, NULL);
+                                } catch (eLio) {}
+                            }
+
+                            // 11. lockOnObj (0xA0)
+                            var lockOnObj = viewThis.add(0xA0).readPointer();
+                            if (!lockOnObj.isNull()) {
+                                try {
+                                    setActiveFn(lockOnObj, isLk ? 1 : 0, NULL);
+                                } catch (eLko) {}
+                            }
+
+                            // 12. lockOffObj (0xA8)
+                            var lockOffObj = viewThis.add(0xA8).readPointer();
+                            if (!lockOffObj.isNull()) {
+                                try {
+                                    setActiveFn(lockOffObj, isLk ? 0 : 1, NULL);
+                                } catch (eLkoff) {}
+                            }
+
+                            log("[✅ EQUIP_VIEW] InvenCardEquipView.Refresh safely completed!");
+                        } catch (eEr) {
+                            log("[-] Error in safe InvenCardEquipView.Refresh: " + eEr.message);
                         }
                     }, "void", ["pointer", "pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on InventoryScene.OnCardItem (0x105CEE8)!");
-                } catch (eHoci) {
-                    log("[-] Error replacing OnCardItem: " + eHoci.message);
+                    log("[+] Interceptor.replace installed on InvenCardEquipView.Refresh (0xF219B4)!");
+                } catch (eHicer) {
+                    log("[-] Error replacing InvenCardEquipView.Refresh: " + eHicer.message);
                 }
 
                 // 10. URLsControl.SetCdnTexture (0x163A9E8) -> Native Texture2D loader with disk cache
