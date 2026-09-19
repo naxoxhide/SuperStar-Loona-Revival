@@ -1,81 +1,51 @@
-# Walkthrough: Perfeccionamiento de la IU de Inventario y Localización de Textos
+# Walkthrough: Perfeccionamiento de la UI del Inventario (Estrellas no-R, OT11 y Contadores)
 
-**Fecha:** 19 de Septiembre de 2026  
-**Objetivo:** Implementar los textos faltantes en botones (`Shop`, `Card Book`, `Sell All`, `Choose Group`, `High`) e integrar la función nativa que alimenta el contador de cartas (`14 / 200`) y contador de grupo (`1 / 1`) de acuerdo a las pantallas oficiales de tutorial de SuperStar LOONA.
-
----
-
-## 1. Textos de Interfaz y Localización Standalone
-
-Se identificaron las llamadas internas a `LanguageControl.GetString(int code32)` (RVA `0xCF1064`) ejecutadas por la lógica nativa del juego durante `InventoryScene.OnOpen` (RVA `0x1051604`) y `InvenSortView.Init` (RVA `0xF25D6C`). Se configuró un mapa de respaldo offline para suministrar las cadenas correspondientes:
-
-| Elemento de IU | Offset / Componente | Clave de Localización | Texto Asignado |
-|---|---|---|---|
-| `btnStore` | `InventoryView + 0x90` | `0x2FC86C1` | `"Shop"` |
-| `btnSellBundle` | `InventoryView + 0x98` | `0x30423FA` | `"Sell All"` |
-| `btnSelectGroup` | `InventoryView + 0xA0` | `0xAD02876` | `"Choose Group"` |
-| `btnMyCollection` | `InventoryView + 0xA8` | `0x1D9405D` / `0x1D94064` | `"Card Book"` |
-| `sortText` (High) | `InvenSortView + 0x40` | `0x14B1DA9` | `"High"` |
-| `sortText` (New) | `InvenSortView + 0x40` | `0x2FE0979` | `"New"` |
-| `sortText` (Low) | `InvenSortView + 0x40` | `0x2FE097D` | `"Low"` |
-| `InvenCardView.count` | `InvenCardView + 0x38` | `0x3072969` | `"{0} / {1}"` |
-| `InvenGroupView.count` | `InvenGroupView + 0x38` | `0x3072D51` | `"{0} / {1}"` |
+**Fecha:** 2026-09-19  
+**Autor:** Antigravity (Pair Programming con Ignacio)  
+**Entorno:** Android ARM64 (IL2CPP / Frida Gadget Standalone Offline) / BlueStacks macOS
 
 ---
 
-## 2. Localización y Pipeline del Contador de Cartas
+## 🎯 Objetivos Cumplidos
 
-Se realizó la ingeniería inversa de la función nativa que alimenta el contador de cartas en el binario ARM64 (`libil2cpp.so`):
+1. **Corrección del Rectángulo Blanco Sólido en Cartas no-R (C, B, A, S):**
+   - Se analizó el desensamblado de `CardView.SetLevel(p)` (RVA `0x1394858`) y la indexación nativa de `starSprites`:
+     $$\text{index} = (\text{tier} \times \text{maxLevel}) + \text{level} - 1$$
+   - En rangos no-R (`grade < 4`), `maxLevel` debe ser 5 (en lugar de 50) y `level` debe acotarse a $[1, 5]$.
+   - Al restablecer los límites canónicos, Dalcomsoft carga los sprites dorados oficiales de 1 a 5 estrellas, eliminando por completo el renderizado del quad blanco por omisión de textura.
 
-- **Función Nativa Identificada:** `InventoryScene.OnUpdateCardCount(object[] args)` en **RVA `0x1054BB4`**.
-- **Flujo de Ejecución:**
-  1. `0x1054C78: bl #0xAB1C1C`: Invoca `UserData.get_CardInvenMaxCount()` -> Lee la capacidad máxima de inventario (200 ranuras).
-  2. `0x1054CB8: bl #0xCF1064`: Invoca `LanguageControl.GetString(0x3072969)` -> Retorna el formato `"{0} / {1}"`.
-  3. `0x1054CE8: bl #0xF275E8`: Invoca `InventoryControl.get_CardMapCount()` -> Retorna la cantidad de cartas en posesión (14).
-  4. `0x1054D2C: bl #0x2205FC4`: Invoca `System.String.Format("{0} / {1}", count, max)` -> Genera `"14 / 200"`.
-  5. `0x1054D40: bl #0xf23260`: Invoca `InvenCardView.set_Count(cardView, "14 / 200")`, asignando el texto en el componente `Text count` (offset `0x38`).
+2. **Alineación Canónica OT11 y Desactivación del Slot 12:**
+   - Se comprobó mediante desencriptación de `grd.bin` y `atd.bin` que el grupo 1001 (`[+ +]`) contiene oficialmente 11 integrantes (`equipableSlot: 11`).
+   - El prefab de Unity `InvenGroupItemView` posee 12 GameObjects fijos en su jerarquía (`cardList`).
+   - Se resolvió `Component.get_gameObject` (RVA `0x1DB6AD4`) y `GameObject.SetActive` (RVA `0x1DBADF4`) para desactivar dinámicamente cualquier slot con índice $i \ge 11$.
+   - Se alinearon a módulo 11 (`% 11`) las rutinas de equipamiento individual (`handleCardEquipOffline`), desequipamiento (`handleCardUnequipOffline`) y auto-equipamiento (`handleAutoEquipOffline`).
 
----
+3. **Visibilidad y Formato de Contadores:**
+   - Contador de cartas en bandeja inferior (`InvenCardView + 0x38`): **`14 / 200`** (14 cartas en posesión de 200 de capacidad máxima).
+   - Contador de grupos en panel de selección (`InvenGroupView + 0x38`): **`1 / 1`** (Grupo 1 de 1 disponible).
 
-## 3. Arquitectura del Ciclo de Vida Seguro (`InventoryView.ShowDefaultLayout`)
-
-Para evitar excepciones de reconstrucción de layout en Unity (`libunity.so!0x2d416c`), se trasladó la invocación de actualización al hook de salida (`onLeave`) de `InventoryView.ShowDefaultLayout` (RVA `0x1055ED0`):
-
-```javascript
-Interceptor.attach(baseAddr.add(0x1055ED0), {
-    onLeave: function (retval) {
-        if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
-            // 1. Contador de cartas nativo
-            var onUpdateCardCountFn = new NativeFunction(baseAddr.add(0x1054BB4), "void", ["pointer", "pointer"]);
-            onUpdateCardCountFn(activeInventorySceneInstance, NULL);
-
-            // 2. Contador de páginas de grupos
-            var setGroupViewCountFn = new NativeFunction(baseAddr.add(0x1053E18), "void", ["pointer"]);
-            setGroupViewCountFn(activeInventorySceneInstance);
-
-            // 3. Etiqueta de ordenamiento
-            var sceneView = activeInventorySceneInstance.add(0x48).readPointer();
-            if (!sceneView.isNull()) {
-                var sortView = sceneView.add(0x80).readPointer();
-                if (!sortView.isNull()) {
-                    var sortText = sortView.add(0x40).readPointer();
-                    if (!sortText.isNull()) {
-                        var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
-                        setTextFn(sortText, createIl2CppString("High"), NULL);
-                    }
-                }
-            }
-        }
-    }
-});
-```
+4. **Flujo de Hot-Reload Ultrarrápido:**
+   - Aprovechando la rutina de `UnityPlayerActivity.java` (`getExternalFilesDir(null)/libscript.js`), se implementó la inyección instantánea vía streaming stdin sobre ADB (`~1 segundo`), acelerando drásticamente los ciclos de prueba sin reconstrucción de APK.
 
 ---
 
-## 4. Verificación en Emulador
+## 📸 Evidencia Visual de Verificación
 
-Captura de pantalla verificada: [`inventory_screen_verified.png`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/inventory_screen_verified.png)
+A continuación se presenta la captura final tomada directamente desde el emulador BlueStacks:
 
-- Botones de la izquierda (`Shop`, `Card Book`, `Sell All`) muestran sus textos e iconos correspondientes.
-- Botones de la derecha (`Choose Group`, `Equip Theme`, `Auto Equip`, `Unequip All`) muestran sus textos completos.
-- Botón de ordenamiento inferior muestra flecha `^` y etiqueta `"High"`.
+![Inventario Final Perfeccionado](file:///Users/ignaciorojas/Documents/repos/sslo_apk/inventory_final_check.png)
+
+### Observaciones de la Captura:
+- **Cabecera de LOONA:** Muestra las 11 integrantes canónicas (HeeJin, HyunJin, HaSeul, YeoJin, ViVi, Kim Lip en fila 1; JinSoul, Choerry, Yves, Go Won, Olivia Hye en fila 2).
+- **Slot 12 Eliminado:** No existe duplicación de HeeJin en la posición 12.
+- **Grado y Tema Activos:** Insignia brillante `Group Grade: R +500.000` y `Group Theme: Lv 3 Hi High` (`ULTRA RAVE`).
+- **Cartas no-R en Bandeja:** Cartas Grado A y Grado S muestran su estrella dorada nítida y su fondo degradado característico, sin artefactos blancos.
+- **Contadores Activos:** `14 / 200` en la esquina inferior izquierda y `1 / 1` en la esquina superior derecha.
+
+---
+
+## 🛠️ Archivos Modificados
+
+- [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js): Lógica de ocultamiento de slot 12, módulo 11 y fórmulas de estrellas no-R.
+- [`app/src/main/lib/arm64-v8a/libscript.so`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/lib/arm64-v8a/libscript.so): Binario sincronizado con `libscript.js`.
+- [`docs/CONTEXT.md`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/CONTEXT.md): Incorporada Sección 16.11 con los hallazgos de ingeniería inversa y decisiones arquitectónicas.

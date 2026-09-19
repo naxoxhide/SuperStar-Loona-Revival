@@ -1548,3 +1548,32 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
      - Actualizar `LOONA_MEMBERS` para reflejar la estructura oficial de 11 miembros del grupo 1001.
      - Configurar `memberCount = 11` en `GroupData` y `InvenGroupItemView.Params`.
      - Esto elimina la duplicación de HeeJin y alinea la cuadrícula de equipamiento al 100% con los datos oficiales del juego.
+
+## 16.11 Desactivación Dinámica del Slot 12 en `InvenGroupItemView` y Hot-Reload de Frida
+
+1. **Ocultamiento del Slot 12 en la Jerarquía de Unity:**
+   - **Diagnóstico:** El prefab de `InvenGroupItemView` contiene un arreglo fijo de 12 componentes `CardSmallView` en `cardList` (`view + 0x60`). Aunque `memberCount` se configuró a 11, el ciclo de renderizado nativo recorría los 12 elementos, provocando que el duodécimo slot recalculase `(11 % 11) = 0` (HeeJin) y permaneciese activo.
+   - **Solución:** En `InvenGroupItemView.Refresh` (RVA `0xF23954`), se resolvieron nativamente `Component.get_gameObject` (RVA `0x1DB6AD4`) y `GameObject.SetActive` (RVA `0x1DBADF4`).
+     - Para cualquier índice `i >= 11`, se ejecuta `SetActive(go, 0)`.
+     - Para índices `0 <= i < 11`, se asegura `SetActive(go, 1)`.
+   - **Efecto en Unity UI:** Al desactivar el 12º GameObject, el componente `GridLayoutGroup` recalcula dinámicamente el layout, renderizando limpiamente 11 integrantes (6 en la fila superior y 5 en la inferior) sin espacios residuales ni duplicados.
+
+2. **Alineación Modular `% 11` en la Lógica de Inventario Offline:**
+   - Se actualizaron de manera exhaustiva todos los cálculos modulares y bucles en:
+     - `GetGroupViewData` (RVA `0x105E8E4`): Cálculo de `eqCount === 11` para `Group Grade` (`R +500.000`) y `Theme Level` (`Lv 3 Hi High`).
+     - `handleCardEquipOffline` / `handleCardUnequipOffline`: Mapeo de `memberIdx = (cardId - 1001) % 11` y validación de slots `0..10`.
+     - `handleAutoEquipOffline`: Iteración acotada a `m = 0..10`, seleccionando y equipando exactamente las 11 mejores cartas de LOONA.
+     - `CardControl/Data` y `CardItem..ctor` (RVA `0xB55850`): Sincronización del índice de artista para cartas especiales (como 1012 HeeJin Prism).
+
+3. **Mecanismo de Hot-Reload Ultrarrápido (`getExternalFilesDir`):**
+   - En `UnityPlayerActivity.java`, la aplicación verifica si existe `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/libscript.js`.
+   - Al existir dicho archivo, Frida lo carga prioritariamente sobre el script empaquetado en los assets del APK.
+   - Permite inyectar actualizaciones completas de instrumentación en ~1 segundo usando streaming stdin (`cat libscript.js | adb shell "cat > /storage/..."`), eliminando la necesidad de reconstruir el APK de 1.4 GB para iteraciones lógicas de Frida.
+
+4. **Validación Visual Exitosa:**
+   - Verificado en BlueStacks mediante captura de pantalla ([inventory_final_check.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/inventory_final_check.png)):
+     - Cuadrícula de LOONA con exactamente 11 integrantes equipadas con cartas Grado R Lv 50.
+     - Desaparición completa de la duplicación de HeeJin.
+     - Cartas no-R (Grado A y S) con estrellas doradas limpias y sin barra blanca.
+     - Contadores `14 / 200` y `1 / 1` perfectamente legibles.
+     - Activación de insignias de grupo: `R +500.000` y `ULTRA RAVE Lv 3 Hi High`.
