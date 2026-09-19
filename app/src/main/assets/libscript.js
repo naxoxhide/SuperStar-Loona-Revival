@@ -3338,6 +3338,43 @@ function initIl2Cpp(module) {
                     }
                 }
 
+                function createMockEmptySmallCardParams(cardId) {
+                    try {
+                        var csvParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardSmallView/Params");
+                        if (!csvParamsKlass || csvParamsKlass.isNull()) return NULL;
+                        var p = il2cpp_object_new(csvParamsKlass);
+                        if (!p || p.isNull()) return NULL;
+
+                        var photoDp = createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/" + cardId + "_s.i.bytes");
+
+                        p.add(0x10).writePointer(photoDp || NULL);
+                        p.add(0x18).writePointer(NULL); // tierPath = null
+                        p.add(0x20).writeU8(0);
+                        p.add(0x28).writePointer(NULL);
+                        p.add(0x30).writePointer(NULL);
+                        p.add(0x38).writeU8(0);
+                        p.add(0x3C).writeS32(5); // tier = 5 (None)
+                        p.add(0x40).writeU8(0); // isRCard = false
+                        p.add(0x41).writeU8(0);
+                        p.add(0x44).writeS32(0); // maxLevel = 0
+                        p.add(0x48).writeS32(0); // level = 0
+                        p.add(0x4C).writeU8(0);
+                        p.add(0x4E).writeS16(0);
+                        p.add(0x50).writeU8(0); // isEquip = false
+                        p.add(0x51).writeU8(0);
+                        p.add(0x52).writeU8(0);
+                        p.add(0x53).writeU8(0);
+                        p.add(0x54).writeU8(0);
+                        p.add(0x55).writeU8(0);
+                        p.add(0x56).writeU8(0);
+                        p.add(0x57).writeU8(0);
+                        return p;
+                    } catch (eMesp) {
+                        log("[-] Error in createMockEmptySmallCardParams: " + eMesp.message);
+                        return NULL;
+                    }
+                }
+
                 function createMockLargeCardParams(cardId, grade, level) {
                     try {
                         var clvParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardLargeView/Params");
@@ -3465,14 +3502,41 @@ function initIl2Cpp(module) {
                             p.add(0x28).writePointer(NULL); // cardParams
                             p.add(0x30).writePointer(NULL); // summary
 
-                            // Texts & values
+                            // Texts & values calculated dynamically from profile
+                            var profile = loadPlayerProfile();
+                            var eqCards = (profile && profile.inventoryCards) ? profile.inventoryCards.filter(function(c) { return c.isEquip; }) : [];
+                            var eqCount = 0;
+                            var minGrade = 4;
+                            var isAllHiHigh = true;
+                            var memberEquipped = {};
+                            for (var ei = 0; ei < eqCards.length; ei++) {
+                                var ec = eqCards[ei];
+                                var em = ((ec.cardID - 1001) % 12);
+                                if (!memberEquipped[em]) {
+                                    memberEquipped[em] = true;
+                                    eqCount++;
+                                    if (ec.grade < minGrade) minGrade = ec.grade;
+                                    if (ec.themeID && ec.themeID !== 1001) isAllHiHigh = false;
+                                }
+                            }
+
+                            var gVal = (eqCount === 12) ? minGrade : -1;
+                            var gScore = 0;
+                            if (gVal === 4) gScore = 500000;
+                            else if (gVal === 3) gScore = 400000;
+                            else if (gVal === 2) gScore = 300000;
+                            else if (gVal === 1) gScore = 200000;
+                            else if (gVal === 0) gScore = 100000;
+
+                            var tLevel = (eqCount === 12 && isAllHiHigh) ? 3 : 0;
+
                             p.add(0x38).writePointer(createIl2CppString("Group Grade"));
                             p.add(0x40).writePointer(createIl2CppString("Collect All Cards"));
-                            p.add(0x48).writeS32(4); // gradeValue: 4 = Grade R
-                            p.add(0x4C).writeS32(500000); // gradeScore: 500,000 score bonus
+                            p.add(0x48).writeS32(gVal);
+                            p.add(0x4C).writeS32(gScore);
                             p.add(0x50).writePointer(createIl2CppString("Group Theme"));
                             p.add(0x58).writePointer(createIl2CppString("No Theme"));
-                            p.add(0x60).writeS32(3); // themeLevel: 3 = Lv 3
+                            p.add(0x60).writeS32(tLevel);
                             var themeDp = createDownloadPath("asiudgasg/asodhsg/aweoijs/2.i.bytes");
                             p.add(0x68).writePointer(themeDp || NULL);
                             p.add(0x70).writePointer(createIl2CppString("ULTRA RAVE"));
@@ -3522,6 +3586,9 @@ function initIl2Cpp(module) {
                                     var cardItemsPtr = cardList.add(0x10).readPointer();
                                     log("[🃏 GROUP_ITEM_VIEW] Populating " + cardCount + " cards in cardList directly...");
                                     var cardRefreshFn = new NativeFunction(baseAddr.add(0x137F570), "void", ["pointer", "pointer", "pointer"]);
+                                    var setTierVis = new NativeFunction(baseAddr.add(0x1393AAC), "void", ["pointer", "int"]);
+                                    var setStarVis = new NativeFunction(baseAddr.add(0x1388C58), "void", ["pointer", "int"]);
+                                    var setNumVis = new NativeFunction(baseAddr.add(0x1393D68), "void", ["pointer", "int"]);
                                     var profile = loadPlayerProfile();
                                     var eqCards = (profile && profile.inventoryCards) ? profile.inventoryCards.filter(function(c) { return c.isEquip; }) : [];
                                     for (var i = 0; i < cardCount; i++) {
@@ -3529,16 +3596,37 @@ function initIl2Cpp(module) {
                                         if (!cardSmallView.isNull()) {
                                             var mIdx = (i % 12);
                                             var targetCard = eqCards.find(function(c) { return ((c.cardID - 1001) % 12) === mIdx; });
-                                            if (!targetCard && profile && profile.inventoryCards) {
-                                                targetCard = profile.inventoryCards.find(function(c) { return ((c.cardID - 1001) % 12) === mIdx; });
-                                            }
-                                            var cId = targetCard ? targetCard.cardID : (1001 + mIdx);
-                                            var gr = targetCard ? targetCard.grade : 4;
-                                            var lvl = targetCard ? targetCard.level : 50;
-                                            var isEq = targetCard ? !!targetCard.isEquip : false;
-                                            var cardParam = createMockSmallCardParams(cId, gr, lvl, isEq);
-                                            if (cardParam && !cardParam.isNull()) {
-                                                cardRefreshFn(cardSmallView, cardParam, NULL);
+                                            if (targetCard) {
+                                                // Slot IS EQUIPPED with active card
+                                                var cId = targetCard.cardID;
+                                                var gr = targetCard.grade;
+                                                var lvl = targetCard.level;
+                                                var cardParam = createMockSmallCardParams(cId, gr, lvl, false);
+                                                if (cardParam && !cardParam.isNull()) {
+                                                    cardRefreshFn(cardSmallView, cardParam, NULL);
+                                                }
+                                                try {
+                                                    setTierVis(cardSmallView, 1);
+                                                    if (gr === 4) {
+                                                        setStarVis(cardSmallView, 0);
+                                                        setNumVis(cardSmallView, 1);
+                                                    } else {
+                                                        setStarVis(cardSmallView, 1);
+                                                        setNumVis(cardSmallView, 0);
+                                                    }
+                                                } catch (eVisEq) {}
+                                            } else {
+                                                // Slot IS UNEQUIPPED: show empty placeholder from sdhgauwehdnu
+                                                var emptyCardId = 1001 + mIdx;
+                                                var emptyParam = createMockEmptySmallCardParams(emptyCardId);
+                                                if (emptyParam && !emptyParam.isNull()) {
+                                                    cardRefreshFn(cardSmallView, emptyParam, NULL);
+                                                }
+                                                try {
+                                                    setTierVis(cardSmallView, 0);
+                                                    setStarVis(cardSmallView, 0);
+                                                    setNumVis(cardSmallView, 0);
+                                                } catch (eVisEmpty) {}
                                             }
                                         }
                                     }
@@ -3749,7 +3837,12 @@ function initIl2Cpp(module) {
                                 var match = relPath.match(/(\d+)_([sl])\.i\.bytes/);
                                 if (match) {
                                     var cId = parseInt(match[1]);
-                                    var folder = accountOwnedCards[cId] ? "wadceg" : "sdhgauwehdnu";
+                                    var folder = "wadceg";
+                                    if (relPath.indexOf("sdhgauwehdnu/") !== -1) {
+                                        folder = "sdhgauwehdnu";
+                                    } else {
+                                        folder = accountOwnedCards[cId] ? "wadceg" : "sdhgauwehdnu";
+                                    }
                                     // High-Definition Upgrade: prefer _l over _s for maximum visual sharpness
                                     var highResPath = "asiudgasg/asodhsg/" + folder + "/" + cId + "_l.i.bytes";
                                     var highResTex = loadLocalTexture2D(highResPath);
