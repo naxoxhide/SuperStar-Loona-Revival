@@ -1857,6 +1857,16 @@ function initIl2Cpp(module) {
                     }
                 });
 
+                // TitleScene.SetStateTermsAndPolicy (0xB22514) -> auto bypass to SetStateLoading (0xB22D64)
+                try {
+                    Interceptor.replace(baseAddr.add(0xB22514), new NativeCallback(function (thiz) {
+                        log("[📜 TERMS] SetStateTermsAndPolicy intercepted -> directly advancing to SetStateLoading!");
+                        var setStateLoadingFn = new NativeFunction(baseAddr.add(0xB22D64), "void", ["pointer"]);
+                        setStateLoadingFn(thiz);
+                    }, "void", ["pointer"]));
+                    log("[+] Hooked TitleScene.SetStateTermsAndPolicy (0xB22514) to auto-advance!");
+                } catch (eTerms) {}
+
                 // TitleScene.SetStateSelectLogin (0xB245AC)
                 Interceptor.attach(baseAddr.add(0xB245AC), {
                     onEnter: function (args) {
@@ -2596,10 +2606,13 @@ function initIl2Cpp(module) {
                             methodInfoTablePtr = baseAddr.add(0x31080E8);
                         }
 
+                        var initMetaFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
+
                         var klass = NULL;
                         try {
                             var ptr1 = klassTablePtr.readPointer();
                             if (!ptr1.isNull()) {
+                                initMetaFn(ptr1);
                                 klass = ptr1.readPointer();
                             }
                         } catch (eKp) {}
@@ -2612,6 +2625,7 @@ function initIl2Cpp(module) {
                                 try {
                                     var miPtr1 = methodInfoTablePtr.readPointer();
                                     if (!miPtr1.isNull()) {
+                                        initMetaFn(miPtr1);
                                         methodInfo = miPtr1.readPointer();
                                     }
                                 } catch (eMip) {}
@@ -4790,19 +4804,21 @@ function initIl2Cpp(module) {
                                     var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
                                     var getActiveInHierarchyFn = new NativeFunction(baseAddr.add(0x1DBAE84), "int", ["pointer"]);
                                     var getTextFn = new NativeFunction(baseAddr.add(0x21A5FBC), "pointer", ["pointer"]);
+                                    var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer"]);
+                                    var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer"]);
+                                    var getTransFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer"]);
 
                                     var go = getGoFn(countTextObj);
                                     if (!go.isNull()) {
                                         setActiveFn(go, 1, NULL);
                                         var inHier = getActiveInHierarchyFn(go);
+                                        setTextFn(countTextObj, createIl2CppString(countStr), NULL);
                                         var curTxt = readIl2CppString(getTextFn(countTextObj));
-                                        var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer"]);
-                                        var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer"]);
-                                        var getTransFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer"]);
                                         var countTrans = getTransFn(countTextObj);
                                         var countName = readIl2CppString(getNameFn(countTextObj));
                                         var parentTrans = getParentFn(countTrans);
                                         var parentName = !parentTrans.isNull() ? readIl2CppString(getNameFn(parentTrans)) : "none";
+                                        
                                         log("[📊 INVENTORY] countText name: '" + countName + "' | parent: '" + parentName + "' | text: '" + curTxt + "' | activeInHier: " + inHier);
                                     }
                                 } catch (eInspect) {
@@ -4810,14 +4826,12 @@ function initIl2Cpp(module) {
                                 }
                             }
                         }
-
-                        }
                     } catch (eUi) {
                         log("[-] Error updating inventory UI elements: " + eUi.message);
                     }
                 };
 
-                // --- Protect UserData.get_CardInvenMaxCount (0xAB1C1C) ---
+                // --- Protect UserData.get_CardInvenMaxCount (0xAB1C1C) & InventoryControl.get_CardMapCount (0xF275E8) ---
                 try {
                     Interceptor.replace(baseAddr.add(0xAB1C1C), new NativeCallback(function () {
                         var profile = loadPlayerProfile();
@@ -4825,6 +4839,14 @@ function initIl2Cpp(module) {
                     }, "int", []));
                     log("[🛡️ USERDATA] UserData.get_CardInvenMaxCount safely protected!");
                 } catch (eMax) {}
+
+                try {
+                    Interceptor.replace(baseAddr.add(0xF275E8), new NativeCallback(function () {
+                        var profile = loadPlayerProfile();
+                        return (profile && profile.inventoryCards) ? profile.inventoryCards.length : 0;
+                    }, "int", []));
+                    log("[🛡️ INVENTORY] InventoryControl.get_CardMapCount safely protected!");
+                } catch (eCmc) {}
 
                 // --- Hook InventoryScene.OnOpen (0x1051604) ---
                 try {
