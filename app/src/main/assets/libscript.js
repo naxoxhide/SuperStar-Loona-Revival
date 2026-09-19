@@ -545,6 +545,45 @@ function initIl2Cpp(module) {
             }
 
             function createDefaultProfile(nickname) {
+                var invCards = [];
+                // 12 cards equipped for LOONA (Theme: Hi High, 1001-1012) at Grade R (4) Level 50
+                for (var i = 0; i < 12; i++) {
+                    invCards.push({
+                        objectID: 100001 + i,
+                        cardID: 1001 + i,
+                        grade: 4, // Grade R
+                        level: 50,
+                        energy: 100,
+                        score: 100,
+                        isEquip: true,
+                        isLock: false,
+                        isPrism: false
+                    });
+                }
+                // 2 extra cards in inventory (unequipped) to verify selective checkmarking
+                invCards.push({
+                    objectID: 100013,
+                    cardID: 1001, // HeeJin extra copy
+                    grade: 2, // Grade A
+                    level: 1,
+                    energy: 50,
+                    score: 50,
+                    isEquip: false,
+                    isLock: false,
+                    isPrism: false
+                });
+                invCards.push({
+                    objectID: 100014,
+                    cardID: 1002, // HyunJin extra copy
+                    grade: 3, // Grade S
+                    level: 1,
+                    energy: 70,
+                    score: 70,
+                    isEquip: false,
+                    isLock: false,
+                    isPrism: false
+                });
+
                 return {
                     userId: 10001,
                     nickname: nickname || "Orbit",
@@ -556,12 +595,14 @@ function initIl2Cpp(module) {
                     cardInvenMax: 200,
                     equipedLobbyBgList: [100001],
                     leaderCard: {
-                        cardID: 10001,
+                        cardID: 1001,
                         grade: 4,
                         level: 50
                     },
-                    inventoryCards: [],
-                    equipedCards: {}
+                    inventoryCards: invCards,
+                    equipedCards: {
+                        "1001": [100001, 100002, 100003, 100004, 100005, 100006, 100007, 100008, 100009, 100010, 100011, 100012]
+                    }
                 };
             }
 
@@ -2485,6 +2526,20 @@ function initIl2Cpp(module) {
                     1012: { grade: 4, level: 50 }
                 };
 
+                function syncAccountOwnedCards() {
+                    try {
+                        var prof = loadPlayerProfile();
+                        if (prof && prof.inventoryCards && prof.inventoryCards.length > 0) {
+                            for (var i = 0; i < prof.inventoryCards.length; i++) {
+                                var ic = prof.inventoryCards[i];
+                                if (!accountOwnedCards[ic.cardID] || ic.grade > accountOwnedCards[ic.cardID].grade) {
+                                    accountOwnedCards[ic.cardID] = { grade: ic.grade, level: ic.level };
+                                }
+                            }
+                        }
+                    } catch (eSc) {}
+                }
+
                 // grade: 0=C, 1=B, 2=A, 3=S, 4=R
                 // type: 0=Large (_l), 1=Small (_s), 2=Collection (_c)
                 function getGradeFrameDownloadPath(grade, type, isCollection, themeCode) {
@@ -3243,7 +3298,7 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing get_SelectedGroupCode: " + eSgc.message);
                 }
 
-                function createMockSmallCardParams(cardId, grade, level) {
+                function createMockSmallCardParams(cardId, grade, level, isEquip) {
                     try {
                         var csvParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardSmallView/Params");
                         if (!csvParamsKlass || csvParamsKlass.isNull()) return NULL;
@@ -3266,7 +3321,7 @@ function initIl2Cpp(module) {
                         p.add(0x48).writeS32(level);
                         p.add(0x4C).writeU8(0);
                         p.add(0x4E).writeS16(0);
-                        p.add(0x50).writeU8(1); // isEquip
+                        p.add(0x50).writeU8(isEquip ? 1 : 0); // isEquip dynamic
                         p.add(0x51).writeU8(0);
                         p.add(0x52).writeU8(0);
                         p.add(0x53).writeU8(0);
@@ -3330,6 +3385,7 @@ function initIl2Cpp(module) {
                             var cId = 1001;
                             var gr = 4;
                             var lvl = 50;
+                            var isEq = false;
                             try {
                                 if (cardItem && !cardItem.isNull()) {
                                     var raw = cardItem.add(0x10).readPointer();
@@ -3337,10 +3393,11 @@ function initIl2Cpp(module) {
                                         cId = raw.add(0x20).readS32();
                                         gr = raw.add(0x24).readS32();
                                         lvl = raw.add(0x1C).readS16();
+                                        isEq = (raw.add(0x28).readU8() === 1);
                                     }
                                 }
                             } catch (e) {}
-                            return createMockSmallCardParams(cId, gr, lvl);
+                            return createMockSmallCardParams(cId, gr, lvl, isEq);
                         } catch (eGscv) {
                             log("[-] Error in GetSmallCardViewData proxy: " + eGscv.message);
                             return NULL;
@@ -3436,10 +3493,14 @@ function initIl2Cpp(module) {
                                     listCtorFn(cardParamsListObj, 12, ctorMethod);
                                     var addMethodSlot = baseAddr.add(0x3130588).readPointer();
                                     var addMethod = !addMethodSlot.isNull() ? addMethodSlot.readPointer() : NULL;
-                                    var listAddFn = new NativeFunction(baseAddr.add(0x23CE41C), "void", ["pointer", "pointer", "pointer"]);
+                                    var profile = loadPlayerProfile();
+                                    var eqCards = (profile && profile.inventoryCards) ? profile.inventoryCards.filter(function(c) { return c.isEquip; }) : [];
                                     for (var ci = 0; ci < 12; ci++) {
-                                        var cardId = 1001 + ci;
-                                        var smParam = createMockSmallCardParams(cardId, 4, 50);
+                                        var targetCard = eqCards[ci] || (profile && profile.inventoryCards && profile.inventoryCards[ci]);
+                                        var cardId = targetCard ? targetCard.cardID : (1001 + ci);
+                                        var gr = targetCard ? targetCard.grade : 4;
+                                        var lvl = targetCard ? targetCard.level : 50;
+                                        var smParam = createMockSmallCardParams(cardId, gr, lvl, true);
                                         listAddFn(cardParamsListObj, smParam, addMethod);
                                     }
                                     p.add(0x28).writePointer(cardParamsListObj);
@@ -3517,11 +3578,16 @@ function initIl2Cpp(module) {
                                     var cardItemsPtr = cardList.add(0x10).readPointer();
                                     log("[🃏 GROUP_ITEM_VIEW] Populating " + cardCount + " cards in cardList directly...");
                                     var cardRefreshFn = new NativeFunction(baseAddr.add(0x137F570), "void", ["pointer", "pointer", "pointer"]);
+                                    var profile = loadPlayerProfile();
+                                    var eqCards = (profile && profile.inventoryCards) ? profile.inventoryCards.filter(function(c) { return c.isEquip; }) : [];
                                     for (var i = 0; i < cardCount; i++) {
                                         var cardSmallView = cardItemsPtr.add(0x20 + i * 8).readPointer();
                                         if (!cardSmallView.isNull()) {
-                                            var cId = 1001 + (i % 12);
-                                            var cardParam = createMockSmallCardParams(cId, 4, 50);
+                                            var targetCard = eqCards[i] || (profile && profile.inventoryCards && profile.inventoryCards[i]);
+                                            var cId = targetCard ? targetCard.cardID : (1001 + (i % 12));
+                                            var gr = targetCard ? targetCard.grade : 4;
+                                            var lvl = targetCard ? targetCard.level : 50;
+                                            var cardParam = createMockSmallCardParams(cId, gr, lvl, true);
                                             if (cardParam && !cardParam.isNull()) {
                                                 cardRefreshFn(cardSmallView, cardParam, NULL);
                                             }
@@ -4351,8 +4417,32 @@ function initIl2Cpp(module) {
 
                         log("[✅ INVENTORY] Successfully populated " + addedCount + " LOONA cards into CardMap!");
 
-                        loonaCardListFastArray = createFastArray(loonaCardItems, 'card');
-                        log("[🃏 INVENTORY] Created loonaCardListFastArray: " + loonaCardListFastArray);
+                        var loonaEquippedCards = [];
+                        var memberFilled = {};
+                        for (var k = 0; k < loonaCardItems.length; k++) {
+                            var itm = loonaCardItems[k];
+                            var r = itm.add(0x10).readPointer();
+                            var cid = r.add(0x20).readS32();
+                            var mIdx = ((cid - 1001) % 12);
+                            var isEq = (r.add(0x28).readU8() === 1);
+                            if (isEq && !memberFilled[mIdx]) {
+                                loonaEquippedCards.push(itm);
+                                memberFilled[mIdx] = true;
+                            }
+                        }
+                        for (var k = 0; k < loonaCardItems.length && loonaEquippedCards.length < 12; k++) {
+                            var itm = loonaCardItems[k];
+                            var r = itm.add(0x10).readPointer();
+                            var cid = r.add(0x20).readS32();
+                            var mIdx = ((cid - 1001) % 12);
+                            if (!memberFilled[mIdx]) {
+                                loonaEquippedCards.push(itm);
+                                memberFilled[mIdx] = true;
+                            }
+                        }
+
+                        loonaCardListFastArray = createFastArray(loonaEquippedCards, 'card');
+                        log("[🃏 INVENTORY] Created loonaCardListFastArray (count=" + loonaEquippedCards.length + "): " + loonaCardListFastArray);
 
                         try {
                             var dictTablePtr = baseAddr.add(0x30F77E8);

@@ -1348,4 +1348,12 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
    - `createMockSmallCardParams(cardId, grade, level, isEquip)` recibe el flag dinámicamente: sólo las cartas con `isEquip: true` reciben el checkmark.
    - `GetGroupViewData` e `InvenGroupItemView.Refresh` leen los datos de `player_profile.json`, garantizando congruencia del 100% entre las cartas equipadas en la cabecera y las cartas marcadas en la bandeja inferior de inventario.
 
+### 16.4. Verificación y Resultados de la Sincronización en Vivo
+1. **Implementación de Filtro para `GroupItem.CardItemList`:**
+   - Dalcomsoft indexa `GroupItem.CardItemList` (`FastArray<CardItem>`) asumiendo estrictamente `memberCount` elementos (12 slots para LOONA).
+   - En `populateOfflineInventoryCards`, se implementó la selección y filtrado de las 12 cartas activas (`loonaEquippedCards`), reservando las cartas no equipadas adicionales exclusivamente para el catálogo general `CardMap`.
+2. **Resultados Visuales Confirmados:**
+   - **Bandeja Inferior (`InvenCardView`):** Las cartas en reserva (HeeJin Grado A Lv 1 y HyunJin Grado S Lv 1) se muestran sin recuadro azul (sin checkmark). Las 12 cartas equipadas (HeeJin a Olivia Hye Grado R Lv 50) muestran el checkmark azul (✓) y su marco R con estrella 50.
+   - **Cabecera de Tema (`InvenGroupItemView`):** Sincronizada al 100% con los datos de `player_profile.json`, manteniendo Group Grade `R +500.000` y `⚡ ULTRA RAVE Lv 3 Hi High`.
+
 
