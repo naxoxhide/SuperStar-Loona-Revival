@@ -2575,6 +2575,8 @@ function initIl2Cpp(module) {
                 var loonaArtistListFastArray = NULL;
                 var loonaCardListFastArray = NULL;
                 var loonaEachThemeBestCardMap = NULL;
+                var loonaCardItems = [];
+                var activeInventorySceneInstance = NULL;
 
                 function createFastArray(items, type) {
                     try {
@@ -3445,8 +3447,7 @@ function initIl2Cpp(module) {
                             log("[🃏 GROUP_VIEW] GetGroupViewData entered for groupItem: " + groupItem);
                             var p = shared;
                             if (!p || p.isNull()) {
-                                var paramsKlassSlot = baseAddr.add(0x3115188).readPointer();
-                                var paramsKlass = !paramsKlassSlot.isNull() ? paramsKlassSlot.readPointer() : NULL;
+                                var paramsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "InvenGroupItemView/Params");
                                 if (paramsKlass && !paramsKlass.isNull()) {
                                     p = il2cpp_object_new(paramsKlass);
                                 }
@@ -3456,72 +3457,15 @@ function initIl2Cpp(module) {
                                 return NULL;
                             }
 
-                            // Populate fields
+                            // Populate fields safely
                             p.add(0x10).writePointer(createIl2CppString("LOONA"));
                             p.add(0x18).writeS32(12); // memberCount
                             p.add(0x1C).writeS32(0);  // summaryCount
+                            p.add(0x20).writePointer(NULL); // exposeArtistIndexList
+                            p.add(0x28).writePointer(NULL); // cardParams
+                            p.add(0x30).writePointer(NULL); // summary
 
-                            // 1. exposeArtistIndexList: List<int>
-                            try {
-                                var intListKlassSlot = baseAddr.add(0x30EF598).readPointer();
-                                var intListKlass = !intListKlassSlot.isNull() ? intListKlassSlot.readPointer() : NULL;
-                                var intListObj = (intListKlass && !intListKlass.isNull()) ? il2cpp_object_new(intListKlass) : NULL;
-                                if (intListObj && !intListObj.isNull()) {
-                                    var ctorMethodSlot = baseAddr.add(0x310BAA0).readPointer();
-                                    var ctorMethod = !ctorMethodSlot.isNull() ? ctorMethodSlot.readPointer() : NULL;
-                                    var listCtorFn = new NativeFunction(baseAddr.add(0x2494E98), "void", ["pointer", "int", "pointer"]);
-                                    listCtorFn(intListObj, 12, ctorMethod);
-                                    var addMethodSlot = baseAddr.add(0x314BC0).readPointer();
-                                    var addMethod = !addMethodSlot.isNull() ? addMethodSlot.readPointer() : NULL;
-                                    var listAddFn = new NativeFunction(baseAddr.add(0x2495BA0), "void", ["pointer", "int", "pointer"]);
-                                    for (var i = 0; i < 12; i++) {
-                                        listAddFn(intListObj, i, addMethod);
-                                    }
-                                    p.add(0x20).writePointer(intListObj);
-                                }
-                            } catch (eIl) {}
-
-                            // 2. cardParams: List<CardSmallView.Params>
-                            try {
-                                var cardParamsListKlassSlot = baseAddr.add(0x3132B38).readPointer();
-                                var cardParamsListKlass = !cardParamsListKlassSlot.isNull() ? cardParamsListKlassSlot.readPointer() : NULL;
-                                var cardParamsListObj = (cardParamsListKlass && !cardParamsListKlass.isNull()) ? il2cpp_object_new(cardParamsListKlass) : NULL;
-                                if (cardParamsListObj && !cardParamsListObj.isNull()) {
-                                    var ctorMethodSlot = baseAddr.add(0x31275B0).readPointer();
-                                    var ctorMethod = !ctorMethodSlot.isNull() ? ctorMethodSlot.readPointer() : NULL;
-                                    var listCtorFn = new NativeFunction(baseAddr.add(0x23CD880), "void", ["pointer", "int", "pointer"]);
-                                    listCtorFn(cardParamsListObj, 12, ctorMethod);
-                                    var addMethodSlot = baseAddr.add(0x3130588).readPointer();
-                                    var addMethod = !addMethodSlot.isNull() ? addMethodSlot.readPointer() : NULL;
-                                    var profile = loadPlayerProfile();
-                                    var eqCards = (profile && profile.inventoryCards) ? profile.inventoryCards.filter(function(c) { return c.isEquip; }) : [];
-                                    for (var ci = 0; ci < 12; ci++) {
-                                        var targetCard = eqCards[ci] || (profile && profile.inventoryCards && profile.inventoryCards[ci]);
-                                        var cardId = targetCard ? targetCard.cardID : (1001 + ci);
-                                        var gr = targetCard ? targetCard.grade : 4;
-                                        var lvl = targetCard ? targetCard.level : 50;
-                                        var smParam = createMockSmallCardParams(cardId, gr, lvl, true);
-                                        listAddFn(cardParamsListObj, smParam, addMethod);
-                                    }
-                                    p.add(0x28).writePointer(cardParamsListObj);
-                                }
-                            } catch (eCp) {}
-
-                            // 3. summary: List<string> (empty list)
-                            try {
-                                var strListKlassSlot = baseAddr.add(0x31222C0).readPointer();
-                                var strListKlass = !strListKlassSlot.isNull() ? strListKlassSlot.readPointer() : NULL;
-                                var strListObj = (strListKlass && !strListKlass.isNull()) ? il2cpp_object_new(strListKlass) : NULL;
-                                if (strListObj && !strListObj.isNull()) {
-                                    var ctorMethodSlot = baseAddr.add(0x3126CD8).readPointer();
-                                    var ctorMethod = !ctorMethodSlot.isNull() ? ctorMethodSlot.readPointer() : NULL;
-                                    var listCtorFn = new NativeFunction(baseAddr.add(0x23CD880), "void", ["pointer", "int", "pointer"]);
-                                    listCtorFn(strListObj, 0, ctorMethod);
-                                    p.add(0x30).writePointer(strListObj);
-                                }
-                            } catch (eSl) {}
-
-                            // 4. Texts & values
+                            // Texts & values
                             p.add(0x38).writePointer(createIl2CppString("Group Grade"));
                             p.add(0x40).writePointer(createIl2CppString("Collect All Cards"));
                             p.add(0x48).writeS32(4); // gradeValue: 4 = Grade R
@@ -3583,11 +3527,16 @@ function initIl2Cpp(module) {
                                     for (var i = 0; i < cardCount; i++) {
                                         var cardSmallView = cardItemsPtr.add(0x20 + i * 8).readPointer();
                                         if (!cardSmallView.isNull()) {
-                                            var targetCard = eqCards[i] || (profile && profile.inventoryCards && profile.inventoryCards[i]);
-                                            var cId = targetCard ? targetCard.cardID : (1001 + (i % 12));
+                                            var mIdx = (i % 12);
+                                            var targetCard = eqCards.find(function(c) { return ((c.cardID - 1001) % 12) === mIdx; });
+                                            if (!targetCard && profile && profile.inventoryCards) {
+                                                targetCard = profile.inventoryCards.find(function(c) { return ((c.cardID - 1001) % 12) === mIdx; });
+                                            }
+                                            var cId = targetCard ? targetCard.cardID : (1001 + mIdx);
                                             var gr = targetCard ? targetCard.grade : 4;
                                             var lvl = targetCard ? targetCard.level : 50;
-                                            var cardParam = createMockSmallCardParams(cId, gr, lvl, true);
+                                            var isEq = targetCard ? !!targetCard.isEquip : false;
+                                            var cardParam = createMockSmallCardParams(cId, gr, lvl, isEq);
                                             if (cardParam && !cardParam.isNull()) {
                                                 cardRefreshFn(cardSmallView, cardParam, NULL);
                                             }
@@ -3607,7 +3556,29 @@ function initIl2Cpp(module) {
                                 }
                             } catch (eSg) {}
 
-                            // 4. Call native UpdateGrade(view, p) (0xF246B4)
+                            // 4. Update button texts
+                            try {
+                                var autoEqTxt = view.add(0xE0).readPointer();
+                                if (!autoEqTxt.isNull() && !p.add(0x78).readPointer().isNull()) {
+                                    var tVTable = autoEqTxt.readPointer();
+                                    var setTxt = new NativeFunction(tVTable.add(0x5E8).readPointer(), "void", ["pointer", "pointer", "pointer"]);
+                                    setTxt(autoEqTxt, p.add(0x78).readPointer(), tVTable.add(0x5F0).readPointer());
+                                }
+                                var allUneqTxt = view.add(0xF0).readPointer();
+                                if (!allUneqTxt.isNull() && !p.add(0x88).readPointer().isNull()) {
+                                    var tVTable = allUneqTxt.readPointer();
+                                    var setTxt = new NativeFunction(tVTable.add(0x5E8).readPointer(), "void", ["pointer", "pointer", "pointer"]);
+                                    setTxt(allUneqTxt, p.add(0x88).readPointer(), tVTable.add(0x5F0).readPointer());
+                                }
+                                var themeEqTxt = view.add(0xF8).readPointer();
+                                if (!themeEqTxt.isNull() && !p.add(0x90).readPointer().isNull()) {
+                                    var tVTable = themeEqTxt.readPointer();
+                                    var setTxt = new NativeFunction(tVTable.add(0x5E8).readPointer(), "void", ["pointer", "pointer", "pointer"]);
+                                    setTxt(themeEqTxt, p.add(0x90).readPointer(), tVTable.add(0x5F0).readPointer());
+                                }
+                            } catch (eBt) {}
+
+                            // 5. Call native UpdateGrade(view, p) (0xF246B4)
                             try {
                                 var updateGradeFn = new NativeFunction(baseAddr.add(0xF246B4), "void", ["pointer", "pointer"]);
                                 updateGradeFn(view, p);
@@ -3616,7 +3587,7 @@ function initIl2Cpp(module) {
                                 log("[-] Error executing native UpdateGrade: " + eUg.message);
                             }
 
-                            // 5. Call native UpdateTheme(view, p) (0xF248E8)
+                            // 6. Call native UpdateTheme(view, p) (0xF248E8)
                             try {
                                 var updateThemeFn = new NativeFunction(baseAddr.add(0xF248E8), "void", ["pointer", "pointer"]);
                                 updateThemeFn(view, p);
@@ -3625,7 +3596,7 @@ function initIl2Cpp(module) {
                                 log("[-] Error executing native UpdateTheme: " + eUt.message);
                             }
 
-                            // 6. Clear & hide summary texts for LOONA OT12 (removes "Summary Summary Summary")
+                            // 7. Clear & hide summary texts for LOONA OT12 (removes "Summary Summary Summary")
                             try {
                                 var summaryArr = view.add(0x68).readPointer();
                                 if (!summaryArr.isNull()) {
@@ -4361,7 +4332,7 @@ function initIl2Cpp(module) {
 
                         log("[🃏 INVENTORY] Populating " + profile.inventoryCards.length + " LOONA cards into CardMap (" + cardMap + ")...");
                         var addedCount = 0;
-                        var loonaCardItems = [];
+                        loonaCardItems = [];
 
                         for (var i = 0; i < profile.inventoryCards.length; i++) {
                             var cData = profile.inventoryCards[i];
@@ -4443,30 +4414,7 @@ function initIl2Cpp(module) {
 
                         loonaCardListFastArray = createFastArray(loonaEquippedCards, 'card');
                         log("[🃏 INVENTORY] Created loonaCardListFastArray (count=" + loonaEquippedCards.length + "): " + loonaCardListFastArray);
-
-                        try {
-                            var dictTablePtr = baseAddr.add(0x30F77E8);
-                            var dictKlassPtr = dictTablePtr.readPointer();
-                            if (!dictKlassPtr.isNull()) {
-                                var dictKlass = dictKlassPtr.readPointer();
-                                if (!dictKlass.isNull()) {
-                                    var dictObj = il2cpp_object_new(dictKlass);
-                                    var dictCtor = new NativeFunction(baseAddr.add(0x2368A30), "void", ["pointer", "pointer"]);
-                                    var ctorMi = baseAddr.add(0x314B0D0).readPointer().readPointer();
-                                    dictCtor(dictObj, ctorMi);
-                                    if (loonaCardListFastArray && !loonaCardListFastArray.isNull()) {
-                                        var dictAdd = new NativeFunction(baseAddr.add(0x236948C), "void", ["pointer", "int", "pointer", "pointer"]);
-                                        var addMi = baseAddr.add(0x31090B0).readPointer().readPointer();
-                                        dictAdd(dictObj, 1001, loonaCardListFastArray, addMi);
-                                    }
-                                    loonaEachThemeBestCardMap = dictObj;
-                                    log("[✅ INVENTORY] Genuine EachThemeBestCardMap created: " + loonaEachThemeBestCardMap);
-                                }
-                            }
-                        } catch (eEd) {
-                            log("[-] Error creating EachThemeBestCardMap: " + eEd.message);
-                            loonaEachThemeBestCardMap = NULL;
-                        }
+                        loonaEachThemeBestCardMap = NULL;
 
                         // Ensure InventoryControl.IsOpened is true
                         try {
@@ -4612,6 +4560,7 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.attach(baseAddr.add(0x1051604), {
                         onEnter: function (args) {
+                            activeInventorySceneInstance = args[0];
                             log("[🗃️ INVENTORY SCENE] InventoryScene.OnOpen entered! instance: " + args[0]);
                             try {
                                 var getIsOpenedFn = new NativeFunction(baseAddr.add(0xF274B8), "int", ["pointer"]);
@@ -4632,6 +4581,387 @@ function initIl2Cpp(module) {
                     log("[+] Hooked InventoryScene.OnOpen (0x1051604) successfully!");
                 } catch (eIs) {
                     log("[-] Error hooking InventoryScene.OnOpen: " + eIs.message);
+                }
+
+                // --- Hook InventoryScene.OnClose (0x1052FA0) ---
+                try {
+                    Interceptor.attach(baseAddr.add(0x1052FA0), {
+                        onEnter: function (args) {
+                            if (activeInventorySceneInstance && activeInventorySceneInstance.equals(args[0])) {
+                                activeInventorySceneInstance = NULL;
+                            }
+                        }
+                    });
+                } catch (eIsc) {}
+
+                // Offline Equip / Unequip Helpers and Hooks
+                var refreshInventoryHeaderView = function() {
+                    try {
+                        if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                            var sceneView = activeInventorySceneInstance.add(0x48).readPointer();
+                            if (!sceneView.isNull()) {
+                                var groupView = sceneView.add(0x70).readPointer();
+                                if (!groupView.isNull()) {
+                                    var refreshGroupViewFn = new NativeFunction(baseAddr.add(0xF25124), "void", ["pointer"]);
+                                    refreshGroupViewFn(groupView);
+                                    log("[🔄 INVENTORY] InvenGroupView.Refresh() triggered successfully!");
+                                }
+                            }
+                        }
+                    } catch (eR) {
+                        log("[-] Error refreshing Inventory header view: " + eR.message);
+                    }
+                };
+
+                var refreshInventoryCardList = function() {
+                    try {
+                        if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                            var updateDisplayFn = new NativeFunction(baseAddr.add(0x10542F4), "void", ["pointer", "int", "int", "int", "pointer"]);
+                            updateDisplayFn(activeInventorySceneInstance, 1, 0, 1, NULL);
+                            log("[🔄 INVENTORY] UpdateDisplayCardList triggered successfully!");
+                        }
+                    } catch (eUd) {
+                        log("[-] Error refreshing display card list: " + eUd.message);
+                    }
+                };
+
+                var handleCardEquipOffline = function(beforeCardItem, newCardItem) {
+                    try {
+                        if (!newCardItem || newCardItem.isNull()) return;
+                        var raw = newCardItem.add(0x10).readPointer();
+                        if (raw.isNull()) return;
+                        var objId = raw.add(0x10).readU64();
+                        var cardId = raw.add(0x20).readS32();
+                        var memberIdx = ((cardId - 1001) % 12);
+                        log("[🗃️ EQUIP] Equipping card: objID=" + objId + ", cardID=" + cardId + ", memberIdx=" + memberIdx);
+
+                        var profile = loadPlayerProfile();
+                        if (profile && profile.inventoryCards) {
+                            for (var i = 0; i < profile.inventoryCards.length; i++) {
+                                var c = profile.inventoryCards[i];
+                                var cMember = ((c.cardID - 1001) % 12);
+                                if (cMember === memberIdx) {
+                                    if (c.objectID == objId || c.cardID == cardId) {
+                                        c.isEquip = true;
+                                    } else {
+                                        c.isEquip = false;
+                                    }
+                                }
+                            }
+                            if (!profile.equipedCards) profile.equipedCards = {};
+                            var newEqList = [];
+                            for (var m = 0; m < 12; m++) {
+                                var eqC = profile.inventoryCards.find(function(c) {
+                                    return ((c.cardID - 1001) % 12) === m && c.isEquip;
+                                });
+                                if (eqC) {
+                                    newEqList.push(eqC.objectID);
+                                }
+                            }
+                            profile.equipedCards["1001"] = newEqList;
+                            savePlayerProfile(profile);
+                            log("[💾 PROFILE] Saved player_profile.json after equip! Member " + memberIdx + " updated.");
+                        }
+
+                        // Update in-memory loonaCardItems
+                        if (loonaCardItems && loonaCardItems.length > 0) {
+                            for (var k = 0; k < loonaCardItems.length; k++) {
+                                var itm = loonaCardItems[k];
+                                var r = itm.add(0x10).readPointer();
+                                var cid = r.add(0x20).readS32();
+                                var mIdx = ((cid - 1001) % 12);
+                                if (mIdx === memberIdx) {
+                                    if (itm.equals(newCardItem)) {
+                                        r.add(0x28).writeU8(1);
+                                    } else {
+                                        r.add(0x28).writeU8(0);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Rebuild FastArray for group
+                        if (loonaCardItems && loonaCardItems.length > 0) {
+                            var loonaEquippedCards = [];
+                            var memberFilled = {};
+                            for (var k = 0; k < loonaCardItems.length; k++) {
+                                var itm = loonaCardItems[k];
+                                var r = itm.add(0x10).readPointer();
+                                var cid = r.add(0x20).readS32();
+                                var mIdx = ((cid - 1001) % 12);
+                                var isEq = (r.add(0x28).readU8() === 1);
+                                if (isEq && !memberFilled[mIdx]) {
+                                    loonaEquippedCards.push(itm);
+                                    memberFilled[mIdx] = true;
+                                }
+                            }
+                            for (var k = 0; k < loonaCardItems.length && loonaEquippedCards.length < 12; k++) {
+                                var itm = loonaCardItems[k];
+                                var r = itm.add(0x10).readPointer();
+                                var cid = r.add(0x20).readS32();
+                                var mIdx = ((cid - 1001) % 12);
+                                if (!memberFilled[mIdx]) {
+                                    loonaEquippedCards.push(itm);
+                                    memberFilled[mIdx] = true;
+                                }
+                            }
+                            loonaCardListFastArray = createFastArray(loonaEquippedCards, 'card');
+                            if (loonaGroupItemObj && !loonaGroupItemObj.isNull()) {
+                                loonaGroupItemObj.add(0x28).writePointer(loonaCardListFastArray);
+                            }
+                        }
+
+                        refreshInventoryHeaderView();
+                        refreshInventoryCardList();
+                    } catch (eHeq) {
+                        log("[-] Error in handleCardEquipOffline: " + eHeq.message);
+                    }
+                };
+
+                var handleCardUnequipOffline = function(cardItem) {
+                    try {
+                        if (!cardItem || cardItem.isNull()) return;
+                        var raw = cardItem.add(0x10).readPointer();
+                        if (raw.isNull()) return;
+                        var objId = raw.add(0x10).readU64();
+                        var cardId = raw.add(0x20).readS32();
+                        var memberIdx = ((cardId - 1001) % 12);
+                        log("[🗃️ UNEQUIP] Unequipping card: objID=" + objId + ", cardID=" + cardId);
+
+                        raw.add(0x28).writeU8(0);
+
+                        var profile = loadPlayerProfile();
+                        if (profile && profile.inventoryCards) {
+                            for (var i = 0; i < profile.inventoryCards.length; i++) {
+                                var c = profile.inventoryCards[i];
+                                if (c.objectID == objId || c.cardID == cardId) {
+                                    c.isEquip = false;
+                                }
+                            }
+                            if (profile.equipedCards && profile.equipedCards["1001"]) {
+                                profile.equipedCards["1001"] = profile.equipedCards["1001"].filter(function(id) {
+                                    return id != objId;
+                                });
+                            }
+                            savePlayerProfile(profile);
+                            log("[💾 PROFILE] Saved player_profile.json after unequip!");
+                        }
+
+                        // Sync in-memory native cards
+                        if (loonaCardItems && loonaCardItems.length > 0) {
+                            for (var k = 0; k < loonaCardItems.length; k++) {
+                                var itm = loonaCardItems[k];
+                                var r = itm.add(0x10).readPointer();
+                                var cid = r.add(0x20).readS32();
+                                var oid = r.add(0x10).readU64();
+                                if (oid == objId || cid == cardId) {
+                                    r.add(0x28).writeU8(0);
+                                }
+                            }
+                        }
+
+                        // Rebuild FastArray
+                        if (loonaCardItems && loonaCardItems.length > 0) {
+                            var loonaEquippedCards = [];
+                            var memberFilled = {};
+                            for (var k = 0; k < loonaCardItems.length; k++) {
+                                var itm = loonaCardItems[k];
+                                var r = itm.add(0x10).readPointer();
+                                var cid = r.add(0x20).readS32();
+                                var mIdx = ((cid - 1001) % 12);
+                                var isEq = (r.add(0x28).readU8() === 1);
+                                if (isEq && !memberFilled[mIdx]) {
+                                    loonaEquippedCards.push(itm);
+                                    memberFilled[mIdx] = true;
+                                }
+                            }
+                            loonaCardListFastArray = createFastArray(loonaEquippedCards, 'card');
+                            if (loonaGroupItemObj && !loonaGroupItemObj.isNull()) {
+                                loonaGroupItemObj.add(0x28).writePointer(loonaCardListFastArray);
+                            }
+                        }
+
+                        refreshInventoryHeaderView();
+                        refreshInventoryCardList();
+                    } catch (eUneq) {
+                        log("[-] Error in handleCardUnequipOffline: " + eUneq.message);
+                    }
+                };
+
+                var handleAutoEquipOffline = function() {
+                    try {
+                        log("[🗃️ AUTO_EQUIP] Processing optimal cards for LOONA OT12...");
+                        var profile = loadPlayerProfile();
+                        if (!profile || !profile.inventoryCards) return;
+
+                        var newEqList = [];
+                        for (var m = 0; m < 12; m++) {
+                            var memberCards = profile.inventoryCards.filter(function(c) {
+                                return ((c.cardID - 1001) % 12) === m;
+                            });
+                            if (memberCards.length > 0) {
+                                memberCards.sort(function(a, b) {
+                                    var ga = a.grade !== undefined ? a.grade : 0;
+                                    var gb = b.grade !== undefined ? b.grade : 0;
+                                    if (ga !== gb) return gb - ga;
+                                    var la = a.level || 0;
+                                    var lb = b.level || 0;
+                                    return lb - la;
+                                });
+                                memberCards[0].isEquip = true;
+                                newEqList.push(memberCards[0].objectID);
+                                for (var k = 1; k < memberCards.length; k++) {
+                                    memberCards[k].isEquip = false;
+                                }
+                            }
+                        }
+                        if (!profile.equipedCards) profile.equipedCards = {};
+                        profile.equipedCards["1001"] = newEqList;
+                        savePlayerProfile(profile);
+                        log("[💾 PROFILE] Auto Equip saved " + newEqList.length + " equipped cards to player_profile.json!");
+
+                        // Sync in-memory native cards
+                        if (loonaCardItems && loonaCardItems.length > 0) {
+                            for (var k = 0; k < loonaCardItems.length; k++) {
+                                var itm = loonaCardItems[k];
+                                var r = itm.add(0x10).readPointer();
+                                var cid = r.add(0x20).readS32();
+                                var oid = r.add(0x10).readU64();
+                                var isE = newEqList.indexOf(oid) !== -1;
+                                r.add(0x28).writeU8(isE ? 1 : 0);
+                            }
+                        }
+
+                        // Rebuild FastArray
+                        if (loonaCardItems && loonaCardItems.length > 0) {
+                            var loonaEquippedCards = [];
+                            var memberFilled = {};
+                            for (var k = 0; k < loonaCardItems.length; k++) {
+                                var itm = loonaCardItems[k];
+                                var r = itm.add(0x10).readPointer();
+                                var cid = r.add(0x20).readS32();
+                                var mIdx = ((cid - 1001) % 12);
+                                var isEq = (r.add(0x28).readU8() === 1);
+                                if (isEq && !memberFilled[mIdx]) {
+                                    loonaEquippedCards.push(itm);
+                                    memberFilled[mIdx] = true;
+                                }
+                            }
+                            loonaCardListFastArray = createFastArray(loonaEquippedCards, 'card');
+                            if (loonaGroupItemObj && !loonaGroupItemObj.isNull()) {
+                                loonaGroupItemObj.add(0x28).writePointer(loonaCardListFastArray);
+                            }
+                        }
+
+                        refreshInventoryHeaderView();
+                        refreshInventoryCardList();
+                    } catch (eAe) {
+                        log("[-] Error in handleAutoEquipOffline: " + eAe.message);
+                    }
+                };
+
+                var handleAllUnequipOffline = function() {
+                    try {
+                        log("[🗃️ ALL_UNEQUIP] Unequipping all cards...");
+                        var profile = loadPlayerProfile();
+                        if (!profile || !profile.inventoryCards) return;
+
+                        for (var i = 0; i < profile.inventoryCards.length; i++) {
+                            profile.inventoryCards[i].isEquip = false;
+                        }
+                        if (!profile.equipedCards) profile.equipedCards = {};
+                        profile.equipedCards["1001"] = [];
+                        savePlayerProfile(profile);
+                        log("[💾 PROFILE] All Unequip saved to player_profile.json!");
+
+                        // Sync in-memory native cards
+                        if (loonaCardItems && loonaCardItems.length > 0) {
+                            for (var k = 0; k < loonaCardItems.length; k++) {
+                                var itm = loonaCardItems[k];
+                                var r = itm.add(0x10).readPointer();
+                                r.add(0x28).writeU8(0);
+                            }
+                        }
+
+                        // FastArray with empty list or placeholders
+                        loonaCardListFastArray = createFastArray([], 'card');
+                        if (loonaGroupItemObj && !loonaGroupItemObj.isNull()) {
+                            loonaGroupItemObj.add(0x28).writePointer(loonaCardListFastArray);
+                        }
+
+                        refreshInventoryHeaderView();
+                        refreshInventoryCardList();
+                    } catch (eAu) {
+                        log("[-] Error in handleAllUnequipOffline: " + eAu.message);
+                    }
+                };
+
+                // Replace InventoryControl.Equip (0xF2C374) with offline handler
+                try {
+                    Interceptor.replace(baseAddr.add(0xF2C374), new NativeCallback(function (isEnterImmediately, beforeCardItem, newCardItem, callback, methodInfo) {
+                        log("[🗃️ INVENTORY_CONTROL] Offline Equip called! before=" + beforeCardItem + ", new=" + newCardItem);
+                        handleCardEquipOffline(beforeCardItem, newCardItem);
+                        if (callback && !callback.isNull()) {
+                            try {
+                                var invokePtr = callback.add(Process.pointerSize * 2).readPointer();
+                                if (!invokePtr.isNull()) {
+                                    var invokeFn = new NativeFunction(invokePtr, "void", ["pointer", "int", "pointer"]);
+                                    invokeFn(callback, 0, NULL);
+                                    log("[🗃️ INVENTORY_CONTROL] Invoked Equip callback(0) -> Success!");
+                                }
+                            } catch (eCb) {
+                                log("[-] Error invoking Equip callback: " + eCb.message);
+                            }
+                        }
+                    }, "void", ["int", "pointer", "pointer", "pointer", "pointer"]));
+                    log("[+] Replaced InventoryControl.Equip (0xF2C374) successfully!");
+                } catch (eEqHook) {
+                    log("[-] Error replacing InventoryControl.Equip: " + eEqHook.message);
+                }
+
+                // Replace InventoryControl.Unequip (0xF2C5E4) with offline handler
+                try {
+                    Interceptor.replace(baseAddr.add(0xF2C5E4), new NativeCallback(function (cardItem, callback, methodInfo) {
+                        log("[🗃️ INVENTORY_CONTROL] Offline Unequip called! card=" + cardItem);
+                        handleCardUnequipOffline(cardItem);
+                        if (callback && !callback.isNull()) {
+                            try {
+                                var invokePtr = callback.add(Process.pointerSize * 2).readPointer();
+                                if (!invokePtr.isNull()) {
+                                    var invokeFn = new NativeFunction(invokePtr, "void", ["pointer", "int", "pointer"]);
+                                    invokeFn(callback, 0, NULL);
+                                    log("[🗃️ INVENTORY_CONTROL] Invoked Unequip callback(0) -> Success!");
+                                }
+                            } catch (eCb) {
+                                log("[-] Error invoking Unequip callback: " + eCb.message);
+                            }
+                        }
+                    }, "void", ["pointer", "pointer", "pointer"]));
+                    log("[+] Replaced InventoryControl.Unequip (0xF2C5E4) successfully!");
+                } catch (eUneqHook) {
+                    log("[-] Error replacing InventoryControl.Unequip: " + eUneqHook.message);
+                }
+
+                // Hook InventoryScene.OnAutoEquip (0x105C024)
+                try {
+                    Interceptor.replace(baseAddr.add(0x105C024), new NativeCallback(function (sceneThis, methodInfo) {
+                        log("[🗃️ AUTO_EQUIP] InventoryScene.OnAutoEquip clicked! Executing offline Auto Equip...");
+                        handleAutoEquipOffline();
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Replaced InventoryScene.OnAutoEquip (0x105C024) successfully!");
+                } catch (eOae) {
+                    log("[-] Error replacing InventoryScene.OnAutoEquip: " + eOae.message);
+                }
+
+                // Hook InventoryScene.OnAllUnequip (0x105C158)
+                try {
+                    Interceptor.replace(baseAddr.add(0x105C158), new NativeCallback(function (sceneThis, methodInfo) {
+                        log("[🗃️ ALL_UNEQUIP] InventoryScene.OnAllUnequip clicked! Executing offline All Unequip...");
+                        handleAllUnequipOffline();
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Replaced InventoryScene.OnAllUnequip (0x105C158) successfully!");
+                } catch (eOau) {
+                    log("[-] Error replacing InventoryScene.OnAllUnequip: " + eOau.message);
                 }
 
                 // --- Hook CardBookScene.OnOpen (0x11CDD64) ---

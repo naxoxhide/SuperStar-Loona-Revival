@@ -1360,16 +1360,34 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
 - Por diseño del IDE, los artefactos volátiles residen en `~/.gemini/antigravity-ide/brain/<conversation-id>/`.
 - Para garantizar persistencia histórica, trazabilidad y acceso directo en el repositorio Git, los reportes de *Walkthrough* e hitos visuales se sincronizan y archivan permanentemente en `docs/walkthroughs/`, respaldados por sus capturas en `docs/walkthroughs/media/`.
 
-### 16.6. Estado de Implementación: Carga (Read) vs. Mutación Interactiva (Write)
+### 16.6. Estado de Implementación: Carga (Read) y Mutación Interactiva (Write)
 1. **Fase de Lectura y Carga (Implementada al 100%):**
    - `InventoryScene` (`InvenGroupItemView`, `InvenCardView`), `CardMap` y `CardBook` leen directamente desde `player_profile.json` en disco mediante `loadPlayerProfile()`.
    - Cualquier alteración en `player_profile.json` (grados, niveles, cartas equipadas, cartas en reserva) se refleja fielmente en pantalla.
-2. **Fase de Mutación y Guardado Interactivo (Próximo Desarrollo):**
-   - Intercepción de eventos de UI en Dalcomsoft:
-     - `InventoryScene.OnUpdateCardEquip` (RVA `0x1054D5C`): Actualizar `isEquip` en `profile.inventoryCards` y guardar con `savePlayerProfile`.
-     - `InventoryScene.OnUpdateCardUnequip` (RVA `0x1054EB4`): Desequipar y persistir.
-     - `InventoryScene.OnCardItemAuto` (RVA `0x1055F60`): Auto-equipar mejores cartas del grupo y persistir.
-     - `InventoryScene.OnIntensify` (RVA `0x105A97C`): Incrementar nivel / grado de carta y deducir Rhythm Points en el JSON local.
+2. **Fase de Mutación y Guardado Interactivo (Implementada al 100%):**
+   - Intercepción de eventos de UI y Controladores en Dalcomsoft:
+     - `InventoryControl.Equip` (RVA `0xF2C374`): Reemplazado por controlador offline que actualiza `player_profile.json`, sincroniza `Card.isEquip` en memoria, reconstruye `loonaCardListFastArray`, invoca el callback nativo de éxito `callback(0)` y refresca las vistas.
+     - `InventoryControl.Unequip` (RVA `0xF2C5E4`): Reemplazado por controlador offline que remueve `isEquip` del JSON y memoria, reconstruye el `FastArray` y ejecuta `callback(0)`.
+     - `InventoryScene.OnAutoEquip` (RVA `0x105C024`): Reemplazado para iterar los 12 miembros de LOONA, seleccionar y equipar la mejor carta por grado y nivel, guardar en `player_profile.json` y actualizar la UI inmediatamente.
+     - `InventoryScene.OnAllUnequip` (RVA `0x105C158`): Reemplazado para limpiar todas las cartas equipadas en JSON y memoria, vaciando los checkmarks azules de la bandeja inferior.
+
+### 16.7. Intercepción y Persistencia Standalone Offline de Equipar / Desequipar
+1. **Resolución del Crash de Garbage Collection (`SIGSEGV` en `libil2cpp.so` PC `0x9F8DE0`):**
+   - **Causa Raíz:** Al cambiar o cargar escenas, Unity ejecuta el GC (`libunity.so` PC `0x27d21c` -> `libil2cpp.so` PC `0x9f9420` -> `0x9f8de0`). El GC recorría la jerarquía de componentes y fallaba al dereferenciar `[x0]` donde `x0` tenía puntero de clase nulo o inválido (`ldrh w21, [x8, #0x132]`).
+   - **Factores Determinantes:**
+     a) En `InvenGroupItemView.Refresh`, se estaba escribiendo `view.add(0x38).writePointer(p)`. La estructura `p` contenía listas genéricas ficticias construidas leyendo tokens de metadata no inicializados (`0x30EF598`, `0x3132B38`), lo que anclaba memoria corrupta en el grafo de objetos del GC de Unity.
+     b) En `populateOfflineInventoryCards`, un bloque intentaba crear un `Dictionary<int, FastArray<CardItem>>` invocando constructores genéricos con punteros token (`0x14ab`), dejando objetos a medio inicializar en el heap.
+   - **Solución Definitiva:**
+     a) Eliminada la escritura innecesaria a `view.add(0x38)` (la función nativa Dalcom jamás escribe a dicho offset durante Refresh).
+     b) Instanciación segura de `InvenGroupItemView.Params` mediante `getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "InvenGroupItemView/Params")`, asignando `NULL` a listas auxiliares no requeridas.
+     c) Eliminada la instanciación de diccionarios genéricos incompletos, fijando `loonaEachThemeBestCardMap = NULL`.
+2. **Permisos de Escritura en Disco (`chmod 666`):**
+   - El archivo `player_profile.json` fue modificado para otorgar permisos de lectura y escritura globales (`-rw-rw-rw-`), permitiendo que el UID de la aplicación Android (`u0_a82`) guarde mutaciones sin requerir permisos de root.
+3. **Flujo y Verificación en Vivo:**
+   - **Equipar Individual:** Al pulsar una carta no equipada (ej. HeeJin Grado A), se abre el modal comparativo (`SetStateDetailCard`). Al pulsar el botón de equipar, `InventoryControl.Equip` (RVA `0xF2C374`) ejecuta la lógica offline, guarda en `player_profile.json`, transfiere el checkmark azul a la nueva carta y cierra el modal.
+   - **Desequipar Todo:** Al pulsar el botón "Unequip All" (x=1620, y=590), `InventoryScene.OnAllUnequip` (RVA `0x105C158`) guarda `"equipedCards": { "1001": [] }` en el JSON y la bandeja inferior limpia todos los checkmarks azules al instante.
+   - **Auto-Equipar:** Al pulsar el botón "Auto Equip" (x=1620, y=460), `InventoryScene.OnAutoEquip` (RVA `0x105C024`) evalúa los 12 miembros, equipa las cartas de mayor grado y nivel (Grado R Lv 50) y restaura los checkmarks y la cabecera del tema.
+
 
 
 
