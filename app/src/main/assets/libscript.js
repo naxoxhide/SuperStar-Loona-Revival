@@ -3717,11 +3717,67 @@ function initIl2Cpp(module) {
                             p.add(0x18).writeS32(11); // memberCount = 11
                             p.add(0x1C).writeS32(0);  // summaryCount
                             p.add(0x20).writePointer(NULL); // exposeArtistIndexList
-                            p.add(0x28).writePointer(NULL); // cardParams
                             p.add(0x30).writePointer(NULL); // summary
 
-                            // Texts & values calculated dynamically from profile
-                            var profile = loadPlayerProfile();
+                            // Build cardParams: List<CardSmallView.Params> with 11 cards (one per LOONA member)
+                            // Uses profile equip state so the lower bar reflects who is equipped
+                            try {
+                                var profile = loadPlayerProfile();
+                                var cardSmallParamsList = [];
+                                for (var mi = 0; mi < 11; mi++) {
+                                    // Find best equipped card for this member, fallback to best unequipped
+                                    var memberCards = (profile && profile.inventoryCards) ?
+                                        profile.inventoryCards.filter(function(c) { return ((c.cardID - 1001) % 11) === mi; }) : [];
+                                    var eqCard = memberCards.find(function(c) { return c.isEquip; });
+                                    var bestCard = eqCard || (memberCards.length > 0 ? memberCards[0] : null);
+                                    var cIdMi = bestCard ? bestCard.cardID : (1001 + mi);
+                                    var grMi = bestCard ? (bestCard.grade !== undefined ? bestCard.grade : 4) : 4;
+                                    var lvlMi = bestCard ? (bestCard.level || 50) : 50;
+                                    var isEqMi = bestCard ? !!bestCard.isEquip : false;
+                                    var smallParam = createMockSmallCardParams(cIdMi, grMi, lvlMi, isEqMi);
+                                    cardSmallParamsList.push(smallParam || NULL);
+                                }
+                                // Build native List<CardSmallView.Params>
+                                var listKlass = getClass("Assembly-CSharp", "System.Collections.Generic", "List`1");
+                                var listParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardSmallView/Params");
+                                // Use il2cpp_runtime_invoke on List.ctor + Add
+                                var cpListKlass = il2cpp_object_new ? getClass("mscorlib", "System.Collections.Generic", "List`1") : null;
+                                // Simple approach: write as managed array pointer
+                                // Build a List<T> by allocating it and calling Add via vtable
+                                var smallCardParamListObj = NULL;
+                                try {
+                                    // Find List<CardSmallView.Params> TypeInfo via slot
+                                    var listTypeInfo = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "InvenGroupItemView");
+                                    if (listTypeInfo && !listTypeInfo.isNull()) {
+                                        // Try direct il2cpp_object_new for a generic list klass via metadata
+                                        // Fallback: build a raw array-based list structure in native memory
+                                        var listMem = Memory.alloc(0x30);
+                                        listMem.add(0x00).writePointer(NULL); // vtable placeholder (null ok for Frida-controlled read)
+                                        listMem.add(0x10).writePointer(NULL); // _items inner array
+                                        listMem.add(0x18).writeS32(cardSmallParamsList.length); // _size
+                                        listMem.add(0x1C).writeS32(cardSmallParamsList.length); // _version
+
+                                        // Build inner object[] array: header (vtable + m_maxLength + m_size) + items
+                                        var arrMem = Memory.alloc(0x20 + cardSmallParamsList.length * 8);
+                                        arrMem.add(0x18).writeS32(cardSmallParamsList.length); // array length
+                                        for (var ai = 0; ai < cardSmallParamsList.length; ai++) {
+                                            arrMem.add(0x20 + ai * 8).writePointer(cardSmallParamsList[ai] || NULL);
+                                        }
+                                        listMem.add(0x10).writePointer(arrMem);
+                                        smallCardParamListObj = listMem;
+                                        log("[✅ GROUP_VIEW] Built cardParams List<CardSmallView.Params> with " + cardSmallParamsList.length + " items");
+                                    }
+                                } catch (eCpl) {
+                                    log("[-] Error building cardParams list: " + eCpl.message);
+                                }
+                                p.add(0x28).writePointer(smallCardParamListObj || NULL);
+                            } catch (eCpb) {
+                                log("[-] Error in cardParams population: " + eCpb.message);
+                                p.add(0x28).writePointer(NULL);
+                            }
+
+                            // Texts & values calculated dynamically from profile (reuse profile loaded above)
+
                             var eqCards = (profile && profile.inventoryCards) ? profile.inventoryCards.filter(function(c) { return c.isEquip; }) : [];
                             var eqCount = 0;
                             var minGrade = 4;
@@ -4426,38 +4482,208 @@ function initIl2Cpp(module) {
                     log("[-] Error attaching GetCardStatInfoViewData: " + eHgcs.message);
                 }
 
-                // 9e. InventoryScene.OnCardItem (0x105CEE8) -> Trace and monitor card clicks safely with Interceptor.attach
+                // 9e. InventoryScene.OnCardItem (0x105CEE8) -> FULL OFFLINE REPLACE to prevent SetStateMain crash chain
                 try {
                     var onCardItemAddr = baseAddr.add(0x105CEE8);
-                    Interceptor.attach(onCardItemAddr, {
-                        onEnter: function (args) {
-                            var sceneThis = args[0];
-                            var go = args[1];
-                            log("[🃏 ON_CARD_ITEM] OnCardItem entered! scene=" + sceneThis + ", go=" + go);
+                    Interceptor.replace(onCardItemAddr, new NativeCallback(function (sceneThis, go, methodInfo) {
+                        log("[🃏 ON_CARD_ITEM] OnCardItem REPLACE entered! scene=" + sceneThis + ", go=" + go);
+                        try {
+                            if (sceneThis.isNull() || go.isNull()) return;
+
+                            // Step 1: Identify the clicked card from displayCardList (offset 0x58)
+                            var clickedCardItem = NULL;
+                            var clickedCardIndex = -1;
                             try {
-                                if (!sceneThis.isNull() && !go.isNull()) {
-                                    var dclPtr = sceneThis.add(0x58).readPointer();
-                                    if (!dclPtr.isNull()) {
-                                        var listSize = dclPtr.add(0x18).readS32();
-                                        var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
-                                        var namePtr = getNameFn(go, NULL);
-                                        if (!namePtr.isNull()) {
-                                            var len = namePtr.add(0x10).readS32();
-                                            if (len > 0) {
-                                                var nameStr = namePtr.add(0x14).readUtf16String(len);
-                                                log("[🃏 ON_CARD_ITEM] Clicked card item name: " + nameStr + " (listSize: " + listSize + ")");
-                                            }
+                                var dclPtr = sceneThis.add(0x58).readPointer();
+                                if (!dclPtr.isNull()) {
+                                    var listSize = dclPtr.add(0x18).readS32();
+                                    var listItems = dclPtr.add(0x10).readPointer(); // _items array
+
+                                    // Get name of clicked GO to match by index (game names them "0", "1", ...)
+                                    var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                                    var namePtr = getNameFn(go, NULL);
+                                    var clickedIndex = -1;
+                                    if (!namePtr.isNull()) {
+                                        var nLen = namePtr.add(0x10).readS32();
+                                        if (nLen > 0) {
+                                            var nStr = namePtr.add(0x14).readUtf16String(nLen);
+                                            log("[🃏 ON_CARD_ITEM] Clicked GO name: '" + nStr + "' from list size " + listSize);
+                                            clickedIndex = parseInt(nStr, 10);
+                                        }
+                                    }
+
+                                    // Resolve card item from displayCardList
+                                    if (!isNaN(clickedIndex) && clickedIndex >= 0 && clickedIndex < listSize && !listItems.isNull()) {
+                                        var ci = listItems.add(0x20 + clickedIndex * 8).readPointer();
+                                        if (!ci.isNull()) {
+                                            clickedCardItem = ci;
+                                            clickedCardIndex = clickedIndex;
+                                            log("[🃏 ON_CARD_ITEM] Resolved CardItem[" + clickedIndex + "] = " + ci);
+                                        }
+                                    }
+
+                                    // Fallback: if index-name failed, try index 0
+                                    if (clickedCardItem.isNull() && listSize > 0 && !listItems.isNull()) {
+                                        var ci0 = listItems.add(0x20).readPointer();
+                                        if (!ci0.isNull()) {
+                                            clickedCardItem = ci0;
+                                            clickedCardIndex = 0;
+                                            log("[🃏 ON_CARD_ITEM] Fallback: using CardItem[0] = " + ci0);
                                         }
                                     }
                                 }
-                            } catch (eOci) {
-                                log("[-] Error in OnCardItem onEnter: " + eOci.message);
+                            } catch (eDcl) {
+                                log("[-] Error resolving CardItem from displayCardList: " + eDcl.message);
                             }
+
+                            if (clickedCardItem.isNull()) {
+                                // Last-resort fallback: use first loonaCardItem
+                                if (loonaCardItems && loonaCardItems.length > 0) {
+                                    clickedCardItem = loonaCardItems[0];
+                                    log("[🃏 ON_CARD_ITEM] Last-resort fallback: loonaCardItems[0]");
+                                } else {
+                                    log("[-] ON_CARD_ITEM: No CardItem found, aborting.");
+                                    return;
+                                }
+                            }
+
+                            // Step 2: Store as selectedCardItem in scene (0x88) & preSelectedCardItem (0x98)
+                            sceneThis.add(0x88).writePointer(clickedCardItem);
+                            sceneThis.add(0x98).writePointer(clickedCardItem);
+                            sceneThis.add(0x80).writePointer(NULL); // selectedArtistData - safe null
+
+                            // Read card data for logging
+                            var cId = 1001; var gr = 4; var lvl = 50;
+                            try {
+                                var rawCard = clickedCardItem.add(0x10).readPointer();
+                                if (!rawCard.isNull()) {
+                                    cId = rawCard.add(0x20).readS32();
+                                    gr = rawCard.add(0x24).readS32();
+                                    lvl = rawCard.add(0x1C).readS16();
+                                }
+                            } catch (eRc) {}
+                            log("[🃏 ON_CARD_ITEM] Selected: cardID=" + cId + ", grade=" + gr + ", level=" + lvl);
+
+                            // Step 3: Call SetStateMain safely (isReload=false means "first entry to card detail")
+                            try {
+                                var setStateMainFn = new NativeFunction(baseAddr.add(0x1053FB0), "void", ["pointer", "bool", "pointer"]);
+                                setStateMainFn(sceneThis, 0, NULL);
+                                log("[🃏 ON_CARD_ITEM] SetStateMain(false) called successfully!");
+                            } catch (eSsm) {
+                                log("[-] Error calling SetStateMain: " + eSsm.message);
+                            }
+                        } catch (eOci) {
+                            log("[-] Error in OnCardItem replace: " + eOci.message);
                         }
-                    });
-                    log("[+] Interceptor.attach installed on InventoryScene.OnCardItem (0x105CEE8)!");
+                    }, "void", ["pointer", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.OnCardItem (0x105CEE8) - FULL OFFLINE MODE!");
                 } catch (eHoci) {
-                    log("[-] Error attaching OnCardItem: " + eHoci.message);
+                    log("[-] Error replacing OnCardItem: " + eHoci.message);
+                }
+
+                // 9e2. InventoryScene.SetStateMain (0x1053FB0) -> Safe replacement preventing null crash chain
+                try {
+                    Interceptor.replace(baseAddr.add(0x1053FB0), new NativeCallback(function (sceneThis, isReload, methodInfo) {
+                        log("[🗃️ SET_STATE_MAIN] SetStateMain entered! isReload=" + isReload);
+                        try {
+                            if (sceneThis.isNull()) return;
+
+                            var selectedCardItem = sceneThis.add(0x88).readPointer();
+                            if (selectedCardItem.isNull()) {
+                                log("[-] SET_STATE_MAIN: selectedCardItem is null - aborting safe!");
+                                return;
+                            }
+
+                            var rawCard = selectedCardItem.add(0x10).readPointer();
+                            if (rawCard.isNull()) {
+                                log("[-] SET_STATE_MAIN: raw card data is null - aborting safe!");
+                                return;
+                            }
+
+                            var cId = rawCard.add(0x20).readS32();
+                            var gr = rawCard.add(0x24).readS32();
+                            var lvl = rawCard.add(0x1C).readS16();
+                            var isEq = (rawCard.add(0x28).readU8() === 1);
+                            var isLk = (rawCard.add(0x29).readU8() === 1);
+                            var isPrism = (rawCard.add(0x2A).readU8() === 1);
+
+                            log("[🗃️ SET_STATE_MAIN] Card: id=" + cId + ", gr=" + gr + ", lvl=" + lvl + ", eq=" + isEq);
+
+                            // Find equippedCardItem for this member slot
+                            var memberIdx = ((cId - 1001) % 11);
+                            var equippedCardItem = NULL;
+                            if (loonaCardItems && loonaCardItems.length > 0) {
+                                for (var k = 0; k < loonaCardItems.length; k++) {
+                                    var itm = loonaCardItems[k];
+                                    try {
+                                        var r = itm.add(0x10).readPointer();
+                                        if (!r.isNull()) {
+                                            var cid2 = r.add(0x20).readS32();
+                                            var isE2 = (r.add(0x28).readU8() === 1);
+                                            if (((cid2 - 1001) % 11) === memberIdx && isE2) {
+                                                equippedCardItem = itm;
+                                            }
+                                        }
+                                    } catch (eEcl) {}
+                                }
+                            }
+                            sceneThis.add(0x90).writePointer((equippedCardItem && !equippedCardItem.isNull()) ? equippedCardItem : NULL);
+
+                            // Get scene view and drive refresh on the SelectView
+                            try {
+                                var sceneView = sceneThis.add(0x48).readPointer(); // InventoryScene.sceneView (InventoryView)
+                                if (!sceneView.isNull()) {
+                                    // 1. Call ShowMainLayout(isSelectedItem=true) -> RVA 0x10571EC
+                                    // This correctly hides/shows all sub-views, no risk of null deref
+                                    try {
+                                        var showMainLayoutFn = new NativeFunction(baseAddr.add(0x10571EC), "void", ["pointer", "int", "pointer"]);
+                                        showMainLayoutFn(sceneView, 1, NULL);
+                                        log("[✅ SET_STATE_MAIN] ShowMainLayout(true) called!");
+                                    } catch (eSml) { log("[-] Error calling ShowMainLayout: " + eSml.message); }
+
+                                    // 2. Correct InventoryView field offsets (from dump.cs):
+                                    //    selectView=0x48, noneView=0x50, mainView=0x58, equipView=0x60
+                                    var mainView = sceneView.add(0x58).readPointer();
+                                    var selectView = sceneView.add(0x48).readPointer();
+
+                                    // 3. Refresh InvenCardMainView (our replaced function handles it safely)
+                                    if (!mainView.isNull()) {
+                                        try {
+                                            var getMainDataFn = new NativeFunction(baseAddr.add(0x105751C), "pointer", ["pointer", "pointer", "int", "pointer"]);
+                                            var mainParams = getMainDataFn(sceneThis, selectedCardItem, 0, NULL);
+                                            if (!mainParams.isNull()) {
+                                                var mainRefreshFn = new NativeFunction(baseAddr.add(0xF227B4), "void", ["pointer", "pointer", "pointer"]);
+                                                mainRefreshFn(mainView, mainParams, NULL);
+                                                log("[✅ SET_STATE_MAIN] InvenCardMainView refreshed!");
+                                            }
+                                        } catch (eMvr) { log("[-] Error refreshing mainView: " + eMvr.message); }
+                                    }
+
+                                    // 4. Refresh InvenCardSelectView (our replaced function handles it safely)
+                                    if (!selectView.isNull()) {
+                                        try {
+                                            var getSelectDataFn = new NativeFunction(baseAddr.add(0x10572AC), "pointer", ["pointer", "pointer", "pointer", "pointer", "int", "pointer"]);
+                                            var selectParams = getSelectDataFn(sceneThis, selectedCardItem, NULL, (equippedCardItem && !equippedCardItem.isNull()) ? equippedCardItem : NULL, 0, NULL);
+                                            if (!selectParams.isNull()) {
+                                                var selectRefreshFn = new NativeFunction(baseAddr.add(0xF22C34), "void", ["pointer", "pointer", "pointer"]);
+                                                selectRefreshFn(selectView, selectParams, NULL);
+                                                log("[✅ SET_STATE_MAIN] InvenCardSelectView refreshed!");
+                                            }
+                                        } catch (eSvr) { log("[-] Error refreshing selectView: " + eSvr.message); }
+                                    }
+                                }
+                            } catch (eSvErr) {
+                                log("[-] Error driving scene view refresh: " + eSvErr.message);
+                            }
+
+                            log("[✅ SET_STATE_MAIN] Safe SetStateMain completed for cardID=" + cId);
+                        } catch (eSetState) {
+                            log("[-] Error in SetStateMain replacement: " + eSetState.message);
+                        }
+                    }, "void", ["pointer", "bool", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.SetStateMain (0x1053FB0)!");
+                } catch (eSsmHook) {
+                    log("[-] Error replacing SetStateMain: " + eSsmHook.message);
                 }
 
                 // 9f. InventoryControl.CheckIntensifyEvent (0xF2C14C) -> Safe offline stub to prevent NullRef in SetStateMain

@@ -6,6 +6,54 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ⚠️ CHECKPOINT 7 — Inventory UI: OnCardItem + SetStateMain + Lower Bar (cardParams)
+
+**Problemas resueltos (libscript.js):**
+
+1. **Crash al click en carta → OnCardItem `Interceptor.replace` (RVA `0x105CEE8`)**
+   - Antes: `Interceptor.attach` solo hacía logging, el nativo continuaba y crasheaba al llamar `SetStateMain → UpdateDisplayCardList → GetCardListByGroup` con listas vacías.
+   - Ahora: Reemplazado con `Interceptor.replace` completamente offline:
+     - Extrae `CardItem` de `displayCardList` (offset `0x58` del scene) por índice del nombre del `GameObject`.
+     - Escribe `selectedCardItem` en `sceneThis+0x88` y `preSelectedCardItem` en `sceneThis+0x98`.
+     - Llama a nuestro `SetStateMain` reemplazado (que ya no crashea).
+
+2. **SetStateMain safe → `Interceptor.replace` (RVA `0x1053FB0`)**
+   - Protege la cadena completa: verifica nulos antes de acceder a `rawCard`.
+   - Llama a `InventoryView.ShowMainLayout(true)` (RVA `0x10571EC`) para transición de layout segura.
+   - Usa offsets correctos del `InventoryView` (del dump.cs):
+     - `selectView` → offset `0x48`
+     - `mainView` → offset `0x58`
+     - `equipView` → offset `0x60`
+   - Refresca `InvenCardMainView.Refresh` y `InvenCardSelectView.Refresh` via nuestros replacements ya instalados.
+
+3. **Inventario inferior (InvenGroupItemView.cardParams) → `GetGroupViewData` (RVA `0x105E8E4`)**
+   - Ahora construye una lista de `CardSmallView.Params` con 11 entradas (una por miembro de LOONA).
+   - Cada slot usa la carta equipada del miembro (fallback a primera disponible).
+   - Se construye un layout manual de `List<T>` en memoria nativa (puntero a array interno).
+
+**Offsets clave de `InventoryView` (confirmados en dump.cs):**
+```
+InventoryView : SceneView
+  +0x40: UICache bottom
+  +0x48: InvenCardSelectView selectView  ← PANTALLA DE SELECCIÓN DE CARTA
+  +0x50: InvenCardNoneView noneView
+  +0x58: InvenCardMainView mainView      ← PANTALLA PRINCIPAL DE CARTA
+  +0x60: InvenCardEquipView equipView
+  +0x68: InvenCardIntensifyView intensifyView
+  +0x70: InvenGroupView groupView        ← PANEL DEL GRUPO (LOONA OT11)
+  +0x78: InvenCardView cardView          ← SCROLLVIEW DE CARTAS (listado inferior)
+  +0x80: InvenSortView sortView
+```
+
+**Métodos nativos clave de `InventoryView`:**
+- `ShowDefaultLayout()` → RVA `0x1055ED0`
+- `ShowMainLayout(bool isSelectedItem)` → RVA `0x10571EC`
+- `ShowEquipLayout()` → RVA `0x1057760`
+- `ShowIntensifyLayout()` → RVA `0x1057B6C`
+- `HideAll()` → RVA `0x10608B4`
+
+
+
 ### 1. Desglose del Bloqueo en Carga Asíncrona de `LobbyScene` (43/804 = 5.34%)
 - **Identificación del valor exacto `0.05348242446780205`:**
   - El valor de `AsyncOperation.get_progress()` corresponde a la fracción exacta `43 / 804`.
