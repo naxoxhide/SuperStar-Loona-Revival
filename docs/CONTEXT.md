@@ -1360,6 +1360,18 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
 - Por diseño del IDE, los artefactos volátiles residen en `~/.gemini/antigravity-ide/brain/<conversation-id>/`.
 - Para garantizar persistencia histórica, trazabilidad y acceso directo en el repositorio Git, los reportes de *Walkthrough* e hitos visuales se sincronizan y archivan permanentemente en `docs/walkthroughs/`, respaldados por sus capturas en `docs/walkthroughs/media/`.
 
+### 16.6. Estado de Implementación: Carga (Read) vs. Mutación Interactiva (Write)
+1. **Fase de Lectura y Carga (Implementada al 100%):**
+   - `InventoryScene` (`InvenGroupItemView`, `InvenCardView`), `CardMap` y `CardBook` leen directamente desde `player_profile.json` en disco mediante `loadPlayerProfile()`.
+   - Cualquier alteración en `player_profile.json` (grados, niveles, cartas equipadas, cartas en reserva) se refleja fielmente en pantalla.
+2. **Fase de Mutación y Guardado Interactivo (Próximo Desarrollo):**
+   - Intercepción de eventos de UI en Dalcomsoft:
+     - `InventoryScene.OnUpdateCardEquip` (RVA `0x1054D5C`): Actualizar `isEquip` en `profile.inventoryCards` y guardar con `savePlayerProfile`.
+     - `InventoryScene.OnUpdateCardUnequip` (RVA `0x1054EB4`): Desequipar y persistir.
+     - `InventoryScene.OnCardItemAuto` (RVA `0x1055F60`): Auto-equipar mejores cartas del grupo y persistir.
+     - `InventoryScene.OnIntensify` (RVA `0x105A97C`): Incrementar nivel / grado de carta y deducir Rhythm Points en el JSON local.
+
+
 
 
 
