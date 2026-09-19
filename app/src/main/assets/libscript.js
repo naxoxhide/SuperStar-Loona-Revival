@@ -3461,20 +3461,21 @@ function initIl2Cpp(module) {
                             } catch (eSl) {}
 
                             // 4. Texts & values
-                            p.add(0x38).writePointer(createIl2CppString("GRADE"));
-                            p.add(0x40).writePointer(createIl2CppString("-"));
-                            p.add(0x48).writeS32(4); // gradeValue
-                            p.add(0x4C).writeS32(0); // gradeScore
-                            p.add(0x50).writePointer(createIl2CppString("THEME"));
-                            p.add(0x58).writePointer(createIl2CppString("-"));
-                            p.add(0x60).writeS32(1); // themeLevel
-                            p.add(0x68).writePointer(NULL);
-                            p.add(0x70).writePointer(createIl2CppString("Hi High"));
-                            p.add(0x78).writePointer(createIl2CppString("AUTO EQUIP"));
+                            p.add(0x38).writePointer(createIl2CppString("Group Grade"));
+                            p.add(0x40).writePointer(createIl2CppString("Collect All Cards"));
+                            p.add(0x48).writeS32(4); // gradeValue: 4 = Grade R
+                            p.add(0x4C).writeS32(500000); // gradeScore: 500,000 score bonus
+                            p.add(0x50).writePointer(createIl2CppString("Group Theme"));
+                            p.add(0x58).writePointer(createIl2CppString("No Theme"));
+                            p.add(0x60).writeS32(3); // themeLevel: 3 = Lv 3
+                            var themeDp = createDownloadPath("asiudgasg/asodhsg/aweoijs/2.i.bytes");
+                            p.add(0x68).writePointer(themeDp || NULL);
+                            p.add(0x70).writePointer(createIl2CppString("ULTRA RAVE"));
+                            p.add(0x78).writePointer(createIl2CppString("Auto Equip"));
                             p.add(0x80).writePointer(NULL); // LOONA has no sub-groups!
-                            p.add(0x88).writePointer(createIl2CppString("UNEQUIP ALL"));
-                            p.add(0x90).writePointer(createIl2CppString("EQUIP"));
-                            p.add(0x98).writePointer(createIl2CppString("MUSIC"));
+                            p.add(0x88).writePointer(createIl2CppString("Unequip All"));
+                            p.add(0x90).writePointer(createIl2CppString("Equip Theme"));
+                            p.add(0x98).writePointer(createIl2CppString("Music"));
 
                             log("[✅ GROUP_VIEW] GetGroupViewData populated successfully!");
                             return p;
@@ -3488,11 +3489,11 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing GetGroupViewData: " + eHgvd.message);
                 }
 
-                // 9. InvenGroupItemView.Refresh (0xF23954) -> Safe replacement
+                // 9. InvenGroupItemView.Refresh (0xF23954) -> Native-integrated replacement
                 try {
                     Interceptor.replace(baseAddr.add(0xF23954), new NativeCallback(function (view, p, methodInfo) {
                         try {
-                            log("[🃏 GROUP_ITEM_VIEW] Safe Refresh called! view: " + view + ", p: " + p);
+                            log("[🃏 GROUP_ITEM_VIEW] Native-integrated Refresh called! view: " + view + ", p: " + p);
                             if (view.isNull() || p.isNull()) return;
 
                             // 1. Set group name text ("LOONA")
@@ -3540,25 +3541,23 @@ function initIl2Cpp(module) {
                                 }
                             } catch (eSg) {}
 
-                            // 4. Set grade text
+                            // 4. Call native UpdateGrade(view, p) (0xF246B4)
                             try {
-                                var gradeText = view.add(0xA0).readPointer();
-                                if (!gradeText.isNull()) {
-                                    var textVTable = gradeText.readPointer();
-                                    var setTextFn = new NativeFunction(textVTable.add(0x5E8).readPointer(), "void", ["pointer", "pointer", "pointer"]);
-                                    setTextFn(gradeText, createIl2CppString("R"), textVTable.add(0x5F0).readPointer());
-                                }
-                            } catch (eGt) {}
+                                var updateGradeFn = new NativeFunction(baseAddr.add(0xF246B4), "void", ["pointer", "pointer"]);
+                                updateGradeFn(view, p);
+                                log("[✅ GROUP_ITEM_VIEW] Native UpdateGrade executed successfully!");
+                            } catch (eUg) {
+                                log("[-] Error executing native UpdateGrade: " + eUg.message);
+                            }
 
-                            // 5. Set theme text
+                            // 5. Call native UpdateTheme(view, p) (0xF248E8)
                             try {
-                                var themeText = view.add(0xD8).readPointer();
-                                if (!themeText.isNull()) {
-                                    var textVTable = themeText.readPointer();
-                                    var setTextFn = new NativeFunction(textVTable.add(0x5E8).readPointer(), "void", ["pointer", "pointer", "pointer"]);
-                                    setTextFn(themeText, createIl2CppString("Hi High"), textVTable.add(0x5F0).readPointer());
-                                }
-                            } catch (eTt) {}
+                                var updateThemeFn = new NativeFunction(baseAddr.add(0xF248E8), "void", ["pointer", "pointer"]);
+                                updateThemeFn(view, p);
+                                log("[✅ GROUP_ITEM_VIEW] Native UpdateTheme executed successfully!");
+                            } catch (eUt) {
+                                log("[-] Error executing native UpdateTheme: " + eUt.message);
+                            }
 
                             // 6. Clear & hide summary texts for LOONA OT12 (removes "Summary Summary Summary")
                             try {
@@ -3583,7 +3582,7 @@ function initIl2Cpp(module) {
                                 }
                             } catch (eSum) {}
 
-                            log("[✅ GROUP_ITEM_VIEW] Safe Refresh completed successfully!");
+                            log("[✅ GROUP_ITEM_VIEW] Native-integrated Refresh completed successfully!");
                         } catch (eGiv) {
                             log("[-] Error in InvenGroupItemView.Refresh replacement: " + eGiv.message);
                         }
@@ -3656,8 +3655,14 @@ function initIl2Cpp(module) {
                         var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
                         var ok = loadImageFn(texObj, bytesObj);
                         if (ok) {
+                            try {
+                                var setFilterModeFn = new NativeFunction(baseAddr.add(0x181A580), "void", ["pointer", "int", "pointer"]);
+                                setFilterModeFn(texObj, 2, NULL); // FilterMode.Trilinear = 2
+                                var setAnisoFn = new NativeFunction(baseAddr.add(0x181A610), "void", ["pointer", "int", "pointer"]);
+                                setAnisoFn(texObj, 8, NULL);
+                            } catch (eFm) {}
                             loadedTextureCache[relPath] = texObj;
-                            log("[🖼️ TEXTURE] Loaded and cached: " + relPath);
+                            log("[🖼️ TEXTURE] Loaded and cached (Trilinear/Aniso8): " + relPath);
                             return texObj;
                         }
                     } catch (eLt) {
@@ -3707,11 +3712,14 @@ function initIl2Cpp(module) {
                                 var match = relPath.match(/(\d+)_([sl])\.i\.bytes/);
                                 if (match) {
                                     var cId = parseInt(match[1]);
-                                    var sz = match[2];
-                                    if (accountOwnedCards[cId]) {
-                                        relPath = "asiudgasg/asodhsg/wadceg/" + cId + "_" + sz + ".i.bytes";
+                                    var folder = accountOwnedCards[cId] ? "wadceg" : "sdhgauwehdnu";
+                                    // High-Definition Upgrade: prefer _l over _s for maximum visual sharpness
+                                    var highResPath = "asiudgasg/asodhsg/" + folder + "/" + cId + "_l.i.bytes";
+                                    var highResTex = loadLocalTexture2D(highResPath);
+                                    if (highResTex && !highResTex.isNull()) {
+                                        relPath = highResPath;
                                     } else {
-                                        relPath = "asiudgasg/asodhsg/sdhgauwehdnu/" + cId + "_" + sz + ".i.bytes";
+                                        relPath = "asiudgasg/asodhsg/" + folder + "/" + cId + "_" + match[2] + ".i.bytes";
                                     }
                                 }
                             }

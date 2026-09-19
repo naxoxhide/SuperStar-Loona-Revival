@@ -1277,13 +1277,43 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
 
 ---
 
-## 🎯 Directriz Estratégica: Enfoque 100% Standalone Offline (On-Device) (2026-09-19)
+### 15. Resolución Integral de Group Grade, Group Theme (Rave), Logo Rendering y Calidad HD de Texturas en `InventoryScene`
 
-Por requerimiento y directriz definida por **Ignacio**:
-- **Objetivo Primordial:** La ejecución del cliente debe ser **100% standalone y offline**, garantizando la preservación permanente del videojuego sin depender de servidores remotos, conexiones de red externas ni infraestructura en la nube.
-- **Autonomía On-Device:** Toda la lógica de autenticación simulada, cuenta de usuario, inventario de cartas, equipamiento por canción, álbum CardBook y ejecución rítmica se resuelve directamente en memoria y almacenamiento local del dispositivo mediante instrumentación IL2CPP / Frida Gadget.
-- **Rol del Mock Server:** El servidor en Python (`server/`) se mantiene como entorno auxiliar de desarrollo, pruebas y análisis de payloads, pero el cliente APK final está diseñado para funcionar de manera completamente desacoplada y autónoma.
+#### 15.1. Causa Raíz de Fallos en Group Grade y Group Theme
+1. **Lógica de `InvenGroupItemView.UpdateGrade` (RVA `0xF246B4`):**
+   - Comprueba `p.gradeScore > 0` (offset `0x4C` de `InvenGroupItemView.Params`).
+   - Al cumplirse:
+     - Formatea el puntaje numérico con separador de miles (ej. `+500.000` para R, `+250.000` para S) y lo asigna en `gradeText` (offset `0xA0`).
+     - Activa `gradeLight` (offset `0x98`) para mostrar el resplandor / aura dorada.
+     - Evalúa `p.gradeValue` (offset `0x48`). Si es distinto de `-1`, oculta `gradeEmpty` ("Collect All Cards") y activa `grade` (Image en `0x88`), extrayendo el sprite correspondiente desde `gradeSprites.GetSprite(gradeValue)` (RVA `0xD0CAB8`).
+   - **Falla detectada:** En `InventoryScene.GetGroupViewData` (RVA `0x105E8E4`), `p.gradeScore` estaba forzado en `0`, provocando que el motor considerara nulo el bono de cartas y mantuviera activo el texto residual `gradeEmpty` ("Collect All Cards"). Adicionalmente, el hook previo en `InvenGroupItemView.Refresh` no llamaba a `UpdateGrade` y forzaba el texto literal `"R"` sobre el campo de puntaje numérico.
 
+2. **Lógica de `InvenGroupItemView.UpdateTheme` (RVA `0xF248E8`):**
+   - Comprueba `p.themeLevel >= 1` (offset `0x60` de `InvenGroupItemView.Params`).
+   - Al cumplirse:
+     - Oculta `themeEmpty` (offset `0xB0`, "No Theme").
+     - Activa `themeLevel` (offset `0xB8`) y formatea `"Lv " + p.themeLevel` (ej. `Lv 3`).
+     - Activa `themeLight` (offset `0xD0`) para el destello temático.
+     - Asigna en `themeText` (offset `0xD8`) el texto del multiplicador de Rave (`p.themeText`, ej. `"ULTRA RAVE"`, `"SUPER RAVE"` o `"RAVE"`), ubicado junto al icono de rayo ⚡ (`themeIcon`, offset `0xC8`).
+     - Activa `theme` (RawImage en offset `0xC0`) e invoca `URLsControl.SetCdnTexture(theme, p.themePath, autoSize=1, autoEnabled=1)` (RVA `0x163A9E8`).
+   - **Falla detectada:** El hook previo en `InvenGroupItemView.Refresh` omitía la llamada a `UpdateTheme`, asignando erróneamente el nombre de la canción (`"Hi High"`) en el campo de texto `themeText` (donde corresponde la etiqueta de Rave), dejando la UI en nivel residual 1 y `themeEmpty` activo.
 
+#### 15.2. Desmitificación de la "Línea Azul" que Tapaba el Texto del Tema
+- **Identificación en Prefab:** En `InvenGroupItemView`, el elemento `theme` (offset `0xC0`) es un `RawImage` posicionado exactamente debajo del texto `themeLevel` ("Lv 1" / "Lv 3").
+- Por defecto en Unity, un `RawImage` sin textura asignada renderiza un rectángulo sólido opaco con el color base del material (azul oscuro marino en el prefab de Dalcomsoft).
+- Dado que `p.themePath` se pasaba como `NULL`, el componente nunca recibía textura, renderizándose como una barra rectangular azulada que cubría el texto de fondo `themeEmpty` ("No Theme").
+- **Mapeo del Logo de Tema en Dalcomsoft:**
+  - En `ThemeData` (`tmd.bin`), cada tema posee `nameImageLarge` (`theme_l_{name}.png`), cuyo registro en `url.bin` corresponde al código numérico de recurso CDN.
+  - Para el tema principal 1001 (*Hi High*), el recurso es `theme_l_hi_high.png`, mapeado a la ruta local `asiudgasg/asodhsg/aweoijs/2.i.bytes`.
+  - Se generó la textura de alta definición para `theme_l_hi_high.png` con tipografía oficial (`pretendardstd_regular.ttf`) en color `#565488` con canal alfa transparente y se desplegó en `aweoijs/2.i.bytes`.
+  - Al enlazar `p.themePath` hacia dicha ruta y delegar la carga en `URLsControl.SetCdnTexture`, `RawImage.SetNativeSize` dimensiona la textura perfectamente bajo "Lv 3", eliminando por completo la barra azul y el texto "No Theme".
 
-
+#### 15.3. Mejora de Resolución y Filtros en Texturas de Cartas (`_s.i` vs `_l.i`)
+1. **Disparidad de Dimensiones Originales:**
+   - Texturas pequeñas (`wadceg/{id}_s.i.bytes`): `85 x 120` px (~22 KB).
+   - Texturas grandes (`wadceg/{id}_l.i.bytes`): `226 x 318` px (~150 KB, ~7x mayor densidad de píxeles).
+   - En pantallas móviles modernas de 1080p+, el slot de carta en el inventario mide ~140 x 230 px. Estirar una textura de 85x120 genera pixelación y borrosidad notable.
+2. **Optimización Gráfica Implementada:**
+   - **Filtros de GPU en `loadLocalTexture2D`:** Se aplica `Texture.set_filterMode(texObj, 2)` (Trilinear) vía RVA `0x181A580` y `Texture.set_anisoLevel(texObj, 8)` vía RVA `0x181A610`.
+   - **Upgrade Dinámico de Calidad en `SetCdnTexture`:** Cuando el motor solicita `wadceg/{id}_s.i.bytes`, el interceptor comprueba la existencia de la variante `_l.i.bytes`. Al estar disponible para el 100% de las cartas del juego, carga la versión de 226x318 px.
+   - El downsampling en GPU de 226x318 al tamaño del slot produce retratos nítidos, limpios y con calidad retina (Retina Display Ready), sin impacto perceptible en rendimiento.
