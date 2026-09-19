@@ -1480,6 +1480,71 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
        - `0x2FE097A`: `"Material Card"` (filtro de cartas de material).
        - `0x2FE097E`: `"Lock"` (filtro de cartas bloqueadas).
 
-3. **Estrategia de Implementación Standalone:**
-   - **Hook en `LanguageControl.GetString(int code32)` (RVA `0xCF1064`):** Proveer un diccionario de respaldo offline con todos los IDs de texto identificados (`Shop`, `Sell All`, `Choose Group`, `Card Book`, `High`, `New`, `Low`, `Prism`, `Group`, `Material Card`, `Lock`, `"{0} / {1}"`), garantizando que cualquier componente nativo de Dalcomsoft obtenga sus textos oficiales automáticamente.
-   - **Actualización Activa en `InventoryScene.OnOpen` y Ciclos de Equipamiento:** Invocar explícitamente `InvenCardView.set_Count(cardView, countStr)`, `InvenGroupView.set_Count(groupView, "1 / 1")`, y los setters de texto en `ButtonCache` para asegurar reactividad inmediata en pantalla.
+3. **Estrategia de Implementación Standalone y Verificación en Pantalla:**
+   - **Hook en `LanguageControl.GetString(int code32)` (RVA `0xCF1064`):** Proveer un diccionario de respaldo offline con todos los IDs de texto identificados (`Shop`, `Sell All`, `Choose Group`, `Card Book`, `High`, `New`, `Low`, `Prism`, `Group`, `Material Card`, `Lock`, `"{0} / {1}"`), garantizando que cualquier componente nativo de Dalcomsoft obtenga sus textos oficiales automáticamente sin depender de la base de datos remota o SQLite incompleto.
+   - **Ciclo de Vida Seguro Post-Layout (`InventoryView.ShowDefaultLayout`, RVA `0x1055ED0`):**
+     - **Problema Detectado:** Modificar la jerarquía de UI o invocar `GameObject.SetActive` sobre componentes hijos (como `countTextObj`) dentro del hook `InventoryScene.OnOpen.onLeave` provocaba un fallo de reconstrucción de layout en Unity (`libunity.so!0x2d416c`), debido a que `InventoryView.Show()` aún no había concluido la activación de `btnBack`.
+     - **Solución Arquitectónica:** Se trasladó la actualización de estado a `InventoryView.ShowDefaultLayout` (RVA `0x1055ED0`) en su fase `onLeave`. En este punto, todas las vistas (`groupView`, `cardView`, `sortView`, `btnBack`) se encuentran completamente instanciadas y activas.
+     - **Invocaciones Nativas Coordinadas:**
+       1. `InventoryScene.OnUpdateCardCount` (RVA `0x1054BB4`): Lee `UserData.get_CardInvenMaxCount()` (200), `LanguageControl.GetString(0x3072969)` (`"{0} / {1}"`), `InventoryControl.get_CardMapCount()` (14) y formatea `14 / 200`.
+       2. `InventoryScene.SetGroupViewCount` (RVA `0x1053E18`): Configura el texto del grupo (`1 / 1`).
+       3. `InvenSortView.sortText.set_text("High")` (RVA `0x21A5FC4`): Asegura que el botón de ordenamiento muestre la etiqueta correspondiente.
+   - **Resultados Verificados en Pantalla (`inventory_screen_verified.png`):**
+     - Botón `btnStore` (carrito): Muestra icono y etiqueta `"Shop"`.
+     - Botón `btnMyCollection` (cinta): Muestra icono y etiqueta `"Card Book"`.
+     - Botón `btnSellBundle`: Muestra etiqueta `"Sell All"`.
+     - Botón `btnSelectGroup`: Muestra etiqueta `"Choose Group"`.
+     - Botón `InvenSortView`: Muestra flecha `^` acompañada de la etiqueta `"High"`.
+
+### 16.10. Ingeniería Inversa de Nivel de Estrellas (Star Sprites) y Alineación Canónica de Integrantes (OT11)
+
+1. **Causa Raíz del Rectángulo Blanco en Cartas No-R (Grados C, B, A, S):**
+   - **Desensamblado de `CardView.SetLevel(CardView.Params p)` (RVA `0x1394858`):**
+     - En `0x139486c`: Lee `p.level` (offset `0x48`). Si es `< 1`, retorna de inmediato.
+     - En `0x1394878`: Lee `p.isRCard` (offset `0x40`).
+       - **Si `isRCard != 0` (Grado R):** Ejecuta `numberLevel.SetNumber(level)` (RVA `0xC10448`) y activa `numberLevel` (NumberBox de nivel 1..50 con estrella dorada).
+       - **Si `isRCard == 0` (Grados C, B, A, S):**
+         - En `0x13948bc`: Lee `p.maxLevel` (offset `0x44`).
+         - En `0x13948c0`: Lee `p.tier` (offset `0x3C`, correspondiente a `CardGrade`: C=0, B=1, A=2, S=3).
+         - En `0x13948cc`: `madd w8, w8, w9, w1` -> `w8 = (tier * maxLevel) + level`.
+         - En `0x13948d0`: `sub w1, w8, #1` -> `index = (tier * maxLevel) + level - 1`.
+         - En `0x13948d4`: `bl #0xd0cab8` -> Invoca `starSprites.GetSprite(index)`.
+         - En `0x13948e8`: Invoca `starLevel.set_sprite(sprite)` (RVA `0x1ECB61C`) y activa el componente `Image starLevel`.
+   - **Diagnóstico del Error:**
+     - El componente `starSprites` contiene exactamente 20 sprites (índices 0..19: 5 estrellas para cada uno de los 4 rangos C, B, A, S con `maxLevel = 5`).
+     - En el mock previo de `createMockSmallCardParams`, se había codificado de forma estática `maxLevel = 50`.
+     - Para HeeJin Grado A (`tier = 2`, `level = 1`), la fórmula calculaba:
+       `index = (2 * 50) + 1 - 1 = 100`.
+     - Al exceder la capacidad del atlas de sprites, `starSprites.GetSprite(100)` retornaba `NULL`.
+     - En Unity, cuando un componente `Image` activo tiene `sprite = null`, la GPU renderiza el quad por defecto con textura blanca sólida, cubriendo la parte inferior de la carta con una barra blanca.
+   - **Solución Arquitectónica:**
+     - Ajustar `maxLevel = (grade === 4) ? 50 : 5`.
+     - Limitar el nivel en rangos no-R al intervalo válido de estrellas (1..5):
+       `var safeLvl = (grade === 4) ? level : Math.min(Math.max(level, 1), 5)`.
+     - Esto restaura el sprite oficial de 1 a 5 estrellas doradas para cartas C, B, A y S, eliminando por completo la barra blanca.
+
+2. **Alineación Canónica del Grupo LOONA: 11 Integrantes (`equipableSlot: 11`):**
+   - **Descubrimiento en Datos Binarios Dalcomsoft (`grd.json` y `atd.json`):**
+     - Al desencriptar `app/src/files/asiudgasg/sdisgkdc/grd.bin` (Group Data):
+       - El grupo `1001` (`[+ +]`) posee la propiedad explícita `"equipableSlot": 11`.
+       - Todos los grupos OT11 de LOONA (`1001 [+ +]`, `2001 [x x]`, `5001 [&]`, `6001 [Flip That]`) tienen exactamente 11 slots (`equipableSlot: 11`).
+     - Al desencriptar `app/src/files/asiudgasg/sdisgkdc/atd.bin` (Artist Data):
+       - El catálogo oficial para el grupo 1001 contiene exactamente 11 artistas:
+         1. `1001`: HeeJin (`orderIndex: 0`)
+         2. `1002`: HyunJin (`orderIndex: 1`)
+         3. `1003`: HaSeul (`orderIndex: 2`)
+         4. `1004`: YeoJin (`orderIndex: 3`)
+         5. `1005`: ViVi (`orderIndex: 4`)
+         6. `1006`: Kim Lip (`orderIndex: 5`)
+         7. `1007`: JinSoul (`orderIndex: 6`)
+         8. `1008`: Choerry (`orderIndex: 7`)
+         9. `1009`: Yves (`orderIndex: 8`)
+         10. `1010`: Go Won (`orderIndex: 9`)
+         11. `1011`: Olivia Hye (`orderIndex: 10`)
+     - En el catálogo de cartas (`cdd.json`), sólo existen cartas asociadas a los artistas `1001` a `1011`.
+   - **Causa de la Duplicación de HeeJin en Slot 11:**
+     - En la configuración previa de `libscript.js`, se había configurado `memberCount = 12` con un arreglo de 12 miembros que incluía a Chuu. Al no existir cartas ni artista para el slot 11, la lógica recurría al fallback de HeeJin (índice 0 / artista 1001), renderizando a HeeJin dos veces.
+   - **Solución Arquitectónica:**
+     - Actualizar `LOONA_MEMBERS` para reflejar la estructura oficial de 11 miembros del grupo 1001.
+     - Configurar `memberCount = 11` en `GroupData` y `InvenGroupItemView.Params`.
+     - Esto elimina la duplicación de HeeJin y alinea la cuadrícula de equipamiento al 100% con los datos oficiales del juego.

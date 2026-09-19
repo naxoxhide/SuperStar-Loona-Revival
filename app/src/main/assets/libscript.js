@@ -546,8 +546,8 @@ function initIl2Cpp(module) {
 
             function createDefaultProfile(nickname) {
                 var invCards = [];
-                // 12 cards equipped for LOONA (Theme: Hi High, 1001-1012) at Grade R (4) Level 50
-                for (var i = 0; i < 12; i++) {
+                // 11 cards equipped for LOONA (Theme: Hi High, 1001-1011) at Grade R (4) Level 50
+                for (var i = 0; i < 11; i++) {
                     invCards.push({
                         objectID: 100001 + i,
                         cardID: 1001 + i,
@@ -2457,9 +2457,8 @@ function initIl2Cpp(module) {
                     { index: 7, name: "JinSoul", krName: "진솔" },
                     { index: 8, name: "Choerry", krName: "최리" },
                     { index: 9, name: "Yves", krName: "이브" },
-                    { index: 10, name: "Chuu", krName: "츄" },
-                    { index: 11, name: "Go Won", krName: "고원" },
-                    { index: 12, name: "Olivia Hye", krName: "올리비아 혜" }
+                    { index: 10, name: "Go Won", krName: "고원" },
+                    { index: 11, name: "Olivia Hye", krName: "올리비아 혜" }
                 ];
 
                 var downloadPathKlass = NULL;
@@ -2538,8 +2537,7 @@ function initIl2Cpp(module) {
                     1008: { grade: 4, level: 50 },
                     1009: { grade: 4, level: 50 },
                     1010: { grade: 4, level: 50 },
-                    1011: { grade: 4, level: 50 },
-                    1012: { grade: 4, level: 50 }
+                    1011: { grade: 4, level: 50 }
                 };
 
                 function syncAccountOwnedCards() {
@@ -2664,7 +2662,7 @@ function initIl2Cpp(module) {
                                         var gd = il2cpp_object_new(gdKlass);
                                         gd.add(0x10).writeS32(1001); // code = 1001
                                         gd.add(0x14).writeS16(1001); // majorGroupCode = 1001
-                                        gd.add(0x18).writeS16(12);   // memberCount = 12
+                                        gd.add(0x18).writeS16(11);   // memberCount = 11 (equipableSlot: 11)
                                         gd.add(0x80).writeS16(1);    // index = 1
                                         gd.add(0x82).writeS16(1);    // index2 = 1
                                         loonaGroupData.add(0x10).writePointer(gd);
@@ -2736,7 +2734,7 @@ function initIl2Cpp(module) {
                                 }
                             }
                             var artistItems = [];
-                            for (var ai = 1; ai <= 12; ai++) {
+                            for (var ai = 1; ai <= 11; ai++) {
                                 artistItems.push(loonaArtistDataMap[ai] || NULL);
                             }
                             loonaArtistListFastArray = createFastArray(artistItems, 'artist');
@@ -2837,7 +2835,7 @@ function initIl2Cpp(module) {
                 // Proxy CardControl.Find (0x11D66F4)
                 try {
                     Interceptor.replace(baseAddr.add(0x11D66F4), new NativeCallback(function (code, methodInfo) {
-                        if (code >= 1001 && code <= 1012) {
+                        if (code >= 1001 && code <= 1022) {
                             return getOrCreateCardControlData(code);
                         }
                         return NULL;
@@ -3054,7 +3052,7 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.replace(baseAddr.add(0xEBB39C), new NativeCallback(function (thisPtr, methodInfo) {
                         ensureLoonaMocks();
-                        for (var i = 1; i <= 12; i++) {
+                        for (var i = 1; i <= 11; i++) {
                             if (loonaArtistDataMap[i] && loonaArtistDataMap[i].equals(thisPtr)) return (i - 1);
                         }
                         return 0;
@@ -3062,7 +3060,7 @@ function initIl2Cpp(module) {
 
                     Interceptor.replace(baseAddr.add(0xEBB3D4), new NativeCallback(function (thisPtr, methodInfo) {
                         ensureLoonaMocks();
-                        for (var i = 1; i <= 12; i++) {
+                        for (var i = 1; i <= 11; i++) {
                             if (loonaArtistDataMap[i] && loonaArtistDataMap[i].equals(thisPtr)) {
                                 return createIl2CppString(LOONA_MEMBERS[i - 1].name);
                             }
@@ -3072,7 +3070,7 @@ function initIl2Cpp(module) {
 
                     Interceptor.replace(baseAddr.add(0xEBB380), new NativeCallback(function (thisPtr, methodInfo) {
                         ensureLoonaMocks();
-                        for (var i = 1; i <= 12; i++) {
+                        for (var i = 1; i <= 11; i++) {
                             if (loonaArtistDataMap[i] && loonaArtistDataMap[i].equals(thisPtr)) return i;
                         }
                         return 1;
@@ -3329,6 +3327,8 @@ function initIl2Cpp(module) {
 
                         var photoDp = createDownloadPath("asiudgasg/asodhsg/wadceg/" + cardId + "_l.i.bytes");
                         var tierDp = getGradeFrameDownloadPath(grade, 1);
+                        var maxLvl = (grade === 4) ? 50 : 5;
+                        var safeLvl = (grade === 4) ? level : Math.min(Math.max(level, 1), 5);
 
                         p.add(0x10).writePointer(photoDp || NULL);
                         p.add(0x18).writePointer(tierDp || NULL);
@@ -3339,8 +3339,8 @@ function initIl2Cpp(module) {
                         p.add(0x3C).writeS32(grade);
                         p.add(0x40).writeU8(grade === 4 ? 1 : 0);
                         p.add(0x41).writeU8(0);
-                        p.add(0x44).writeS32(50);
-                        p.add(0x48).writeS32(level);
+                        p.add(0x44).writeS32(maxLvl);
+                        p.add(0x48).writeS32(safeLvl);
                         p.add(0x4C).writeU8(0);
                         p.add(0x4E).writeS16(0);
                         p.add(0x50).writeU8(isEquip ? 1 : 0); // isEquip dynamic (controls blue checkmark)
@@ -3531,7 +3531,7 @@ function initIl2Cpp(module) {
 
                             // Populate fields safely
                             p.add(0x10).writePointer(createIl2CppString("LOONA"));
-                            p.add(0x18).writeS32(12); // memberCount
+                            p.add(0x18).writeS32(11); // memberCount = 11
                             p.add(0x1C).writeS32(0);  // summaryCount
                             p.add(0x20).writePointer(NULL); // exposeArtistIndexList
                             p.add(0x28).writePointer(NULL); // cardParams
@@ -3629,8 +3629,8 @@ function initIl2Cpp(module) {
                                     for (var i = 0; i < cardCount; i++) {
                                         var cardSmallView = cardItemsPtr.add(0x20 + i * 8).readPointer();
                                         if (!cardSmallView.isNull()) {
-                                            var mIdx = (i % 12);
-                                            var targetCard = eqCards.find(function(c) { return ((c.cardID - 1001) % 12) === mIdx; });
+                                            var mIdx = (i % 11);
+                                            var targetCard = eqCards.find(function(c) { return ((c.cardID - 1001) % 11) === mIdx; });
                                             if (targetCard) {
                                                 // Slot IS EQUIPPED with active card
                                                 var cId = targetCard.cardID;
@@ -4491,7 +4491,7 @@ function initIl2Cpp(module) {
                                 cardItemObj.add(0x24).writeU32(0x3F800000); // 1.0f
                                 cardItemObj.add(0x28).writeS32(100); // <SellPrice>
                                 cardItemObj.add(0x2C).writeU8(0); // isMaterial = false
-                                var memberIdx = ((cId - 1001) % 12) + 1;
+                                var memberIdx = ((cId - 1001) % 11) + 1;
                                 cardItemObj.add(0x30).writeS32(1001 * 10000 + 1 * 100 + memberIdx); // sortCardIndex
                                 cardItemObj.add(0x34).writeU8(0); // isNew = false
                                 cardItemObj.add(0x38).writeS32(1); // <ThemeLevel>
@@ -4522,18 +4522,18 @@ function initIl2Cpp(module) {
                             var itm = loonaCardItems[k];
                             var r = itm.add(0x10).readPointer();
                             var cid = r.add(0x20).readS32();
-                            var mIdx = ((cid - 1001) % 12);
+                            var mIdx = ((cid - 1001) % 11);
                             var isEq = (r.add(0x28).readU8() === 1);
                             if (isEq && !memberFilled[mIdx]) {
                                 loonaEquippedCards.push(itm);
                                 memberFilled[mIdx] = true;
                             }
                         }
-                        for (var k = 0; k < loonaCardItems.length && loonaEquippedCards.length < 12; k++) {
+                        for (var k = 0; k < loonaCardItems.length && loonaEquippedCards.length < 11; k++) {
                             var itm = loonaCardItems[k];
                             var r = itm.add(0x10).readPointer();
                             var cid = r.add(0x20).readS32();
-                            var mIdx = ((cid - 1001) % 12);
+                            var mIdx = ((cid - 1001) % 11);
                             if (!memberFilled[mIdx]) {
                                 loonaEquippedCards.push(itm);
                                 memberFilled[mIdx] = true;
@@ -4764,8 +4764,11 @@ function initIl2Cpp(module) {
 
                                         // Inspect Card Count & Group Count Text GameObjects
                                         var getTextFn = new NativeFunction(baseAddr.add(0x21A5FBC), "pointer", ["pointer"]);
+                                        var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
                                         var getActiveAndEnabledFn = new NativeFunction(baseAddr.add(0x1DB3D4C), "int", ["pointer"]);
                                         var getFontSizeFn = new NativeFunction(baseAddr.add(0x21A6394), "int", ["pointer"]);
+                                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer"]);
+                                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
 
                                         var cardView = sceneView.add(0x78).readPointer();
                                         if (!cardView.isNull()) {
@@ -4775,6 +4778,21 @@ function initIl2Cpp(module) {
                                                 var isAE = getActiveAndEnabledFn(cardCountText);
                                                 var fSize = getFontSizeFn(cardCountText);
                                                 log("[📊 CARD COUNT INSPECT] cardCountText=" + cardCountText + " | text: '" + cTxt + "' | isActiveAndEnabled: " + isAE + " | fontSize: " + fSize);
+                                                // Ensure the GameObject itself is active
+                                                try {
+                                                    var cGo = getGoFn(cardCountText);
+                                                    if (!cGo.isNull()) {
+                                                        setActiveFn(cGo, 1, NULL);
+                                                    }
+                                                } catch (eCgo) {}
+                                                // If text is empty or not formatted, force update
+                                                if (!cTxt || cTxt.length === 0) {
+                                                    var prof = loadPlayerProfile();
+                                                    var cardCount = (prof && prof.inventoryCards) ? prof.inventoryCards.length : 14;
+                                                    var maxCount = 200;
+                                                    setTextFn(cardCountText, createIl2CppString(cardCount + " / " + maxCount), NULL);
+                                                    log("[📊 CARD COUNT] Force set text to: " + cardCount + " / " + maxCount);
+                                                }
                                             }
                                         }
 
@@ -4786,6 +4804,16 @@ function initIl2Cpp(module) {
                                                 var gIsAE = getActiveAndEnabledFn(groupCountText);
                                                 var gFSize = getFontSizeFn(groupCountText);
                                                 log("[📊 GROUP COUNT INSPECT] groupCountText=" + groupCountText + " | text: '" + gTxt + "' | isActiveAndEnabled: " + gIsAE + " | fontSize: " + gFSize);
+                                                try {
+                                                    var gGo = getGoFn(groupCountText);
+                                                    if (!gGo.isNull()) {
+                                                        setActiveFn(gGo, 1, NULL);
+                                                    }
+                                                } catch (eGgo) {}
+                                                if (!gTxt || gTxt.length === 0) {
+                                                    setTextFn(groupCountText, createIl2CppString("1 / 1"), NULL);
+                                                    log("[📊 GROUP COUNT] Force set text to: 1 / 1");
+                                                }
                                             }
                                         }
                                     }
