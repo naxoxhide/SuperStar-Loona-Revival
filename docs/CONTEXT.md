@@ -6,6 +6,35 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ✅ CHECKPOINT 9 — Inventory Verification: SceneId:4 Estable + 14 Cartas + Barra Inferior (2026-09-20)
+
+**Estado verificado en sesión activa (PID 3252):**
+
+1. **Navegación exitosa a InventoryScene (SceneId:4)** vía `scene_cmd.txt` con valor `4`:
+   - Archivo: `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt`
+   - El script monitorea este archivo cada 30 frames y dispara `openSceneDirectFn(4)` (RVA `0xD534BC`).
+   - Transición Lobby → Inventory confirmada en logcat.
+
+2. **Inventario UI completamente operativo:**
+   - Panel de 11 cartas LOONA (6 fila 1 + 5 fila 2), todas con grade R y level 50.
+   - Barra inferior: `14 / 200` cartas, miniaturas correctas con checkmarks (✓) en equipadas.
+   - Panel de grupo: `1/1`, Group Grade R, Group Theme ULTRA RAVE, Lv 3 Hi High.
+   - Botones funcionales: Equip Theme, Auto Equip, Unequip All, Card Book, Shop, Sell All.
+
+3. **SceneId:4 estable durante >5 minutos** sin crashes ni reinicios.
+
+4. **Frida Gadget**: en `~/.venv_frida/bin/frida` (no en PATH global).
+   - APK tiene Frida Gadget embedido en modo `libscript.so` + `libfrida-gadget.config.so`.
+   - No es posible `attach` externo — el Gadget carga el script desde assets automáticamente.
+
+5. **Mecanismo de hot-reload**: `scene_cmd.txt` permite navegar a cualquier escena (1-13) sin reconstruir APK.
+
+**Pendiente:**
+- Verificar click en carta (OnCardItem) para abrir DetailView — `adb input tap` no procesa correctamente en este emulador (BlueStacks). Los taps llegan al sistema pero Unity no los procesa desde ADB.
+- Alternativa: Implementar auto-navegación a detail via `scene_cmd.txt` extendido con formato `4:CARD_ID`.
+
+---
+
 ### ⚠️ CHECKPOINT 7 — Inventory UI: OnCardItem + SetStateMain + Lower Bar (cardParams)
 
 **Problemas resueltos (libscript.js):**
