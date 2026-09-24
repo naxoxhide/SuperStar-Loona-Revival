@@ -3545,8 +3545,7 @@ function initIl2Cpp(module) {
 
                 function createMockLargeCardParams(cardId, grade, level, isPrism) {
                     try {
-                        var slotKlass = getIl2CppClassFromSlot(0x3100660);
-                        var clvParamsKlass = (slotKlass && !slotKlass.isNull()) ? slotKlass : getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardLargeView/Params");
+                        var clvParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardLargeView/Params");
                         if (!clvParamsKlass || clvParamsKlass.isNull()) {
                             clvParamsKlass = getClass("Assembly-CSharp", "", "CardLargeView.Params");
                         }
@@ -3597,8 +3596,10 @@ function initIl2Cpp(module) {
 
                 function createMockCardStatInfoParams(grade, level, isPrism) {
                     try {
-                        var slotKlass = getIl2CppClassFromSlot(0x3102CA0);
-                        var statKlass = (slotKlass && !slotKlass.isNull()) ? slotKlass : getClass("Assembly-CSharp", "", "CardStatInfoView.Params");
+                        var statKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardStatInfoView/Params");
+                        if (!statKlass || statKlass.isNull()) {
+                            statKlass = getClass("Assembly-CSharp", "", "CardStatInfoView.Params");
+                        }
                         if (!statKlass || statKlass.isNull()) return NULL;
                         var p = il2cpp_object_new(statKlass);
                         if (!p || p.isNull()) return NULL;
@@ -4184,14 +4185,25 @@ function initIl2Cpp(module) {
                 // 9c. InventoryScene.GetSelectViewData (0x10572AC) -> Bulletproof replacement with full ABI signature
                 function safeGetSelectViewData(sceneThis, cardItem, artistData, otherCardItem, isSell) {
                     try {
-                        var slotKlass = getIl2CppClassFromSlot(0x30E5FD8);
-                        var selectParamsKlass = (slotKlass && !slotKlass.isNull()) ? slotKlass : getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "InvenCardSelectView/Params");
+                        log("[🔍 GSVD] safeGetSelectViewData entered");
+                        var selectParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "InvenCardSelectView/Params");
                         if (!selectParamsKlass || selectParamsKlass.isNull()) {
                             selectParamsKlass = getClass("Assembly-CSharp", "", "InvenCardSelectView.Params");
                         }
-                        if (!selectParamsKlass || selectParamsKlass.isNull()) return NULL;
-                        var p = il2cpp_object_new(selectParamsKlass);
-                        if (!p || p.isNull()) return NULL;
+                        log("[🔍 GSVD] Step 1: selectParamsKlass=" + selectParamsKlass);
+                        var p = NULL;
+                        if (selectParamsKlass && !selectParamsKlass.isNull()) {
+                            try {
+                                p = il2cpp_object_new(selectParamsKlass);
+                            } catch (eNew) {
+                                log("[-] Error in il2cpp_object_new(selectParamsKlass): " + eNew.message);
+                            }
+                        }
+                        if (!p || p.isNull()) {
+                            log("[🔍 GSVD] Fallback: allocating 0x60 native buffer for InvenCardSelectView.Params");
+                            p = Memory.alloc(0x60);
+                        }
+                        log("[🔍 GSVD] Step 2: p=" + p);
 
                         try {
                             var ctorFn = new NativeFunction(baseAddr.add(0xB531B0), "void", ["pointer", "pointer"]);
@@ -4206,15 +4218,17 @@ function initIl2Cpp(module) {
                         var isLk = false;
 
                         if (cardItem && !cardItem.isNull()) {
-                            var raw = cardItem.add(0x10).readPointer();
-                            if (!raw.isNull()) {
-                                cId = raw.add(0x20).readS32();
-                                gr = raw.add(0x24).readS32();
-                                lvl = raw.add(0x1C).readS16();
-                                isEq = (raw.add(0x28).readU8() === 1);
-                                isLk = (raw.add(0x29).readU8() === 1);
-                                isPrism = (raw.add(0x2A).readU8() === 1);
-                            }
+                            try {
+                                var raw = cardItem.add(0x10).readPointer();
+                                if (!raw.isNull()) {
+                                    cId = raw.add(0x20).readS32();
+                                    gr = raw.add(0x24).readS32();
+                                    lvl = raw.add(0x1C).readS16();
+                                    isEq = (raw.add(0x28).readU8() === 1);
+                                    isLk = (raw.add(0x29).readU8() === 1);
+                                    isPrism = (raw.add(0x2A).readU8() === 1);
+                                }
+                            } catch (eRci) {}
                         }
 
                         var meta = getCardMetadata(cId);
@@ -4225,13 +4239,17 @@ function initIl2Cpp(module) {
                         var tName = themeNamesMap[tId] || "Hi High";
 
                         // Large card params
+                        log("[🔍 GSVD] Step 3: createMockLargeCardParams for cId=" + cId);
                         var cardParams = createMockLargeCardParams(cId, gr, lvl, isPrism);
+                        log("[🔍 GSVD] Step 4: cardParams=" + cardParams);
                         p.add(0x10).writePointer(cardParams || NULL);
                         p.add(0x18).writePointer(createIl2CppString("LOONA"));
                         p.add(0x20).writePointer(createIl2CppString(aName));
 
                         // Stat params
+                        log("[🔍 GSVD] Step 5: createMockCardStatInfoParams");
                         var statParams = createMockCardStatInfoParams(gr, lvl, isPrism);
+                        log("[🔍 GSVD] Step 6: statParams=" + statParams);
                         p.add(0x28).writePointer(statParams || NULL);
 
                         p.add(0x30).writeS32(0); // deltaScore
@@ -4239,14 +4257,8 @@ function initIl2Cpp(module) {
                         p.add(0x38).writePointer(createIl2CppString("Theme"));
                         p.add(0x40).writePointer(createIl2CppString(tName));
 
-                        // Theme params (0xABFF78)
-                        try {
-                            if (cardItem && !cardItem.isNull()) {
-                                var getThemeFn = new NativeFunction(baseAddr.add(0xABFF78), "pointer", ["pointer", "pointer"]);
-                                var themeParams = getThemeFn(cardItem, NULL);
-                                p.add(0x48).writePointer(themeParams || NULL);
-                            }
-                        } catch (eThp) {}
+                        // Theme params: write NULL safely
+                        p.add(0x48).writePointer(NULL);
 
                         p.add(0x50).writeU8(isEq ? 1 : 0);
                         p.add(0x51).writeU8(isSell ? 1 : 0);
@@ -4671,10 +4683,8 @@ function initIl2Cpp(module) {
                                 if (!selectView.isNull()) {
                                     try {
                                         var selectParams = safeGetSelectViewData(sceneThis, selectedCardItem, NULL, (equippedCardItem && !equippedCardItem.isNull()) ? equippedCardItem : NULL, 0);
-                                        if (selectParams && !selectParams.isNull()) {
-                                            safeRefreshInvenCardSelectView(selectView, selectParams);
-                                            log("[✅ SET_STATE_MAIN] InvenCardSelectView refreshed!");
-                                        }
+                                        safeRefreshInvenCardSelectView(selectView, selectParams);
+                                        log("[✅ SET_STATE_MAIN] InvenCardSelectView refreshed!");
                                     } catch (eSvr) { log("[-] Error refreshing selectView: " + eSvr.message); }
                                 }
                             }
@@ -4798,14 +4808,8 @@ function initIl2Cpp(module) {
                             p.add(0x38).writePointer(createIl2CppString("Theme"));
                             p.add(0x40).writePointer(createIl2CppString(tName));
 
-                            // Theme params (0xABFF78)
-                            try {
-                                if (cardItem && !cardItem.isNull()) {
-                                    var getThemeFn = new NativeFunction(baseAddr.add(0xABFF78), "pointer", ["pointer", "pointer"]);
-                                    var themeParams = getThemeFn(cardItem, NULL);
-                                    p.add(0x48).writePointer(themeParams || NULL);
-                                }
-                            } catch (eThp) {}
+                            // Theme params: write NULL safely (native 0xABFF78 crashes with access violation 0x132 on mock cardItem)
+                            p.add(0x48).writePointer(NULL);
 
                             p.add(0x50).writePointer(createIl2CppString("Equip"));
                             p.add(0x58).writePointer(createIl2CppString("Cancel"));
@@ -4995,57 +4999,47 @@ function initIl2Cpp(module) {
                         var basePath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/";
                         var fullPath = basePath + relPath;
 
-                        var readAllBytesMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllBytes", 1);
-                        var fileExistsMethod = findMethod("mscorlib", "System.IO", "File", "Exists", 1);
-                        if (!readAllBytesMethod || readAllBytesMethod.isNull()) return NULL;
+                        var fileExistsFn = new NativeFunction(baseAddr.add(0x1F01DF4), "bool", ["pointer", "pointer"]);
+                        var fileReadAllBytesFn = new NativeFunction(baseAddr.add(0x1F0268C), "pointer", ["pointer", "pointer"]);
 
-                        var args1 = Memory.alloc(Process.pointerSize);
-                        var exc = Memory.alloc(Process.pointerSize);
-                        exc.writePointer(NULL);
-
-                        // Try primary path
-                        args1.writePointer(createIl2CppString(fullPath));
-                        var existsObj = il2cpp_runtime_invoke(fileExistsMethod, NULL, args1, exc);
-                        var exists = (!existsObj.isNull()) ? existsObj.add(0x10).readU8() : 0;
+                        var pathStr = createIl2CppString(fullPath);
+                        var exists = fileExistsFn(pathStr, NULL);
 
                         if (!exists) {
                             fullPath = fullPath + ".png";
-                            args1.writePointer(createIl2CppString(fullPath));
-                            existsObj = il2cpp_runtime_invoke(fileExistsMethod, NULL, args1, exc);
-                            exists = (!existsObj.isNull()) ? existsObj.add(0x10).readU8() : 0;
+                            pathStr = createIl2CppString(fullPath);
+                            exists = fileExistsFn(pathStr, NULL);
                         }
 
                         if (!exists && relPath.indexOf(".i.bytes") !== -1) {
                             fullPath = basePath + relPath.replace(".i.bytes", ".png");
-                            args1.writePointer(createIl2CppString(fullPath));
-                            existsObj = il2cpp_runtime_invoke(fileExistsMethod, NULL, args1, exc);
-                            exists = (!existsObj.isNull()) ? existsObj.add(0x10).readU8() : 0;
+                            pathStr = createIl2CppString(fullPath);
+                            exists = fileExistsFn(pathStr, NULL);
                         }
 
                         if (!exists) {
+                            log("[-] loadLocalTexture2D: file does not exist: " + relPath);
                             return NULL;
                         }
 
-                        var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
-                        if (!bytesObj || bytesObj.isNull()) return NULL;
+                        var bytesObj = fileReadAllBytesFn(pathStr, NULL);
+                        if (!bytesObj || bytesObj.isNull()) {
+                            log("[-] loadLocalTexture2D: ReadAllBytes returned null for: " + fullPath);
+                            return NULL;
+                        }
 
                         // Create Texture2D(2, 2)
                         var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
+                        if (!tex2dClass || tex2dClass.isNull()) return NULL;
                         var texObj = il2cpp_object_new(tex2dClass);
-                        var texCtor = findMethod("UnityEngine.CoreModule", "UnityEngine", "Texture2D", ".ctor", 2);
-                        var pWidth = Memory.alloc(4);
-                        pWidth.writeInt(2);
-                        var pHeight = Memory.alloc(4);
-                        pHeight.writeInt(2);
-                        var argsCtor = Memory.alloc(Process.pointerSize * 2);
-                        argsCtor.writePointer(pWidth);
-                        argsCtor.add(Process.pointerSize).writePointer(pHeight);
-                        il2cpp_runtime_invoke(texCtor, texObj, argsCtor, exc);
+                        if (!texObj || texObj.isNull()) return NULL;
 
-                        // ImageConversion.LoadImage(texObj, bytesObj)
-                        var loadImagePtr = baseAddr.add(0x25B3E90);
-                        var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
-                        var ok = loadImageFn(texObj, bytesObj);
+                        var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
+                        texCtorFn(texObj, 2, 2, NULL);
+
+                        // ImageConversion.LoadImage(texObj, bytesObj, NULL) -> RVA 0x25B3E90
+                        var loadImageFn = new NativeFunction(baseAddr.add(0x25B3E90), "bool", ["pointer", "pointer", "pointer"]);
+                        var ok = loadImageFn(texObj, bytesObj, NULL);
                         if (ok) {
                             try {
                                 var setFilterModeFn = new NativeFunction(baseAddr.add(0x181A580), "void", ["pointer", "int", "pointer"]);
@@ -5056,6 +5050,8 @@ function initIl2Cpp(module) {
                             loadedTextureCache[relPath] = texObj;
                             log("[🖼️ TEXTURE] Loaded and cached (Trilinear/Aniso8): " + relPath);
                             return texObj;
+                        } else {
+                            log("[-] LoadImage returned false for " + relPath);
                         }
                     } catch (eLt) {
                         log("[-] Error in loadLocalTexture2D for " + relPath + ": " + eLt.message);

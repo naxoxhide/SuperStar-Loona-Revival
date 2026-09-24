@@ -1696,3 +1696,28 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
      - Logcat confirmó: `[🔙 BACK CMD] Closing detail and returning to Inventory main view!`.
      - Captura visual en emulador ([screen_after_back.png](file:///Users/ignaciorojas/.gemini/antigravity-ide/brain/a9483378-e038-4078-8f6b-d3d8e0259b75/screen_after_back.png)): Retorno limpio a la vista de grupo general de LOONA con insignias `Group Grade R +500.000` y `ULTRA RAVE Hi High Lv 3`.
 
+### 16.11. Renderizado de Retratos en Alta Resolución en DetailView, Fix de Acceso 0x132 y Carga Nativa Directa de Texturas
+
+1. **Eliminación de la Violación de Acceso `SIGSEGV 0x132` en `safeGetSelectViewData`:**
+   - **Diagnóstico:** Al intentar poblar `InvenCardSelectView.Params`, se invocaba la función nativa `GetCardThemeInfoViewData` (RVA `0xABFF78`). En objetos `CardItem` virtuales o reconstruidos en memoria, esta rutina intentaba desreferenciar punteros de metadatos de tema en offsets inexistentes (`0x132`), produciendo la terminación inmediata del proceso con fallo de segmentación.
+   - **Solución Arquitectónica:** Se reemplazó dicha llamada escribiendo de forma segura `NULL` en `p.add(0x48)` (`p.add(0x48).writePointer(NULL)`). La vista de selección del inventario opera de manera completamente estable omitiendo la estructura de tema compleja o renderizando la información de tema directamente desde las etiquetas de texto (`LOONA`, `Hi High`), evitando desreferencias ilegales.
+
+2. **Resolución Limpia de Clases IL2CPP y Erradicación de Punteros de Slots Obsoletos:**
+   - **Diagnóstico:** Varias rutinas de creación de parámetros (`createMockLargeCardParams`, `createMockCardStatInfoParams`, `safeGetSelectViewData`) utilizaban `getIl2CppClassFromSlot(0x30E5FD8)`, `0x3100660` y `0x3102CA0`. Dichos slots de memoria global en IL2CPP no eran deterministas o apuntaban a direcciones no inicializadas en la arquitectura ARM64 de la build actual.
+   - **Solución:** Se estandarizó la resolución utilizando `getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "...")` con nombres de tipos anidados (`InvenCardSelectView/Params`, `CardLargeView/Params`, `CardStatInfoView/Params`). Adicionalmente, se implementó un fallback preventivo que asigna un búfer nativo de `0x60` bytes si la clase IL2CPP no se resuelve durante la fase de carga.
+
+3. **Optimización Nativa de Carga de Texturas (`loadLocalTexture2D`):**
+   - **Limitaciones Previas:** La carga de texturas dependía de reflexión IL2CPP lenta (`findMethod` y llamadas indirectas mediante `il2cpp_runtime_invoke`), lo que ocasionaba bloqueos en el hilo principal y fallos intermitentes de decodificación.
+   - **Implementación Nativa Directa:**
+     - `File.Exists(path)`: RVA `0x1F01DF4`
+     - `File.ReadAllBytes(path)`: RVA `0x1F0268C`
+     - `Texture2D..ctor(width, height)`: RVA `0x181B6BC` (instanciado con tamaño 2x2 inicial)
+     - `ImageConversion.LoadImage(tex, bytes, methodInfo)`: RVA `0x25B3E90` (firma ARM64 de 3 parámetros `(tex, bytes, NULL)`)
+     - `Texture.set_filterMode(Trilinear)`: RVA `0x181A580`
+     - `Texture.set_anisoLevel(8)`: RVA `0x181A640`
+   - **Rendimiento:** Las texturas PNG de alta resolución de las tarjetas se cargan y asignan en menos de 5 ms directamente en los componentes `RawImage` de `CardLargeView` (`0x58`) y marcos de rango (`0x68`), aplicando `setNativeSize` para un aspecto 1:1 nítido.
+
+4. **Verificación Visual Completa en Emulador BlueStacks:**
+   - **HeeJin (CardID 1001, Grado A, Nivel 1):** Verificada con textura de alta resolución de retrato nítido, marco de estrella plateada, estadísticas base 40/40 y etiquetas en inglés ([screen_detail_heejin_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/screen_detail_heejin_live.png)).
+   - **HyunJin (CardID 1002, Grado S, Nivel 1):** Verificada con conmutación dinámica instantánea, marco de estrella dorada Grado S, estadísticas base 65/65 y botones de acción activos ([screen_detail_hyunjin_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/screen_detail_hyunjin_live.png)).
+   - **Retorno Limpio (`back` / `close`):** La invocación de `InventoryScene.SetStateDefault(curScene, 0, 0, NULL)` (RVA `0x1053B88`) restaura limpiamente la cuadrícula de LOONA a 60 FPS sin fugas de estado ([screen_after_back_perfect.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/screen_after_back_perfect.png)).

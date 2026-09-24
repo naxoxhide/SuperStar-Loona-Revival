@@ -56,4 +56,23 @@ Esta skill define los pasos estándar y flujos de trabajo para analizar, desensa
     * `InventoryControl.GroupItem.ExtractPath` (RVA `0xB56EC4`): Retornar `NULL`.
   * Parchear submenús con tabs huérfanas o nulas (`CardBookScene.SetupSubMenu` @ RVA `0xCAFC24`) con instrucciones `NOP` (`0x1F, 0x20, 0x03, 0xD5`).
 
+### 6. Pipeline Nativo de Carga Directa de Texturas y DetailView de Cartas
+* **RVAs Nativo para Carga y Renderizado Rápido:**
+  * `File.Exists(path)`: RVA `0x1F01DF4`
+  * `File.ReadAllBytes(path)`: RVA `0x1F0268C`
+  * `Texture2D..ctor(int, int)`: RVA `0x181B6BC`
+  * `ImageConversion.LoadImage(tex, bytes, methodInfo)`: RVA `0x25B3E90` (Firma ARM64 con 3 parámetros; pasar `NULL` en `methodInfo`).
+  * `Texture.set_filterMode(FilterMode)`: RVA `0x181A580` (Usar `2` para Trilinear).
+  * `Texture.set_anisoLevel(int)`: RVA `0x181A640` (Usar `8`).
+  * `RawImage.set_texture(Texture)`: RVA `0x194C074`
+  * `Graphic.SetNativeSize()`: RVA `0x1949574`
+* **Offsets Estructurales de `CardLargeView` (`CardView`):**
+  * `+0x58`: `photo` (`RawImage*` para textura de retrato de alta resolución).
+  * `+0x68`: `tier` (`RawImage*` para textura del marco de rango / estrella).
+* **Transición y Estabilización de `DetailView`:**
+  * `InventoryView.ShowMainLayout(bool isSelectedItem)`: RVA `0x10571EC`
+  * `InvenCardMainView.Refresh(Params)`: RVA `0xF227B4`
+  * `InvenCardSelectView.Refresh(Params)`: RVA `0xF22C34`
+  * **Prevención de Violación de Acceso `0x132`:** En `InvenCardSelectView.Params`, escribir `NULL` en el offset `+0x48` en lugar de llamar a `GetCardThemeInfoViewData` (RVA `0xABFF78`), el cual desreferencia campos de tema inexistentes en `CardItem` virtuales.
+
 
