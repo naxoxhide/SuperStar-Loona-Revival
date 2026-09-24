@@ -4103,74 +4103,78 @@ function initIl2Cpp(module) {
                 }
 
                 // 9b2. InvenCardMainView.Refresh (0xF227B4) -> Bulletproof replacement to prevent any NullReferenceException
+                function safeRefreshInvenCardMainView(viewThis, p) {
+                    try {
+                        if (viewThis.isNull()) return;
+
+                        var btnExchange = viewThis.add(0x38).readPointer();
+                        var btnInfo = viewThis.add(0x40).readPointer();
+                        var btnChange = viewThis.add(0x48).readPointer();
+                        var btnIntensify = viewThis.add(0x50).readPointer();
+                        var btnIntensifyEvent = viewThis.add(0x58).readPointer();
+                        var numberExchange = viewThis.add(0x60).readPointer();
+
+                        var setBtnTextFn = new NativeFunction(baseAddr.add(0xE9B7B0), "void", ["pointer", "pointer", "pointer"]);
+                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+
+                        // 1. btnInfo (0x40) -> "Information"
+                        if (!btnInfo.isNull()) {
+                            try {
+                                setBtnTextFn(btnInfo, createIl2CppString("Information"), NULL);
+                            } catch (eBi) {}
+                        }
+
+                        // 2. btnChange (0x48) -> "Equip" or "Unequip"
+                        var isEq = false;
+                        try {
+                            if (p && !p.isNull()) isEq = (p.add(0x12).readU8() === 1);
+                        } catch (eIe) {}
+                        if (!btnChange.isNull()) {
+                            try {
+                                setBtnTextFn(btnChange, createIl2CppString(isEq ? "Unequip" : "Equip"), NULL);
+                            } catch (eBc) {}
+                        }
+
+                        // 3. btnIntensify (0x50) -> "Level Up" or "MAX"
+                        var isMax = false;
+                        try {
+                            if (p && !p.isNull()) isMax = (p.add(0x11).readU8() === 1);
+                        } catch (eIm) {}
+                        var btnIntensifyStr = isMax ? "MAX" : "Level Up";
+                        if (!btnIntensify.isNull()) {
+                            try {
+                                var biGo = btnIntensify.add(0x10).readPointer();
+                                if (!biGo.isNull()) setActiveFn(biGo, 1, NULL);
+                                setBtnTextFn(btnIntensify, createIl2CppString(btnIntensifyStr), NULL);
+                            } catch (eBi) {}
+                        }
+
+                        // 4. btnIntensifyEvent (0x58) -> Deactivate if present
+                        if (!btnIntensifyEvent.isNull()) {
+                            try {
+                                var bieGo = getGoFn(btnIntensifyEvent, NULL);
+                                if (!bieGo.isNull()) setActiveFn(bieGo, 0, NULL);
+                            } catch (eBie) {}
+                        }
+
+                        // 5. btnExchange (0x38) -> "Exchange"
+                        if (!btnExchange.isNull()) {
+                            try {
+                                setBtnTextFn(btnExchange, createIl2CppString("Exchange"), NULL);
+                            } catch (eBe) {}
+                        }
+
+                        log("[✅ MAIN_VIEW] InvenCardMainView.Refresh safely completed with English labels!");
+                    } catch (eMvr) {
+                        log("[-] Error in safe InvenCardMainView.Refresh: " + eMvr.message);
+                    }
+                }
+
                 try {
                     var invenCardMainViewRefreshAddr = baseAddr.add(0xF227B4);
                     Interceptor.replace(invenCardMainViewRefreshAddr, new NativeCallback(function (viewThis, p, methodInfo) {
-                        try {
-                            if (viewThis.isNull()) return;
-
-                            var btnExchange = viewThis.add(0x38).readPointer();
-                            var btnInfo = viewThis.add(0x40).readPointer();
-                            var btnChange = viewThis.add(0x48).readPointer();
-                            var btnIntensify = viewThis.add(0x50).readPointer();
-                            var btnIntensifyEvent = viewThis.add(0x58).readPointer();
-                            var numberExchange = viewThis.add(0x60).readPointer();
-
-                            var setBtnTextFn = new NativeFunction(baseAddr.add(0xE9B7B0), "void", ["pointer", "pointer", "pointer"]);
-                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
-
-                            // 1. btnInfo (0x40) -> "Information"
-                            if (!btnInfo.isNull()) {
-                                try {
-                                    setBtnTextFn(btnInfo, createIl2CppString("Information"), NULL);
-                                } catch (eBi) {}
-                            }
-
-                            // 2. btnChange (0x48) -> "Equip" or "Unequip"
-                            var isEq = false;
-                            try {
-                                if (p && !p.isNull()) isEq = (p.add(0x12).readU8() === 1);
-                            } catch (eIe) {}
-                            if (!btnChange.isNull()) {
-                                try {
-                                    setBtnTextFn(btnChange, createIl2CppString(isEq ? "Unequip" : "Equip"), NULL);
-                                } catch (eBc) {}
-                            }
-
-                            // 3. btnIntensify (0x50) -> "Level Up" or "MAX"
-                            var isMax = false;
-                            try {
-                                if (p && !p.isNull()) isMax = (p.add(0x11).readU8() === 1);
-                            } catch (eIm) {}
-                            var btnIntensifyStr = isMax ? "MAX" : "Level Up";
-                            if (!btnIntensify.isNull()) {
-                                try {
-                                    var biGo = btnIntensify.add(0x10).readPointer();
-                                    if (!biGo.isNull()) setActiveFn(biGo, 1, NULL);
-                                    setBtnTextFn(btnIntensify, createIl2CppString(btnIntensifyStr), NULL);
-                                } catch (eBi) {}
-                            }
-
-                            // 4. btnIntensifyEvent (0x58) -> Deactivate if present
-                            if (!btnIntensifyEvent.isNull()) {
-                                try {
-                                    var bieGo = getGoFn(btnIntensifyEvent, NULL);
-                                    if (!bieGo.isNull()) setActiveFn(bieGo, 0, NULL);
-                                } catch (eBie) {}
-                            }
-
-                            // 5. btnExchange (0x38) -> "Exchange"
-                            if (!btnExchange.isNull()) {
-                                try {
-                                    setBtnTextFn(btnExchange, createIl2CppString("Exchange"), NULL);
-                                } catch (eBe) {}
-                            }
-
-                            log("[✅ MAIN_VIEW] InvenCardMainView.Refresh safely completed with English labels!");
-                        } catch (eMvr) {
-                            log("[-] Error in safe InvenCardMainView.Refresh: " + eMvr.message);
-                        }
+                        safeRefreshInvenCardMainView(viewThis, p);
                     }, "void", ["pointer", "pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on InvenCardMainView.Refresh (0xF227B4)!");
                 } catch (eHicmr) {
@@ -4178,85 +4182,89 @@ function initIl2Cpp(module) {
                 }
 
                 // 9c. InventoryScene.GetSelectViewData (0x10572AC) -> Bulletproof replacement with full ABI signature
+                function safeGetSelectViewData(sceneThis, cardItem, artistData, otherCardItem, isSell) {
+                    try {
+                        var slotKlass = getIl2CppClassFromSlot(0x30E5FD8);
+                        var selectParamsKlass = (slotKlass && !slotKlass.isNull()) ? slotKlass : getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "InvenCardSelectView/Params");
+                        if (!selectParamsKlass || selectParamsKlass.isNull()) {
+                            selectParamsKlass = getClass("Assembly-CSharp", "", "InvenCardSelectView.Params");
+                        }
+                        if (!selectParamsKlass || selectParamsKlass.isNull()) return NULL;
+                        var p = il2cpp_object_new(selectParamsKlass);
+                        if (!p || p.isNull()) return NULL;
+
+                        try {
+                            var ctorFn = new NativeFunction(baseAddr.add(0xB531B0), "void", ["pointer", "pointer"]);
+                            ctorFn(p, NULL);
+                        } catch (eCt) {}
+
+                        var cId = 1001;
+                        var gr = 4;
+                        var lvl = 50;
+                        var isPrism = false;
+                        var isEq = false;
+                        var isLk = false;
+
+                        if (cardItem && !cardItem.isNull()) {
+                            var raw = cardItem.add(0x10).readPointer();
+                            if (!raw.isNull()) {
+                                cId = raw.add(0x20).readS32();
+                                gr = raw.add(0x24).readS32();
+                                lvl = raw.add(0x1C).readS16();
+                                isEq = (raw.add(0x28).readU8() === 1);
+                                isLk = (raw.add(0x29).readU8() === 1);
+                                isPrism = (raw.add(0x2A).readU8() === 1);
+                            }
+                        }
+
+                        var meta = getCardMetadata(cId);
+                        var aId = (meta && meta.artistID) ? meta.artistID : 1001;
+                        var tId = (meta && meta.theme) ? meta.theme : 1001;
+
+                        var aName = artistNamesMap[aId] || "HeeJin";
+                        var tName = themeNamesMap[tId] || "Hi High";
+
+                        // Large card params
+                        var cardParams = createMockLargeCardParams(cId, gr, lvl, isPrism);
+                        p.add(0x10).writePointer(cardParams || NULL);
+                        p.add(0x18).writePointer(createIl2CppString("LOONA"));
+                        p.add(0x20).writePointer(createIl2CppString(aName));
+
+                        // Stat params
+                        var statParams = createMockCardStatInfoParams(gr, lvl, isPrism);
+                        p.add(0x28).writePointer(statParams || NULL);
+
+                        p.add(0x30).writeS32(0); // deltaScore
+                        p.add(0x34).writeS32(0); // deltaEnergy
+                        p.add(0x38).writePointer(createIl2CppString("Theme"));
+                        p.add(0x40).writePointer(createIl2CppString(tName));
+
+                        // Theme params (0xABFF78)
+                        try {
+                            if (cardItem && !cardItem.isNull()) {
+                                var getThemeFn = new NativeFunction(baseAddr.add(0xABFF78), "pointer", ["pointer", "pointer"]);
+                                var themeParams = getThemeFn(cardItem, NULL);
+                                p.add(0x48).writePointer(themeParams || NULL);
+                            }
+                        } catch (eThp) {}
+
+                        p.add(0x50).writeU8(isEq ? 1 : 0);
+                        p.add(0x51).writeU8(isSell ? 1 : 0);
+                        p.add(0x52).writeU8(0); // isLeader
+                        p.add(0x53).writeU8(isLk ? 1 : 0);
+
+                        log("[✅ GET_SELECT_DATA] Created InvenCardSelectView.Params: cId=" + cId + ", artist=" + aName + ", theme=" + tName);
+                        return p;
+                    } catch (eGsvR) {
+                        log("[-] Error in safe GetSelectViewData replacement: " + eGsvR.message);
+                        return NULL;
+                    }
+                }
+
                 try {
                     var getSelectViewDataAddr = baseAddr.add(0x10572AC);
                     Interceptor.replace(getSelectViewDataAddr, new NativeCallback(function (sceneThis, cardItem, artistData, otherCardItem, isSell, methodInfo) {
-                        try {
-                            var slotKlass = getIl2CppClassFromSlot(0x30E5FD8);
-                            var selectParamsKlass = (slotKlass && !slotKlass.isNull()) ? slotKlass : getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "InvenCardSelectView/Params");
-                            if (!selectParamsKlass || selectParamsKlass.isNull()) {
-                                selectParamsKlass = getClass("Assembly-CSharp", "", "InvenCardSelectView.Params");
-                            }
-                            if (!selectParamsKlass || selectParamsKlass.isNull()) return NULL;
-                            var p = il2cpp_object_new(selectParamsKlass);
-                            if (!p || p.isNull()) return NULL;
-
-                            try {
-                                var ctorFn = new NativeFunction(baseAddr.add(0xB531B0), "void", ["pointer", "pointer"]);
-                                ctorFn(p, NULL);
-                            } catch (eCt) {}
-
-                            var cId = 1001;
-                            var gr = 4;
-                            var lvl = 50;
-                            var isPrism = false;
-                            var isEq = false;
-                            var isLk = false;
-
-                            if (cardItem && !cardItem.isNull()) {
-                                var raw = cardItem.add(0x10).readPointer();
-                                if (!raw.isNull()) {
-                                    cId = raw.add(0x20).readS32();
-                                    gr = raw.add(0x24).readS32();
-                                    lvl = raw.add(0x1C).readS16();
-                                    isEq = (raw.add(0x28).readU8() === 1);
-                                    isLk = (raw.add(0x29).readU8() === 1);
-                                    isPrism = (raw.add(0x2A).readU8() === 1);
-                                }
-                            }
-
-                            var meta = getCardMetadata(cId);
-                            var aId = (meta && meta.artistID) ? meta.artistID : 1001;
-                            var tId = (meta && meta.theme) ? meta.theme : 1001;
-
-                            var aName = artistNamesMap[aId] || "HeeJin";
-                            var tName = themeNamesMap[tId] || "Hi High";
-
-                            // Large card params
-                            var cardParams = createMockLargeCardParams(cId, gr, lvl, isPrism);
-                            p.add(0x10).writePointer(cardParams || NULL);
-                            p.add(0x18).writePointer(createIl2CppString("LOONA"));
-                            p.add(0x20).writePointer(createIl2CppString(aName));
-
-                            // Stat params
-                            var statParams = createMockCardStatInfoParams(gr, lvl, isPrism);
-                            p.add(0x28).writePointer(statParams || NULL);
-
-                            p.add(0x30).writeS32(0); // deltaScore
-                            p.add(0x34).writeS32(0); // deltaEnergy
-                            p.add(0x38).writePointer(createIl2CppString("Theme"));
-                            p.add(0x40).writePointer(createIl2CppString(tName));
-
-                            // Theme params (0xABFF78)
-                            try {
-                                if (cardItem && !cardItem.isNull()) {
-                                    var getThemeFn = new NativeFunction(baseAddr.add(0xABFF78), "pointer", ["pointer", "pointer"]);
-                                    var themeParams = getThemeFn(cardItem, NULL);
-                                    p.add(0x48).writePointer(themeParams || NULL);
-                                }
-                            } catch (eThp) {}
-
-                            p.add(0x50).writeU8(isEq ? 1 : 0);
-                            p.add(0x51).writeU8(isSell ? 1 : 0);
-                            p.add(0x52).writeU8(0); // isLeader
-                            p.add(0x53).writeU8(isLk ? 1 : 0);
-
-                            log("[✅ GET_SELECT_DATA] Created InvenCardSelectView.Params: cId=" + cId + ", artist=" + aName + ", theme=" + tName);
-                            return p;
-                        } catch (eGsvR) {
-                            log("[-] Error in safe GetSelectViewData replacement: " + eGsvR.message);
-                            return NULL;
-                        }
+                        return safeGetSelectViewData(sceneThis, cardItem, artistData, otherCardItem, isSell);
                     }, "pointer", ["pointer", "pointer", "pointer", "pointer", "int", "pointer"]));
                     log("[+] Interceptor.replace installed on InventoryScene.GetSelectViewData (0x10572AC)!");
                 } catch (eRepGsv) {
@@ -4264,195 +4272,199 @@ function initIl2Cpp(module) {
                 }
 
                 // 9c2. InvenCardSelectView.Refresh (0xF22C34) -> Bulletproof replacement to prevent any NullReferenceException
+                function safeRefreshInvenCardSelectView(viewThis, p) {
+                    try {
+                        if (viewThis.isNull()) return;
+
+                        var cardParams = (p && !p.isNull()) ? p.add(0x10).readPointer() : NULL;
+                        var groupNameStr = (p && !p.isNull()) ? p.add(0x18).readPointer() : NULL;
+                        var artistNameStr = (p && !p.isNull()) ? p.add(0x20).readPointer() : NULL;
+                        var statParams = (p && !p.isNull()) ? p.add(0x28).readPointer() : NULL;
+                        var themeHeaderStr = (p && !p.isNull()) ? p.add(0x38).readPointer() : NULL;
+                        var themeNameStr = (p && !p.isNull()) ? p.add(0x40).readPointer() : NULL;
+                        var themeParams = (p && !p.isNull()) ? p.add(0x48).readPointer() : NULL;
+                        var isEq = (p && !p.isNull()) ? (p.add(0x50).readU8() === 1) : false;
+                        var isSell = (p && !p.isNull()) ? (p.add(0x51).readU8() === 1) : false;
+                        var isLeader = (p && !p.isNull()) ? (p.add(0x52).readU8() === 1) : false;
+                        var isLk = (p && !p.isNull()) ? (p.add(0x53).readU8() === 1) : false;
+
+                        var cId = 1001;
+                        var gr = 4;
+                        var lvl = 50;
+                        var isPrism = false;
+                        if (!cardParams.isNull()) {
+                            try {
+                                var photoDp = cardParams.add(0x10).readPointer();
+                                if (!photoDp.isNull()) {
+                                    var fpPtr = photoDp.add(0x18).readPointer();
+                                    if (!fpPtr.isNull()) {
+                                        var pLen = fpPtr.add(0x10).readS32();
+                                        if (pLen > 0) {
+                                            var pStr = fpPtr.add(0x14).readUtf16String(pLen);
+                                            var m = pStr.match(/(\d+)_l\.i\.bytes/);
+                                            if (m) cId = parseInt(m[1], 10);
+                                        }
+                                    }
+                                }
+                            } catch (eCid) {}
+                            gr = cardParams.add(0x3C).readS32();
+                            lvl = cardParams.add(0x48).readS32();
+                            isPrism = (cardParams.add(0x20).readU8() === 1);
+                        }
+
+                        var meta = getCardMetadata(cId);
+                        var aId = (meta && meta.artistID) ? meta.artistID : 1001;
+                        var tId = (meta && meta.theme) ? meta.theme : 1001;
+                        var aName = artistNamesMap[aId] || "HeeJin";
+                        var tName = themeNamesMap[tId] || "Hi High";
+
+                        var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                        var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+
+                        // 1. card (0x38) -> CardLargeView
+                        var card = viewThis.add(0x38).readPointer();
+                        if (!card.isNull()) {
+                            if (!cardParams.isNull()) {
+                                try {
+                                    var cardRefreshFn = new NativeFunction(baseAddr.add(0x137F570), "void", ["pointer", "pointer", "pointer"]);
+                                    cardRefreshFn(card, cardParams, NULL);
+                                } catch (eC) {}
+                            }
+                            // Direct texture loading on photo (0x58) and tier (0x68) to guarantee immediate high-res portrait
+                            try {
+                                var photo = card.add(0x58).readPointer();
+                                if (!photo.isNull()) {
+                                    var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
+                                    if (photoTex && !photoTex.isNull()) {
+                                        setTextureFn(photo, photoTex, NULL);
+                                        try {
+                                            var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
+                                            setNativeSizeFn(photo, NULL);
+                                        } catch (eSns) {}
+                                        var photoGo = getGoFn(photo, NULL);
+                                        if (!photoGo.isNull()) setActiveFn(photoGo, 1, NULL);
+                                    }
+                                }
+                            } catch (ePh) {}
+                        }
+
+                        // 2. groupName (0x40)
+                        var groupName = viewThis.add(0x40).readPointer();
+                        if (!groupName.isNull()) {
+                            try {
+                                setTextFn(groupName, groupNameStr || createIl2CppString("LOONA"), NULL);
+                            } catch (eG) {}
+                        }
+
+                        // 3. artistName (0x48)
+                        var artistName = viewThis.add(0x48).readPointer();
+                        if (!artistName.isNull()) {
+                            try {
+                                setTextFn(artistName, artistNameStr || createIl2CppString(aName), NULL);
+                            } catch (eA) {}
+                        }
+
+                        // 4. stat (0x50)
+                        var stat = viewThis.add(0x50).readPointer();
+                        if (!stat.isNull()) {
+                            try {
+                                if (statParams.isNull()) {
+                                    statParams = createMockCardStatInfoParams(gr, lvl, isPrism);
+                                }
+                                if (!statParams.isNull()) {
+                                    var statRefreshFn = new NativeFunction(baseAddr.add(0x1390F48), "void", ["pointer", "pointer", "pointer"]);
+                                    statRefreshFn(stat, statParams, NULL);
+                                }
+                            } catch (eS) {}
+                        }
+
+                        // 5. themeHeader (0x58)
+                        var themeHeader = viewThis.add(0x58).readPointer();
+                        if (!themeHeader.isNull()) {
+                            try {
+                                setTextFn(themeHeader, themeHeaderStr || createIl2CppString("Theme"), NULL);
+                            } catch (eTh) {}
+                        }
+
+                        // 6. themeName (0x60)
+                        var themeName = viewThis.add(0x60).readPointer();
+                        if (!themeName.isNull()) {
+                            try {
+                                setTextFn(themeName, themeNameStr || createIl2CppString(tName), NULL);
+                            } catch (eTn) {}
+                        }
+
+                        // 7. theme (0x68)
+                        var theme = viewThis.add(0x68).readPointer();
+                        if (!theme.isNull() && !themeParams.isNull()) {
+                            try {
+                                var themeRefreshFn = new NativeFunction(baseAddr.add(0x1393510), "void", ["pointer", "pointer", "pointer"]);
+                                themeRefreshFn(theme, themeParams, NULL);
+                            } catch (eThm) {}
+                        }
+
+                        // 8. equipIcon (0x70)
+                        var equipIcon = viewThis.add(0x70).readPointer();
+                        if (!equipIcon.isNull()) {
+                            try {
+                                var eqGo = getGoFn(equipIcon, NULL);
+                                if (!eqGo.isNull()) setActiveFn(eqGo, isEq ? 1 : 0, NULL);
+                            } catch (eEqGo) {}
+                        }
+
+                        // 9. btnSell (0x80)
+                        var btnSell = viewThis.add(0x80).readPointer();
+                        if (!btnSell.isNull()) {
+                            try {
+                                var bsGo = btnSell.add(0x10).readPointer();
+                                if (!bsGo.isNull()) setActiveFn(bsGo, (!isEq && isSell) ? 1 : 0, NULL);
+                            } catch (eBsGo) {}
+                        }
+
+                        // 10. leaderIcon (0x78)
+                        var leaderIcon = viewThis.add(0x78).readPointer();
+                        if (!leaderIcon.isNull()) {
+                            try {
+                                setActiveFn(leaderIcon, isLeader ? 1 : 0, NULL);
+                            } catch (eLi) {}
+                        }
+
+                        // 11. leaderOnObj (0x90)
+                        var leaderOnObj = viewThis.add(0x90).readPointer();
+                        if (!leaderOnObj.isNull()) {
+                            try {
+                                setActiveFn(leaderOnObj, isLeader ? 1 : 0, NULL);
+                            } catch (eLio) {}
+                        }
+
+                        // 12. lockOnObj (0xA0)
+                        var lockOnObj = viewThis.add(0xA0).readPointer();
+                        if (!lockOnObj.isNull()) {
+                            try {
+                                setActiveFn(lockOnObj, isLk ? 1 : 0, NULL);
+                            } catch (eLko) {}
+                        }
+
+                        // 13. lockOffObj (0xA8)
+                        var lockOffObj = viewThis.add(0xA8).readPointer();
+                        if (!lockOffObj.isNull()) {
+                            try {
+                                setActiveFn(lockOffObj, isLk ? 0 : 1, NULL);
+                            } catch (eLkoff) {}
+                        }
+
+                        log("[✅ SELECT_VIEW] InvenCardSelectView.Refresh safely completed! artist=" + aName + ", theme=" + tName);
+                    } catch (eR) {
+                        log("[-] Error in safe InvenCardSelectView.Refresh: " + eR.message);
+                    }
+                }
+
                 try {
                     var invenCardSelectViewRefreshAddr = baseAddr.add(0xF22C34);
                     Interceptor.replace(invenCardSelectViewRefreshAddr, new NativeCallback(function (viewThis, p, methodInfo) {
-                        try {
-                            if (viewThis.isNull()) return;
-
-                            var cardParams = (p && !p.isNull()) ? p.add(0x10).readPointer() : NULL;
-                            var groupNameStr = (p && !p.isNull()) ? p.add(0x18).readPointer() : NULL;
-                            var artistNameStr = (p && !p.isNull()) ? p.add(0x20).readPointer() : NULL;
-                            var statParams = (p && !p.isNull()) ? p.add(0x28).readPointer() : NULL;
-                            var themeHeaderStr = (p && !p.isNull()) ? p.add(0x38).readPointer() : NULL;
-                            var themeNameStr = (p && !p.isNull()) ? p.add(0x40).readPointer() : NULL;
-                            var themeParams = (p && !p.isNull()) ? p.add(0x48).readPointer() : NULL;
-                            var isEq = (p && !p.isNull()) ? (p.add(0x50).readU8() === 1) : false;
-                            var isSell = (p && !p.isNull()) ? (p.add(0x51).readU8() === 1) : false;
-                            var isLeader = (p && !p.isNull()) ? (p.add(0x52).readU8() === 1) : false;
-                            var isLk = (p && !p.isNull()) ? (p.add(0x53).readU8() === 1) : false;
-
-                            var cId = 1001;
-                            var gr = 4;
-                            var lvl = 50;
-                            var isPrism = false;
-                            if (!cardParams.isNull()) {
-                                try {
-                                    var photoDp = cardParams.add(0x10).readPointer();
-                                    if (!photoDp.isNull()) {
-                                        var fpPtr = photoDp.add(0x18).readPointer();
-                                        if (!fpPtr.isNull()) {
-                                            var pLen = fpPtr.add(0x10).readS32();
-                                            if (pLen > 0) {
-                                                var pStr = fpPtr.add(0x14).readUtf16String(pLen);
-                                                var m = pStr.match(/(\d+)_l\.i\.bytes/);
-                                                if (m) cId = parseInt(m[1], 10);
-                                            }
-                                        }
-                                    }
-                                } catch (eCid) {}
-                                gr = cardParams.add(0x3C).readS32();
-                                lvl = cardParams.add(0x48).readS32();
-                                isPrism = (cardParams.add(0x20).readU8() === 1);
-                            }
-
-                            var meta = getCardMetadata(cId);
-                            var aId = (meta && meta.artistID) ? meta.artistID : 1001;
-                            var tId = (meta && meta.theme) ? meta.theme : 1001;
-                            var aName = artistNamesMap[aId] || "HeeJin";
-                            var tName = themeNamesMap[tId] || "Hi High";
-
-                            var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
-                            var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
-                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
-
-                            // 1. card (0x38) -> CardLargeView
-                            var card = viewThis.add(0x38).readPointer();
-                            if (!card.isNull()) {
-                                if (!cardParams.isNull()) {
-                                    try {
-                                        var cardRefreshFn = new NativeFunction(baseAddr.add(0x137F570), "void", ["pointer", "pointer", "pointer"]);
-                                        cardRefreshFn(card, cardParams, NULL);
-                                    } catch (eC) {}
-                                }
-                                // Direct texture loading on photo (0x58) and tier (0x68) to guarantee immediate high-res portrait
-                                try {
-                                    var photo = card.add(0x58).readPointer();
-                                    if (!photo.isNull()) {
-                                        var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
-                                        if (photoTex && !photoTex.isNull()) {
-                                            setTextureFn(photo, photoTex, NULL);
-                                            try {
-                                                var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
-                                                setNativeSizeFn(photo, NULL);
-                                            } catch (eSns) {}
-                                            var photoGo = getGoFn(photo, NULL);
-                                            if (!photoGo.isNull()) setActiveFn(photoGo, 1, NULL);
-                                        }
-                                    }
-                                } catch (ePh) {}
-                            }
-
-                            // 2. groupName (0x40)
-                            var groupName = viewThis.add(0x40).readPointer();
-                            if (!groupName.isNull()) {
-                                try {
-                                    setTextFn(groupName, groupNameStr || createIl2CppString("LOONA"), NULL);
-                                } catch (eG) {}
-                            }
-
-                            // 3. artistName (0x48)
-                            var artistName = viewThis.add(0x48).readPointer();
-                            if (!artistName.isNull()) {
-                                try {
-                                    setTextFn(artistName, artistNameStr || createIl2CppString(aName), NULL);
-                                } catch (eA) {}
-                            }
-
-                            // 4. stat (0x50)
-                            var stat = viewThis.add(0x50).readPointer();
-                            if (!stat.isNull()) {
-                                try {
-                                    if (statParams.isNull()) {
-                                        statParams = createMockCardStatInfoParams(gr, lvl, isPrism);
-                                    }
-                                    if (!statParams.isNull()) {
-                                        var statRefreshFn = new NativeFunction(baseAddr.add(0x1390F48), "void", ["pointer", "pointer", "pointer"]);
-                                        statRefreshFn(stat, statParams, NULL);
-                                    }
-                                } catch (eS) {}
-                            }
-
-                            // 5. themeHeader (0x58)
-                            var themeHeader = viewThis.add(0x58).readPointer();
-                            if (!themeHeader.isNull()) {
-                                try {
-                                    setTextFn(themeHeader, themeHeaderStr || createIl2CppString("Theme"), NULL);
-                                } catch (eTh) {}
-                            }
-
-                            // 6. themeName (0x60)
-                            var themeName = viewThis.add(0x60).readPointer();
-                            if (!themeName.isNull()) {
-                                try {
-                                    setTextFn(themeName, themeNameStr || createIl2CppString(tName), NULL);
-                                } catch (eTn) {}
-                            }
-
-                            // 7. theme (0x68)
-                            var theme = viewThis.add(0x68).readPointer();
-                            if (!theme.isNull() && !themeParams.isNull()) {
-                                try {
-                                    var themeRefreshFn = new NativeFunction(baseAddr.add(0x1393510), "void", ["pointer", "pointer", "pointer"]);
-                                    themeRefreshFn(theme, themeParams, NULL);
-                                } catch (eThm) {}
-                            }
-
-                            // 8. equipIcon (0x70)
-                            var equipIcon = viewThis.add(0x70).readPointer();
-                            if (!equipIcon.isNull()) {
-                                try {
-                                    var eqGo = getGoFn(equipIcon, NULL);
-                                    if (!eqGo.isNull()) setActiveFn(eqGo, isEq ? 1 : 0, NULL);
-                                } catch (eEqGo) {}
-                            }
-
-                            // 9. btnSell (0x80)
-                            var btnSell = viewThis.add(0x80).readPointer();
-                            if (!btnSell.isNull()) {
-                                try {
-                                    var bsGo = btnSell.add(0x10).readPointer();
-                                    if (!bsGo.isNull()) setActiveFn(bsGo, (!isEq && isSell) ? 1 : 0, NULL);
-                                } catch (eBsGo) {}
-                            }
-
-                            // 10. leaderIcon (0x78)
-                            var leaderIcon = viewThis.add(0x78).readPointer();
-                            if (!leaderIcon.isNull()) {
-                                try {
-                                    setActiveFn(leaderIcon, isLeader ? 1 : 0, NULL);
-                                } catch (eLi) {}
-                            }
-
-                            // 11. leaderOnObj (0x90)
-                            var leaderOnObj = viewThis.add(0x90).readPointer();
-                            if (!leaderOnObj.isNull()) {
-                                try {
-                                    setActiveFn(leaderOnObj, isLeader ? 1 : 0, NULL);
-                                } catch (eLio) {}
-                            }
-
-                            // 12. lockOnObj (0xA0)
-                            var lockOnObj = viewThis.add(0xA0).readPointer();
-                            if (!lockOnObj.isNull()) {
-                                try {
-                                    setActiveFn(lockOnObj, isLk ? 1 : 0, NULL);
-                                } catch (eLko) {}
-                            }
-
-                            // 13. lockOffObj (0xA8)
-                            var lockOffObj = viewThis.add(0xA8).readPointer();
-                            if (!lockOffObj.isNull()) {
-                                try {
-                                    setActiveFn(lockOffObj, isLk ? 0 : 1, NULL);
-                                } catch (eLkoff) {}
-                            }
-
-                            log("[✅ SELECT_VIEW] InvenCardSelectView.Refresh safely completed! artist=" + aName + ", theme=" + tName);
-                        } catch (eR) {
-                            log("[-] Error in safe InvenCardSelectView.Refresh: " + eR.message);
-                        }
+                        safeRefreshInvenCardSelectView(viewThis, p);
                     }, "void", ["pointer", "pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on InvenCardSelectView.Refresh (0xF22C34)!");
                 } catch (eHicsr) {
@@ -4649,8 +4661,7 @@ function initIl2Cpp(module) {
                                         var getMainDataFn = new NativeFunction(baseAddr.add(0x105751C), "pointer", ["pointer", "pointer", "int", "pointer"]);
                                         var mainParams = getMainDataFn(sceneThis, selectedCardItem, 0, NULL);
                                         if (!mainParams.isNull()) {
-                                            var mainRefreshFn = new NativeFunction(baseAddr.add(0xF227B4), "void", ["pointer", "pointer", "pointer"]);
-                                            mainRefreshFn(mainView, mainParams, NULL);
+                                            safeRefreshInvenCardMainView(mainView, mainParams);
                                             log("[✅ SET_STATE_MAIN] InvenCardMainView refreshed!");
                                         }
                                     } catch (eMvr) { log("[-] Error refreshing mainView: " + eMvr.message); }
@@ -4659,11 +4670,9 @@ function initIl2Cpp(module) {
                                 // 4. Refresh InvenCardSelectView (our replaced function handles it safely)
                                 if (!selectView.isNull()) {
                                     try {
-                                        var getSelectDataFn = new NativeFunction(baseAddr.add(0x10572AC), "pointer", ["pointer", "pointer", "pointer", "pointer", "int", "pointer"]);
-                                        var selectParams = getSelectDataFn(sceneThis, selectedCardItem, NULL, (equippedCardItem && !equippedCardItem.isNull()) ? equippedCardItem : NULL, 0, NULL);
-                                        if (!selectParams.isNull()) {
-                                            var selectRefreshFn = new NativeFunction(baseAddr.add(0xF22C34), "void", ["pointer", "pointer", "pointer"]);
-                                            selectRefreshFn(selectView, selectParams, NULL);
+                                        var selectParams = safeGetSelectViewData(sceneThis, selectedCardItem, NULL, (equippedCardItem && !equippedCardItem.isNull()) ? equippedCardItem : NULL, 0);
+                                        if (selectParams && !selectParams.isNull()) {
+                                            safeRefreshInvenCardSelectView(selectView, selectParams);
                                             log("[✅ SET_STATE_MAIN] InvenCardSelectView refreshed!");
                                         }
                                     } catch (eSvr) { log("[-] Error refreshing selectView: " + eSvr.message); }
@@ -6815,8 +6824,8 @@ function initIl2Cpp(module) {
                                                 var curScene = staticFields.add(0x20).readPointer();
                                                 if (!curScene.isNull() && sceneId === 4) {
                                                     log("[🔙 BACK CMD] Closing detail and returning to Inventory main view!");
-                                                    var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "int", "pointer", "pointer"]);
-                                                    setStateDefaultFn(curScene, 1, NULL, NULL);
+                                                    var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
+                                                    setStateDefaultFn(curScene, 0, 0, NULL);
                                                 }
                                             } else {
                                                 var targetScene = parseInt(cmdRaw);
