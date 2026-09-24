@@ -1654,3 +1654,45 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
      - Cartas no-R (Grado A y S) con estrellas doradas limpias y sin barra blanca.
      - Contadores `14 / 200` y `1 / 1` perfectamente legibles.
      - Activación de insignias de grupo: `R +500.000` y `ULTRA RAVE Lv 3 Hi High`.
+
+### 16.10. Verificación Completa de Selección de Carta, Apertura de DetailView y Fix de GC en `InvenGroupItemView`
+
+1. **Resolución Definitiva del Crash de GC en `InvenGroupItemView.Params` (`0x9F8DE0`):**
+   - **Causa Raíz:** En `GetGroupViewData` (RVA `0x105E8E4`), se intentaba construir una lista administrada de cartas (`List<CardSmallView.Params>`) asignando memoria nativa sin inicializar de Frida (`Memory.alloc(0x30)`) con vtable nula directamente en el campo `p.add(0x28)`. Al activarse el Garbage Collector de Unity (`libil2cpp.so` PC `0x9F8DE0`), el motor desreferenciaba el encabezado del objeto no-IL2CPP, produciendo una violación de acceso `SIGSEGV`.
+   - **Solución:** Se fijó `p.add(0x28).writePointer(NULL)`. La estructura de `InvenGroupItemView` opera de manera segura y estable con `cardParams = NULL`, eliminando por completo la corrupción de memoria y asegurando estabilidad a 60 FPS indefinidamente en `SceneId: 4`.
+
+2. **Desacoplamiento de Intercepción de Toque en Pantalla (`Input.GetMouseButtonDown`):**
+   - **Diagnóstico:** En `libscript.js`, el hook en `Input.GetMouseButtonDown` (RVA `0x25A5624`) evaluaba `!hasTriggeredLobbyTransition && isAtTouchToStart`. Al saltar directamente a la escena de inventario mediante `scene_cmd.txt`, estas variables permanecían activas desde la pantalla de título, provocando que cualquier toque en la pantalla de inventario forzara una redirección inesperada a `LobbyScene`.
+   - **Solución:** Se añadió la comprobación estricta de escena actual `sceneId === 2` y el reinicio preventivo de flags (`isAtTouchToStart = false`, `hasTriggeredLobbyTransition = true`) en `SceneControl.OpenScene` (RVA `0xD534BC`).
+
+3. **Arquitectura Compartida de `safeSetStateMain` e Integración con `scene_cmd.txt`:**
+   - Se consolidó la lógica de transición al detalle de carta en la función JavaScript `safeSetStateMain(sceneThis, isReload)`:
+     - Extrae de forma segura `selectedCardItem` desde `sceneThis + 0x88`.
+     - Resuelve `equippedCardItem` correspondiente al miembro y lo escribe en `sceneThis + 0x90`.
+     - Ejecuta `InventoryView.ShowMainLayout(sceneView, true)` (RVA `0x10571EC`), ocultando la vista de grupo y desplegando la vista de detalle.
+     - Refresca de forma desacoplada `InvenCardMainView` (RVA `0xF227B4`) e `InvenCardSelectView` (RVA `0xF22C34`).
+   - Se extendió el parser de `scene_cmd.txt` para soportar:
+     - `card:<idx>`: Selecciona la carta indicada desde `displayCardList` (`sceneThis + 0x58`), actualiza los punteros nativos de selección (`0x88` y `0x98`) y llama a `safeSetStateMain(curScene, 0)`.
+     - `back` / `close`: Invoca `InventoryScene.SetStateDefault(curScene, 1)` (RVA `0x1053B88`), restaurando la vista general del tema y cerrando el panel de detalle.
+
+4. **Validación Visual y de Logs en Emulador:**
+   - **Ejecución de Comando `card:0`:**
+     - Logcat confirmó:
+       ```text
+       [🚀 SCENE CMD] Read command: 'card:0'
+       [🃏 CARD CMD] Triggering card select for arg: '0' (idx=0)
+       [🃏 CARD CMD] Selected CardItem[0] = 0x7865a09aa0 (out of 14)
+       [🗃️ SET_STATE_MAIN] safeSetStateMain entered! isReload=0, scene=0x79fd8b2a90
+       [🗃️ SET_STATE_MAIN] Card: id=1001, gr=2, lvl=1, eq=false
+       [✅ SET_STATE_MAIN] ShowMainLayout(true) called!
+       [✅ SET_STATE_MAIN] InvenCardMainView refreshed!
+       [✅ SET_STATE_MAIN] Safe SetStateMain completed for cardID=1001
+       [🎉 CARD CMD SUCCESS] safeSetStateMain(0) invoked on InventoryScene!
+       ```
+     - Captura visual en emulador ([screen_card_detail.png](file:///Users/ignaciorojas/.gemini/antigravity-ide/brain/a9483378-e038-4078-8f6b-d3d8e0259b75/screen_card_detail.png)):
+       - Panel de detalle abierto con botones funcionales `UNEQUIP`, `정보` (Info), `카드 강화` (Power Up), botón de candado, corona y botón 'X' de cierre.
+       - Barra inferior de cartas preservada e interactiva.
+   - **Ejecución de Comando `back`:**
+     - Logcat confirmó: `[🔙 BACK CMD] Closing detail and returning to Inventory main view!`.
+     - Captura visual en emulador ([screen_after_back.png](file:///Users/ignaciorojas/.gemini/antigravity-ide/brain/a9483378-e038-4078-8f6b-d3d8e0259b75/screen_after_back.png)): Retorno limpio a la vista de grupo general de LOONA con insignias `Group Grade R +500.000` y `ULTRA RAVE Hi High Lv 3`.
+

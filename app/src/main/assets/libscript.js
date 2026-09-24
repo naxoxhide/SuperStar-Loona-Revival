@@ -1878,7 +1878,7 @@ function initIl2Cpp(module) {
                 // Input.GetMouseButtonDown (0x25A5624) para detectar toques en pantalla durante TitleScene
                 Interceptor.attach(baseAddr.add(0x25A5624), {
                     onLeave: function (retval) {
-                        if (retval.toInt32() === 1 && !hasTriggeredLobbyTransition && isAtTouchToStart) {
+                        if (retval.toInt32() === 1 && !hasTriggeredLobbyTransition && isAtTouchToStart && sceneId === 2) {
                             if (globalTitleScene && !globalTitleScene.isNull()) {
                                 log("[👆 INPUT TAP] Touch/Click detected on screen during TitleScene TOUCH TO START!");
                                 triggerLobbyTransition("Input.GetMouseButtonDown");
@@ -1889,7 +1889,12 @@ function initIl2Cpp(module) {
 
                 Interceptor.attach(baseAddr.add(0xD534BC), {
                     onEnter: function (args) {
-                        log("[🎬 SCENE] SceneControl.OpenScene -> sceneId: " + args[0].toInt32());
+                        var targetSid = args[0].toInt32();
+                        log("[🎬 SCENE] SceneControl.OpenScene -> sceneId: " + targetSid);
+                        if (targetSid !== 2) {
+                            isAtTouchToStart = false;
+                            hasTriggeredLobbyTransition = true;
+                        }
                     }
                 });
                 Interceptor.attach(baseAddr.add(0xD5512C), {
@@ -3770,7 +3775,7 @@ function initIl2Cpp(module) {
                                 } catch (eCpl) {
                                     log("[-] Error building cardParams list: " + eCpl.message);
                                 }
-                                p.add(0x28).writePointer(smallCardParamListObj || NULL);
+                                p.add(0x28).writePointer(NULL); // Keep NULL to prevent Unity GC SIGSEGV at 0x9f8de0
                             } catch (eCpb) {
                                 log("[-] Error in cardParams population: " + eCpb.message);
                                 p.add(0x28).writePointer(NULL);
@@ -4564,14 +4569,8 @@ function initIl2Cpp(module) {
                             } catch (eRc) {}
                             log("[🃏 ON_CARD_ITEM] Selected: cardID=" + cId + ", grade=" + gr + ", level=" + lvl);
 
-                            // Step 3: Call SetStateMain safely (isReload=false means "first entry to card detail")
-                            try {
-                                var setStateMainFn = new NativeFunction(baseAddr.add(0x1053FB0), "void", ["pointer", "bool", "pointer"]);
-                                setStateMainFn(sceneThis, 0, NULL);
-                                log("[🃏 ON_CARD_ITEM] SetStateMain(false) called successfully!");
-                            } catch (eSsm) {
-                                log("[-] Error calling SetStateMain: " + eSsm.message);
-                            }
+                            // Step 3: Call safeSetStateMain (isReload=false means "first entry to card detail")
+                            safeSetStateMain(sceneThis, 0);
                         } catch (eOci) {
                             log("[-] Error in OnCardItem replace: " + eOci.message);
                         }
@@ -4582,104 +4581,107 @@ function initIl2Cpp(module) {
                 }
 
                 // 9e2. InventoryScene.SetStateMain (0x1053FB0) -> Safe replacement preventing null crash chain
+                function safeSetStateMain(sceneThis, isReload) {
+                    log("[🗃️ SET_STATE_MAIN] safeSetStateMain entered! isReload=" + isReload + ", scene=" + sceneThis);
+                    try {
+                        if (sceneThis.isNull()) return;
+
+                        var selectedCardItem = sceneThis.add(0x88).readPointer();
+                        if (selectedCardItem.isNull()) {
+                            log("[-] SET_STATE_MAIN: selectedCardItem is null - aborting safe!");
+                            return;
+                        }
+
+                        var rawCard = selectedCardItem.add(0x10).readPointer();
+                        if (rawCard.isNull()) {
+                            log("[-] SET_STATE_MAIN: raw card data is null - aborting safe!");
+                            return;
+                        }
+
+                        var cId = rawCard.add(0x20).readS32();
+                        var gr = rawCard.add(0x24).readS32();
+                        var lvl = rawCard.add(0x1C).readS16();
+                        var isEq = (rawCard.add(0x28).readU8() === 1);
+                        var isLk = (rawCard.add(0x29).readU8() === 1);
+                        var isPrism = (rawCard.add(0x2A).readU8() === 1);
+
+                        log("[🗃️ SET_STATE_MAIN] Card: id=" + cId + ", gr=" + gr + ", lvl=" + lvl + ", eq=" + isEq);
+
+                        // Find equippedCardItem for this member slot
+                        var memberIdx = ((cId - 1001) % 11);
+                        var equippedCardItem = NULL;
+                        if (loonaCardItems && loonaCardItems.length > 0) {
+                            for (var k = 0; k < loonaCardItems.length; k++) {
+                                var itm = loonaCardItems[k];
+                                try {
+                                    var r = itm.add(0x10).readPointer();
+                                    if (!r.isNull()) {
+                                        var cid2 = r.add(0x20).readS32();
+                                        var isE2 = (r.add(0x28).readU8() === 1);
+                                        if (((cid2 - 1001) % 11) === memberIdx && isE2) {
+                                            equippedCardItem = itm;
+                                        }
+                                    }
+                                } catch (eEcl) {}
+                            }
+                        }
+                        sceneThis.add(0x90).writePointer((equippedCardItem && !equippedCardItem.isNull()) ? equippedCardItem : NULL);
+
+                        // Get scene view and drive refresh on the SelectView
+                        try {
+                            var sceneView = sceneThis.add(0x48).readPointer(); // InventoryScene.sceneView (InventoryView)
+                            if (!sceneView.isNull()) {
+                                // 1. Call ShowMainLayout(isSelectedItem=true) -> RVA 0x10571EC
+                                try {
+                                    var showMainLayoutFn = new NativeFunction(baseAddr.add(0x10571EC), "void", ["pointer", "int", "pointer"]);
+                                    showMainLayoutFn(sceneView, 1, NULL);
+                                    log("[✅ SET_STATE_MAIN] ShowMainLayout(true) called!");
+                                } catch (eSml) { log("[-] Error calling ShowMainLayout: " + eSml.message); }
+
+                                // 2. Correct InventoryView field offsets (from dump.cs):
+                                //    selectView=0x48, noneView=0x50, mainView=0x58, equipView=0x60
+                                var mainView = sceneView.add(0x58).readPointer();
+                                var selectView = sceneView.add(0x48).readPointer();
+
+                                // 3. Refresh InvenCardMainView (our replaced function handles it safely)
+                                if (!mainView.isNull()) {
+                                    try {
+                                        var getMainDataFn = new NativeFunction(baseAddr.add(0x105751C), "pointer", ["pointer", "pointer", "int", "pointer"]);
+                                        var mainParams = getMainDataFn(sceneThis, selectedCardItem, 0, NULL);
+                                        if (!mainParams.isNull()) {
+                                            var mainRefreshFn = new NativeFunction(baseAddr.add(0xF227B4), "void", ["pointer", "pointer", "pointer"]);
+                                            mainRefreshFn(mainView, mainParams, NULL);
+                                            log("[✅ SET_STATE_MAIN] InvenCardMainView refreshed!");
+                                        }
+                                    } catch (eMvr) { log("[-] Error refreshing mainView: " + eMvr.message); }
+                                }
+
+                                // 4. Refresh InvenCardSelectView (our replaced function handles it safely)
+                                if (!selectView.isNull()) {
+                                    try {
+                                        var getSelectDataFn = new NativeFunction(baseAddr.add(0x10572AC), "pointer", ["pointer", "pointer", "pointer", "pointer", "int", "pointer"]);
+                                        var selectParams = getSelectDataFn(sceneThis, selectedCardItem, NULL, (equippedCardItem && !equippedCardItem.isNull()) ? equippedCardItem : NULL, 0, NULL);
+                                        if (!selectParams.isNull()) {
+                                            var selectRefreshFn = new NativeFunction(baseAddr.add(0xF22C34), "void", ["pointer", "pointer", "pointer"]);
+                                            selectRefreshFn(selectView, selectParams, NULL);
+                                            log("[✅ SET_STATE_MAIN] InvenCardSelectView refreshed!");
+                                        }
+                                    } catch (eSvr) { log("[-] Error refreshing selectView: " + eSvr.message); }
+                                }
+                            }
+                        } catch (eSvErr) {
+                            log("[-] Error driving scene view refresh: " + eSvErr.message);
+                        }
+
+                        log("[✅ SET_STATE_MAIN] Safe SetStateMain completed for cardID=" + cId);
+                    } catch (eSetState) {
+                        log("[-] Error in safeSetStateMain: " + eSetState.message);
+                    }
+                }
+
                 try {
                     Interceptor.replace(baseAddr.add(0x1053FB0), new NativeCallback(function (sceneThis, isReload, methodInfo) {
-                        log("[🗃️ SET_STATE_MAIN] SetStateMain entered! isReload=" + isReload);
-                        try {
-                            if (sceneThis.isNull()) return;
-
-                            var selectedCardItem = sceneThis.add(0x88).readPointer();
-                            if (selectedCardItem.isNull()) {
-                                log("[-] SET_STATE_MAIN: selectedCardItem is null - aborting safe!");
-                                return;
-                            }
-
-                            var rawCard = selectedCardItem.add(0x10).readPointer();
-                            if (rawCard.isNull()) {
-                                log("[-] SET_STATE_MAIN: raw card data is null - aborting safe!");
-                                return;
-                            }
-
-                            var cId = rawCard.add(0x20).readS32();
-                            var gr = rawCard.add(0x24).readS32();
-                            var lvl = rawCard.add(0x1C).readS16();
-                            var isEq = (rawCard.add(0x28).readU8() === 1);
-                            var isLk = (rawCard.add(0x29).readU8() === 1);
-                            var isPrism = (rawCard.add(0x2A).readU8() === 1);
-
-                            log("[🗃️ SET_STATE_MAIN] Card: id=" + cId + ", gr=" + gr + ", lvl=" + lvl + ", eq=" + isEq);
-
-                            // Find equippedCardItem for this member slot
-                            var memberIdx = ((cId - 1001) % 11);
-                            var equippedCardItem = NULL;
-                            if (loonaCardItems && loonaCardItems.length > 0) {
-                                for (var k = 0; k < loonaCardItems.length; k++) {
-                                    var itm = loonaCardItems[k];
-                                    try {
-                                        var r = itm.add(0x10).readPointer();
-                                        if (!r.isNull()) {
-                                            var cid2 = r.add(0x20).readS32();
-                                            var isE2 = (r.add(0x28).readU8() === 1);
-                                            if (((cid2 - 1001) % 11) === memberIdx && isE2) {
-                                                equippedCardItem = itm;
-                                            }
-                                        }
-                                    } catch (eEcl) {}
-                                }
-                            }
-                            sceneThis.add(0x90).writePointer((equippedCardItem && !equippedCardItem.isNull()) ? equippedCardItem : NULL);
-
-                            // Get scene view and drive refresh on the SelectView
-                            try {
-                                var sceneView = sceneThis.add(0x48).readPointer(); // InventoryScene.sceneView (InventoryView)
-                                if (!sceneView.isNull()) {
-                                    // 1. Call ShowMainLayout(isSelectedItem=true) -> RVA 0x10571EC
-                                    // This correctly hides/shows all sub-views, no risk of null deref
-                                    try {
-                                        var showMainLayoutFn = new NativeFunction(baseAddr.add(0x10571EC), "void", ["pointer", "int", "pointer"]);
-                                        showMainLayoutFn(sceneView, 1, NULL);
-                                        log("[✅ SET_STATE_MAIN] ShowMainLayout(true) called!");
-                                    } catch (eSml) { log("[-] Error calling ShowMainLayout: " + eSml.message); }
-
-                                    // 2. Correct InventoryView field offsets (from dump.cs):
-                                    //    selectView=0x48, noneView=0x50, mainView=0x58, equipView=0x60
-                                    var mainView = sceneView.add(0x58).readPointer();
-                                    var selectView = sceneView.add(0x48).readPointer();
-
-                                    // 3. Refresh InvenCardMainView (our replaced function handles it safely)
-                                    if (!mainView.isNull()) {
-                                        try {
-                                            var getMainDataFn = new NativeFunction(baseAddr.add(0x105751C), "pointer", ["pointer", "pointer", "int", "pointer"]);
-                                            var mainParams = getMainDataFn(sceneThis, selectedCardItem, 0, NULL);
-                                            if (!mainParams.isNull()) {
-                                                var mainRefreshFn = new NativeFunction(baseAddr.add(0xF227B4), "void", ["pointer", "pointer", "pointer"]);
-                                                mainRefreshFn(mainView, mainParams, NULL);
-                                                log("[✅ SET_STATE_MAIN] InvenCardMainView refreshed!");
-                                            }
-                                        } catch (eMvr) { log("[-] Error refreshing mainView: " + eMvr.message); }
-                                    }
-
-                                    // 4. Refresh InvenCardSelectView (our replaced function handles it safely)
-                                    if (!selectView.isNull()) {
-                                        try {
-                                            var getSelectDataFn = new NativeFunction(baseAddr.add(0x10572AC), "pointer", ["pointer", "pointer", "pointer", "pointer", "int", "pointer"]);
-                                            var selectParams = getSelectDataFn(sceneThis, selectedCardItem, NULL, (equippedCardItem && !equippedCardItem.isNull()) ? equippedCardItem : NULL, 0, NULL);
-                                            if (!selectParams.isNull()) {
-                                                var selectRefreshFn = new NativeFunction(baseAddr.add(0xF22C34), "void", ["pointer", "pointer", "pointer"]);
-                                                selectRefreshFn(selectView, selectParams, NULL);
-                                                log("[✅ SET_STATE_MAIN] InvenCardSelectView refreshed!");
-                                            }
-                                        } catch (eSvr) { log("[-] Error refreshing selectView: " + eSvr.message); }
-                                    }
-                                }
-                            } catch (eSvErr) {
-                                log("[-] Error driving scene view refresh: " + eSvErr.message);
-                            }
-
-                            log("[✅ SET_STATE_MAIN] Safe SetStateMain completed for cardID=" + cId);
-                        } catch (eSetState) {
-                            log("[-] Error in SetStateMain replacement: " + eSetState.message);
-                        }
+                        safeSetStateMain(sceneThis, isReload);
                     }, "void", ["pointer", "bool", "pointer"]));
                     log("[+] Interceptor.replace installed on InventoryScene.SetStateMain (0x1053FB0)!");
                 } catch (eSsmHook) {
@@ -6773,11 +6775,56 @@ function initIl2Cpp(module) {
                                         aDel.writePointer(cmdPathStr);
                                         il2cpp_runtime_invoke(deleteMethod, NULL, aDel, exc);
                                         if (!txtObj.isNull()) {
-                                            var targetScene = parseInt(readIl2CppString(txtObj).trim());
-                                            if (!isNaN(targetScene) && targetScene >= 1 && targetScene <= 13) {
-                                                log("[🚀 SCENE CMD] Received command to switch to SceneId: " + targetScene);
-                                                var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), 'void', ['int', 'pointer', 'pointer']);
-                                                openSceneDirectFn(targetScene, NULL, NULL);
+                                            var cmdRaw = readIl2CppString(txtObj).trim();
+                                            log("[🚀 SCENE CMD] Read command: '" + cmdRaw + "'");
+                                            if (cmdRaw.indexOf("card:") === 0) {
+                                                var cardArg = cmdRaw.substring(5).trim();
+                                                var cardIdx = parseInt(cardArg, 10);
+                                                log("[🃏 CARD CMD] Triggering card select for arg: '" + cardArg + "' (idx=" + cardIdx + ")");
+                                                var curScene = staticFields.add(0x20).readPointer();
+                                                if (!curScene.isNull() && sceneId === 4) {
+                                                    var targetCardItem = NULL;
+                                                    try {
+                                                        var dclPtr = curScene.add(0x58).readPointer();
+                                                        if (!dclPtr.isNull()) {
+                                                            var listItems = dclPtr.add(0x10).readPointer();
+                                                            var listSize = dclPtr.add(0x18).readS32();
+                                                            if (isNaN(cardIdx) || cardIdx < 0 || cardIdx >= listSize) cardIdx = 0;
+                                                            if (!listItems.isNull() && listSize > 0) {
+                                                                targetCardItem = listItems.add(0x20 + cardIdx * 8).readPointer();
+                                                                log("[🃏 CARD CMD] Selected CardItem[" + cardIdx + "] = " + targetCardItem + " (out of " + listSize + ")");
+                                                            }
+                                                        }
+                                                    } catch (eDclCmd) {
+                                                        log("[-] Error reading displayCardList in CARD CMD: " + eDclCmd.message);
+                                                    }
+                                                    if (targetCardItem.isNull() && loonaCardItems && loonaCardItems.length > 0) {
+                                                        targetCardItem = loonaCardItems[0];
+                                                    }
+                                                    if (!targetCardItem.isNull()) {
+                                                        curScene.add(0x88).writePointer(targetCardItem);
+                                                        curScene.add(0x98).writePointer(targetCardItem);
+                                                        curScene.add(0x80).writePointer(NULL);
+                                                        safeSetStateMain(curScene, 0);
+                                                        log("[🎉 CARD CMD SUCCESS] safeSetStateMain(0) invoked on InventoryScene!");
+                                                    }
+                                                } else {
+                                                    log("[-] CARD CMD failed: not in InventoryScene (sceneId=" + sceneId + ", instance=" + curScene + ")");
+                                                }
+                                            } else if (cmdRaw === "back" || cmdRaw === "close") {
+                                                var curScene = staticFields.add(0x20).readPointer();
+                                                if (!curScene.isNull() && sceneId === 4) {
+                                                    log("[🔙 BACK CMD] Closing detail and returning to Inventory main view!");
+                                                    var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "int", "pointer", "pointer"]);
+                                                    setStateDefaultFn(curScene, 1, NULL, NULL);
+                                                }
+                                            } else {
+                                                var targetScene = parseInt(cmdRaw);
+                                                if (!isNaN(targetScene) && targetScene >= 1 && targetScene <= 13) {
+                                                    log("[🚀 SCENE CMD] Received command to switch to SceneId: " + targetScene);
+                                                    var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), 'void', ['int', 'pointer', 'pointer']);
+                                                    openSceneDirectFn(targetScene, NULL, NULL);
+                                                }
                                             }
                                         }
                                     }
