@@ -6779,10 +6779,11 @@ function initIl2Cpp(module) {
                 var lastWorkerTid = 0;
                 var deadlockFrames = 0;
                 var cachedCmdPathStr = NULL;
-                var pCmdPathCStr = Memory.allocUtf8String("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt");
-                var accessPtr = Module.findExportByName("libc.so", "access");
-                var accessFn = accessPtr ? new NativeFunction(accessPtr, "int", ["pointer", "int"]) : null;
+                var cachedExistsMethod = null;
+                var cachedReadAllTextMethod = null;
+                var cachedDeleteMethod = null;
                 var cmdReusableBuf = Memory.alloc(Process.pointerSize);
+                var excReusableBuf = Memory.alloc(Process.pointerSize);
 
                 var findGameObjectFn = new NativeFunction(baseAddr.add(0x1DBB16C), 'pointer', ['pointer', 'pointer']);
                 var isDoneFn = new NativeFunction(baseAddr.add(0x1DB2C9C), 'int', ['pointer']);
@@ -6894,26 +6895,26 @@ function initIl2Cpp(module) {
                                 }
                             }
 
-                            // Check scene navigation command file every 30 frames (zero allocation check via libc access)
+                            // Check scene navigation command file every 30 frames (zero allocation check via cached File.Exists)
                             if (sceneUpdateCounter % 30 === 0) {
                                 try {
-                                    if (pCmdPathCStr && accessFn && accessFn(pCmdPathCStr, 0) === 0) {
-                                        var readAllTextMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllText", 1);
-                                        var deleteMethod = findMethod("mscorlib", "System.IO", "File", "Delete", 1);
-                                        if (!cachedCmdPathStr || cachedCmdPathStr.isNull()) {
-                                            cachedCmdPathStr = createIl2CppString("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt");
-                                        }
-                                        if (!cmdReusableBuf) {
-                                            cmdReusableBuf = Memory.alloc(Process.pointerSize);
-                                        }
+                                    if (!cachedCmdPathStr || cachedCmdPathStr.isNull()) {
+                                        cachedCmdPathStr = createIl2CppString("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt");
+                                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(cachedCmdPathStr, 0);
+                                        cachedExistsMethod = findMethod("mscorlib", "System.IO", "File", "Exists", 1);
+                                        cachedReadAllTextMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllText", 1);
+                                        cachedDeleteMethod = findMethod("mscorlib", "System.IO", "File", "Delete", 1);
+                                    }
+                                    if (cachedExistsMethod) {
                                         cmdReusableBuf.writePointer(cachedCmdPathStr);
-                                        var exc = Memory.alloc(Process.pointerSize);
-                                        exc.writePointer(NULL);
-                                        var txtObj = il2cpp_runtime_invoke(readAllTextMethod, NULL, cmdReusableBuf, exc);
-                                        il2cpp_runtime_invoke(deleteMethod, NULL, cmdReusableBuf, exc);
-                                        if (!txtObj.isNull()) {
-                                            var cmdRaw = readIl2CppString(txtObj).trim();
-                                            log("[🚀 SCENE CMD] Read command: '" + cmdRaw + "'");
+                                        excReusableBuf.writePointer(NULL);
+                                        var cmdExists = il2cpp_runtime_invoke(cachedExistsMethod, NULL, cmdReusableBuf, excReusableBuf);
+                                        if (cmdExists && cmdExists.toInt32() !== 0) {
+                                            var txtObj = il2cpp_runtime_invoke(cachedReadAllTextMethod, NULL, cmdReusableBuf, excReusableBuf);
+                                            il2cpp_runtime_invoke(cachedDeleteMethod, NULL, cmdReusableBuf, excReusableBuf);
+                                            if (!txtObj.isNull()) {
+                                                var cmdRaw = readIl2CppString(txtObj).trim();
+                                                log("[🚀 SCENE CMD] Read command: '" + cmdRaw + "'");
                                             if (cmdRaw.indexOf("card:") === 0) {
                                                 var cardArg = cmdRaw.substring(5).trim();
                                                 var cardIdx = parseInt(cardArg, 10);
