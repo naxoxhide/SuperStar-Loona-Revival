@@ -37,6 +37,7 @@ if (abortPtr) {
 }
 
 var globalTitleScene = null;
+var globalPlayerObj = null;
 var il2cppInitialized = false;
 function tryInitAll() {
     if (il2cppInitialized) return;
@@ -254,6 +255,7 @@ function initIl2Cpp(module) {
     var il2cpp_thread_attach = getExport("il2cpp_thread_attach", "pointer", ["pointer"]);
     var il2cpp_class_get_nested_types = getExport("il2cpp_class_get_nested_types", "pointer", ["pointer", "pointer"]);
     var il2cpp_class_get_name = getExport("il2cpp_class_get_name", "pointer", ["pointer"]);
+    var il2cpp_gchandle_new = getExport("il2cpp_gchandle_new", "uint32", ["pointer", "bool"]);
 
     function getNestedClass(parentClass, nestedName) {
         if (!parentClass || parentClass.isNull() || !il2cpp_class_get_nested_types || !il2cpp_class_get_name) return NULL;
@@ -754,9 +756,18 @@ function initIl2Cpp(module) {
                     playerObj.add(0x5C).writeInt(profile.headphone !== undefined ? profile.headphone : 50);
                     playerObj.add(0x60).writeInt(0);
 
+                    // nicknameChanger: int at 0x64
+                    playerObj.add(0x64).writeInt(0);
+
                     // dalcomCoin: int at 0x70, freeDalcomCoin: int at 0x74
                     playerObj.add(0x70).writeInt(profile.dalcomCoin !== undefined ? profile.dalcomCoin : 5000);
                     playerObj.add(0x74).writeInt(0);
+
+                    // Pin playerObj so Unity GC never collects it
+                    if (il2cpp_gchandle_new && !playerObj.isNull()) {
+                        try { il2cpp_gchandle_new(playerObj, 0); } catch (eGc) {}
+                    }
+                    globalPlayerObj = playerObj;
 
                     // Invoke UserControl.Open(player) (RVA 0xAAB0D4)
                     if (userControlOpenFn) {
@@ -774,18 +785,25 @@ function initIl2Cpp(module) {
                 }
             }
 
-            // Hook UserControl.get_Me (0xAAC818) to ensure non-null return value
+            // Hook UserControl.get_Me (0xAAC818) & set_Me (0xAAC7B0) to ensure persistent valid Player
             try {
-                Interceptor.attach(baseAddr.add(0xAAC818), {
-                    onLeave: function (retval) {
-                        if (retval.isNull()) {
-                            log("[🛡️ NULL GUARD] UserControl.get_Me returned null! Re-initializing UserControl...");
-                            var p = loadPlayerProfile() || createDefaultProfile("Orbit");
-                            setupUserControl(p);
-                        }
+                Interceptor.replace(baseAddr.add(0xAAC818), new NativeCallback(function (methodInfo) {
+                    if (!globalPlayerObj || globalPlayerObj.isNull()) {
+                        var p = loadPlayerProfile() || createDefaultProfile("Orbit");
+                        setupUserControl(p);
                     }
-                });
-            } catch (eMeHook) {}
+                    return (globalPlayerObj && !globalPlayerObj.isNull()) ? globalPlayerObj : NULL;
+                }, "pointer", ["pointer"]));
+
+                Interceptor.replace(baseAddr.add(0xAAC7B0), new NativeCallback(function (playerPtr, methodInfo) {
+                    if (playerPtr && !playerPtr.isNull()) {
+                        globalPlayerObj = playerPtr;
+                    }
+                }, "void", ["pointer", "pointer"]));
+                log("[🛡️ USER GUARD] UserControl.get_Me & set_Me safely replaced!");
+            } catch (eMeHook) {
+                log("[-] Error replacing UserControl.get_Me: " + eMeHook.message);
+            }
 
             // UserControl.Prefs.ConvertKey (0xD723E0) - Return key directly to prevent startup NullReferenceException
             try {
@@ -795,7 +813,7 @@ function initIl2Cpp(module) {
                 log("[🛡️ PREFS GUARD] UserControl.Prefs.ConvertKey safely protected!");
             } catch (eKey) {}
 
-            // UserControl.get_ObjectID (0xAAE33C) & get_LastLoginTime (0xAAE40C) null guards
+            // Comprehensive UserControl null guards to prevent NullReferenceException when UserControl.Me is null or during background refresh
             try {
                 Interceptor.replace(baseAddr.add(0xAAE33C), new NativeCallback(function () {
                     return ptr(10001);
@@ -803,14 +821,50 @@ function initIl2Cpp(module) {
                 Interceptor.replace(baseAddr.add(0xAAE40C), new NativeCallback(function () {
                     return ptr(0);
                 }, "pointer", []));
-                log("[🛡️ USER GUARD] UserControl.ObjectID & LastLoginTime safely protected!");
-
-                // UserControl.UpdateHeadphone (0xAAC034) - protect against null UserControl.Me
                 Interceptor.replace(baseAddr.add(0xAAC034), new NativeCallback(function (forced) {
                     return;
                 }, "void", ["bool"]));
-                log("[🛡️ USER GUARD] UserControl.UpdateHeadphone safely protected!");
-            } catch (eUserG) {}
+
+                // Nickname & Special User Type null guards
+                Interceptor.replace(baseAddr.add(0xAAE734), new NativeCallback(function (methodInfo) {
+                    var p = loadPlayerProfile();
+                    var nick = (p && p.nickname) ? p.nickname : "Orbit";
+                    return createIl2CppString(nick);
+                }, "pointer", ["pointer"]));
+                Interceptor.replace(baseAddr.add(0xAAE61C), new NativeCallback(function (nickPtr, methodInfo) {
+                    try {
+                        var nick = readIl2CppString(nickPtr);
+                        log("[👤 USER] set_Nickname safely intercepted: " + nick);
+                        var p = loadPlayerProfile() || createDefaultProfile("Orbit");
+                        p.nickname = nick;
+                        savePlayerProfile(p);
+                    } catch (eNick) {}
+                }, "void", ["pointer", "pointer"]));
+                Interceptor.replace(baseAddr.add(0xAAE54C), new NativeCallback(function (methodInfo) {
+                    return 0; // SPECIAL_USER_TYPE
+                }, "short", ["pointer"]));
+                Interceptor.replace(baseAddr.add(0xAAE818), new NativeCallback(function (val, methodInfo) {
+                    log("[👤 USER] set_NicknameChanger safely intercepted: " + val);
+                }, "void", ["int", "pointer"]));
+                Interceptor.replace(baseAddr.add(0xAAE930), new NativeCallback(function (methodInfo) {
+                    return 0;
+                }, "int", ["pointer"]));
+                Interceptor.replace(baseAddr.add(0xAAF414), new NativeCallback(function (methodInfo) {
+                    var p = loadPlayerProfile();
+                    return (p && p.profileCode) ? p.profileCode : 1001;
+                }, "int", ["pointer"]));
+                Interceptor.replace(baseAddr.add(0xAAF588), new NativeCallback(function (profileCode, methodInfo) {
+                    try {
+                        log("[👤 USER] set_ProfileCode safely intercepted: " + profileCode);
+                        var p = loadPlayerProfile() || createDefaultProfile("Orbit");
+                        p.profileCode = profileCode;
+                        savePlayerProfile(p);
+                    } catch (ePrf) {}
+                }, "void", ["int", "pointer"]));
+                log("[🛡️ USER GUARD] UserControl null guards (Nickname, NicknameChanger, ProfileCode, ObjectID, Headphone) successfully installed!");
+            } catch (eUserG) {
+                log("[-] Error installing UserControl guards: " + eUserG.message);
+            }
 
             // TitleScene Hooks
             var requestSequentialLoginPtr = baseAddr.add(0xB23630);
@@ -1178,17 +1232,6 @@ function initIl2Cpp(module) {
                                 log("[✅ NICKNAME] ChangeNickname callback(0) invoked!");
                             } catch (e) {}
                         }
-                    }
-                });
-
-                // In-game Profile Picture change: UserControl.set_ProfileCode (0xAAF588)
-                Interceptor.attach(baseAddr.add(0xAAF588), {
-                    onEnter: function (args) {
-                        var newCode = args[0].toInt32();
-                        log("[🖼️ PROFILE] UserControl.set_ProfileCode called with: " + newCode);
-                        var p = loadPlayerProfile() || createDefaultProfile("Orbit");
-                        p.profileCode = newCode;
-                        savePlayerProfile(p);
                     }
                 });
             } catch (e) {
@@ -5476,19 +5519,6 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on GetMajorGroupItem (0xF27090) & GetCurrentGroup (0xF2B51C)!");
                 } catch (eGmg) {
                     log("[-] Error replacing GetMajorGroupItem / GetCurrentGroup: " + eGmg.message);
-                }
-
-                // ProfileControl.set_ProfileCode (0xAAF588) & get_ProfileCode (0xAAF414)
-                try {
-                    Interceptor.replace(baseAddr.add(0xAAF588), new NativeCallback(function (profileCode, methodInfo) {
-                        log("[👤 PROFILE] Safely set profileCode: " + profileCode);
-                    }, "void", ["int", "pointer"]));
-                    Interceptor.replace(baseAddr.add(0xAAF414), new NativeCallback(function (methodInfo) {
-                        return 1001;
-                    }, "int", ["pointer"]));
-                    log("[+] Interceptor.replace installed on ProfileControl.set_ProfileCode & get_ProfileCode!");
-                } catch (ePrf) {
-                    log("[-] Error replacing ProfileControl: " + ePrf.message);
                 }
 
                 // Safe InventoryControl.UpdateDisplayGroupList (0xF28CE8)
