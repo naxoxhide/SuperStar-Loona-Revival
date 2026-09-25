@@ -1721,3 +1721,35 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
    - **HeeJin (CardID 1001, Grado A, Nivel 1):** Verificada con textura de alta resolución de retrato nítido, marco de estrella plateada, estadísticas base 40/40 y etiquetas en inglés ([screen_detail_heejin_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/screen_detail_heejin_live.png)).
    - **HyunJin (CardID 1002, Grado S, Nivel 1):** Verificada con conmutación dinámica instantánea, marco de estrella dorada Grado S, estadísticas base 65/65 y botones de acción activos ([screen_detail_hyunjin_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/screen_detail_hyunjin_live.png)).
    - **Retorno Limpio (`back` / `close`):** La invocación de `InventoryScene.SetStateDefault(curScene, 0, 0, NULL)` (RVA `0x1053B88`) restaura limpiamente la cuadrícula de LOONA a 60 FPS sin fugas de estado ([screen_after_back_perfect.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/screen_after_back_perfect.png)).
+
+### 16.12. Estabilización de InvenCardEquipView, Ciclo de Vida Nativo de InventoryView y Verificación Bidireccional de Equipamiento Offline con Persistencia en player_profile.json
+
+1. **Erradicación de Llamadas Artificiales `SetActive` y Restauración de `ShowMainLayout` / `ShowDefaultLayout` (Commit `58cc1c34`):**
+   - **Diagnóstico:** Los intentos de forzar manualmente `GameObject.SetActive` en vistas secundarias de Unity (`mainView`, `selectView`, `cardView`, `equipView`) causaban interferencias destructivas con el gestor de layout nativo de Dalcomsoft (`HideAll` @ RVA `0x10608B4`, `ShowMainLayout` @ RVA `0x10571EC`, `ShowDefaultLayout` @ RVA `0x1055ED0`), generando pantallas blancas y desincronizaciones de canvas.
+   - **Solución:** Se eliminaron por completo las llamadas `setActiveFn` y los interceptores forzados sobre `SetStateWait`, `SetStateLoadingData`, `SetStateHelp` y `HelpAssist.Open`, delegando la gestión de visibilidad exclusivamente en las rutinas de diseño nativas del juego.
+
+2. **Arquitectura y Transición hacia `InvenCardEquipView`:**
+   - **Evento Disparador:** En `InvenCardMainView`, la interacción con el botón `Equip` (`btnChange` @ offset `0x48`) ejecuta `InvenCardMainView.OnChange` (RVA `0xF22A88`), el cual transfiere el control a `InventoryScene.OnChange` (RVA `0x105A61C`).
+   - **Configuración de Punteros en Escena:**
+     - `sceneThis + 0x88` (`selectedCardItem`): Carta seleccionada para inspección / equipamiento.
+     - `sceneThis + 0x90` (`equippedCardItem`): Carta actualmente equipada en el slot del grupo.
+   - **Invocación de Layout:** Se invoca `InventoryView.ShowEquipLayout()` (RVA `0x1057760`), lo que oculta el carrusel inferior y activa la vista comparativa de tarjetas `InvenCardEquipView`.
+   - **Generación de Parámetros:** `InventoryScene.GetEquipViewData` (RVA `0x10577DC`) instancia `InvenCardEquipView.Params`, calculando diferencias de puntuación (`deltaScore`) y energía (`deltaEnergy`), vinculando `createMockLargeCardParams` y resolviendo los sprites de los botones desde `sceneView.btnBoxSprites` (`0xC0`).
+   - **Refresco de Vista:** `InvenCardEquipView.Refresh` (RVA `0xF219B4`) inicializa de forma segura los textos y estados de los botones `btnEquip` (`0x78`), `btnCancel` (`0x80`) y `btnIntensify` (`0xB0`), mostrando la vista comparativa sin dependencias de red ([inven_card_equip_view.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/inven_card_equip_view.png)).
+
+3. **Confirmación de Equipamiento (`OnEquip`) y Persistencia en `player_profile.json`:**
+   - **Disparo:** La pulsación sobre el botón `EQUIP` (`btnEquip`) dispara `InvenCardEquipView.OnEquip` (RVA `0xF21D7C`), invocando `InventoryScene.OnEquip` (RVA `0x105AFC8`).
+   - **Interceptor `InventoryScene.OnEquip`:**
+     - Recupera `beforeCard` (`0x88`) y `newCard` (`0x90`).
+     - Invoca `handleCardEquipOffline(beforeCard, newCard)`.
+     - `handleCardEquipOffline` localiza el miembro correspondiente (`(cardID - 1001) % 11`), actualiza los flags `isEquip` en `inventoryCards`, reconstruye el arreglo ordenado de slots en `equipedCards["1001"]` y escribe atómicamente el estado en disco en `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/player_profile.json`.
+     - Actualiza el byte de estado de equipamiento (`rawCard + 0x28`) de los objetos `CardItem` en memoria.
+     - Reconstruye el `FastArray` del grupo (`loonaCardListFastArray`) y lo reasigna a `loonaGroupItemObj + 0x28`.
+     - Llama a `refreshInventoryHeaderView()` y `refreshInventoryCardList()` para sincronizar cabecera y carrusel.
+     - Retorna al estado base invocando `InventoryScene.SetStateDefault(sceneThis, 1, 0, NULL)` (RVA `0x1053B88`).
+
+4. **Validación Bidireccional en Emulador BlueStacks:**
+   - **Equipamiento de HeeJin Grado A Lv 1:** Toque en `EQUIP` (`x=1670, y=875`) -> `handleCardEquipOffline` ejecutado -> `player_profile.json` actualizado (`100013`: `isEquip=true`, `100001`: `isEquip=false`). La cuadrícula de LOONA actualizó el primer slot con HeeJin Grado A (estrella plateada), recalculó el `Group Grade` a `A +300.000` con `ULTRA RAVE Lv 3 Hi High` y asignó la insignia azul de equipamiento en el carrusel ([inven_after_equip_heejin_a.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/inven_after_equip_heejin_a.png)).
+   - **Reequipamiento de HeeJin Grado R Lv 50:** Selección vía `card:2` ([inven_heejin_r50_detail.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/inven_heejin_r50_detail.png)) -> `change` -> Toque en `EQUIP` -> Invocación exitosa de `OnEquip`. `player_profile.json` guardado en disco con `100001` (`isEquip=true`), restaurando la cuadrícula a `Group Grade R +500.000` ([inven_after_reequip_r50.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/inven_after_reequip_r50.png)).
+   - Se certifica la total estabilidad, sincronización y bidireccionalidad del sistema de inventario y equipamiento offline.
+

@@ -75,4 +75,25 @@ Esta skill define los pasos estándar y flujos de trabajo para analizar, desensa
   * `InvenCardSelectView.Refresh(Params)`: RVA `0xF22C34`
   * **Prevención de Violación de Acceso `0x132`:** En `InvenCardSelectView.Params`, escribir `NULL` en el offset `+0x48` en lugar de llamar a `GetCardThemeInfoViewData` (RVA `0xABFF78`), el cual desreferencia campos de tema inexistentes en `CardItem` virtuales.
 
+### 7. Ciclo de Vida de Equipamiento de Cartas, InvenCardEquipView y Persistencia Local de Perfil
+* **Flujo Nativo de Eventos e Interceptores:**
+  * En `InvenCardMainView`, el botón `Equip` (`btnChange` @ offset `0x48`) dispara `InvenCardMainView.OnChange` (RVA `0xF22A88`), el cual invoca `InventoryScene.OnChange` (RVA `0x105A61C`).
+  * `InventoryScene.OnChange` configura los punteros nativos de carta en la escena:
+    * `sceneThis + 0x88` (`selectedCardItem`): Carta seleccionada a inspeccionar / equipar.
+    * `sceneThis + 0x90` (`equippedCardItem`): Carta actualmente equipada en el slot del grupo.
+  * Llama a `InventoryView.ShowEquipLayout()` (RVA `0x1057760`), ocultando el carrusel inferior y desplegando la vista comparativa `InvenCardEquipView`.
+  * `InventoryScene.GetEquipViewData` (RVA `0x10577DC`): Instancia `InvenCardEquipView.Params`, calcula `deltaScore` y `deltaEnergy`, e inicializa los textos de los botones (`Equip`, `Cancel`, `Level Up`).
+  * `InvenCardEquipView.Refresh` (RVA `0xF219B4`): Aplica los parámetros en pantalla sin dependencias de red.
+* **Confirmación de Equipamiento (`OnEquip`) y Persistencia Atómica:**
+  * Al pulsar `btnEquip` (`InvenCardEquipView + 0x78`), se invoca `InvenCardEquipView.OnEquip` (RVA `0xF21D7C`), el cual llama a `InventoryScene.OnEquip` (RVA `0x105AFC8`).
+  * En el interceptor de `InventoryScene.OnEquip`:
+    1. Se obtienen `beforeCard` (`0x88`) y `newCard` (`0x90`).
+    2. Se ejecuta `handleCardEquipOffline(beforeCard, newCard)`.
+    3. Se calcula el slot del miembro `memberIdx = ((cardID - 1001) % 11)`.
+    4. Se actualizan los atributos `isEquip` en `inventoryCards` y el arreglo de slots en `equipedCards["1001"]` de `player_profile.json` en disco.
+    5. Se actualiza en memoria el byte de estado de equipamiento (`rawCard + 0x28`) para todos los objetos `CardItem` de LOONA.
+    6. Se reconstruye el `FastArray` del grupo (`loonaCardListFastArray`) y se reasigna a `loonaGroupItemObj + 0x28`.
+    7. Se refrescan los contadores de cabecera y el carrusel mediante `refreshInventoryHeaderView()` y `refreshInventoryCardList()`.
+    8. Se retorna a la vista principal del inventario mediante `InventoryScene.SetStateDefault(sceneThis, 1, 0, NULL)` (RVA `0x1053B88`), restaurando la cuadrícula general de 11 miembros con insignias recalculadas en tiempo real.
+
 
