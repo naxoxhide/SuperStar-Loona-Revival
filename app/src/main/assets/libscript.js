@@ -4171,6 +4171,8 @@ function initIl2Cpp(module) {
                         var setBtnTextFn = new NativeFunction(baseAddr.add(0xE9B7B0), "void", ["pointer", "pointer", "pointer"]);
                         var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                         var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                        var mvGo = getGoFn(viewThis, NULL);
+                        if (!mvGo.isNull()) setActiveFn(mvGo, 1, NULL);
 
                         // 1. btnInfo (0x40) -> "Information"
                         if (!btnInfo.isNull()) {
@@ -4387,6 +4389,8 @@ function initIl2Cpp(module) {
                         var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
                         var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                         var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                        var svGo = getGoFn(viewThis, NULL);
+                        if (!svGo.isNull()) setActiveFn(svGo, 1, NULL);
 
                         // 1. card (0x38) -> CardLargeView
                         var card = viewThis.add(0x38).readPointer();
@@ -4716,9 +4720,45 @@ function initIl2Cpp(module) {
                                 } catch (eSml) { log("[-] Error calling ShowMainLayout: " + eSml.message); }
 
                                 // 2. Correct InventoryView field offsets (from dump.cs):
-                                //    selectView=0x48, noneView=0x50, mainView=0x58, equipView=0x60
+                                //    selectView=0x48, noneView=0x50, mainView=0x58, equipView=0x60, cardView=0x78
                                 var mainView = sceneView.add(0x58).readPointer();
                                 var selectView = sceneView.add(0x48).readPointer();
+                                var cardView = sceneView.add(0x78).readPointer();
+
+                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+
+                                if (!selectView.isNull()) {
+                                    var svGo = getGoFn(selectView, NULL);
+                                    if (!svGo.isNull()) {
+                                        setActiveFn(svGo, 1, NULL);
+                                        log("[✅ SET_STATE_MAIN] selectView GameObject activated: " + svGo);
+                                    }
+                                }
+                                if (!mainView.isNull()) {
+                                    var mvGo = getGoFn(mainView, NULL);
+                                    if (!mvGo.isNull()) {
+                                        setActiveFn(mvGo, 1, NULL);
+                                        log("[✅ SET_STATE_MAIN] mainView GameObject activated: " + mvGo);
+                                    }
+                                }
+                                if (!cardView.isNull()) {
+                                    var cvGo = getGoFn(cardView, NULL);
+                                    if (!cvGo.isNull()) {
+                                        setActiveFn(cvGo, 1, NULL);
+                                        log("[✅ SET_STATE_MAIN] cardView GameObject activated: " + cvGo);
+                                    }
+                                }
+
+                                try {
+                                    var setStateFn = new NativeFunction(baseAddr.add(0x10C1774), "void", ["pointer", "int", "pointer"]);
+                                    setStateFn(sceneThis, 6, NULL);
+                                } catch (eSs) {}
+
+                                try {
+                                    var updateDisplayFn = new NativeFunction(baseAddr.add(0x10542F4), "void", ["pointer", "int", "int", "int", "pointer"]);
+                                    updateDisplayFn(sceneThis, 1, 0, 1, NULL);
+                                } catch (eUdl) {}
 
                                 // 3. Refresh InvenCardMainView (our replaced function handles it safely)
                                 if (!mainView.isNull()) {
@@ -4914,6 +4954,14 @@ function initIl2Cpp(module) {
                     Interceptor.replace(invenCardEquipViewRefreshAddr, new NativeCallback(function (viewThis, p, methodInfo) {
                         try {
                             if (viewThis.isNull() || p.isNull()) return;
+
+                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                            var eqGo = getGoFn(viewThis, NULL);
+                            if (!eqGo.isNull()) {
+                                setActiveFn(eqGo, 1, NULL);
+                                log("[✅ EQUIP_VIEW] InvenCardEquipView GameObject activated: " + eqGo);
+                            }
 
                             // 1. card (0x38)
                             var card = viewThis.add(0x38).readPointer();
@@ -6948,6 +6996,20 @@ function initIl2Cpp(module) {
                                                     }
                                                 } else {
                                                     log("[-] CARD CMD failed: not in InventoryScene (sceneId=" + sceneId + ", instance=" + curScene + ")");
+                                                }
+                                            } else if (cmdRaw === "change") {
+                                                var curScene = staticFields.add(0x20).readPointer();
+                                                if (!curScene.isNull() && sceneId === 4) {
+                                                    log("[🗃️ CHANGE CMD] Triggering OnChange directly!");
+                                                    var onChangeFn = new NativeFunction(baseAddr.add(0x105A61C), "void", ["pointer", "pointer"]);
+                                                    onChangeFn(curScene, NULL);
+                                                }
+                                            } else if (cmdRaw === "equip") {
+                                                var curScene = staticFields.add(0x20).readPointer();
+                                                if (!curScene.isNull() && sceneId === 4) {
+                                                    log("[🗃️ EQUIP CMD] Triggering OnEquip directly!");
+                                                    var onEquipFn = new NativeFunction(baseAddr.add(0x105AFC8), "void", ["pointer", "pointer"]);
+                                                    onEquipFn(curScene, NULL);
                                                 }
                                             } else if (cmdRaw === "back" || cmdRaw === "close") {
                                                 var curScene = staticFields.add(0x20).readPointer();
