@@ -6157,6 +6157,12 @@ function initIl2Cpp(module) {
 
                                         var cardView = sceneView.add(0x78).readPointer();
                                         if (!cardView.isNull()) {
+                                            try {
+                                                var cViewGo = getGoFn(cardView);
+                                                if (!cViewGo.isNull()) {
+                                                    setActiveFn(cViewGo, 1, NULL);
+                                                }
+                                            } catch (eCvGo) {}
                                             var cardCountText = cardView.add(0x38).readPointer();
                                             if (!cardCountText.isNull()) {
                                                 var cTxt = readIl2CppString(getTextFn(cardCountText));
@@ -6183,6 +6189,12 @@ function initIl2Cpp(module) {
 
                                         var groupView = sceneView.add(0x70).readPointer();
                                         if (!groupView.isNull()) {
+                                            try {
+                                                var gViewGo = getGoFn(groupView);
+                                                if (!gViewGo.isNull()) {
+                                                    setActiveFn(gViewGo, 1, NULL);
+                                                }
+                                            } catch (eGvGo) {}
                                             var groupCountText = groupView.add(0x38).readPointer();
                                             if (!groupCountText.isNull()) {
                                                 var gTxt = readIl2CppString(getTextFn(groupCountText));
@@ -6268,10 +6280,10 @@ function initIl2Cpp(module) {
                 // --- Intercept InventoryScene.SetStateLoadingData (0x1055594) -> Forward directly to SetStateDefault ---
                 try {
                     Interceptor.replace(baseAddr.add(0x1055594), new NativeCallback(function (sceneThis, methodInfo) {
-                        log("[🗃️ INVENTORY] SetStateLoadingData intercepted! Forwarding directly to SetStateDefault(1, 1).");
+                        log("[🗃️ INVENTORY] SetStateLoadingData intercepted! Forwarding directly to SetStateDefault(1, 0).");
                         try {
                             var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
-                            setStateDefaultFn(sceneThis, 1, 1, NULL);
+                            setStateDefaultFn(sceneThis, 1, 0, NULL);
                         } catch (eSsd) {
                             log("[-] Error calling SetStateDefault from SetStateLoadingData: " + eSsd.message);
                         }
@@ -6279,6 +6291,41 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on InventoryScene.SetStateLoadingData (0x1055594)!");
                 } catch (eSsld) {
                     log("[-] Error replacing SetStateLoadingData: " + eSsld.message);
+                }
+
+                // --- Intercept InventoryScene.SetStateHelp (0x10554C4) -> Bypass HelpAssist modal and forward to SetStateDefault ---
+                try {
+                    Interceptor.replace(baseAddr.add(0x10554C4), new NativeCallback(function (sceneThis, methodInfo) {
+                        log("[🗃️ INVENTORY] SetStateHelp intercepted! Bypassing HelpAssist modal and forwarding to SetStateDefault(1, 0).");
+                        try {
+                            var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
+                            setStateDefaultFn(sceneThis, 1, 0, NULL);
+                        } catch (eSsh) {
+                            log("[-] Error calling SetStateDefault from SetStateHelp: " + eSsh.message);
+                        }
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.SetStateHelp (0x10554C4)!");
+                } catch (eSshInv) {
+                    log("[-] Error replacing InventoryScene.SetStateHelp: " + eSshInv.message);
+                }
+
+                // --- Intercept HelpAssist.Open (0xBA6DA4) -> Immediately invoke callback to prevent blocking modal popups ---
+                try {
+                    Interceptor.replace(baseAddr.add(0xBA6DA4), new NativeCallback(function (state, callback, methodInfo) {
+                        log("[ℹ️ HELP_ASSIST] HelpAssist.Open intercepted (state=" + state + ", callback=" + callback + "). Bypassing modal...");
+                        if (!callback.isNull()) {
+                            try {
+                                var invokeFn = new NativeFunction(baseAddr.add(0xCA8E34), "void", ["pointer", "pointer"]);
+                                invokeFn(callback, NULL);
+                                log("[ℹ️ HELP_ASSIST] HelpAssist callback invoked successfully!");
+                            } catch (eCb) {
+                                log("[-] Error invoking HelpAssist callback: " + eCb.message);
+                            }
+                        }
+                    }, "void", ["int", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on HelpAssist.Open (0xBA6DA4)!");
+                } catch (eHa) {
+                    log("[-] Error replacing HelpAssist.Open: " + eHa.message);
                 }
 
                 // --- Intercept InventoryScene.GetMaterialViewData (0x105E33C) -> Safe value type filler ---
