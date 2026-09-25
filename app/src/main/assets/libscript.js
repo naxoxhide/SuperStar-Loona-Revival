@@ -4169,10 +4169,6 @@ function initIl2Cpp(module) {
                         var numberExchange = viewThis.add(0x60).readPointer();
 
                         var setBtnTextFn = new NativeFunction(baseAddr.add(0xE9B7B0), "void", ["pointer", "pointer", "pointer"]);
-                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
-                        var mvGo = getGoFn(viewThis, NULL);
-                        if (!mvGo.isNull()) setActiveFn(mvGo, 1, NULL);
 
                         // 1. btnInfo (0x40) -> "Information"
                         if (!btnInfo.isNull()) {
@@ -4387,10 +4383,6 @@ function initIl2Cpp(module) {
 
                         var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
                         var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
-                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
-                        var svGo = getGoFn(viewThis, NULL);
-                        if (!svGo.isNull()) setActiveFn(svGo, 1, NULL);
 
                         // 1. card (0x38) -> CardLargeView
                         var card = viewThis.add(0x38).readPointer();
@@ -4720,35 +4712,9 @@ function initIl2Cpp(module) {
                                 } catch (eSml) { log("[-] Error calling ShowMainLayout: " + eSml.message); }
 
                                 // 2. Correct InventoryView field offsets (from dump.cs):
-                                //    selectView=0x48, noneView=0x50, mainView=0x58, equipView=0x60, cardView=0x78
+                                //    selectView=0x48, noneView=0x50, mainView=0x58, equipView=0x60
                                 var mainView = sceneView.add(0x58).readPointer();
                                 var selectView = sceneView.add(0x48).readPointer();
-                                var cardView = sceneView.add(0x78).readPointer();
-
-                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
-
-                                if (!selectView.isNull()) {
-                                    var svGo = getGoFn(selectView, NULL);
-                                    if (!svGo.isNull()) {
-                                        setActiveFn(svGo, 1, NULL);
-                                        log("[✅ SET_STATE_MAIN] selectView GameObject activated: " + svGo);
-                                    }
-                                }
-                                if (!mainView.isNull()) {
-                                    var mvGo = getGoFn(mainView, NULL);
-                                    if (!mvGo.isNull()) {
-                                        setActiveFn(mvGo, 1, NULL);
-                                        log("[✅ SET_STATE_MAIN] mainView GameObject activated: " + mvGo);
-                                    }
-                                }
-                                if (!cardView.isNull()) {
-                                    var cvGo = getGoFn(cardView, NULL);
-                                    if (!cvGo.isNull()) {
-                                        setActiveFn(cvGo, 1, NULL);
-                                        log("[✅ SET_STATE_MAIN] cardView GameObject activated: " + cvGo);
-                                    }
-                                }
 
                                 // 3. Refresh InvenCardMainView (our replaced function handles it safely)
                                 if (!mainView.isNull()) {
@@ -4945,13 +4911,6 @@ function initIl2Cpp(module) {
                         try {
                             if (viewThis.isNull() || p.isNull()) return;
 
-                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
-                            var eqGo = getGoFn(viewThis, NULL);
-                            if (!eqGo.isNull()) {
-                                setActiveFn(eqGo, 1, NULL);
-                                log("[✅ EQUIP_VIEW] InvenCardEquipView GameObject activated: " + eqGo);
-                            }
 
                             // 1. card (0x38)
                             var card = viewThis.add(0x38).readPointer();
@@ -6147,12 +6106,6 @@ function initIl2Cpp(module) {
 
                                         var cardView = sceneView.add(0x78).readPointer();
                                         if (!cardView.isNull()) {
-                                            try {
-                                                var cViewGo = getGoFn(cardView);
-                                                if (!cViewGo.isNull()) {
-                                                    setActiveFn(cViewGo, 1, NULL);
-                                                }
-                                            } catch (eCvGo) {}
                                             var cardCountText = cardView.add(0x38).readPointer();
                                             if (!cardCountText.isNull()) {
                                                 var cTxt = readIl2CppString(getTextFn(cardCountText));
@@ -6179,12 +6132,6 @@ function initIl2Cpp(module) {
 
                                         var groupView = sceneView.add(0x70).readPointer();
                                         if (!groupView.isNull()) {
-                                            try {
-                                                var gViewGo = getGoFn(groupView);
-                                                if (!gViewGo.isNull()) {
-                                                    setActiveFn(gViewGo, 1, NULL);
-                                                }
-                                            } catch (eGvGo) {}
                                             var groupCountText = groupView.add(0x38).readPointer();
                                             if (!groupCountText.isNull()) {
                                                 var gTxt = readIl2CppString(getTextFn(groupCountText));
@@ -6251,77 +6198,7 @@ function initIl2Cpp(module) {
                     });
                 } catch (eIsc) {}
 
-                // --- Intercept InventoryScene.SetStateWait (0x10556C0) -> Forward directly to SetStateWaitDone (0x1055E14) ---
-                try {
-                    Interceptor.replace(baseAddr.add(0x10556C0), new NativeCallback(function (sceneThis, methodInfo) {
-                        log("[🗃️ INVENTORY] InventoryScene.SetStateWait intercepted! Forwarding directly to SetStateWaitDone.");
-                        try {
-                            var setStateWaitDoneFn = new NativeFunction(baseAddr.add(0x1055E14), "void", ["pointer", "pointer"]);
-                            setStateWaitDoneFn(sceneThis, NULL);
-                        } catch (eSswd) {
-                            log("[-] Error calling SetStateWaitDone: " + eSswd.message);
-                        }
-                    }, "void", ["pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on InventoryScene.SetStateWait (0x10556C0)!");
-                } catch (eSswInv) {
-                    log("[-] Error replacing InventoryScene.SetStateWait: " + eSswInv.message);
-                }
 
-                // --- Intercept InventoryScene.SetStateLoadingData (0x1055594) -> Forward directly to SetStateDefault ---
-                try {
-                    Interceptor.replace(baseAddr.add(0x1055594), new NativeCallback(function (sceneThis, methodInfo) {
-                        log("[🗃️ INVENTORY] SetStateLoadingData intercepted! Forwarding directly to SetStateDefault(1, 0).");
-                        try {
-                            var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
-                            setStateDefaultFn(sceneThis, 1, 0, NULL);
-                        } catch (eSsd) {
-                            log("[-] Error calling SetStateDefault from SetStateLoadingData: " + eSsd.message);
-                        }
-                    }, "void", ["pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on InventoryScene.SetStateLoadingData (0x1055594)!");
-                } catch (eSsld) {
-                    log("[-] Error replacing SetStateLoadingData: " + eSsld.message);
-                }
-
-                // --- Intercept InventoryScene.SetStateHelp (0x10554C4) -> Bypass HelpAssist modal and refresh InventoryScene ---
-                try {
-                    Interceptor.replace(baseAddr.add(0x10554C4), new NativeCallback(function (sceneThis, methodInfo) {
-                        log("[🗃️ INVENTORY] SetStateHelp intercepted! Bypassing HelpAssist modal and initializing InventoryScene...");
-                        try {
-                            var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
-                            setStateDefaultFn(sceneThis, 1, 0, NULL);
-
-                            log("[🗃️ INVENTORY] Calling InventoryScene.Refresh (0x105E0FC)...");
-                            var invenSceneRefreshFn = new NativeFunction(baseAddr.add(0x105E0FC), "void", ["pointer", "pointer"]);
-                            invenSceneRefreshFn(sceneThis, NULL);
-                            log("[🎉 INVENTORY] InventoryScene.Refresh (0x105E0FC) completed!");
-                        } catch (eSsh) {
-                            log("[-] Error in SetStateHelp bypass: " + eSsh.message);
-                        }
-                    }, "void", ["pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on InventoryScene.SetStateHelp (0x10554C4)!");
-                } catch (eSshInv) {
-                    log("[-] Error replacing InventoryScene.SetStateHelp: " + eSshInv.message);
-                }
-
-                // --- Intercept HelpAssist.Open (0xBA6DA4) -> Immediately invoke callback to prevent blocking modal popups ---
-                try {
-                    Interceptor.replace(baseAddr.add(0xBA6DA4), new NativeCallback(function (state, callback, methodInfo) {
-                        log("[ℹ️ HELP_ASSIST] HelpAssist.Open intercepted (state=" + state + ", callback=" + callback + "). Bypassing modal...");
-                        if (!callback.isNull()) {
-                            try {
-                                var invokeFn = new NativeFunction(baseAddr.add(0xCA8E34), "void", ["pointer", "pointer"]);
-                                invokeFn(callback, NULL);
-                                log("[ℹ️ HELP_ASSIST] HelpAssist callback invoked successfully!");
-                            } catch (eCb) {
-                                log("[-] Error invoking HelpAssist callback: " + eCb.message);
-                            }
-                        }
-                    }, "void", ["int", "pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on HelpAssist.Open (0xBA6DA4)!");
-                } catch (eHa) {
-                    log("[-] Error replacing HelpAssist.Open: " + eHa.message);
-                }
 
                 // --- Intercept InventoryScene.GetMaterialViewData (0x105E33C) -> Safe value type filler ---
                 try {
