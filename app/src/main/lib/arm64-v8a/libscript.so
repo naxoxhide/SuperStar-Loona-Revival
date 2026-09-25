@@ -4750,16 +4750,6 @@ function initIl2Cpp(module) {
                                     }
                                 }
 
-                                try {
-                                    var setStateFn = new NativeFunction(baseAddr.add(0x10C1774), "void", ["pointer", "int", "pointer"]);
-                                    setStateFn(sceneThis, 6, NULL);
-                                } catch (eSs) {}
-
-                                try {
-                                    var updateDisplayFn = new NativeFunction(baseAddr.add(0x10542F4), "void", ["pointer", "int", "int", "int", "pointer"]);
-                                    updateDisplayFn(sceneThis, 1, 0, 1, NULL);
-                                } catch (eUdl) {}
-
                                 // 3. Refresh InvenCardMainView (our replaced function handles it safely)
                                 if (!mainView.isNull()) {
                                     try {
@@ -6088,18 +6078,19 @@ function initIl2Cpp(module) {
                         0x2FE097E: "Lock"
                     };
 
-                    Interceptor.replace(baseAddr.add(0xCF2288), new NativeCallback(function (code32, lang, methodInfo) {
-                        try {
-                            var uCode = code32 >>> 0;
-                            if (offlineLocaleStrings[uCode] !== undefined) {
-                                return createIl2CppString(offlineLocaleStrings[uCode]);
+                    Interceptor.attach(baseAddr.add(0xCF1064), {
+                        onEnter: function (args) {
+                            this.code32 = args[0].toInt32() >>> 0;
+                        },
+                        onLeave: function (retval) {
+                            if (offlineLocaleStrings[this.code32] !== undefined) {
+                                retval.replace(createIl2CppString(offlineLocaleStrings[this.code32]));
                             }
-                        } catch (eGswl) {}
-                        return createIl2CppString("");
-                    }, "pointer", ["int", "int16", "pointer"]));
-                    log("[+] Interceptor.replace installed on LanguageControl.GetStringWantlang (0xCF2288)!");
+                        }
+                    });
+                    log("[+] Hooked LanguageControl.GetString (0xCF1064) with offline fallbacks!");
                 } catch (eLg) {
-                    log("[-] Error setting up LanguageControl: " + eLg.message);
+                    log("[-] Error hooking LanguageControl.GetString: " + eLg.message);
                 }
 
                 // --- Protect UserData.get_CardInvenMaxCount (0xAB1C1C) & InventoryControl.get_CardMapCount (0xF275E8) ---
