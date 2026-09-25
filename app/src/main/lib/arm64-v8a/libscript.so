@@ -6103,6 +6103,21 @@ function initIl2Cpp(module) {
                     log("[-] Error hooking LanguageControl.GetString: " + eLg.message);
                 }
 
+                // --- Intercept LanguageControl.GetStringWantlang (0xCF2288) to prevent crashes on scene transitions ---
+                try {
+                    Interceptor.replace(baseAddr.add(0xCF2288), new NativeCallback(function (code32, lang, methodInfo) {
+                        try {
+                            var getStringFn = new NativeFunction(baseAddr.add(0xCF1064), "pointer", ["int", "pointer"]);
+                            var res = getStringFn(code32, NULL);
+                            if (!res.isNull()) return res;
+                        } catch (eGswl) {}
+                        return createIl2CppString("");
+                    }, "pointer", ["int", "int16", "pointer"]));
+                    log("[+] Interceptor.replace installed on LanguageControl.GetStringWantlang (0xCF2288)!");
+                } catch (eGswlHook) {
+                    log("[-] Error replacing GetStringWantlang: " + eGswlHook.message);
+                }
+
                 // --- Protect UserData.get_CardInvenMaxCount (0xAB1C1C) & InventoryControl.get_CardMapCount (0xF275E8) ---
                 try {
                     Interceptor.replace(baseAddr.add(0xAB1C1C), new NativeCallback(function () {
@@ -6293,15 +6308,20 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing SetStateLoadingData: " + eSsld.message);
                 }
 
-                // --- Intercept InventoryScene.SetStateHelp (0x10554C4) -> Bypass HelpAssist modal and forward to SetStateDefault ---
+                // --- Intercept InventoryScene.SetStateHelp (0x10554C4) -> Bypass HelpAssist modal and refresh InventoryScene ---
                 try {
                     Interceptor.replace(baseAddr.add(0x10554C4), new NativeCallback(function (sceneThis, methodInfo) {
-                        log("[🗃️ INVENTORY] SetStateHelp intercepted! Bypassing HelpAssist modal and forwarding to SetStateDefault(1, 0).");
+                        log("[🗃️ INVENTORY] SetStateHelp intercepted! Bypassing HelpAssist modal and initializing InventoryScene...");
                         try {
                             var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
                             setStateDefaultFn(sceneThis, 1, 0, NULL);
+
+                            log("[🗃️ INVENTORY] Calling InventoryScene.Refresh (0x105E0FC)...");
+                            var invenSceneRefreshFn = new NativeFunction(baseAddr.add(0x105E0FC), "void", ["pointer", "pointer"]);
+                            invenSceneRefreshFn(sceneThis, NULL);
+                            log("[🎉 INVENTORY] InventoryScene.Refresh (0x105E0FC) completed!");
                         } catch (eSsh) {
-                            log("[-] Error calling SetStateDefault from SetStateHelp: " + eSsh.message);
+                            log("[-] Error in SetStateHelp bypass: " + eSsh.message);
                         }
                     }, "void", ["pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on InventoryScene.SetStateHelp (0x10554C4)!");
