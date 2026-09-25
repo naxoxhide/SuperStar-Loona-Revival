@@ -5447,6 +5447,50 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing CardItem.ExtractLargeImagePath: " + eElip.message);
                 }
 
+                // Bypass InventoryControl.SetSubGroupCode (0xF271E8) & GetSubGroupCode (0xF272B8)
+                try {
+                    Interceptor.replace(baseAddr.add(0xF271E8), new NativeCallback(function (groupCode, subCode, methodInfo) {
+                        log("[🛡️ INVENTORY] Safely bypassed SetSubGroupCode: " + groupCode + " -> " + subCode);
+                    }, "void", ["int", "int", "pointer"]));
+                    Interceptor.replace(baseAddr.add(0xF272B8), new NativeCallback(function (groupCode, methodInfo) {
+                        return 0;
+                    }, "int", ["int", "pointer"]));
+                    log("[+] Interceptor.replace installed on SetSubGroupCode (0xF271E8) & GetSubGroupCode (0xF272B8)!");
+                } catch (eSsgc) {
+                    log("[-] Error replacing SetSubGroupCode: " + eSsgc.message);
+                }
+
+                // InventoryControl.GetMajorGroupItem (0xF27090) & GetCurrentGroup (0xF2B51C)
+                try {
+                    Interceptor.replace(baseAddr.add(0xF27090), new NativeCallback(function (groupCode, methodInfo) {
+                        if (loonaGroupItemObj && !loonaGroupItemObj.isNull()) {
+                            return loonaGroupItemObj;
+                        }
+                        return NULL;
+                    }, "pointer", ["int", "pointer"]));
+                    Interceptor.replace(baseAddr.add(0xF2B51C), new NativeCallback(function (pIndex, pSubIndex, methodInfo) {
+                        if (pIndex && !pIndex.isNull()) pIndex.writeInt(0);
+                        if (pSubIndex && !pSubIndex.isNull()) pSubIndex.writeInt(0);
+                        return 1001; // LOONA group code
+                    }, "int", ["pointer", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on GetMajorGroupItem (0xF27090) & GetCurrentGroup (0xF2B51C)!");
+                } catch (eGmg) {
+                    log("[-] Error replacing GetMajorGroupItem / GetCurrentGroup: " + eGmg.message);
+                }
+
+                // ProfileControl.set_ProfileCode (0xAAF588) & get_ProfileCode (0xAAF414)
+                try {
+                    Interceptor.replace(baseAddr.add(0xAAF588), new NativeCallback(function (profileCode, methodInfo) {
+                        log("[👤 PROFILE] Safely set profileCode: " + profileCode);
+                    }, "void", ["int", "pointer"]));
+                    Interceptor.replace(baseAddr.add(0xAAF414), new NativeCallback(function (methodInfo) {
+                        return 1001;
+                    }, "int", ["pointer"]));
+                    log("[+] Interceptor.replace installed on ProfileControl.set_ProfileCode & get_ProfileCode!");
+                } catch (ePrf) {
+                    log("[-] Error replacing ProfileControl: " + ePrf.message);
+                }
+
                 // Safe InventoryControl.UpdateDisplayGroupList (0xF28CE8)
                 try {
                     Interceptor.replace(baseAddr.add(0xF28CE8), new NativeCallback(function (isForceSortAlphabet, methodInfo) {
@@ -6117,6 +6161,52 @@ function initIl2Cpp(module) {
                     });
                 } catch (eIsc) {}
 
+                // --- Intercept InventoryScene.SetStateWait (0x10556C0) -> Forward directly to SetStateWaitDone (0x1055E14) ---
+                try {
+                    Interceptor.replace(baseAddr.add(0x10556C0), new NativeCallback(function (sceneThis, methodInfo) {
+                        log("[🗃️ INVENTORY] InventoryScene.SetStateWait intercepted! Forwarding directly to SetStateWaitDone.");
+                        try {
+                            var setStateWaitDoneFn = new NativeFunction(baseAddr.add(0x1055E14), "void", ["pointer", "pointer"]);
+                            setStateWaitDoneFn(sceneThis, NULL);
+                        } catch (eSswd) {
+                            log("[-] Error calling SetStateWaitDone: " + eSswd.message);
+                        }
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.SetStateWait (0x10556C0)!");
+                } catch (eSswInv) {
+                    log("[-] Error replacing InventoryScene.SetStateWait: " + eSswInv.message);
+                }
+
+                // --- Intercept InventoryScene.SetStateLoadingData (0x1055594) -> Forward directly to SetStateDefault ---
+                try {
+                    Interceptor.replace(baseAddr.add(0x1055594), new NativeCallback(function (sceneThis, methodInfo) {
+                        log("[🗃️ INVENTORY] SetStateLoadingData intercepted! Forwarding directly to SetStateDefault(1, 1).");
+                        try {
+                            var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
+                            setStateDefaultFn(sceneThis, 1, 1, NULL);
+                        } catch (eSsd) {
+                            log("[-] Error calling SetStateDefault from SetStateLoadingData: " + eSsd.message);
+                        }
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.SetStateLoadingData (0x1055594)!");
+                } catch (eSsld) {
+                    log("[-] Error replacing SetStateLoadingData: " + eSsld.message);
+                }
+
+                // --- Intercept InventoryScene.GetMaterialViewData (0x105E33C) -> Safe value type filler ---
+                try {
+                    Interceptor.replace(baseAddr.add(0x105E33C), new NativeCallback(function (retBuf, sceneThis, cardItem, materialCardItem, index, methodInfo) {
+                        try {
+                            if (retBuf && !retBuf.isNull()) {
+                                for (var b = 0; b < 0x20; b++) retBuf.add(b).writeU8(0);
+                            }
+                        } catch (eMb) {}
+                    }, "void", ["pointer", "pointer", "pointer", "pointer", "int", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.GetMaterialViewData (0x105E33C)!");
+                } catch (eGmvd) {
+                    log("[-] Error replacing GetMaterialViewData: " + eGmvd.message);
+                }
+
                 // Offline Equip / Unequip Helpers and Hooks
                 var refreshInventoryHeaderView = function() {
                     try {
@@ -6648,6 +6738,11 @@ function initIl2Cpp(module) {
                 var isLobbyIntegrated = false;
                 var lastWorkerTid = 0;
                 var deadlockFrames = 0;
+                var cachedCmdPathStr = NULL;
+                var pCmdPathCStr = Memory.allocUtf8String("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt");
+                var accessPtr = Module.findExportByName("libc.so", "access");
+                var accessFn = accessPtr ? new NativeFunction(accessPtr, "int", ["pointer", "int"]) : null;
+                var cmdReusableBuf = Memory.alloc(Process.pointerSize);
 
                 var findGameObjectFn = new NativeFunction(baseAddr.add(0x1DBB16C), 'pointer', ['pointer', 'pointer']);
                 var isDoneFn = new NativeFunction(baseAddr.add(0x1DB2C9C), 'int', ['pointer']);
@@ -6759,26 +6854,23 @@ function initIl2Cpp(module) {
                                 }
                             }
 
-                            // Check scene navigation command file every 30 frames
+                            // Check scene navigation command file every 30 frames (zero allocation check via libc access)
                             if (sceneUpdateCounter % 30 === 0) {
                                 try {
-                                    var cmdPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt";
-                                    var existsMethod = findMethod("mscorlib", "System.IO", "File", "Exists", 1);
-                                    var readAllTextMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllText", 1);
-                                    var deleteMethod = findMethod("mscorlib", "System.IO", "File", "Delete", 1);
-                                    var cmdPathStr = createIl2CppString(cmdPath);
-                                    var aCheck = Memory.alloc(Process.pointerSize);
-                                    aCheck.writePointer(cmdPathStr);
-                                    var exc = Memory.alloc(Process.pointerSize);
-                                    exc.writePointer(NULL);
-                                    var cmdExists = il2cpp_runtime_invoke(existsMethod, NULL, aCheck, exc);
-                                    if (cmdExists.toInt32() !== 0) {
-                                        var aRead = Memory.alloc(Process.pointerSize);
-                                        aRead.writePointer(cmdPathStr);
-                                        var txtObj = il2cpp_runtime_invoke(readAllTextMethod, NULL, aRead, exc);
-                                        var aDel = Memory.alloc(Process.pointerSize);
-                                        aDel.writePointer(cmdPathStr);
-                                        il2cpp_runtime_invoke(deleteMethod, NULL, aDel, exc);
+                                    if (pCmdPathCStr && accessFn && accessFn(pCmdPathCStr, 0) === 0) {
+                                        var readAllTextMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllText", 1);
+                                        var deleteMethod = findMethod("mscorlib", "System.IO", "File", "Delete", 1);
+                                        if (!cachedCmdPathStr || cachedCmdPathStr.isNull()) {
+                                            cachedCmdPathStr = createIl2CppString("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt");
+                                        }
+                                        if (!cmdReusableBuf) {
+                                            cmdReusableBuf = Memory.alloc(Process.pointerSize);
+                                        }
+                                        cmdReusableBuf.writePointer(cachedCmdPathStr);
+                                        var exc = Memory.alloc(Process.pointerSize);
+                                        exc.writePointer(NULL);
+                                        var txtObj = il2cpp_runtime_invoke(readAllTextMethod, NULL, cmdReusableBuf, exc);
+                                        il2cpp_runtime_invoke(deleteMethod, NULL, cmdReusableBuf, exc);
                                         if (!txtObj.isNull()) {
                                             var cmdRaw = readIl2CppString(txtObj).trim();
                                             log("[🚀 SCENE CMD] Read command: '" + cmdRaw + "'");
