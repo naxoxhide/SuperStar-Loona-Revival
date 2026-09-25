@@ -6069,7 +6069,7 @@ function initIl2Cpp(module) {
                     log("[-] Error patching HelpAssist.GetCompleted: " + eHgc.message);
                 }
 
-                // --- Hook LanguageControl.GetString (0xCF1064) with offline fallbacks ---
+                // --- Hook LanguageControl.GetString & GetStringWantlang with offline fallbacks ---
                 try {
                     var offlineLocaleStrings = {
                         0x2FC86C1: "Shop",
@@ -6088,34 +6088,18 @@ function initIl2Cpp(module) {
                         0x2FE097E: "Lock"
                     };
 
-                    Interceptor.attach(baseAddr.add(0xCF1064), {
-                        onEnter: function (args) {
-                            this.code32 = args[0].toInt32() >>> 0;
-                        },
-                        onLeave: function (retval) {
-                            if (offlineLocaleStrings[this.code32] !== undefined) {
-                                retval.replace(createIl2CppString(offlineLocaleStrings[this.code32]));
-                            }
-                        }
-                    });
-                    log("[+] Hooked LanguageControl.GetString (0xCF1064) with offline fallbacks!");
-                } catch (eLg) {
-                    log("[-] Error hooking LanguageControl.GetString: " + eLg.message);
-                }
-
-                // --- Intercept LanguageControl.GetStringWantlang (0xCF2288) to prevent crashes on scene transitions ---
-                try {
                     Interceptor.replace(baseAddr.add(0xCF2288), new NativeCallback(function (code32, lang, methodInfo) {
                         try {
-                            var getStringFn = new NativeFunction(baseAddr.add(0xCF1064), "pointer", ["int", "pointer"]);
-                            var res = getStringFn(code32, NULL);
-                            if (!res.isNull()) return res;
+                            var uCode = code32 >>> 0;
+                            if (offlineLocaleStrings[uCode] !== undefined) {
+                                return createIl2CppString(offlineLocaleStrings[uCode]);
+                            }
                         } catch (eGswl) {}
                         return createIl2CppString("");
                     }, "pointer", ["int", "int16", "pointer"]));
                     log("[+] Interceptor.replace installed on LanguageControl.GetStringWantlang (0xCF2288)!");
-                } catch (eGswlHook) {
-                    log("[-] Error replacing GetStringWantlang: " + eGswlHook.message);
+                } catch (eLg) {
+                    log("[-] Error setting up LanguageControl: " + eLg.message);
                 }
 
                 // --- Protect UserData.get_CardInvenMaxCount (0xAB1C1C) & InventoryControl.get_CardMapCount (0xF275E8) ---
