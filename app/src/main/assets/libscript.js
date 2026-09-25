@@ -6966,7 +6966,8 @@ function initIl2Cpp(module) {
                                             }
                                         }
                                     }
-                                } catch (eCmd) {}
+                                }
+                            } catch (eCmd) {}
                             }
 
                             // Auto-Enlace / Activador Seguro de LobbyScene ONLY when isDone or already unloaded
