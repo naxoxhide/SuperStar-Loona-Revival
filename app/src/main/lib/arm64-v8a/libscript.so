@@ -878,6 +878,14 @@ function initIl2Cpp(module) {
             try { setStateMainFn = new NativeFunction(titleSceneSetStateMainPtr, "void", ["pointer"]); } catch (e) {}
             try { setStateGuestLoginFn = new NativeFunction(titleSceneSetStateGuestLoginPtr, "void", ["pointer"]); } catch (e) {}
 
+            // TitleLoginAssist.Close (0xB2030C) null guard
+            try {
+                Interceptor.replace(baseAddr.add(0xB2030C), new NativeCallback(function (methodInfo) {
+                    log("[🛡️ LOGIN ASSIST] TitleLoginAssist.Close safely called");
+                }, "void", ["pointer"]));
+                log("[🛡️ LOGIN ASSIST] TitleLoginAssist.Close null guard installed!");
+            } catch (eTla) {}
+
             Interceptor.attach(requestSequentialLoginPtr, {
                 onEnter: function (args) {
                     log("[🔐 LOGIN] TitleScene.RequestSequentialLogin called");
@@ -1911,12 +1919,14 @@ function initIl2Cpp(module) {
                 } catch (eTerms) {}
 
                 // TitleScene.SetStateSelectLogin (0xB245AC)
-                Interceptor.attach(baseAddr.add(0xB245AC), {
-                    onEnter: function (args) {
-                        log("[🚀 TITLE SCENE] TitleScene.SetStateSelectLogin called on instance: " + args[0]);
-                        globalTitleScene = args[0];
-                    }
-                });
+                try {
+                    Interceptor.replace(baseAddr.add(0xB245AC), new NativeCallback(function (thiz, toggleIndex, methodInfo) {
+                        log("[🚀 TITLE SCENE] TitleScene.SetStateSelectLogin intercepted! Redirecting directly to Lobby...");
+                        globalTitleScene = thiz;
+                        triggerLobbyTransition("SetStateSelectLogin");
+                    }, "void", ["pointer", "int", "pointer"]));
+                    log("[+] Hooked TitleScene.SetStateSelectLogin (0xB245AC)!");
+                } catch (eSsl) {}
 
                 // Input.GetMouseButtonDown (0x25A5624) para detectar toques en pantalla durante TitleScene
                 Interceptor.attach(baseAddr.add(0x25A5624), {
