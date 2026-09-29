@@ -31,6 +31,11 @@ agent_scratch/
 screen_*.png
 screen_*.jpg
 screenshot*.png
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+/*.log
 !docs/walkthroughs/media/**
 
 # Exclusiones de caches internos en .agents/ (se preservan AGENTS.md y skills/)
