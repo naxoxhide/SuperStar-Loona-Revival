@@ -31,25 +31,34 @@ Tras el cierre definitivo de los servidores oficiales de Dalcomsoft, este proyec
 ## 📁 Estructura del Repositorio
 
 ```text
-├── .agents/               # Reglas obligatorias (AGENTS.md) y skills de ingeniería para agentes IA
-│   └── skills/            # Procedimientos especializados (criptografía, bypass de red, reversing)
-├── app/                   # Código fuente del cliente Android reconstruido (Java, Smali, Assets, Libs nativas)
-│   ├── src/main/          # Manifiesto, librerías nativas (libil2cpp.so), recursos y assets de Unity
-│   └── src/files/         # Metadatos del juego y assets descifrados de Dalcomsoft
-├── docs/                  # Fuente de verdad acumulativa y documentación técnica
-│   └── CONTEXT.md         # Registro de avances, memoria de offsets, análisis de red y decisiones de diseño
-├── dump/                  # Dumps de IL2CPP (dump.cs, il2cpp.h, script.json, stringliteral.json, DummyDll)
-├── server/                # Servidor mock local en Python (FastAPI/Flask) y rutas estáticas
-│   ├── app/               # Endpoints emulados (auth, lobby, inventory, cardbook, etc.)
-│   ├── static/            # Archivos estáticos y binarios servidos al cliente
-│   └── run.py             # Punto de entrada del servidor mock
-├── tools/                 # Herramientas CLI auxiliares
-│   ├── decrypt_dalcom.py  # Algoritmo de desencriptación/encriptación para archivos .bin
-│   └── normalize_assets.py# Normalización de nombres de assets y hashes de descarga
-├── deploy_card_assets.py  # Script de sincronización de assets al emulador Android vía ADB
-├── build.gradle           # Configuración de compilación raíz de Gradle
-├── settings.gradle        # Declaración de módulos del proyecto
-└── cdd.json               # Definiciones y catálogo completo de cartas (Card Data Definition)
+├── .agents/                        # Reglas operativas (AGENTS.md) y skills de ingeniería para agentes IA
+│   └── skills/                     # Procedimientos especializados (criptografía, reversing, conventional-commit)
+├── app/                            # Código fuente del cliente Android reconstruido (Java, Smali, Assets, Libs nativas)
+│   ├── src/main/                   # Manifiesto, librerías nativas (libil2cpp.so, libscript.so), recursos y assets
+│   └── src/files/                  # Cache local de metadatos del juego y texturas descifradas de Dalcomsoft
+├── data/                           # Tablas de metadatos y definiciones deserializadas
+│   └── tables/                     # atd.json (artistas), cdd.json (cartas), grd.json (grupos)
+├── docs/                           # Fuente de verdad acumulativa y documentación técnica
+│   ├── CONTEXT.md                  # Registro continuo de ingeniería, offsets, análisis de red y diseño
+│   └── walkthroughs/               # Hitos cronológicos documentados con capturas en media/
+├── dump/                           # Dumps de IL2CPP y scripts de desensamblado
+│   ├── dump.cs, il2cpp.h           # Símbolos y cabeceras de tipos C++ / C#
+│   ├── script.json, stringliteral  # Metadatos para desensambladores
+│   ├── DummyDll/                   # DLLs gestionadas reconstruidas para análisis estático
+│   └── scripts/                    # Scripts de integración y loaders para Ghidra e IDA Pro
+├── server/                         # Servidor mock local en Python (FastAPI) y rutas estáticas
+│   ├── app/                        # Endpoints emulados (auth, lobby, inventory, cardbook, etc.)
+│   ├── static/                     # Archivos estáticos y binarios servidos al cliente
+│   └── run.py                      # Punto de entrada del servidor mock
+├── tools/                          # Suite modular de herramientas CLI y automatización
+│   ├── crypto/                     # Criptografía AES-128-CBC de Dalcomsoft (decrypt_dalcom.py)
+│   ├── deploy/                     # Sincronización al emulador Android (deploy_card_assets.py)
+│   ├── patch/                      # Utilidades de corrección de código decompilado Java/Unity
+│   └── reversing/                  # Extracción de metadatos y normalización de assets
+├── build.gradle                    # Configuración de compilación raíz de Gradle
+├── settings.gradle                 # Declaración de módulos del proyecto (:app)
+├── gradle.properties               # Propiedades de JVM y flags de compilación
+└── skills-lock.json                # Lockfile de dependencias de skills para agentes
 ```
 
 ---
@@ -88,7 +97,7 @@ Asegúrate de que tu emulador o dispositivo esté conectado vía `adb`:
 
 ```bash
 adb devices
-python deploy_card_assets.py
+python tools/deploy/deploy_card_assets.py
 ```
 
 ### 3. Compilar el Cliente Android (APK)
