@@ -1753,3 +1753,29 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
    - **Reequipamiento de HeeJin Grado R Lv 50:** Selección vía `card:2` ([inven_heejin_r50_detail.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/inven_heejin_r50_detail.png)) -> `change` -> Toque en `EQUIP` -> Invocación exitosa de `OnEquip`. `player_profile.json` guardado en disco con `100001` (`isEquip=true`), restaurando la cuadrícula a `Group Grade R +500.000` ([inven_after_reequip_r50.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/inven_after_reequip_r50.png)).
    - Se certifica la total estabilidad, sincronización y bidireccionalidad del sistema de inventario y equipamiento offline.
 
+---
+
+## 17. Reorganización Profesional del Sistema de Archivos y Arquitectura Modular del Repositorio
+
+Con el objetivo de alcanzar los estándares de calidad de la industria en proyectos de ingeniería inversa y desarrollo de videojuegos móviles (Unity IL2CPP), se implementó una reestructuración integral del sistema de archivos para erradicar la dispersión en el directorio raíz y estructurar cada componente en dominios semánticos aislados:
+
+### 17.1. Diagnóstico y Problemas Resueltos
+1. **Erradicación de Polución Visual en la Raíz:**
+   - Se reubicaron **25 capturas de pantalla PNG versionadas** y 3 capturas sueltas de `docs/` hacia su repositorio canónico en `docs/walkthroughs/media/`.
+   - Se aislaron las capturas temporales no versionadas en `scratch/screenshots/`, manteniendo el área de trabajo limpia e ignorada por Git.
+2. **Modularización de la Suite de Herramientas (`tools/`):**
+   - 11 scripts de Python dispersos en el root (`clean_unity_player.py`, `fix_*.py`, `deploy_card_assets.py`, `dump_metadata.py`) fueron clasificados y reubicados en subdirectorios funcionales:
+     - `tools/crypto/`: Herramientas de criptografía propietaria (`decrypt_dalcom.py`).
+     - `tools/deploy/`: Herramientas de sincronización ADB hacia dispositivos Android (`deploy_card_assets.py`), refactorizado con resolución de rutas relativas al proyecto.
+     - `tools/patch/`: Scripts históricos de corrección y saneamiento de fuentes Java/Unity decompilados (`clean_unity_player.py`, `fix_*.py`).
+     - `tools/reversing/`: Utilidades de extracción de metadatos y normalización de assets (`dump_metadata.py`, `normalize_assets.py`).
+3. **Centralización de Tablas Maestras de Metadatos (`data/tables/`):**
+   - Se crearon directorios específicos para tablas deserializadas: `data/tables/atd.json` (artistas), `data/tables/cdd.json` (cartas) y `data/tables/grd.json` (grupos), eliminando duplicaciones desarticuladas en la raíz.
+4. **Organización Interna de `dump/`:**
+   - Se agruparon los scripts de integración para desensambladores (`ghidra*.py`, `ida*.py`, `il2cpp_header_to_ghidra.py`) en `dump/scripts/`, despejando los artefactos principales (`dump.cs`, `il2cpp.h`, `script.json`, `stringliteral.json`, `DummyDll/`).
+5. **Blindaje Preventivo en `.gitignore`:**
+   - Se añadieron directivas de exclusión estricta para la raíz (`/*.png`, `/*.jpg`, `/*.jpeg`, `/*.webp`, `/*.log`), garantizando que ninguna captura de prueba o archivo de log vuelva a contaminar el nivel principal del repositorio.
+6. **Sincronización de Documentación:**
+   - Se actualizó el mapa de directorios en [README.md](file:///Users/ignaciorojas/Documents/repos/sslo_apk/README.md) y se completó la tabla cronológica en [docs/walkthroughs/README.md](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/README.md) indexando los 4 hitos técnicos documentados.
+
+
