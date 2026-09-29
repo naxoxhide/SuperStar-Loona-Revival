@@ -33,7 +33,7 @@
 
 A continuación se presenta la captura final tomada directamente desde el emulador BlueStacks:
 
-![Inventario Final Perfeccionado](file:///Users/ignaciorojas/Documents/repos/sslo_apk/inventory_final_check.png)
+![Inventario Final Perfeccionado](media/inventory_final_check.png)
 
 ### Observaciones de la Captura:
 - **Cabecera de LOONA:** Muestra las 11 integrantes canónicas (HeeJin, HyunJin, HaSeul, YeoJin, ViVi, Kim Lip en fila 1; JinSoul, Choerry, Yves, Go Won, Olivia Hye en fila 2).

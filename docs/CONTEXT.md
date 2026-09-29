@@ -1648,7 +1648,7 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
    - Permite inyectar actualizaciones completas de instrumentación en ~1 segundo usando streaming stdin (`cat libscript.js | adb shell "cat > /storage/..."`), eliminando la necesidad de reconstruir el APK de 1.4 GB para iteraciones lógicas de Frida.
 
 4. **Validación Visual Exitosa:**
-   - Verificado en BlueStacks mediante captura de pantalla ([inventory_final_check.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/inventory_final_check.png)):
+   - Verificado en BlueStacks mediante captura de pantalla ([inventory_final_check.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/inventory_final_check.png)):
      - Cuadrícula de LOONA con exactamente 11 integrantes equipadas con cartas Grado R Lv 50.
      - Desaparición completa de la duplicación de HeeJin.
      - Cartas no-R (Grado A y S) con estrellas doradas limpias y sin barra blanca.
@@ -1718,9 +1718,9 @@ Se auditó la totalidad de los 1035 archivos `.png` en `app/src/files/asiudgasg/
    - **Rendimiento:** Las texturas PNG de alta resolución de las tarjetas se cargan y asignan en menos de 5 ms directamente en los componentes `RawImage` de `CardLargeView` (`0x58`) y marcos de rango (`0x68`), aplicando `setNativeSize` para un aspecto 1:1 nítido.
 
 4. **Verificación Visual Completa en Emulador BlueStacks:**
-   - **HeeJin (CardID 1001, Grado A, Nivel 1):** Verificada con textura de alta resolución de retrato nítido, marco de estrella plateada, estadísticas base 40/40 y etiquetas en inglés ([screen_detail_heejin_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/screen_detail_heejin_live.png)).
-   - **HyunJin (CardID 1002, Grado S, Nivel 1):** Verificada con conmutación dinámica instantánea, marco de estrella dorada Grado S, estadísticas base 65/65 y botones de acción activos ([screen_detail_hyunjin_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/screen_detail_hyunjin_live.png)).
-   - **Retorno Limpio (`back` / `close`):** La invocación de `InventoryScene.SetStateDefault(curScene, 0, 0, NULL)` (RVA `0x1053B88`) restaura limpiamente la cuadrícula de LOONA a 60 FPS sin fugas de estado ([screen_after_back_perfect.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/screen_after_back_perfect.png)).
+   - **HeeJin (CardID 1001, Grado A, Nivel 1):** Verificada con textura de alta resolución de retrato nítido, marco de estrella plateada, estadísticas base 40/40 y etiquetas en inglés ([screen_detail_heejin_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_detail_heejin_live.png)).
+   - **HyunJin (CardID 1002, Grado S, Nivel 1):** Verificada con conmutación dinámica instantánea, marco de estrella dorada Grado S, estadísticas base 65/65 y botones de acción activos ([screen_detail_hyunjin_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_detail_hyunjin_live.png)).
+   - **Retorno Limpio (`back` / `close`):** La invocación de `InventoryScene.SetStateDefault(curScene, 0, 0, NULL)` (RVA `0x1053B88`) restaura limpiamente la cuadrícula de LOONA a 60 FPS sin fugas de estado ([screen_after_back_perfect.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_after_back_perfect.png)).
 
 ### 16.12. Estabilización de InvenCardEquipView, Ciclo de Vida Nativo de InventoryView y Verificación Bidireccional de Equipamiento Offline con Persistencia en player_profile.json
 
