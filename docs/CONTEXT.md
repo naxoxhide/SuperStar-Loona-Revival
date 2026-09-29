@@ -1778,4 +1778,33 @@ Con el objetivo de alcanzar los estándares de calidad de la industria en proyec
 6. **Sincronización de Documentación:**
    - Se actualizó el mapa de directorios en [README.md](file:///Users/ignaciorojas/Documents/repos/sslo_apk/README.md) y se completó la tabla cronológica en [docs/walkthroughs/README.md](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/README.md) indexando los 4 hitos técnicos documentados.
 
+---
+
+## 18. Arquitectura Multi-Agente basada en SDD (Software Design Description) y Contextos Mínimos Viables (MVC)
+
+Para escalar el desarrollo del proyecto *SuperStar LOONA Revival* a niveles de ingeniería de software de alta gama y eliminar la saturación de tokens (context bloat) y alucinaciones en modelos de lenguaje, se formalizó e implementó un sistema multi-agente jerárquico guiado por especificaciones (SDD-SLR-MAS-001).
+
+### 18.1. Especificación SDD y Topología Jerárquica
+* **Documento Rector:** [docs/SDD_MULTI_AGENT_ARCHITECTURE.md](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/SDD_MULTI_AGENT_ARCHITECTURE.md)
+* **Patrón Arquitectónico:** *Hierarchical Orchestrator-Workers with Quality Gate*.
+* **Estructura de Agentes Registrados:**
+  1. [Agente Orquestador (Lead AI Architect)](file:///Users/ignaciorojas/Documents/repos/sslo_apk/.agents/agents/orchestrator.md): Responsable de la descomposición de requerimientos, especificación técnica, gestión de Git (Conventional Commits) y actualización continua de `docs/CONTEXT.md`.
+  2. [Senior Game Developer](file:///Users/ignaciorojas/Documents/repos/sslo_apk/.agents/agents/senior-game-dev.md): Especialista en Dalcom Engine, `libil2cpp.so` ARM64, hooks Frida (`libscript.js`) y persistencia offline (`player_profile.json`).
+  3. [Senior UI/UX Game Developer](file:///Users/ignaciorojas/Documents/repos/sslo_apk/.agents/agents/senior-ui-ux-dev.md): Especialista en Unity UI, Canvas, renderizado HD (Trilinear, Aniso 8, `SetNativeSize`), marcos de rango y alineación canónica OT11.
+  4. [Senior QA & Test Automation Engineer](file:///Users/ignaciorojas/Documents/repos/sslo_apk/.agents/agents/qa-tester.md): Especialista en verificación automatizada en emulador (BlueStacks `127.0.0.1:5555`), inyección ADB (`scene_cmd.txt`, `input tap`), aserciones de `logcat` (`FridaSSLO`) y emisión del *QA Sign-off Report*.
+
+### 18.2. Definición de Contextos Mínimos Viables (MVC)
+Cada subagente opera exclusivamente sobre un subconjunto acotado de código, memoria y documentación para asegurar máxima fidelidad y velocidad:
+* **MVC Game Dev:** `app/src/main/assets/libscript.js`, RVAs de ciclo de vida (`0x1051604`, `0x1053B88`, `0x105A61C`, `0x105AFC8`, `0xF2C374`, `0xF2C5E4`, `0xD534BC`), offsets nativos de `InventoryScene` (`0x48`, `0x58`, `0x88`, `0x90`), tablas maestras (`data/tables/`) y prohibición estricta de `GameObject.SetActive` en subvistas.
+* **MVC UI/UX Dev:** Catálogo de assets en `app/src/files/asiudgasg/asodhsg/` (`weoihxd/`, `aoeiwhslc/uhex/`, `wadceg/`, `sdhgauwehdnu/`), RVAs de renderizado nativo (`0x181B6BC`, `0x25B3E90`, `0x181A580`, `0x181A640`, `0x194C074`, `0x1949574`), acotación de estrellas a $[1, 5]$ y directriz OT11.
+* **MVC QA Tester:** Comandos de inyección en `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt`, toques ADB, captura en `docs/walkthroughs/media/`, checklist de aceptación y skill dedicada [.agents/skills/dalcomsoft-qa-testing/SKILL.md](file:///Users/ignaciorojas/Documents/repos/sslo_apk/.agents/skills/dalcomsoft-qa-testing/SKILL.md).
+
+### 18.3. Protocolo de Ciclo de Vida SDD (5 Fases)
+1. **Fase 1 (SDD Spec):** Orquestador crea especificación y checkpoint en Git (`chore(checkpoint): ...`).
+2. **Fase 2 (Engine & Memory):** Senior Game Dev implementa intercepciones nativas seguras en `libscript.js`.
+3. **Fase 3 (UI/UX & Assets):** Senior UI/UX Dev vincula texturas HD y normaliza layouts sin quads blancos.
+4. **Fase 4 (QA Gate):** Senior QA Tester ejecuta pruebas ADB en vivo y emite *Sign-off Report*.
+5. **Fase 5 (Release & Context):** Orquestador actualiza `docs/CONTEXT.md` y realiza commit Conventional (`feat(...)`).
+
+
 

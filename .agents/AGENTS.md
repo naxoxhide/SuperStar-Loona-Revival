@@ -21,3 +21,12 @@ Este repositorio contiene el proyecto de Revival de la serie de videojuegos Supe
 
 5. **Rutina de Checkpoints en Git (Conventional Commits):**
    * Antes de iniciar cualquier modificación de código, refactorización o cambio sustancial en scripts, lógica o recursos, se debe generar obligatoriamente un commit de checkpoint siguiendo la especificación de *Conventional Commits* (ej. `chore(checkpoint): ...`), garantizando un estado base limpio y restaurable antes de experimentar.
+
+6. **Arquitectura Multi-Agente SDD y Contextos Mínimos Viables (MVC):**
+   * Toda iniciativa técnica debe regirse por la especificación de diseño [docs/SDD_MULTI_AGENT_ARCHITECTURE.md](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/SDD_MULTI_AGENT_ARCHITECTURE.md).
+   * La ejecución se orquesta a través de roles especializados con contextos acotados para evitar la saturación de tokens:
+     * [Agente Orquestador](file:///Users/ignaciorojas/Documents/repos/sslo_apk/.agents/agents/orchestrator.md) (`orchestrator`): Planificación SDD, control de Git y release.
+     * [Senior Game Dev](file:///Users/ignaciorojas/Documents/repos/sslo_apk/.agents/agents/senior-game-dev.md) (`senior-game-dev`): Lógica IL2CPP, hooks Frida y memoria.
+     * [Senior UI/UX Dev](file:///Users/ignaciorojas/Documents/repos/sslo_apk/.agents/agents/senior-ui-ux-dev.md) (`senior-ui-ux-dev`): Pipeline visual de texturas, canvas y OT11.
+     * [Senior QA Tester](file:///Users/ignaciorojas/Documents/repos/sslo_apk/.agents/agents/qa-tester.md) (`qa-tester`): Validación ADB, logcat y control de calidad (Quality Gate).
+   * Ninguna entrega se considera finalizada sin el visto bueno (*Sign-off*) del `qa-tester`.
