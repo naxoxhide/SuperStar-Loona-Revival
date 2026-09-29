@@ -3,7 +3,7 @@ import os
 import re
 import shutil
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "app", "src", "files"))
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "app", "src", "files"))
 
 def normalize_files():
     print(f"Normalizing files in: {BASE_DIR}")

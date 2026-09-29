@@ -5,7 +5,9 @@ import tarfile
 import subprocess
 import time
 
-SOURCE_BASE = "app/src/files/asiudgasg/asodhsg"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "../.."))
+SOURCE_BASE = os.path.join(PROJECT_ROOT, "app/src/files/asiudgasg/asodhsg")
 TARGET_DEVICE_DIR = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg"
 
 DIRS_TO_SYNC = [
