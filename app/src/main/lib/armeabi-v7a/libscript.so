@@ -1685,14 +1685,47 @@ function initIl2Cpp(module) {
                 log("[-] Error installing exception tracker: " + e.message);
             }
 
+            // Safe replacement for AssetControl.OnOpenContents (0xAD948C) to prevent crashes on missing online asset configs
+            try {
+                Interceptor.replace(baseAddr.add(0xAD948C), new NativeCallback(function (methodInfo) {
+                    try {
+                        log("[📦 ASSET] Safe AssetControl.OnOpenContents running...");
+                        var openContentsFn = new NativeFunction(baseAddr.add(0xADAA74), "pointer", ["pointer"]);
+                        var list = openContentsFn(NULL);
+                        if (!list.isNull()) {
+                            var items = list.add(0x10).readPointer();
+                            var count = list.add(0x18).readS32();
+                            log("[📦 ASSET] Found " + count + " OpenAssetContents callbacks to execute safely");
+                            var invokeFn = new NativeFunction(baseAddr.add(0xB86944), "bool", ["pointer", "pointer"]);
+                            for (var i = 0; i < count; i++) {
+                                try {
+                                    var cb = items.add(0x20 + i * 8).readPointer();
+                                    if (!cb.isNull()) {
+                                        invokeFn(cb, NULL);
+                                    }
+                                } catch (eCb) {
+                                    log("[-] Safe bypass of asset callback[" + i + "]: " + eCb.message);
+                                }
+                            }
+                        }
+                        log("[📦 ASSET] Safe AssetControl.OnOpenContents completed cleanly!");
+                    } catch (eOoc) {
+                        log("[-] Error in safe OnOpenContents: " + eOoc.message);
+                    }
+                }, "void", ["pointer"]));
+                log("[+] Safe replacement installed for AssetControl.OnOpenContents (0xAD948C)!");
+            } catch (eOocH) {
+                log("[-] Error replacing AssetControl.OnOpenContents: " + eOocH.message);
+            }
+
             var downloadDoneCalled = false;
             function ensureDownloadDone() {
                 if (downloadDoneCalled) return;
                 downloadDoneCalled = true;
                 log("[📦 ASSET] ensureDownloadDone invoked -> calling AssetControl.DownloadDone (0xADA150)");
                 try {
-                    var downloadDoneFn = new NativeFunction(baseAddr.add(0xADA150), 'void', []);
-                    downloadDoneFn();
+                    var downloadDoneFn = new NativeFunction(baseAddr.add(0xADA150), 'void', ['pointer']);
+                    downloadDoneFn(NULL);
                 } catch (e) {
                     log("[-] Error calling DownloadDone: " + e.message);
                 }
@@ -4826,6 +4859,7 @@ function initIl2Cpp(module) {
                                                 ctorFn(newObj, methodInfo);
                                             } catch (eCt) {}
                                             dummyMaterialCardItemList = newObj;
+                                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(newObj, 0);
                                             log("[🗃️ INVENTORY] Created authentic IL2CPP List<CardItem> for 0xA0: " + newObj);
                                         }
                                     }
@@ -5150,6 +5184,28 @@ function initIl2Cpp(module) {
                         }
                     });
                 } catch (eExcM) {}
+
+                // GC Liveness TraverseObject null-class protection (0x9F8DBC)
+                try {
+                    Interceptor.attach(baseAddr.add(0x9F8DBC), {
+                        onEnter: function (args) {
+                            var obj = args[0];
+                            if (!obj.isNull()) {
+                                try {
+                                    var klass = obj.readPointer();
+                                    if (klass.isNull()) {
+                                        args[0] = NULL;
+                                    }
+                                } catch (eTr) {
+                                    args[0] = NULL;
+                                }
+                            }
+                        }
+                    });
+                    log("[+] GC Liveness TraverseObject guard installed at 0x9F8DBC!");
+                } catch (eTrHook) {
+                    log("[-] Error installing TraverseObject guard: " + eTrHook.message);
+                }
 
                 // 9f. InventoryControl.CheckIntensifyEvent (0xF2C14C) -> Safe offline stub to prevent NullRef in SetStateMain
                 try {
@@ -5942,28 +5998,67 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing GetMajorGroupItem / GetCurrentGroup: " + eGmg.message);
                 }
 
-                // Safe InventoryControl.UpdateDisplayGroupList (0xF28CE8)
+                // Bulletproof DisplayGroupList initializer & updater (0xF28CE8)
+                var ensureDisplayGroupList = function() {
+                    try {
+                        var getDglFn = new NativeFunction(baseAddr.add(0xF2770C), "pointer", ["pointer"]);
+                        var dgl = getDglFn(NULL);
+                        if (dgl.isNull()) {
+                            // Slot 0x30EDFE8 is the exact TypeInfo for List<InventoryControl.GroupItem>
+                            var pKlassSlot = baseAddr.add(0x30ED000).add(0xFE8).readPointer();
+                            var klass = !pKlassSlot.isNull() ? pKlassSlot.readPointer() : NULL;
+                            if (klass && !klass.isNull()) {
+                                var newDgl = il2cpp_object_new(klass);
+                                if (!newDgl.isNull()) {
+                                    var ctorSlot = baseAddr.add(0x30D5000).add(0x3B8).readPointer();
+                                    var ctorMethodInfo = !ctorSlot.isNull() ? ctorSlot.readPointer() : NULL;
+                                    var ctorFn = new NativeFunction(baseAddr.add(0x23CD7B4), "void", ["pointer", "pointer"]);
+                                    ctorFn(newDgl, ctorMethodInfo);
+                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(newDgl, 0);
+                                    var setDglFn = new NativeFunction(baseAddr.add(0xF27770), "void", ["pointer", "pointer"]);
+                                    setDglFn(newDgl, NULL);
+                                    dgl = newDgl;
+                                    log("[🃏 INVENTORY] Created authentic IL2CPP List<GroupItem> for DisplayGroupList: " + newDgl);
+                                }
+                            }
+                        }
+                        if (!dgl.isNull() && loonaGroupItemObj && !loonaGroupItemObj.isNull()) {
+                            var count = dgl.add(0x18).readS32();
+                            if (count === 0) {
+                                var mSlot = baseAddr.add(0x31390F8).readPointer();
+                                var addMethodInfo = !mSlot.isNull() ? mSlot.readPointer() : NULL;
+                                var listAddFn = new NativeFunction(baseAddr.add(0x23CE41C), "void", ["pointer", "pointer", "pointer"]);
+                                listAddFn(dgl, loonaGroupItemObj, addMethodInfo);
+                                log("[🃏 INVENTORY] Added loonaGroupItemObj to DisplayGroupList! Count: " + dgl.add(0x18).readS32());
+                            }
+                        }
+                        return dgl;
+                    } catch (eEdgl) {
+                        log("[-] Error in ensureDisplayGroupList: " + eEdgl.message);
+                        return NULL;
+                    }
+                };
+
                 try {
                     Interceptor.replace(baseAddr.add(0xF28CE8), new NativeCallback(function (isForceSortAlphabet, methodInfo) {
                         log("[🃏 INVENTORY] Safe UpdateDisplayGroupList called (isForce=" + isForceSortAlphabet + ")");
-                        try {
-                            var getDglFn = new NativeFunction(baseAddr.add(0xF2770C), "pointer", ["pointer"]);
-                            var dgl = getDglFn(NULL);
-                            if (!dgl.isNull()) {
-                                var dglCount = dgl.add(0x18).readS32();
-                                if (dglCount === 0 && loonaGroupItemObj && !loonaGroupItemObj.isNull()) {
-                                    var mSlot = baseAddr.add(0x31390F8).readPointer();
-                                    var addMethodInfo = !mSlot.isNull() ? mSlot.readPointer() : NULL;
-                                    var listAddFn = new NativeFunction(baseAddr.add(0x23CE41C), "void", ["pointer", "pointer", "pointer"]);
-                                    listAddFn(dgl, loonaGroupItemObj, addMethodInfo);
-                                    log("[🃏 INVENTORY] Safe UpdateDisplayGroupList ensured loonaGroupItemObj in DisplayGroupList!");
-                                }
-                            }
-                        } catch (eDgl) {}
+                        ensureDisplayGroupList();
                     }, "void", ["int", "pointer"]));
                     log("[+] Interceptor.replace installed on InventoryControl.UpdateDisplayGroupList (0xF28CE8)!");
                 } catch (eUdgl) {
                     log("[-] Error replacing InventoryControl.UpdateDisplayGroupList: " + eUdgl.message);
+                }
+
+                try {
+                    Interceptor.attach(baseAddr.add(0x105E0FC), {
+                        onEnter: function (args) {
+                            log("[🗃️ INVENTORY SCENE] Refresh (0x105E0FC) entered, ensuring DisplayGroupList...");
+                            ensureDisplayGroupList();
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on InventoryScene.Refresh (0x105E0FC)!");
+                } catch (eIsr) {
+                    log("[-] Error attaching to InventoryScene.Refresh: " + eIsr.message);
                 }
 
                 // Proxy ThemeControl.Data.get_EffectType (0xC89B28)
@@ -6134,9 +6229,15 @@ function initIl2Cpp(module) {
                     }, "int", ["pointer", "pointer"]));
                 } catch (eGlErr) {}
 
+                var isInventoryPopulated = false;
                 function populateOfflineInventoryCards() {
+                    if (isInventoryPopulated) {
+                        log("[🃏 INVENTORY] populateOfflineInventoryCards: already populated, skipping duplicate run!");
+                        return;
+                    }
                     log("[🃏 INVENTORY] populateOfflineInventoryCards() starting...");
                     try {
+                        isInventoryPopulated = true;
                         ensureLoonaMocks();
 
                         var getCardMapFn = new NativeFunction(baseAddr.add(0xF2751C), "pointer", ["pointer"]);
@@ -7073,6 +7174,25 @@ function initIl2Cpp(module) {
                     log("[-] Error installing LobbyScene safe stubs: " + eLobbyStubs.message);
                 }
 
+                // Safe stubs for LobbyBgDataControl (Open: 0xB3EB60, Close: 0xB3EF68, get_IsOpened: 0xB3E9C4, Find: 0xB3F0A4)
+                try {
+                    Interceptor.replace(baseAddr.add(0xB3EB60), new NativeCallback(function (methodInfo) {
+                        log("[🛡️ LOBBY BG] LobbyBgDataControl.Open safely bypassed!");
+                    }, "void", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xB3EF68), new NativeCallback(function (methodInfo) {
+                        log("[🛡️ LOBBY BG] LobbyBgDataControl.Close safely bypassed!");
+                    }, "void", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xB3E9C4), new NativeCallback(function (methodInfo) {
+                        return 1;
+                    }, "bool", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xB3F0A4), new NativeCallback(function (code, methodInfo) {
+                        return NULL;
+                    }, "pointer", ["short", "pointer"]));
+                    log("[+] Safe stubs installed for LobbyBgDataControl (Open, Close, get_IsOpened, Find)!");
+                } catch (eLbg) {
+                    log("[-] Error installing LobbyBgDataControl stubs: " + eLbg.message);
+                }
+
                 // Hook LobbyScene.OnOpen (0xB45508)
                 var curLobbyInstance = NULL;
                 Interceptor.attach(baseAddr.add(0xB45508), {
@@ -7386,8 +7506,22 @@ function initIl2Cpp(module) {
                                                 var targetScene = parseInt(cmdRaw);
                                                 if (!isNaN(targetScene) && targetScene >= 1 && targetScene <= 13) {
                                                     log("[🚀 SCENE CMD] Received command to switch to SceneId: " + targetScene);
-                                                    var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), 'void', ['int', 'pointer', 'pointer']);
-                                                    openSceneDirectFn(targetScene, NULL, NULL);
+                                                    var curScene = staticFields.add(0x20).readPointer();
+                                                    if (!curScene.isNull()) {
+                                                        if (sceneId === 3 && targetScene === 4) {
+                                                            log("[🚀 SCENE CMD] Invoking LobbyScene.OnInventory (0xB4C418) cleanly on LobbyScene: " + curScene);
+                                                            var onInvenFn = new NativeFunction(baseAddr.add(0xB4C418), 'void', ['pointer', 'pointer']);
+                                                            onInvenFn(curScene, NULL);
+                                                        } else {
+                                                            log("[🚀 SCENE CMD] Invoking Scene.SetStateOpenScene (0xD5338C) on curScene: " + curScene + " -> target: " + targetScene);
+                                                            var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
+                                                            setStateOpenSceneFn(curScene, targetScene, NULL, NULL, NULL);
+                                                        }
+                                                    } else {
+                                                        log("[🚀 SCENE CMD] curScene is null, invoking SceneControl.OpenScene direct (0xD534BC)");
+                                                        var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), 'void', ['int', 'pointer', 'pointer']);
+                                                        openSceneDirectFn(targetScene, NULL, NULL);
+                                                    }
                                                 }
                                             }
                                         }
