@@ -4821,6 +4821,25 @@ function initIl2Cpp(module) {
                         // Read the existing onEventListener delegate (0x90 in InvenCardView)
                         var eventListener = cardView.add(0x90).readPointer();
                         log("[🎠 CAROUSEL] Existing onEventListener delegate: " + eventListener);
+                        if (eventListener.isNull()) {
+                            try {
+                                var dKlassSlot = baseAddr.add(0x30FC000).add(0x690).readPointer();
+                                var dKlass = !dKlassSlot.isNull() ? dKlassSlot.readPointer() : NULL;
+                                var mPtrSlot = baseAddr.add(0x3104000).add(0x918).readPointer();
+                                var mPtr = !mPtrSlot.isNull() ? mPtrSlot.readPointer() : NULL;
+                                if (dKlass && !dKlass.isNull() && mPtr && !mPtr.isNull()) {
+                                    var newDel = il2cpp_object_new(dKlass);
+                                    var dCtorFn = new NativeFunction(baseAddr.add(0xB52D54), "void", ["pointer", "pointer", "pointer", "pointer"]);
+                                    dCtorFn(newDel, sceneThis, mPtr, NULL);
+                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(newDel, 0);
+                                    eventListener = newDel;
+                                    cardView.add(0x90).writePointer(eventListener);
+                                    log("[🎠 CAROUSEL] Created fallback delegate for cardView: " + eventListener);
+                                }
+                            } catch (eDel) {
+                                log("[-] Error creating fallback delegate: " + eDel.message);
+                            }
+                        }
 
                         // Step 4: Invoke InvenCardView.SetData(maxCount, isIntensify=false, eventListener) -> RVA 0xF23384
                         var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
@@ -4837,48 +4856,51 @@ function initIl2Cpp(module) {
                     }
                 };
 
-                // Helper to ensure materialCardItemList (0xA0) is never null in InventoryScene
-                var dummyMaterialCardItemList = null;
-                var ensureMaterialCardItemList = function(scene) {
+                // Bulletproof InventoryScene lists allocator (0x58, 0x60, 0x68, 0x70, 0x78, 0xA0)
+                var ensureInventoryLists = function(scene) {
                     try {
                         if (!scene || scene.isNull()) return;
-                        var curPtr = scene.add(0xA0).readPointer();
-                        if (curPtr.isNull()) {
-                            var matList = scene.add(0x68).readPointer();
+                        var pKlassSlot = baseAddr.add(0x310C000).add(0x7A0).readPointer();
+                        var klass = !pKlassSlot.isNull() ? pKlassSlot.readPointer() : NULL;
+                        if (!klass || klass.isNull()) {
                             var dcl = scene.add(0x58).readPointer();
-                            var validList = (!matList.isNull()) ? matList : dcl;
-                            if (!validList.isNull()) {
-                                var klass = validList.readPointer();
-                                if (!klass.isNull()) {
-                                    if (!dummyMaterialCardItemList || dummyMaterialCardItemList.isNull()) {
-                                        var newObj = il2cpp_object_new(klass);
-                                        if (newObj && !newObj.isNull()) {
-                                            try {
-                                                var methodInfo = baseAddr.add(0x30dc800).readPointer();
-                                                var ctorFn = new NativeFunction(baseAddr.add(0x23cd7b4), "void", ["pointer", "pointer"]);
-                                                ctorFn(newObj, methodInfo);
-                                            } catch (eCt) {}
-                                            dummyMaterialCardItemList = newObj;
-                                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(newObj, 0);
-                                            log("[🗃️ INVENTORY] Created authentic IL2CPP List<CardItem> for 0xA0: " + newObj);
-                                        }
-                                    }
-                                    if (dummyMaterialCardItemList && !dummyMaterialCardItemList.isNull()) {
-                                        scene.add(0xA0).writePointer(dummyMaterialCardItemList);
-                                        log("[🗃️ INVENTORY] Assigned materialCardItemList (0xA0) successfully!");
-                                    }
+                            if (!dcl.isNull()) klass = dcl.readPointer();
+                        }
+                        if (!klass || klass.isNull()) {
+                            var mat = scene.add(0x68).readPointer();
+                            if (!mat.isNull()) klass = mat.readPointer();
+                        }
+                        if (!klass || klass.isNull()) return;
+
+                        var ctorSlot = baseAddr.add(0x30DC000).add(0x800).readPointer();
+                        var ctorMethodInfo = !ctorSlot.isNull() ? ctorSlot.readPointer() : NULL;
+                        var listCtorFn = new NativeFunction(baseAddr.add(0x23CD7B4), "void", ["pointer", "pointer"]);
+
+                        var listOffsets = [0x58, 0x60, 0x68, 0x70, 0x78, 0xA0];
+                        for (var i = 0; i < listOffsets.length; i++) {
+                            var off = listOffsets[i];
+                            var curPtr = scene.add(off).readPointer();
+                            if (curPtr.isNull()) {
+                                var newObj = il2cpp_object_new(klass);
+                                if (!newObj.isNull()) {
+                                    listCtorFn(newObj, ctorMethodInfo);
+                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(newObj, 0);
+                                    scene.add(off).writePointer(newObj);
+                                    log("[🗃️ INVENTORY] ensureInventoryLists: initialized offset 0x" + off.toString(16) + " -> " + newObj);
                                 }
                             }
                         }
-                    } catch (eMat) {
-                        log("[-] Error ensuring materialCardItemList: " + eMat.message);
+                    } catch (eLists) {
+                        log("[-] Error in ensureInventoryLists: " + eLists.message);
                     }
                 };
+                var ensureMaterialCardItemList = ensureInventoryLists;
 
                 // Helper to restore all cards in displayCardList when returning to default state
                 var restoreDefaultDisplayCardList = function(sceneThis) {
                     try {
                         if (sceneThis.isNull() || !loonaCardItems || loonaCardItems.length === 0) return;
+                        ensureInventoryLists(sceneThis);
                         var dclPtr = sceneThis.add(0x58).readPointer();
                         if (dclPtr.isNull()) return;
                         var listItems = dclPtr.add(0x10).readPointer();
@@ -5184,6 +5206,28 @@ function initIl2Cpp(module) {
                         }
                     });
                 } catch (eExcM) {}
+
+                // InventoryScene.UpdateDisplayCardList (0x10542F4) list protection & 0x1054A04 ARM64 patch
+                try {
+                    Interceptor.attach(baseAddr.add(0x10542F4), {
+                        onEnter: function (args) {
+                            var scene = args[0];
+                            var isGroup = args[1].toInt32();
+                            var type = args[2].toInt32();
+                            var isReload = args[3].toInt32();
+                            log("[🗃️ UPDATE_DISPLAY_CARD_LIST] Entered: scene=" + scene + ", isGroup=" + isGroup + ", type=" + type + ", isReload=" + isReload);
+                            ensureInventoryLists(scene);
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on InventoryScene.UpdateDisplayCardList (0x10542F4)!");
+
+                    // ARM64 byte patch at 0x1054A04: replace 'bl #0xa43cc0' with 'b #0x1054a98' (safe epilogue exit)
+                    Memory.protect(baseAddr.add(0x1054A04), 4, 'rwx');
+                    baseAddr.add(0x1054A04).writeByteArray([0x25, 0x00, 0x00, 0x14]);
+                    log("[🛡️ INVENTORY PATCH] Patched 0x1054A04 with 'b #0x1054a98' (safe ret epilogue)!");
+                } catch (eUdclProtect) {
+                    log("[-] Error protecting UpdateDisplayCardList / patching 0x1054A04: " + eUdclProtect.message);
+                }
 
                 // GC Liveness TraverseObject null-class protection (0x9F8DBC)
                 try {
@@ -6052,8 +6096,9 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.attach(baseAddr.add(0x105E0FC), {
                         onEnter: function (args) {
-                            log("[🗃️ INVENTORY SCENE] Refresh (0x105E0FC) entered, ensuring DisplayGroupList...");
+                            log("[🗃️ INVENTORY SCENE] Refresh (0x105E0FC) entered, ensuring DisplayGroupList and lists...");
                             ensureDisplayGroupList();
+                            ensureInventoryLists(args[0]);
                         }
                     });
                     log("[+] Interceptor.attach installed on InventoryScene.Refresh (0x105E0FC)!");
@@ -6683,11 +6728,15 @@ function initIl2Cpp(module) {
                             log("[🗃️ INVENTORY SCENE] InventoryScene.OnOpen entered! instance: " + args[0]);
                             try {
                                 populateOfflineInventoryCards();
+                                ensureInventoryLists(args[0]);
                             } catch (ie) {
                                 log("[-] Error checking/opening inventory in InventoryScene: " + ie.message);
                             }
                         },
                         onLeave: function (retval) {
+                            if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                ensureInventoryLists(activeInventorySceneInstance);
+                            }
                             log("[🗃️ INVENTORY SCENE] InventoryScene.OnOpen completed!");
                         }
                     });
@@ -7187,7 +7236,7 @@ function initIl2Cpp(module) {
                     }, "bool", ["pointer"]));
                     Interceptor.replace(baseAddr.add(0xB3F0A4), new NativeCallback(function (code, methodInfo) {
                         return NULL;
-                    }, "pointer", ["short", "pointer"]));
+                    }, "pointer", ["int16", "pointer"]));
                     log("[+] Safe stubs installed for LobbyBgDataControl (Open, Close, get_IsOpened, Find)!");
                 } catch (eLbg) {
                     log("[-] Error installing LobbyBgDataControl stubs: " + eLbg.message);
