@@ -1806,5 +1806,71 @@ Cada subagente opera exclusivamente sobre un subconjunto acotado de código, mem
 4. **Fase 4 (QA Gate):** Senior QA Tester ejecuta pruebas ADB en vivo y emite *Sign-off Report*.
 5. **Fase 5 (Release & Context):** Orquestador actualiza `docs/CONTEXT.md` y realiza commit Conventional (`feat(...)`).
 
+---
+
+## 19. Investigación Arquitectónica: Sincronización del Inventario Inferior en Vista de Datos de Carta (`SetStateMain`), Filtrado por Miembro y Correlación con Theme / Canción
+
+### 19.1. Diagnóstico del Estado Actual en `libscript.js`
+1. **Comportamiento Observado:**
+   - Al pulsar sobre una carta en la escena de inventario / colección (`OnCardItem` @ RVA `0x105CEE8`), se transfiere el flujo a `safeSetStateMain` (RVA `0x1053FB0`), activando correctamente el layout de detalle `ShowMainLayout(true)` y refrescando la cabecera comparativa (`InvenCardSelectView` @ `+0x48`) y las acciones (`InvenCardMainView` @ `+0x58`).
+   - Sin embargo, **el carrusel inferior horizontal (`InvenCardView` @ `sceneView + 0x78`) permanece estático o con el listado global desincronizado**.
+2. **Causa Raíz a Nivel de Memoria e IL2CPP:**
+   - En el hook actual de `OnCardItem` (línea 4631 de `libscript.js`):
+     `sceneThis.add(0x80).writePointer(NULL); // selectedArtistData - safe null`
+     Se asignaba deliberadamente `NULL` en el offset `+0x80` de `InventoryScene` (`selectedArtistData`) para mitigar excepciones tempranas.
+   - En `safeSetStateMain`:
+     Se omitió la invocación de `UpdateDisplayCardList` (RVA `0x10542F4`) y el refresco de `sceneView.cardView` (`InvenCardView`). Por ende, la lista nativa `displayCardList` (`sceneThis + 0x58`) nunca se reconstruye para la vista de detalle.
+
+### 19.2. Mecanismo Nativo de Dalcomsoft (Desensamblado ARM64)
+El análisis por desensamblado con Capstone en `libil2cpp.so` revela el flujo oficial exacto de Dalcom Engine:
+1. **Poblado de Metadatos en `OnCardItem` (`0x105CEE8`):**
+   ```assembly
+   0x105d39c: ldr  x8, [x20, #0x18]      ; x20 = clickedCardItem. +0x18 = CardControl.Data
+   0x105d3a4: ldr  x8, [x8, #0x30]       ; +0x30 = ArtistControl.Data (selectedArtistData)
+   0x105d3ac: stp  x8, x20, [x19, #0x80] ; Escribe:
+                                         ; scene + 0x80 = selectedArtistData
+                                         ; scene + 0x88 = selectedCardItem
+   0x105d3b8: bl   #0x1053fb0            ; Llama a SetStateMain(this, true)
+   ```
+2. **Disparo de Filtrado en `SetStateMain` (`0x1053FB0`):**
+   Al concluir el refresco de la vista superior, la rutina nativa ejecuta un salto de cola (*tail call*) incondicional:
+   ```assembly
+   0x10540ec: bl   #0x10510c8            ; get_IsSortGroup()
+   0x10540f4: and  w1, w0, #1            ; isGroup
+   0x1054108: mov  w2, #1                ; type = EXTRACT_TYPE.Artist (1)
+   0x1054110: b    #0x10542f4            ; UpdateDisplayCardList(this, isGroup, 1, isReload)
+   ```
+3. **Filtrado por Miembro en `UpdateDisplayCardList` (`0x10542F4`):**
+   - Limpia `displayCardList` (`+0x58`).
+   - Itera por todas las cartas de `InventoryControl.CardMap` invocando `ExtractWithArtist` (RVA `0x1058158`).
+   - `ExtractWithArtist` comprueba:
+     - `this.selectedArtistData != NULL` (si es NULL, aborta inmediatamente).
+     - `cardItem.Card.ArtistCode == this.selectedArtistData.ArtistCode`.
+     - `cardItem != this.selectedCardItem` (excluye la carta que ya está en inspección).
+   - Ordena las cartas resultantes (`SORT_TYPE`: LowGrade, HighGrade, Newest).
+   - Inyecta la cantidad y el delegado de celda llamando a `InvenCardView.SetData(count, false, eventListener)` (RVA `0xF23384`) y `InvenCardView.Refresh(false)` (RVA `0xF233B8`).
+
+### 19.3. Correlación entre Cartas, Themes y Canciones en SuperStar LOONA
+La inspección de las tablas maestras (`data/tables/cdd.json`, `app/src/files/asiudgasg/sdisgkdc/tmd.json` y `msd.json`) confirma la estructura relacional del juego:
+1. **Identificadores de Integrantes (`artistID`):**
+   `1001` (HeeJin) a `1011` (Olivia Hye/Go Won).
+2. **Mapeo Biunívoco de Themes y Canciones:**
+   | Theme Code | Nombre de Tema (`tmd.json`) | Canción Asociada (`msd.json`) | Track Álbum `[+ +]` |
+   | :---: | :--- | :--- | :---: |
+   | `1001` | `Hi High` | `[+ +]_Hi High [Verse 1 / 2]` (Code `1001`, `1005`) | Track 2 |
+   | `1002` | `HEAT` | `[+ +]_열기 (HEAT) [Verse 1 / 2]` (Code `1003`, `1008`) | Track 4 |
+   | `1003` | `Stylish` | `[+ +]_Stylish [Verse 1 / 2]` (Code `1004`, `1010`) | Track 6 |
+   | `1004` | `Take me High` | *(Instrumental / Event Theme)* | — |
+   | `1005` | `Perfect Love` | `[+ +]_Perfect Love [Verse 1 / 2]` (Code `1002`, `1006`) | Track 5 |
+   | `1006` | `favOriTe` | `[+ +]_favOriTe [Verse 1 / 2]` (Code `1007`, `1009`) | Track 3 |
+
+3. **Arquitectura de Relación para el Inventario Inferior:**
+   Al entrar en la vista de datos de una carta, se pueden aplicar dos modelos de relación:
+   - **Modelo A: Priorización por Tema de la Canción (Estándar Dalcom Enriquecido):**
+     El inventario inferior extrae todas las cartas del miembro seleccionado, pero las **ordena de forma inteligente colocando en primer lugar aquellas que coinciden con el Theme activo** (ej. *Hi High* Normal y Prism para bonificación de *Rave* en la canción), seguidas por las cartas de otros temas (*HEAT*, *Stylish*), ordenadas por grado y nivel.
+   - **Modelo B: Filtrado Estricto (Miembro + Mismo Theme):**
+     El carrusel inferior solo expone las cartas que coinciden simultáneamente con el `artistID` del miembro y el `theme` de la canción/carta seleccionada.
+
+
 
 
