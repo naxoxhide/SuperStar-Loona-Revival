@@ -840,41 +840,55 @@ function initIl2Cpp(module) {
                 }, "void", ["bool"]));
 
                 // Nickname & Special User Type null guards
-                Interceptor.replace(baseAddr.add(0xAAE734), new NativeCallback(function (methodInfo) {
-                    var p = loadPlayerProfile();
-                    var nick = (p && p.nickname) ? p.nickname : "Orbit";
-                    return createIl2CppString(nick);
-                }, "pointer", ["pointer"]));
-                Interceptor.replace(baseAddr.add(0xAAE61C), new NativeCallback(function (nickPtr, methodInfo) {
-                    try {
-                        var nick = readIl2CppString(nickPtr);
-                        log("[👤 USER] set_Nickname safely intercepted: " + nick);
-                        var p = loadPlayerProfile() || createDefaultProfile("Orbit");
-                        p.nickname = nick;
-                        savePlayerProfile(p);
-                    } catch (eNick) {}
-                }, "void", ["pointer", "pointer"]));
-                Interceptor.replace(baseAddr.add(0xAAE54C), new NativeCallback(function (methodInfo) {
-                    return 0; // SPECIAL_USER_TYPE
-                }, "short", ["pointer"]));
-                Interceptor.replace(baseAddr.add(0xAAE818), new NativeCallback(function (val, methodInfo) {
-                    log("[👤 USER] set_NicknameChanger safely intercepted: " + val);
-                }, "void", ["int", "pointer"]));
-                Interceptor.replace(baseAddr.add(0xAAE930), new NativeCallback(function (methodInfo) {
-                    return 0;
-                }, "int", ["pointer"]));
-                Interceptor.replace(baseAddr.add(0xAAF414), new NativeCallback(function (methodInfo) {
-                    var p = loadPlayerProfile();
-                    return (p && p.profileCode) ? p.profileCode : 1001;
-                }, "int", ["pointer"]));
-                Interceptor.replace(baseAddr.add(0xAAF588), new NativeCallback(function (profileCode, methodInfo) {
-                    try {
-                        log("[👤 USER] set_ProfileCode safely intercepted: " + profileCode);
-                        var p = loadPlayerProfile() || createDefaultProfile("Orbit");
-                        p.profileCode = profileCode;
-                        savePlayerProfile(p);
-                    } catch (ePrf) {}
-                }, "void", ["int", "pointer"]));
+                try {
+                    Interceptor.replace(baseAddr.add(0xAAE734), new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        var nick = (p && p.nickname) ? p.nickname : "Orbit";
+                        return createIl2CppString(nick);
+                    }, "pointer", ["pointer"]));
+                } catch (eNe) {}
+                try {
+                    Interceptor.replace(baseAddr.add(0xAAE61C), new NativeCallback(function (nickPtr, methodInfo) {
+                        try {
+                            var nick = readIl2CppString(nickPtr);
+                            log("[👤 USER] set_Nickname safely intercepted: " + nick);
+                            var p = loadPlayerProfile() || createDefaultProfile("Orbit");
+                            p.nickname = nick;
+                            savePlayerProfile(p);
+                        } catch (eNick) {}
+                    }, "void", ["pointer", "pointer"]));
+                } catch (eNs) {}
+                try {
+                    Interceptor.replace(baseAddr.add(0xAAE54C), new NativeCallback(function (methodInfo) {
+                        return 0; // SPECIAL_USER_TYPE
+                    }, "int", ["pointer"]));
+                } catch (eSut) {}
+                try {
+                    Interceptor.replace(baseAddr.add(0xAAE818), new NativeCallback(function (val, methodInfo) {
+                        log("[👤 USER] set_NicknameChanger safely intercepted: " + val);
+                    }, "void", ["int", "pointer"]));
+                } catch (eNc) {}
+                try {
+                    Interceptor.replace(baseAddr.add(0xAAE930), new NativeCallback(function (methodInfo) {
+                        return 0;
+                    }, "int", ["pointer"]));
+                } catch (eNcr) {}
+                try {
+                    Interceptor.replace(baseAddr.add(0xAAF414), new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        return (p && p.profileCode) ? p.profileCode : 1001;
+                    }, "int", ["pointer"]));
+                } catch (ePcg) {}
+                try {
+                    Interceptor.replace(baseAddr.add(0xAAF588), new NativeCallback(function (profileCode, methodInfo) {
+                        try {
+                            log("[👤 USER] set_ProfileCode safely intercepted: " + profileCode);
+                            var p = loadPlayerProfile() || createDefaultProfile("Orbit");
+                            p.profileCode = profileCode;
+                            savePlayerProfile(p);
+                        } catch (ePrf) {}
+                    }, "void", ["int", "pointer"]));
+                } catch (ePcs) {}
                 log("[🛡️ USER GUARD] UserControl null guards (Nickname, NicknameChanger, ProfileCode, ObjectID, Headphone) successfully installed!");
             } catch (eUserG) {
                 log("[-] Error installing UserControl guards: " + eUserG.message);
@@ -2633,9 +2647,13 @@ function initIl2Cpp(module) {
                                     accountOwnedCards[ic.cardID] = { grade: ic.grade, level: ic.level };
                                 }
                             }
+                            log("[🗃️ OWNED CARDS] Synced " + prof.inventoryCards.length + " cards to accountOwnedCards!");
                         }
-                    } catch (eSc) {}
+                    } catch (eSc) {
+                        log("[-] Error in syncAccountOwnedCards: " + eSc.message);
+                    }
                 }
+                syncAccountOwnedCards();
 
                 // grade: 0=C, 1=B, 2=A, 3=S, 4=R
                 // type: 0=Large (_l), 1=Small (_s), 2=Collection (_c)
@@ -2840,6 +2858,7 @@ function initIl2Cpp(module) {
 
                 function ensureLoonaMocks() {
                     try {
+                        syncAccountOwnedCards();
                         if (!loonaGroupData || loonaGroupData.isNull()) {
                             var grpKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "GroupControl/Data");
                             if (grpKlass && !grpKlass.isNull()) {
@@ -4785,6 +4804,43 @@ function initIl2Cpp(module) {
                     }
                 };
 
+                // Helper to ensure materialCardItemList (0xA0) is never null in InventoryScene
+                var dummyMaterialCardItemList = null;
+                var ensureMaterialCardItemList = function(scene) {
+                    try {
+                        if (!scene || scene.isNull()) return;
+                        var curPtr = scene.add(0xA0).readPointer();
+                        if (curPtr.isNull()) {
+                            var matList = scene.add(0x68).readPointer();
+                            var dcl = scene.add(0x58).readPointer();
+                            var validList = (!matList.isNull()) ? matList : dcl;
+                            if (!validList.isNull()) {
+                                var klass = validList.readPointer();
+                                if (!klass.isNull()) {
+                                    if (!dummyMaterialCardItemList || dummyMaterialCardItemList.isNull()) {
+                                        var newObj = il2cpp_object_new(klass);
+                                        if (newObj && !newObj.isNull()) {
+                                            try {
+                                                var methodInfo = baseAddr.add(0x30dc800).readPointer();
+                                                var ctorFn = new NativeFunction(baseAddr.add(0x23cd7b4), "void", ["pointer", "pointer"]);
+                                                ctorFn(newObj, methodInfo);
+                                            } catch (eCt) {}
+                                            dummyMaterialCardItemList = newObj;
+                                            log("[🗃️ INVENTORY] Created authentic IL2CPP List<CardItem> for 0xA0: " + newObj);
+                                        }
+                                    }
+                                    if (dummyMaterialCardItemList && !dummyMaterialCardItemList.isNull()) {
+                                        scene.add(0xA0).writePointer(dummyMaterialCardItemList);
+                                        log("[🗃️ INVENTORY] Assigned materialCardItemList (0xA0) successfully!");
+                                    }
+                                }
+                            }
+                        }
+                    } catch (eMat) {
+                        log("[-] Error ensuring materialCardItemList: " + eMat.message);
+                    }
+                };
+
                 // Helper to restore all cards in displayCardList when returning to default state
                 var restoreDefaultDisplayCardList = function(sceneThis) {
                     try {
@@ -4822,6 +4878,7 @@ function initIl2Cpp(module) {
                     log("[🗃️ SET_STATE_MAIN] safeSetStateMain entered! isReload=" + isReload + ", scene=" + sceneThis);
                     try {
                         if (sceneThis.isNull()) return;
+                        ensureMaterialCardItemList(sceneThis);
 
                         var selectedCardItem = sceneThis.add(0x88).readPointer();
                         if (selectedCardItem.isNull()) {
@@ -4933,14 +4990,14 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing SetStateMain: " + eSsmHook.message);
                 }
 
-                // Hook InventoryScene.SetStateDefault (0x1053B88) to restore all cards
+                // Hook InventoryScene.SetStateDefault (0x1053B88) to protect null pointer crash
                 try {
                     Interceptor.attach(baseAddr.add(0x1053B88), {
                         onEnter: function (args) {
                             var scene = args[0];
                             if (!scene.isNull()) {
-                                log("[🗃️ SET_STATE_DEFAULT] onEnter triggered, restoring default display card list");
-                                restoreDefaultDisplayCardList(scene);
+                                log("[🗃️ SET_STATE_DEFAULT] onEnter triggered, verifying materialCardItemList");
+                                ensureMaterialCardItemList(scene);
                             }
                         }
                     });
@@ -5018,6 +5075,82 @@ function initIl2Cpp(module) {
                     log("[-] Error installing material stubs: " + eMatStub.message);
                 }
 
+                // 9e5. InventoryScene.<UpdateDisplayCardList>b__63_0 (0x105F448) -> Safe cell data provider preventing IndexOutOfRangeException
+                try {
+                    var getSmallCardViewDataFn = new NativeFunction(baseAddr.add(0xABEB30), "pointer", ["pointer", "pointer", "bool", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0x105F448), new NativeCallback(function (sceneThis, view, index, methodInfo) {
+                        try {
+                            if (sceneThis.isNull()) return NULL;
+                            var dclPtr = sceneThis.add(0x58).readPointer();
+                            if (dclPtr.isNull()) return NULL;
+                            var size = dclPtr.add(0x18).readS32();
+                            log("[🎠 B63] index=" + index + ", size=" + size);
+                            if (index < 0 || index >= size) return NULL; // Bounds protection against EnhancedScroller race/reclaim
+
+                            var listItems = dclPtr.add(0x10).readPointer();
+                            if (listItems.isNull()) return NULL;
+                            var cardItem = listItems.add(0x20 + index * 8).readPointer();
+                            if (cardItem.isNull()) return NULL;
+
+                            var viewData = getSmallCardViewDataFn(cardItem, NULL, 1, NULL);
+                            if (viewData && !viewData.isNull()) {
+                                var isCardEquipped = 0;
+                                try {
+                                    var eqItem = sceneThis.add(0x90).readPointer();
+                                    if (!eqItem.isNull()) {
+                                        var eqRaw = eqItem.add(0x10).readPointer();
+                                        var cardRaw = cardItem.add(0x10).readPointer();
+                                        if (!eqRaw.isNull() && !cardRaw.isNull()) {
+                                            if (eqRaw.add(0x10).readS64().toString() === cardRaw.add(0x10).readS64().toString()) {
+                                                isCardEquipped = 1;
+                                            }
+                                        }
+                                    }
+                                } catch (eEq) {}
+                                viewData.add(0x54).writeU8(isCardEquipped);
+                            }
+                            return viewData;
+                        } catch (eB63) {
+                            log("[-] Error in b__63_0: " + eB63.message);
+                            return NULL;
+                        }
+                    }, "pointer", ["pointer", "pointer", "int", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.<UpdateDisplayCardList>b__63_0 (0x105F448)!");
+                } catch (eB63Hook) {
+                    log("[-] Error replacing <UpdateDisplayCardList>b__63_0: " + eB63Hook.message);
+                }
+
+                // 9e6. CardView.get_IsMaterialCard (0x13939A8) -> Safe null check protection
+                try {
+                    Interceptor.replace(baseAddr.add(0x13939A8), new NativeCallback(function (thisPtr, methodInfo) {
+                        try {
+                            if (thisPtr.isNull()) return 0;
+                            var p = thisPtr.add(0x48).readPointer();
+                            if (p.isNull()) return 0;
+                            return p.add(0x4C).readU8();
+                        } catch (eImc) {
+                            return 0;
+                        }
+                    }, "int", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on CardView.get_IsMaterialCard (0x13939A8)!");
+                } catch (eImcHook) {
+                    log("[-] Error replacing CardView.get_IsMaterialCard: " + eImcHook.message);
+                }
+
+                // Exception monitors
+                try {
+                    Interceptor.attach(baseAddr.add(0xA43CC0), {
+                        onEnter: function (args) {
+                            log("🚨 [IL2CPP EXCEPTION 0xA43CC0 NullRef] from RVA: " + this.returnAddress.sub(baseAddr));
+                        }
+                    });
+                    Interceptor.attach(baseAddr.add(0x1FF9000), {
+                        onEnter: function (args) {
+                            log("🚨 [IL2CPP EXCEPTION 0x1FF9000 OutOfRange] from RVA: " + this.returnAddress.sub(baseAddr));
+                        }
+                    });
+                } catch (eExcM) {}
+
                 // 9f. InventoryControl.CheckIntensifyEvent (0xF2C14C) -> Safe offline stub to prevent NullRef in SetStateMain
                 try {
                     var checkIntensifyEventAddr = baseAddr.add(0xF2C14C);
@@ -5037,6 +5170,15 @@ function initIl2Cpp(module) {
                     log("[+] Patched CardThemeInfoView.Refresh (0x1393598) null check to safe ret!");
                 } catch (ePct) {
                     log("[-] Error patching CardThemeInfoView.Refresh: " + ePct.message);
+                }
+
+                // 9g2. InventoryScene.GetMaterialViewData (0x105E33C) -> Patch at 0x105E3F0 to branch directly to return
+                try {
+                    Memory.protect(baseAddr.add(0x105E3F0), 4, "rwx");
+                    baseAddr.add(0x105E3F0).writeByteArray([0x07, 0x00, 0x00, 0x14]); // b #0x105e40c (bypass materialCardInfo & name null refs)
+                    log("[+] Patched InventoryScene.GetMaterialViewData (0x105E3F0) to safe b #0x105e40c!");
+                } catch (eGmv) {
+                    log("[-] Error patching GetMaterialViewData: " + eGmv.message);
                 }
 
                 // 9h. InventoryScene.GetEquipViewData (0x10577DC) -> Bulletproof replacement
@@ -5424,7 +5566,9 @@ function initIl2Cpp(module) {
                                     if (relPath.indexOf("sdhgauwehdnu/") !== -1) {
                                         folder = "sdhgauwehdnu";
                                     } else {
-                                        folder = accountOwnedCards[cId] ? "wadceg" : "sdhgauwehdnu";
+                                        var existsInWadceg = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes") !== null ||
+                                                             loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") !== null;
+                                        folder = (accountOwnedCards[cId] || existsInWadceg) ? "wadceg" : "sdhgauwehdnu";
                                     }
                                     // High-Definition Upgrade: prefer _l over _s for maximum visual sharpness
                                     var highResPath = "asiudgasg/asodhsg/" + folder + "/" + cId + "_l.i.bytes";
@@ -6437,12 +6581,6 @@ function initIl2Cpp(module) {
                             activeInventorySceneInstance = args[0];
                             log("[🗃️ INVENTORY SCENE] InventoryScene.OnOpen entered! instance: " + args[0]);
                             try {
-                                var getIsOpenedFn = new NativeFunction(baseAddr.add(0xF274B8), "int", ["pointer"]);
-                                if (getIsOpenedFn(NULL) === 0) {
-                                    log("[🗃️ INVENTORY SCENE] InventoryControl not opened yet! Calling Open(NULL)...");
-                                    var invenOpenFn = new NativeFunction(baseAddr.add(0xF27AA0), "void", ["pointer"]);
-                                    invenOpenFn(NULL);
-                                }
                                 populateOfflineInventoryCards();
                             } catch (ie) {
                                 log("[-] Error checking/opening inventory in InventoryScene: " + ie.message);
@@ -6922,6 +7060,19 @@ function initIl2Cpp(module) {
                     log("[-] Error hooking CardBookScene.OnBack: " + eObh.message);
                 }
 
+                // Safe stubs for LobbyScene.OnUpdate (0xB47AB8) and LobbyScene.SetMyCollectionNewMark (0xB478DC)
+                try {
+                    Interceptor.replace(baseAddr.add(0xB47AB8), new NativeCallback(function (thisPtr, methodInfo) {
+                        return;
+                    }, "void", ["pointer", "pointer"]));
+                    Interceptor.replace(baseAddr.add(0xB478DC), new NativeCallback(function (thisPtr, methodInfo) {
+                        return;
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Safe stubs installed for LobbyScene.OnUpdate (0xB47AB8) & SetMyCollectionNewMark (0xB478DC)!");
+                } catch (eLobbyStubs) {
+                    log("[-] Error installing LobbyScene safe stubs: " + eLobbyStubs.message);
+                }
+
                 // Hook LobbyScene.OnOpen (0xB45508)
                 var curLobbyInstance = NULL;
                 Interceptor.attach(baseAddr.add(0xB45508), {
@@ -7226,8 +7377,10 @@ function initIl2Cpp(module) {
                                                 var curScene = staticFields.add(0x20).readPointer();
                                                 if (!curScene.isNull() && sceneId === 4) {
                                                     log("[🔙 BACK CMD] Closing detail and returning to Inventory main view!");
+                                                    ensureMaterialCardItemList(curScene);
                                                     var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
                                                     setStateDefaultFn(curScene, 0, 0, NULL);
+                                                    restoreDefaultDisplayCardList(curScene);
                                                 }
                                             } else {
                                                 var targetScene = parseInt(cmdRaw);
