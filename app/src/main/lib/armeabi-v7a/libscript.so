@@ -256,6 +256,7 @@ function initIl2Cpp(module) {
     var il2cpp_class_get_nested_types = getExport("il2cpp_class_get_nested_types", "pointer", ["pointer", "pointer"]);
     var il2cpp_class_get_name = getExport("il2cpp_class_get_name", "pointer", ["pointer"]);
     var il2cpp_gchandle_new = getExport("il2cpp_gchandle_new", "uint32", ["pointer", "bool"]);
+    var il2cpp_array_new = getExport("il2cpp_array_new", "pointer", ["pointer", "size_t"]);
 
     function getNestedClass(parentClass, nestedName) {
         if (!parentClass || parentClass.isNull() || !il2cpp_class_get_nested_types || !il2cpp_class_get_name) return NULL;
@@ -2832,6 +2833,8 @@ function initIl2Cpp(module) {
                 var loonaEachThemeBestCardMap = NULL;
                 var loonaCardItems = [];
                 var activeInventorySceneInstance = NULL;
+                var cachedCardItemKlass = NULL;
+                var cachedCardKlass = NULL;
 
                 function createFastArray(items, type) {
                     try {
@@ -2896,12 +2899,14 @@ function initIl2Cpp(module) {
                             var grpKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "GroupControl/Data");
                             if (grpKlass && !grpKlass.isNull()) {
                                 loonaGroupData = il2cpp_object_new(grpKlass);
+                                if (il2cpp_gchandle_new && !loonaGroupData.isNull()) il2cpp_gchandle_new(loonaGroupData, 2);
                                 loonaGroupData.add(0x18).writePointer(createDownloadPath("asiudgasg/asodhsg/aweoijs/1001.i.bytes"));
                                 loonaGroupData.add(0x28).writePointer(createDownloadPath("asiudgasg/asodhsg/aweoijs/1001.i.bytes"));
                                 try {
                                     var gdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "GroupData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "GroupData");
                                     if (gdKlass && !gdKlass.isNull()) {
                                         var gd = il2cpp_object_new(gdKlass);
+                                        if (il2cpp_gchandle_new && !gd.isNull()) il2cpp_gchandle_new(gd, 2);
                                         gd.add(0x10).writeS32(1001); // code = 1001
                                         gd.add(0x14).writeS16(1001); // majorGroupCode = 1001
                                         gd.add(0x18).writeS16(11);   // memberCount = 11 (equipableSlot: 11)
@@ -2919,6 +2924,7 @@ function initIl2Cpp(module) {
                             var thmKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "ThemeControl/Data");
                             if (thmKlass && !thmKlass.isNull()) {
                                 loonaThemeData = il2cpp_object_new(thmKlass);
+                                if (il2cpp_gchandle_new && !loonaThemeData.isNull()) il2cpp_gchandle_new(loonaThemeData, 2);
                                 loonaThemeData.add(0x30).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes"));
                                 loonaThemeData.add(0x38).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
                                 loonaThemeData.add(0x40).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
@@ -2926,6 +2932,7 @@ function initIl2Cpp(module) {
                                     var tdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "ThemeData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "ThemeData");
                                     if (tdKlass && !tdKlass.isNull()) {
                                         var td = il2cpp_object_new(tdKlass);
+                                        if (il2cpp_gchandle_new && !td.isNull()) il2cpp_gchandle_new(td, 2);
                                         td.add(0x10).writeS32(1001);
                                         td.add(0x18).writePointer(createIl2CppString("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes"));
                                         td.add(0x20).writePointer(createIl2CppString("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
@@ -2939,10 +2946,12 @@ function initIl2Cpp(module) {
                             var ttKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "ThemeTypeControl/Data");
                             if (ttKlass && !ttKlass.isNull()) {
                                 loonaThemeTypeData = il2cpp_object_new(ttKlass);
+                                if (il2cpp_gchandle_new && !loonaThemeTypeData.isNull()) il2cpp_gchandle_new(loonaThemeTypeData, 2);
                                 try {
                                     var ttdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "ThemeTypeData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "ThemeTypeData");
                                     if (ttdKlass && !ttdKlass.isNull()) {
                                         var ttd = il2cpp_object_new(ttdKlass);
+                                        if (il2cpp_gchandle_new && !ttd.isNull()) il2cpp_gchandle_new(ttd, 2);
                                         ttd.add(0x10).writeS16(1); // code = 1
                                         loonaThemeTypeData.add(0x10).writePointer(ttd);
                                     }
@@ -2959,12 +2968,14 @@ function initIl2Cpp(module) {
                                 var m = LOONA_MEMBERS[i];
                                 if (!loonaArtistDataMap[m.index]) {
                                     var aObj = il2cpp_object_new(artKlass);
+                                    if (il2cpp_gchandle_new && !aObj.isNull()) il2cpp_gchandle_new(aObj, 2);
                                     aObj.add(0x20).writePointer(createIl2CppString("LOONA"));
                                     aObj.add(0x38).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes"));
                                     aObj.add(0x40).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
                                     try {
                                         if (adKlass && !adKlass.isNull()) {
                                             var ad = il2cpp_object_new(adKlass);
+                                            if (il2cpp_gchandle_new && !ad.isNull()) il2cpp_gchandle_new(ad, 2);
                                             ad.add(0x10).writeS32(m.index);
                                             ad.add(0x18).writeS32(1001);
                                             ad.add(0x88).writePointer(createIl2CppString(m.name));
@@ -2980,6 +2991,9 @@ function initIl2Cpp(module) {
                                 artistItems.push(loonaArtistDataMap[ai] || NULL);
                             }
                             loonaArtistListFastArray = createFastArray(artistItems, 'artist');
+                            if (il2cpp_gchandle_new && loonaArtistListFastArray && !loonaArtistListFastArray.isNull()) {
+                                il2cpp_gchandle_new(loonaArtistListFastArray, 2);
+                            }
                             if (loonaGroupData && !loonaGroupData.isNull()) {
                                 loonaGroupData.add(0x30).writePointer(loonaArtistListFastArray);
                             }
@@ -2997,12 +3011,14 @@ function initIl2Cpp(module) {
                         var thmKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "ThemeControl/Data");
                         if (!thmKlass || thmKlass.isNull()) return loonaThemeData;
                         var tObj = il2cpp_object_new(thmKlass);
+                        if (il2cpp_gchandle_new && !tObj.isNull()) il2cpp_gchandle_new(tObj, 2);
                         tObj.add(0x30).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes"));
                         tObj.add(0x38).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
                         tObj.add(0x40).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
                         var tdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "ThemeData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "ThemeData");
                         if (tdKlass && !tdKlass.isNull()) {
                             var td = il2cpp_object_new(tdKlass);
+                            if (il2cpp_gchandle_new && !td.isNull()) il2cpp_gchandle_new(td, 2);
                             td.add(0x10).writeS32(themeId);
                             td.add(0x14).writeS32(10010100 + (themeId % 100)); // localeName
                             td.add(0x18).writePointer(createIl2CppString("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes"));
@@ -3026,6 +3042,7 @@ function initIl2Cpp(module) {
                         var ccdKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardControl/Data");
                         if (!ccdKlass || ccdKlass.isNull()) return NULL;
                         var ccd = il2cpp_object_new(ccdKlass);
+                        if (il2cpp_gchandle_new && !ccd.isNull()) il2cpp_gchandle_new(ccd, 2);
                         var meta = getCardMetadata(cardId);
                         var memberIdx = (meta.artistID >= 1000) ? (meta.artistID - 1000) : meta.artistID;
                         if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cardId - 1001) % 11) + 1;
@@ -3047,6 +3064,7 @@ function initIl2Cpp(module) {
                             var cdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "CardData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "CardData");
                             if (cdKlass && !cdKlass.isNull()) {
                                 var cd = il2cpp_object_new(cdKlass);
+                                if (il2cpp_gchandle_new && !cd.isNull()) il2cpp_gchandle_new(cd, 2);
                                 cd.add(0x10).writeS32(cardId);
                                 cd.add(0x14).writeS32(isPrism ? 1 : 0); // type = 1 for prism
                                 cd.add(0x20).writePointer(createIl2CppString("asiudgasg/asodhsg/wadceg/" + cardId + "_s.i.bytes")); // cardImageSmall
@@ -4794,6 +4812,15 @@ function initIl2Cpp(module) {
                         }
 
                         var listItems = dclPtr.add(0x10).readPointer();
+                        var requiredCap = filteredItems.length + 5;
+                        var curCap = (!listItems.isNull()) ? listItems.add(0x18).readS32() : 0;
+                        if (curCap < requiredCap && il2cpp_array_new && cachedCardItemKlass && !cachedCardItemKlass.isNull()) {
+                            var newArr = il2cpp_array_new(cachedCardItemKlass, 64);
+                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(newArr, 2);
+                            dclPtr.add(0x10).writePointer(newArr);
+                            listItems = newArr;
+                            log("[🎠 CAROUSEL] safeUpdateLowerCarousel: expanded _items to capacity 64");
+                        }
                         if (listItems.isNull()) {
                             log("[-] CAROUSEL: displayCardList._items is null!");
                             return;
@@ -4884,7 +4911,12 @@ function initIl2Cpp(module) {
                                 var newObj = il2cpp_object_new(klass);
                                 if (!newObj.isNull()) {
                                     listCtorFn(newObj, ctorMethodInfo);
-                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(newObj, 0);
+                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(newObj, 2);
+                                    if (il2cpp_array_new && cachedCardItemKlass && !cachedCardItemKlass.isNull()) {
+                                        var newArr = il2cpp_array_new(cachedCardItemKlass, 128);
+                                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(newArr, 2);
+                                        newObj.add(0x10).writePointer(newArr);
+                                    }
                                     scene.add(off).writePointer(newObj);
                                     log("[🗃️ INVENTORY] ensureInventoryLists: initialized offset 0x" + off.toString(16) + " -> " + newObj);
                                 }
@@ -4904,6 +4936,15 @@ function initIl2Cpp(module) {
                         var dclPtr = sceneThis.add(0x58).readPointer();
                         if (dclPtr.isNull()) return;
                         var listItems = dclPtr.add(0x10).readPointer();
+                        var requiredCap = loonaCardItems.length + 10;
+                        var curCap = (!listItems.isNull()) ? listItems.add(0x18).readS32() : 0;
+                        if (curCap < requiredCap && il2cpp_array_new && cachedCardItemKlass && !cachedCardItemKlass.isNull()) {
+                            var newArr = il2cpp_array_new(cachedCardItemKlass, 128);
+                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(newArr, 2);
+                            dclPtr.add(0x10).writePointer(newArr);
+                            listItems = newArr;
+                            log("[🗃️ INVENTORY] restoreDefaultDisplayCardList: expanded _items to capacity 128");
+                        }
                         if (listItems.isNull()) return;
 
                         for (var i = 0; i < loonaCardItems.length; i++) {
@@ -5050,10 +5091,16 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.attach(baseAddr.add(0x1053B88), {
                         onEnter: function (args) {
-                            var scene = args[0];
-                            if (!scene.isNull()) {
+                            this.scene = args[0];
+                            if (!this.scene.isNull()) {
                                 log("[🗃️ SET_STATE_DEFAULT] onEnter triggered, verifying materialCardItemList");
-                                ensureMaterialCardItemList(scene);
+                                ensureMaterialCardItemList(this.scene);
+                            }
+                        },
+                        onLeave: function (retval) {
+                            if (this.scene && !this.scene.isNull()) {
+                                log("[🗃️ SET_STATE_DEFAULT] onLeave triggered, restoring displayCardList...");
+                                restoreDefaultDisplayCardList(this.scene);
                             }
                         }
                     });
@@ -5227,6 +5274,24 @@ function initIl2Cpp(module) {
                     log("[🛡️ INVENTORY PATCH] Patched 0x1054A04 with 'b #0x1054a98' (safe ret epilogue)!");
                 } catch (eUdclProtect) {
                     log("[-] Error protecting UpdateDisplayCardList / patching 0x1054A04: " + eUdclProtect.message);
+                }
+
+                // InventoryScene.SetStateWait (0x10556C0) null protections & ARM64 patches
+                try {
+                    // 1. Patch 0x1055B80: change 'cbz x22, #0x1055db4' to 'cbz x22, #0x1055c08' (skip null item in theme type loop)
+                    Memory.protect(baseAddr.add(0x1055B80), 4, 'rwx');
+                    baseAddr.add(0x1055B80).writeByteArray([0x56, 0x04, 0x00, 0xB4]);
+
+                    // 2. Patch 0x1055DAC..0x1055DB8: replace 'bl #0xa43cc0' throw sites with 'b #0x1055da8' (safe ret epilogue)
+                    Memory.protect(baseAddr.add(0x1055DAC), 16, 'rwx');
+                    baseAddr.add(0x1055DAC).writeByteArray([0xFF, 0xFF, 0xFF, 0x17]); // b #0x1055da8
+                    baseAddr.add(0x1055DB0).writeByteArray([0xFE, 0xFF, 0xFF, 0x17]); // b #0x1055da8
+                    baseAddr.add(0x1055DB4).writeByteArray([0xFD, 0xFF, 0xFF, 0x17]); // b #0x1055da8
+                    baseAddr.add(0x1055DB8).writeByteArray([0xFC, 0xFF, 0xFF, 0x17]); // b #0x1055da8
+
+                    log("[🛡️ INVENTORY PATCH] Patched SetStateWait 0x1055B80 & 0x1055DAC-DB8 with safe skips and ret!");
+                } catch (eSswPatch) {
+                    log("[-] Error patching SetStateWait: " + eSswPatch.message);
                 }
 
                 // GC Liveness TraverseObject null-class protection (0x9F8DBC)
@@ -6347,6 +6412,8 @@ function initIl2Cpp(module) {
                             log("[-] Could not resolve Card or CardItem class! cardKlass: " + cardKlass + ", cardItemKlass: " + cardItemKlass);
                             return;
                         }
+                        cachedCardKlass = cardKlass;
+                        cachedCardItemKlass = cardItemKlass;
 
                         log("[🃏 INVENTORY] Populating " + profile.inventoryCards.length + " LOONA cards into CardMap (" + cardMap + ")...");
                         var addedCount = 0;
@@ -6357,6 +6424,9 @@ function initIl2Cpp(module) {
                             try {
                                 // 1. Create Card managed instance
                                 var cardObj = il2cpp_object_new(cardKlass);
+                                if (il2cpp_gchandle_new && !cardObj.isNull()) {
+                                    il2cpp_gchandle_new(cardObj, 2);
+                                }
                                 var objId = int64(cData.objectID || (100000 + i + 1));
                                 var cId = parseInt(cData.cardID || (1001 + i), 10);
                                 var gr = parseInt(cData.grade !== undefined ? cData.grade : 4, 10);
@@ -6376,6 +6446,9 @@ function initIl2Cpp(module) {
 
                                 // 2. Directly construct CardItem managed instance
                                 var cardItemObj = il2cpp_object_new(cardItemKlass);
+                                if (il2cpp_gchandle_new && !cardItemObj.isNull()) {
+                                    il2cpp_gchandle_new(cardItemObj, 2);
+                                }
                                 cardItemObj.add(0x10).writePointer(cardObj); // <Raw>
                                 var ccd = getOrCreateCardControlData(cId);
                                 cardItemObj.add(0x18).writePointer(ccd || NULL); // <Card>
@@ -6636,6 +6709,9 @@ function initIl2Cpp(module) {
                             log("[🗃️ INVENTORY VIEW] ShowDefaultLayout completed! Updating UI texts and card count...");
                             try {
                                 if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                    // 0. Restore card list in default view
+                                    restoreDefaultDisplayCardList(activeInventorySceneInstance);
+
                                     // 1. Native OnUpdateCardCount (0x1054BB4)
                                     var onUpdateCardCountFn = new NativeFunction(baseAddr.add(0x1054BB4), "void", ["pointer", "pointer"]);
                                     onUpdateCardCountFn(activeInventorySceneInstance, NULL);
@@ -7457,7 +7533,7 @@ function initIl2Cpp(module) {
                                             var txtObj = il2cpp_runtime_invoke(cachedReadAllTextMethod, NULL, cmdReusableBuf, excReusableBuf);
                                             il2cpp_runtime_invoke(cachedDeleteMethod, NULL, cmdReusableBuf, excReusableBuf);
                                             if (!txtObj.isNull()) {
-                                                var cmdRaw = readIl2CppString(txtObj).trim();
+                                                var cmdRaw = readIl2CppString(txtObj).replace(/['"]/g, '').trim();
                                                 log("[🚀 SCENE CMD] Read command: '" + cmdRaw + "'");
                                             if (cmdRaw.indexOf("card:") === 0) {
                                                 var cardArg = cmdRaw.substring(5).trim();
