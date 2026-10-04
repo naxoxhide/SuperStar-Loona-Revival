@@ -465,6 +465,8 @@ function initIl2Cpp(module) {
             var freadPtr = Module.findExportByName("libc.so", "fread");
             var fwritePtr = Module.findExportByName("libc.so", "fwrite");
             var fclosePtr = Module.findExportByName("libc.so", "fclose");
+            var fseekPtr = Module.findExportByName("libc.so", "fseek");
+            var ftellPtr = Module.findExportByName("libc.so", "ftell");
             var accessPtr = Module.findExportByName("libc.so", "access");
             var strlenPtr = Module.findExportByName("libc.so", "strlen");
             var unlinkPtr = Module.findExportByName("libc.so", "unlink");
@@ -473,6 +475,8 @@ function initIl2Cpp(module) {
             var freadFn = freadPtr ? new NativeFunction(freadPtr, "size_t", ["pointer", "size_t", "size_t", "pointer"]) : null;
             var fwriteFn = fwritePtr ? new NativeFunction(fwritePtr, "size_t", ["pointer", "size_t", "size_t", "pointer"]) : null;
             var fcloseFn = fclosePtr ? new NativeFunction(fclosePtr, "int", ["pointer"]) : null;
+            var fseekFn = fseekPtr ? new NativeFunction(fseekPtr, "int", ["pointer", "long", "int"]) : null;
+            var ftellFn = ftellPtr ? new NativeFunction(ftellPtr, "long", ["pointer"]) : null;
             var accessFn = accessPtr ? new NativeFunction(accessPtr, "int", ["pointer", "int"]) : null;
             var strlenFn = strlenPtr ? new NativeFunction(strlenPtr, "size_t", ["pointer"]) : null;
             var unlinkFn = unlinkPtr ? new NativeFunction(unlinkPtr, "int", ["pointer"]) : null;
@@ -532,8 +536,18 @@ function initIl2Cpp(module) {
                     var cMode = Memory.allocUtf8String("rb");
                     var fp = fopenFn(cPath, cMode);
                     if (!fp.isNull()) {
-                        var buf = Memory.alloc(65536);
-                        var readRes = freadFn(buf, 1, 65535, fp);
+                        var fileSize = 65536;
+                        if (fseekFn && ftellFn) {
+                            fseekFn(fp, 0, 2); // SEEK_END
+                            fileSize = Number(ftellFn(fp));
+                            fseekFn(fp, 0, 0); // SEEK_SET
+                        }
+                        if (fileSize <= 0) {
+                            fcloseFn(fp);
+                            return "";
+                        }
+                        var buf = Memory.alloc(fileSize + 1);
+                        var readRes = freadFn(buf, 1, fileSize, fp);
                         var bytesRead = Number(readRes);
                         fcloseFn(fp);
                         if (bytesRead > 0) {
@@ -2688,6 +2702,7 @@ function initIl2Cpp(module) {
                 }
 
                 var cddCache = null;
+                var urlToCardMap = {};
                 function getCardMetadata(cardId) {
                     if (!cddCache) {
                         try {
@@ -2695,11 +2710,26 @@ function initIl2Cpp(module) {
                             if (raw) {
                                 var arr = JSON.parse(raw);
                                 cddCache = {};
+                                urlToCardMap = {};
                                 for (var i = 0; i < arr.length; i++) {
-                                    cddCache[arr[i].code] = arr[i];
+                                    var item = arr[i];
+                                    cddCache[item.code] = item;
+                                    if (item.cardImageSmall) {
+                                        var sUrl = item.cardImageSmall.split("?")[0];
+                                        urlToCardMap[sUrl] = { cId: item.code, type: "s" };
+                                    }
+                                    if (item.cardImageLarge) {
+                                        var lUrl = item.cardImageLarge.split("?")[0];
+                                        urlToCardMap[lUrl] = { cId: item.code, type: "l" };
+                                    }
                                 }
+                                log("[📦 CDD] Loaded cdd.json: " + arr.length + " card metadata entries cached, " + Object.keys(urlToCardMap).length + " URLs mapped!");
+                            } else {
+                                log("[-] readTextFile returned null for cdd.json!");
                             }
-                        } catch (e) {}
+                        } catch (e) {
+                            log("[-] Error parsing cdd.json: " + e.message);
+                        }
                     }
                     if (cddCache && cddCache[cardId]) {
                         return cddCache[cardId];
@@ -4625,12 +4655,7 @@ function initIl2Cpp(module) {
                                 }
                             }
 
-                            // Step 2: Store as selectedCardItem in scene (0x88) & preSelectedCardItem (0x98)
-                            sceneThis.add(0x88).writePointer(clickedCardItem);
-                            sceneThis.add(0x98).writePointer(clickedCardItem);
-                            sceneThis.add(0x80).writePointer(NULL); // selectedArtistData - safe null
-
-                            // Read card data for logging
+                            // Read card data for logging and resolving artist data
                             var cId = 1001; var gr = 4; var lvl = 50;
                             try {
                                 var rawCard = clickedCardItem.add(0x10).readPointer();
@@ -4640,7 +4665,18 @@ function initIl2Cpp(module) {
                                     lvl = rawCard.add(0x1C).readS16();
                                 }
                             } catch (eRc) {}
-                            log("[🃏 ON_CARD_ITEM] Selected: cardID=" + cId + ", grade=" + gr + ", level=" + lvl);
+
+                            var meta = getCardMetadata(cId);
+                            var memberIdx = (meta.artistID >= 1000) ? (meta.artistID - 1000) : meta.artistID;
+                            if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cId - 1001) % 11) + 1;
+                            var artistData = loonaArtistDataMap[memberIdx] || NULL;
+
+                            // Step 2: Store as selectedCardItem in scene (0x88) & preSelectedCardItem (0x98) & selectedArtistData (0x80)
+                            sceneThis.add(0x88).writePointer(clickedCardItem);
+                            sceneThis.add(0x98).writePointer(clickedCardItem);
+                            sceneThis.add(0x80).writePointer(artistData);
+
+                            log("[🃏 ON_CARD_ITEM] Selected: cardID=" + cId + ", grade=" + gr + ", level=" + lvl + ", theme=" + meta.theme + ", memberIdx=" + memberIdx);
 
                             // Step 3: Call safeSetStateMain (isReload=false means "first entry to card detail")
                             safeSetStateMain(sceneThis, 0);
@@ -4652,6 +4688,134 @@ function initIl2Cpp(module) {
                 } catch (eHoci) {
                     log("[-] Error replacing OnCardItem: " + eHoci.message);
                 }
+
+                // Helper to safely filter lower carousel (InvenCardView @ sceneView + 0x78) by member and theme
+                var safeUpdateLowerCarousel = function(sceneThis, selectedCardItem) {
+                    try {
+                        if (sceneThis.isNull() || selectedCardItem.isNull()) return;
+
+                        var rawSel = selectedCardItem.add(0x10).readPointer();
+                        if (rawSel.isNull()) return;
+
+                        var selObjIdStr = rawSel.add(0x10).readS64().toString();
+                        var selCardId = rawSel.add(0x20).readS32();
+                        var selMeta = getCardMetadata(selCardId);
+                        var selArtist = selMeta.artistID;
+                        var selTheme = selMeta.theme;
+
+                        log("[🎠 CAROUSEL] Filtering lower cards for selCard=" + selCardId + " (artist=" + selArtist + ", theme=" + selTheme + ", obj=" + selObjIdStr + ")");
+
+                        // Step 1: Collect matching cards from loonaCardItems
+                        var filteredItems = [];
+                        if (loonaCardItems && loonaCardItems.length > 0) {
+                            for (var i = 0; i < loonaCardItems.length; i++) {
+                                var cItem = loonaCardItems[i];
+                                if (cItem.isNull()) continue;
+
+                                var rawC = cItem.add(0x10).readPointer();
+                                if (rawC.isNull()) continue;
+
+                                var cObjIdStr = rawC.add(0x10).readS64().toString();
+                                // Exclude the inspected card itself
+                                if (cObjIdStr === selObjIdStr) continue;
+
+                                var cCardId = rawC.add(0x20).readS32();
+                                var cMeta = getCardMetadata(cCardId);
+
+                                // Strict filter: same member (artist) AND same theme
+                                if (cMeta.artistID === selArtist && cMeta.theme === selTheme) {
+                                    filteredItems.push(cItem);
+                                    log("[🎠 CAROUSEL MATCH] Added candidate cardID=" + cCardId + " obj=" + cObjIdStr + " theme=" + cMeta.theme);
+                                }
+                            }
+                        }
+                        log("[🎠 CAROUSEL] Total matching filtered cards: " + filteredItems.length);
+
+                        // Set extractType to 1 (Artist)
+                        sceneThis.add(0x50).writeS32(1);
+
+                        // Step 2: Update displayCardList (offset 0x58 in InventoryScene)
+                        var dclPtr = sceneThis.add(0x58).readPointer();
+                        if (dclPtr.isNull()) {
+                            log("[-] CAROUSEL: displayCardList is null!");
+                            return;
+                        }
+
+                        var listItems = dclPtr.add(0x10).readPointer();
+                        if (listItems.isNull()) {
+                            log("[-] CAROUSEL: displayCardList._items is null!");
+                            return;
+                        }
+
+                        // Write filtered items into displayCardList array
+                        for (var f = 0; f < filteredItems.length; f++) {
+                            listItems.add(0x20 + f * 8).writePointer(filteredItems[f]);
+                        }
+                        // Update displayCardList._size
+                        dclPtr.add(0x18).writeS32(filteredItems.length);
+
+                        // Step 3: Get sceneView (0x48) -> cardView (0x78)
+                        var sceneView = sceneThis.add(0x48).readPointer();
+                        if (sceneView.isNull()) {
+                            log("[-] CAROUSEL: sceneView is null!");
+                            return;
+                        }
+                        var cardView = sceneView.add(0x78).readPointer();
+                        if (cardView.isNull()) {
+                            log("[-] CAROUSEL: cardView is null!");
+                            return;
+                        }
+
+                        // Read the existing onEventListener delegate (0x90 in InvenCardView)
+                        var eventListener = cardView.add(0x90).readPointer();
+                        log("[🎠 CAROUSEL] Existing onEventListener delegate: " + eventListener);
+
+                        // Step 4: Invoke InvenCardView.SetData(maxCount, isIntensify=false, eventListener) -> RVA 0xF23384
+                        var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
+                        setDataFn(cardView, filteredItems.length, 0, eventListener, NULL);
+                        log("[✅ CAROUSEL] InvenCardView.SetData called with count=" + filteredItems.length);
+
+                        // Step 5: Invoke InvenCardView.Refresh(isMaterialCardLight=false) -> RVA 0xF233B8
+                        var refreshFn = new NativeFunction(baseAddr.add(0xF233B8), "void", ["pointer", "bool", "pointer"]);
+                        refreshFn(cardView, 0, NULL);
+                        log("[✅ CAROUSEL] InvenCardView.Refresh called successfully!");
+
+                    } catch (eCar) {
+                        log("[-] Error in safeUpdateLowerCarousel: " + eCar.message);
+                    }
+                };
+
+                // Helper to restore all cards in displayCardList when returning to default state
+                var restoreDefaultDisplayCardList = function(sceneThis) {
+                    try {
+                        if (sceneThis.isNull() || !loonaCardItems || loonaCardItems.length === 0) return;
+                        var dclPtr = sceneThis.add(0x58).readPointer();
+                        if (dclPtr.isNull()) return;
+                        var listItems = dclPtr.add(0x10).readPointer();
+                        if (listItems.isNull()) return;
+
+                        for (var i = 0; i < loonaCardItems.length; i++) {
+                            listItems.add(0x20 + i * 8).writePointer(loonaCardItems[i]);
+                        }
+                        dclPtr.add(0x18).writeS32(loonaCardItems.length);
+                        sceneThis.add(0x50).writeS32(0); // EXTRACT_TYPE.All
+
+                        var sceneView = sceneThis.add(0x48).readPointer();
+                        if (!sceneView.isNull()) {
+                            var cardView = sceneView.add(0x78).readPointer();
+                            if (!cardView.isNull()) {
+                                var eventListener = cardView.add(0x90).readPointer();
+                                var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
+                                setDataFn(cardView, loonaCardItems.length, 0, eventListener, NULL);
+                                var refreshFn = new NativeFunction(baseAddr.add(0xF233B8), "void", ["pointer", "bool", "pointer"]);
+                                refreshFn(cardView, 0, NULL);
+                            }
+                        }
+                        log("[✅ RESTORE] Restored displayCardList to all " + loonaCardItems.length + " cards!");
+                    } catch (eR) {
+                        log("[-] Error restoring displayCardList: " + eR.message);
+                    }
+                };
 
                 // 9e2. InventoryScene.SetStateMain (0x1053FB0) -> Safe replacement preventing null crash chain
                 function safeSetStateMain(sceneThis, isReload) {
@@ -4678,10 +4842,20 @@ function initIl2Cpp(module) {
                         var isLk = (rawCard.add(0x29).readU8() === 1);
                         var isPrism = (rawCard.add(0x2A).readU8() === 1);
 
-                        log("[🗃️ SET_STATE_MAIN] Card: id=" + cId + ", gr=" + gr + ", lvl=" + lvl + ", eq=" + isEq);
+                        var meta = getCardMetadata(cId);
+                        var memberIdx = (meta.artistID >= 1000) ? (meta.artistID - 1000) : meta.artistID;
+                        if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cId - 1001) % 11) + 1;
+                        var artistData = loonaArtistDataMap[memberIdx] || NULL;
+
+                        // Ensure selectedArtistData (0x80) is populated
+                        if (sceneThis.add(0x80).readPointer().isNull() && artistData && !artistData.isNull()) {
+                            sceneThis.add(0x80).writePointer(artistData);
+                        }
+
+                        log("[🗃️ SET_STATE_MAIN] Card: id=" + cId + ", gr=" + gr + ", lvl=" + lvl + ", theme=" + meta.theme + ", eq=" + isEq);
 
                         // Find equippedCardItem for this member slot
-                        var memberIdx = ((cId - 1001) % 11);
+                        var mSlot = memberIdx - 1;
                         var equippedCardItem = NULL;
                         if (loonaCardItems && loonaCardItems.length > 0) {
                             for (var k = 0; k < loonaCardItems.length; k++) {
@@ -4691,7 +4865,7 @@ function initIl2Cpp(module) {
                                     if (!r.isNull()) {
                                         var cid2 = r.add(0x20).readS32();
                                         var isE2 = (r.add(0x28).readU8() === 1);
-                                        if (((cid2 - 1001) % 11) === memberIdx && isE2) {
+                                        if (((cid2 - 1001) % 11) === mSlot && isE2) {
                                             equippedCardItem = itm;
                                         }
                                     }
@@ -4736,12 +4910,15 @@ function initIl2Cpp(module) {
                                         log("[✅ SET_STATE_MAIN] InvenCardSelectView refreshed!");
                                     } catch (eSvr) { log("[-] Error refreshing selectView: " + eSvr.message); }
                                 }
+
+                                // 5. Update lower card carousel (InvenCardView @ sceneView + 0x78) with member + theme filtered cards
+                                safeUpdateLowerCarousel(sceneThis, selectedCardItem);
                             }
                         } catch (eSvErr) {
                             log("[-] Error driving scene view refresh: " + eSvErr.message);
                         }
 
-                        log("[✅ SET_STATE_MAIN] Safe SetStateMain completed for cardID=" + cId);
+                        log("[✅ SET_STATE_MAIN] Safe SetStateMain completed for cardID=" + cId + ", theme=" + meta.theme);
                     } catch (eSetState) {
                         log("[-] Error in safeSetStateMain: " + eSetState.message);
                     }
@@ -4754,6 +4931,91 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on InventoryScene.SetStateMain (0x1053FB0)!");
                 } catch (eSsmHook) {
                     log("[-] Error replacing SetStateMain: " + eSsmHook.message);
+                }
+
+                // Hook InventoryScene.SetStateDefault (0x1053B88) to restore all cards
+                try {
+                    Interceptor.attach(baseAddr.add(0x1053B88), {
+                        onEnter: function (args) {
+                            var scene = args[0];
+                            if (!scene.isNull()) {
+                                log("[🗃️ SET_STATE_DEFAULT] onEnter triggered, restoring default display card list");
+                                restoreDefaultDisplayCardList(scene);
+                            }
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on InventoryScene.SetStateDefault (0x1053B88)!");
+                } catch (eSsdHook) {
+                    log("[-] Error attaching to SetStateDefault: " + eSsdHook.message);
+                }
+
+                // 9e3. InventoryScene.ExtractWithArtist (0x1058158) -> Strict filtering by member AND theme/song
+                try {
+                    var extractWithArtistAddr = baseAddr.add(0x1058158);
+                    Interceptor.replace(extractWithArtistAddr, new NativeCallback(function (sceneThis, isGroup, cardItem, methodInfo) {
+                        try {
+                            if (sceneThis.isNull() || cardItem.isNull()) return;
+
+                            var selectedCardItem = sceneThis.add(0x88).readPointer();
+                            if (selectedCardItem.isNull()) return;
+
+                            var selRaw = selectedCardItem.add(0x10).readPointer();
+                            var cardRaw = cardItem.add(0x10).readPointer();
+                            if (selRaw.isNull() || cardRaw.isNull()) return;
+
+                            var selObjIdStr = selRaw.add(0x10).readS64().toString();
+                            var cardObjIdStr = cardRaw.add(0x10).readS64().toString();
+
+                            // Exclude the currently inspected card itself (Dalcom standard: compare ObjectID)
+                            if (selObjIdStr === cardObjIdStr) return;
+
+                            var selCardId = selRaw.add(0x20).readS32();
+                            var cardId = cardRaw.add(0x20).readS32();
+
+                            var selMeta = getCardMetadata(selCardId);
+                            var cardMeta = getCardMetadata(cardId);
+
+                            var selArtistID = selMeta.artistID;
+                            var cardArtistID = cardMeta.artistID;
+                            var selTheme = selMeta.theme;
+                            var cardTheme = cardMeta.theme;
+
+                            // Strict Filter:
+                            // 1. Same Member (artistID)
+                            // 2. Same Theme / Song (theme)
+                            if (selArtistID !== cardArtistID) return;
+                            if (selTheme !== cardTheme) return;
+
+                            // Add card to displayCardList via native AddCardItem (0x1057FF0)
+                            var addCardItemFn = new NativeFunction(baseAddr.add(0x1057FF0), "void", ["pointer", "int", "pointer", "pointer"]);
+                            addCardItemFn(sceneThis, isGroup, cardItem, NULL);
+                            log("[🃏 EXTRACT_ARTIST] Added card: id=" + cardId + ", obj=" + cardObjIdStr + ", theme=" + cardTheme + ", artist=" + cardArtistID);
+                        } catch (eEwa) {
+                            log("[-] Error in ExtractWithArtist: " + eEwa.message);
+                        }
+                    }, "void", ["pointer", "int", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.ExtractWithArtist (0x1058158) - STRICT MEMBER & THEME FILTER!");
+                } catch (eHewa) {
+                    log("[-] Error replacing ExtractWithArtist: " + eHewa.message);
+                }
+
+                // 9e4. Safe material stubs to prevent KeyVault.get_MaterialCardInfo null ref in UpdateDisplayCardList
+                try {
+                    // CardItem.get_IsMaterialCard (0xB55F08) -> return false (0)
+                    Interceptor.replace(baseAddr.add(0xB55F08), new NativeCallback(function (thisPtr, methodInfo) {
+                        return 0;
+                    }, "int", ["pointer", "pointer"]));
+                    // CardControl.Data.get_IsMaterial (0xE4340C) -> return false (0)
+                    Interceptor.replace(baseAddr.add(0xE4340C), new NativeCallback(function (thisPtr, methodInfo) {
+                        return 0;
+                    }, "int", ["pointer", "pointer"]));
+                    // KeyVault.get_MaterialCardInfo (0x1061598) -> return NULL
+                    Interceptor.replace(baseAddr.add(0x1061598), new NativeCallback(function (methodInfo) {
+                        return NULL;
+                    }, "pointer", ["pointer"]));
+                    log("[+] Safe offline stubs installed for IsMaterialCard & KeyVault (0xB55F08, 0xE4340C, 0x1061598)!");
+                } catch (eMatStub) {
+                    log("[-] Error installing material stubs: " + eMatStub.message);
                 }
 
                 // 9f. InventoryControl.CheckIntensifyEvent (0xF2C14C) -> Safe offline stub to prevent NullRef in SetStateMain
@@ -5138,7 +5400,15 @@ function initIl2Cpp(module) {
                                     if (uLen > 0) {
                                         var fullUrl = urlPtr.add(0x14).readUtf16String(uLen);
                                         var idx = fullUrl.indexOf("asiudgasg/");
-                                        if (idx !== -1) relPath = fullUrl.substring(idx);
+                                        if (idx !== -1) {
+                                            relPath = fullUrl.substring(idx);
+                                        } else {
+                                            var cleanUrl = fullUrl.split("?")[0];
+                                            if (urlToCardMap && urlToCardMap[cleanUrl]) {
+                                                var uInfo = urlToCardMap[cleanUrl];
+                                                relPath = "asiudgasg/asodhsg/wadceg/" + uInfo.cId + "_" + uInfo.type + ".i.bytes";
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -6200,19 +6470,6 @@ function initIl2Cpp(module) {
 
 
 
-                // --- Intercept InventoryScene.GetMaterialViewData (0x105E33C) -> Safe value type filler ---
-                try {
-                    Interceptor.replace(baseAddr.add(0x105E33C), new NativeCallback(function (retBuf, sceneThis, cardItem, materialCardItem, index, methodInfo) {
-                        try {
-                            if (retBuf && !retBuf.isNull()) {
-                                for (var b = 0; b < 0x20; b++) retBuf.add(b).writeU8(0);
-                            }
-                        } catch (eMb) {}
-                    }, "void", ["pointer", "pointer", "pointer", "pointer", "int", "pointer"]));
-                    log("[+] Interceptor.replace installed on InventoryScene.GetMaterialViewData (0x105E33C)!");
-                } catch (eGmvd) {
-                    log("[-] Error replacing GetMaterialViewData: " + eGmvd.message);
-                }
 
                 // Offline Equip / Unequip Helpers and Hooks
                 var refreshInventoryHeaderView = function() {
@@ -6884,20 +7141,48 @@ function initIl2Cpp(module) {
                                                 log("[🚀 SCENE CMD] Read command: '" + cmdRaw + "'");
                                             if (cmdRaw.indexOf("card:") === 0) {
                                                 var cardArg = cmdRaw.substring(5).trim();
-                                                var cardIdx = parseInt(cardArg, 10);
-                                                log("[🃏 CARD CMD] Triggering card select for arg: '" + cardArg + "' (idx=" + cardIdx + ")");
+                                                log("[🃏 CARD CMD] Triggering card select for arg: '" + cardArg + "'");
                                                 var curScene = staticFields.add(0x20).readPointer();
                                                 if (!curScene.isNull() && sceneId === 4) {
                                                     var targetCardItem = NULL;
                                                     try {
-                                                        var dclPtr = curScene.add(0x58).readPointer();
-                                                        if (!dclPtr.isNull()) {
-                                                            var listItems = dclPtr.add(0x10).readPointer();
-                                                            var listSize = dclPtr.add(0x18).readS32();
-                                                            if (isNaN(cardIdx) || cardIdx < 0 || cardIdx >= listSize) cardIdx = 0;
-                                                            if (!listItems.isNull() && listSize > 0) {
-                                                                targetCardItem = listItems.add(0x20 + cardIdx * 8).readPointer();
-                                                                log("[🃏 CARD CMD] Selected CardItem[" + cardIdx + "] = " + targetCardItem + " (out of " + listSize + ")");
+                                                        if (cardArg.indexOf("obj:") === 0) {
+                                                            var targetObjStr = cardArg.substring(4).trim();
+                                                            if (loonaCardItems) {
+                                                                for (var ci = 0; ci < loonaCardItems.length; ci++) {
+                                                                    var cItem = loonaCardItems[ci];
+                                                                    var raw = cItem.add(0x10).readPointer();
+                                                                    if (!raw.isNull() && raw.add(0x10).readS64().toString() === targetObjStr) {
+                                                                        targetCardItem = cItem;
+                                                                        log("[🃏 CARD CMD] Resolved by ObjectID: " + targetObjStr);
+                                                                        break;
+                                                                    }
+                                                                }
+                                                            }
+                                                        } else if (cardArg.indexOf("id:") === 0) {
+                                                            var targetCid = parseInt(cardArg.substring(3).trim(), 10);
+                                                            if (loonaCardItems) {
+                                                                for (var ci = 0; ci < loonaCardItems.length; ci++) {
+                                                                    var cItem = loonaCardItems[ci];
+                                                                    var raw = cItem.add(0x10).readPointer();
+                                                                    if (!raw.isNull() && raw.add(0x20).readS32() === targetCid) {
+                                                                        targetCardItem = cItem;
+                                                                        log("[🃏 CARD CMD] Resolved by CardID: " + targetCid);
+                                                                        break;
+                                                                    }
+                                                                }
+                                                            }
+                                                        } else {
+                                                            var cardIdx = parseInt(cardArg, 10);
+                                                            var dclPtr = curScene.add(0x58).readPointer();
+                                                            if (!dclPtr.isNull()) {
+                                                                var listItems = dclPtr.add(0x10).readPointer();
+                                                                var listSize = dclPtr.add(0x18).readS32();
+                                                                if (isNaN(cardIdx) || cardIdx < 0 || cardIdx >= listSize) cardIdx = 0;
+                                                                if (!listItems.isNull() && listSize > 0) {
+                                                                    targetCardItem = listItems.add(0x20 + cardIdx * 8).readPointer();
+                                                                    log("[🃏 CARD CMD] Selected CardItem[" + cardIdx + "] = " + targetCardItem + " (out of " + listSize + ")");
+                                                                }
                                                             }
                                                         }
                                                     } catch (eDclCmd) {
@@ -6907,11 +7192,18 @@ function initIl2Cpp(module) {
                                                         targetCardItem = loonaCardItems[0];
                                                     }
                                                     if (!targetCardItem.isNull()) {
+                                                        var rawCard = targetCardItem.add(0x10).readPointer();
+                                                        var cId = rawCard.add(0x20).readS32();
+                                                        var meta = getCardMetadata(cId);
+                                                        var memberIdx = (meta.artistID >= 1000) ? (meta.artistID - 1000) : meta.artistID;
+                                                        if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cId - 1001) % 11) + 1;
+                                                        var artistData = loonaArtistDataMap[memberIdx] || NULL;
+
                                                         curScene.add(0x88).writePointer(targetCardItem);
                                                         curScene.add(0x98).writePointer(targetCardItem);
-                                                        curScene.add(0x80).writePointer(NULL);
+                                                        curScene.add(0x80).writePointer(artistData);
                                                         safeSetStateMain(curScene, 0);
-                                                        log("[🎉 CARD CMD SUCCESS] safeSetStateMain(0) invoked on InventoryScene!");
+                                                        log("[🎉 CARD CMD SUCCESS] safeSetStateMain(0) invoked on InventoryScene for cardID=" + cId + ", theme=" + meta.theme);
                                                     }
                                                 } else {
                                                     log("[-] CARD CMD failed: not in InventoryScene (sceneId=" + sceneId + ", instance=" + curScene + ")");
