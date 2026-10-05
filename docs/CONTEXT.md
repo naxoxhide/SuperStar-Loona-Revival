@@ -6,6 +6,36 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ✅ CHECKPOINT 10 — Estabilización Integral de InventoryScene y Navegación Bidireccional de Cartas (2026-10-05)
+
+**Estado verificado y validado en sesión activa en emulador (`127.0.0.1:5555`):**
+
+1. **Resolución de la Causa Raíz en `UpdateDisplayCardList` (RVA `0x10542F4`):**
+   - El desensamblado ARM64 reveló que `UpdateDisplayCardList` ejecuta chequeos `cbz` al inicio sobre las listas de cartas asociadas a la escena en offsets `0x58`, `0x60`, `0x68`, `0x70`, `0x78`. Si cualquiera de estas referencias apunta a `NULL`, el flujo bifurca a `0x1054A04`.
+   - Debido a que `0x1054A04` estaba parcheado con un salto incondicional al epílogo de retorno (`b #0x1054a98`), cualquier lista nula abortaba la ejecución completa de la función en su segunda instrucción sin poblar cartas ni disparar `InvenCardView.SetData`.
+   - En `ensureInventoryLists`, la inicialización intentaba resolver la metadata en `0x310C7A0`, desencadenando una violación de acceso (`access violation accessing 0xc000da45`) que dejaba la lista `0x60` sin instanciar.
+   - **Solución implementada:** Se eliminó la desreferencia insegura de metadata en [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js). Ahora la clase `klass` se extrae de manera directa y segura desde `scene.add(0x58).readPointer().readPointer()` y se cachea en `cachedListCardItemKlass`. Las 6 listas nativas (`0x58`, `0x60`, `0x68`, `0x70`, `0x78`, `0xA0`) se instancian con buffers válidos de 64 elementos, permitiendo que `UpdateDisplayCardList` complete su flujo íntegro.
+
+2. **Eliminación del Hook Redundante en `SetStateDefault` (RVA `0x1053B88`):**
+   - Se removió el bloque `onLeave` de `InventoryScene.SetStateDefault` en [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js). Este bloque ejecutaba una llamada secundaria a `restoreDefaultDisplayCardList`, duplicando llamadas a `SetData` e interfiriendo con el ciclo de vida del componente `EnhancedScroller`.
+
+3. **Navegación Bidireccional y Flujo Nativo de `InventoryScene.OnBack` (RVA `0x10537F4`):**
+   - El análisis del desensamblado de `OnBack` reveló una tabla de salto nativa en `0x2670F80`:
+     - **Estado 5 (`Default`):** Gestiona la salida del inventario y regreso al lobby.
+     - **Estado 6 (`Main` / Detalle de Carta):** Salta a `0x10539E8` → `0x1053A5C`, invocando directamente `SetStateDefault(curScene, 1, 0)` con el flag `isReload = 1`.
+   - Se corrigió el comando `back` en `scene_cmd.txt`. Anteriormente, el script modificaba manualmente el campo de estado `curScene.add(0x24).writeS32(5)`, lo que provocaba que la máquina de estados Dalcom abortara la transición al considerar que ya se encontraba en `Default`.
+   - Al delegar la acción directamente a `onBackFn(curScene, NULL)` (`0x10537F4`), Unity transiciona limpiamente de la vista de detalle al inventario principal sin pantallas blancas, cuelgues ni corrupción visual.
+
+4. **Transición Limpia en `SetStateWait` (RVA `0x10556C0`):**
+   - Se estabilizó la transición de espera sustituyendo la rutina bloqueante por una invocación directa a `SetStateWaitDone` (RVA `0x1055E14`), eliminando el fade congelado y garantizando la renderización inmediata de la escena.
+
+5. **Evidencia Visual y Pruebas de QA:**
+   - **Vista Principal de Inventario (OT11 R50):** [docs/walkthroughs/media/screen_inven_ok.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_inven_ok.png) — Muestra los 11 miembros LOONA equipados con marco R50, Group Grade R (+500.000), Group Theme Lv 3 ULTRA RAVE Hi High, y bandeja inferior `24 / 200`.
+   - **Vista de Detalle de Carta (HeeJin R50):** [docs/walkthroughs/media/screen_card_detail_ok.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_card_detail_ok.png) — Muestra portrait HD, score 199 / energy 100, botón "Unequip", candado, corona y carrusel filtrado con carta alternativa.
+   - **Retorno Limpio a Inventario Principal:** [docs/walkthroughs/media/screen_inven_returned.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_inven_returned.png) — Muestra la restauración visual exacta del inventario sin artefactos tras ejecutar `back`.
+
+---
+
 ### ✅ CHECKPOINT 9 — Inventory Verification: SceneId:4 Estable + 14 Cartas + Barra Inferior (2026-09-20)
 
 **Estado verificado en sesión activa (PID 3252):**

@@ -4944,28 +4944,20 @@ function initIl2Cpp(module) {
                 };
 
                 // Helper to ensure all required card lists are initialized with valid buffer capacity (64)
+                var cachedListCardItemKlass = NULL;
                 var ensureInventoryLists = function(scene) {
                     try {
                         if (!scene || scene.isNull()) return;
 
-                        var initMetaFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
-                        var klassSlot = baseAddr.add(0x310C000).add(0x7A0);
-                        initMetaFn(klassSlot);
                         var klass = NULL;
-                        if (!klassSlot.isNull()) {
-                            var pKlass = klassSlot.readPointer();
-                            if (!pKlass.isNull()) klass = pKlass.readPointer();
-                        }
-                        if (!klass || klass.isNull()) {
-                            var dcl = scene.add(0x58).readPointer();
-                            if (!dcl.isNull()) klass = dcl.readPointer();
+                        var dcl = scene.add(0x58).readPointer();
+                        if (!dcl.isNull()) {
+                            klass = dcl.readPointer();
+                            cachedListCardItemKlass = klass;
+                        } else if (cachedListCardItemKlass && !cachedListCardItemKlass.isNull()) {
+                            klass = cachedListCardItemKlass;
                         }
                         if (!klass || klass.isNull()) return;
-
-                        var ctorSlot = baseAddr.add(0x30DC000).add(0x800);
-                        initMetaFn(ctorSlot);
-                        var ctorMethodInfo = ctorSlot.readPointer();
-                        var listCtorFn = new NativeFunction(baseAddr.add(0x23CD7B4), "void", ["pointer", "pointer"]);
 
                         var listOffsets = [0x58, 0x60, 0x68, 0x70, 0x78, 0xA0];
                         for (var i = 0; i < listOffsets.length; i++) {
@@ -4974,7 +4966,6 @@ function initIl2Cpp(module) {
                             if (curPtr.isNull()) {
                                 var newObj = il2cpp_object_new(klass);
                                 if (!newObj.isNull()) {
-                                    listCtorFn(newObj, ctorMethodInfo);
                                     if (il2cpp_gchandle_new) il2cpp_gchandle_new(newObj, 2);
                                     scene.add(off).writePointer(newObj);
                                     curPtr = newObj;
@@ -5153,12 +5144,6 @@ function initIl2Cpp(module) {
                             if (!this.scene.isNull()) {
                                 log("[🗃️ SET_STATE_DEFAULT] onEnter triggered, verifying materialCardItemList");
                                 ensureMaterialCardItemList(this.scene);
-                            }
-                        },
-                        onLeave: function (retval) {
-                            if (this.scene && !this.scene.isNull()) {
-                                log("[🗃️ SET_STATE_DEFAULT] onLeave triggered, restoring displayCardList...");
-                                restoreDefaultDisplayCardList(this.scene);
                             }
                         }
                     });
@@ -7759,15 +7744,9 @@ function initIl2Cpp(module) {
                                             } else if (cmdRaw === "back" || cmdRaw === "close") {
                                                 var curScene = staticFields.add(0x20).readPointer();
                                                 if (!curScene.isNull() && sceneId === 4) {
-                                                    log("[🔙 BACK CMD] Closing detail and returning to Inventory main view!");
-                                                    curScene.add(0x88).writePointer(NULL);
-                                                    curScene.add(0x98).writePointer(NULL);
-                                                    curScene.add(0x80).writePointer(NULL);
-                                                    curScene.add(0x24).writeS32(5); // STATE.Default = 5
-                                                    ensureMaterialCardItemList(curScene);
-                                                    var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
-                                                    setStateDefaultFn(curScene, 0, 0, NULL);
-                                                    restoreDefaultDisplayCardList(curScene);
+                                                    log("[🔙 BACK CMD] Closing detail via OnBack!");
+                                                    var onBackFn = new NativeFunction(baseAddr.add(0x10537F4), "void", ["pointer", "pointer"]);
+                                                    onBackFn(curScene, NULL);
                                                 }
                                             } else {
                                                 var targetScene = parseInt(cmdRaw);
