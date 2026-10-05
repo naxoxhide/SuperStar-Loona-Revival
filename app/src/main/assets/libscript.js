@@ -2835,6 +2835,7 @@ function initIl2Cpp(module) {
                 var activeInventorySceneInstance = NULL;
                 var cachedCardItemKlass = NULL;
                 var cachedCardKlass = NULL;
+                var cachedLoonaCbGroupItem = NULL;
 
                 function createFastArray(items, type) {
                     try {
@@ -2888,6 +2889,64 @@ function initIl2Cpp(module) {
                         }
                     } catch (eFa) {
                         log("[-] Error creating FastArray: " + eFa.message);
+                    }
+                    return NULL;
+                }
+
+                function createManagedList(items, type) {
+                    try {
+                        var klassTablePtr = NULL;
+                        var methodInfoTablePtr = NULL;
+                        if (type === 'group') {
+                            klassTablePtr = baseAddr.add(0x30EE228);
+                            methodInfoTablePtr = baseAddr.add(0x3122270);
+                        } else if (type === 'theme') {
+                            klassTablePtr = baseAddr.add(0x30D6870);
+                            methodInfoTablePtr = baseAddr.add(0x31120D0);
+                        }
+
+                        var initMetaFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
+
+                        var klass = NULL;
+                        try {
+                            var ptr1 = klassTablePtr.readPointer();
+                            if (!ptr1.isNull()) {
+                                initMetaFn(ptr1);
+                                klass = ptr1.readPointer();
+                            }
+                        } catch (eKp) {}
+
+                        if (klass && !klass.isNull()) {
+                            var listObj = il2cpp_object_new(klass);
+                            if (listObj && !listObj.isNull()) {
+                                var len = items ? items.length : 0;
+                                var cap = Math.max(len + 4, 16);
+                                var methodInfo = NULL;
+                                try {
+                                    var miPtr1 = methodInfoTablePtr.readPointer();
+                                    if (!miPtr1.isNull()) {
+                                        initMetaFn(miPtr1);
+                                        methodInfo = miPtr1.readPointer();
+                                    }
+                                } catch (eMip) {}
+
+                                var ctorFn = new NativeFunction(baseAddr.add(0x23CD880), "void", ["pointer", "int", "pointer"]);
+                                ctorFn(listObj, cap, methodInfo);
+
+                                var pool = listObj.add(0x10).readPointer();
+                                if (!pool.isNull()) {
+                                    for (var i = 0; i < len; i++) {
+                                        pool.add(0x20 + i * 8).writePointer(items[i] || NULL);
+                                    }
+                                }
+                                listObj.add(0x18).writeS32(len);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(listObj, 2);
+                                log("[✅ MANAGED_LIST] Created genuine List<" + type + "> at: " + listObj + " (len: " + len + ", cap: " + cap + ")");
+                                return listObj;
+                            }
+                        }
+                    } catch (eList) {
+                        log("[-] Error creating ManagedList: " + eList.message);
                     }
                     return NULL;
                 }
@@ -6250,15 +6309,17 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing InitTabObjectSetting: " + eItos.message);
                 }
 
-                // 3. CardBookScene.SetStateWait (0x11CF378) -> Immediately populate CardBook and refresh MainView
+                // 3. CardBookScene.SetStateWait (0x11CF378) -> Immediately populate CardBook, refresh MainView, and finish wait
                 try {
                     Interceptor.replace(baseAddr.add(0x11CF378), new NativeCallback(function (sceneThis, methodInfo) {
-                        log("[📖 CARDBOOK] SetStateWait intercepted -> instantly populating CardBook and refreshing MainView!");
+                        log("[📖 CARDBOOK] SetStateWait intercepted -> instantly populating CardBook and activating UI!");
                         try {
                             ensureCardBookControlData();
                             var refreshMainFn = new NativeFunction(baseAddr.add(0x11CFDD8), "void", ["pointer", "bool", "pointer"]);
                             refreshMainFn(sceneThis, 1, NULL);
-                            log("[📖 CARDBOOK] RefreshSetMainView(true) executed on CardBookScene!");
+                            var waitDoneFn = new NativeFunction(baseAddr.add(0x11CF1CC), "void", ["pointer", "pointer"]);
+                            waitDoneFn(sceneThis, NULL);
+                            log("[📖 CARDBOOK] RefreshSetMainView(true) and SetStateWaitDone cleanly executed!");
                         } catch (eWait) {
                             log("[-] Error in CardBook SetStateWait: " + eWait.message);
                         }
@@ -6303,6 +6364,40 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on CardBookControl.GroupItem.GetGrade (0xB96694)!");
                 } catch (eGrd) {
                     log("[-] Error replacing GroupItem.GetGrade: " + eGrd.message);
+                }
+
+                // 3e. CardBookScene.RefreshFavoriteGroupFive (0x11D0048) -> Safe no-op
+                try {
+                    Interceptor.replace(baseAddr.add(0x11D0048), new NativeCallback(function (thisPtr, isReload, methodInfo) {
+                        log("[📖 CARDBOOK] RefreshFavoriteGroupFive intercepted (safe no-op)!");
+                    }, "void", ["pointer", "bool", "pointer"]));
+                    log("[+] Interceptor.replace installed on CardBookScene.RefreshFavoriteGroupFive (0x11D0048)!");
+                } catch (eRfgf) {
+                    log("[-] Error replacing RefreshFavoriteGroupFive: " + eRfgf.message);
+                }
+
+                // 3f. CardBookControl.GetGroupItem (0x11C83DC) & GetMajorGroupItem (0x11C8528) -> Safe LOONA group return
+                try {
+                    Interceptor.replace(baseAddr.add(0x11C83DC), new NativeCallback(function (groupList, groupCode, methodInfo) {
+                        return cachedLoonaCbGroupItem || NULL;
+                    }, "pointer", ["pointer", "int", "pointer"]));
+                    Interceptor.replace(baseAddr.add(0x11C8528), new NativeCallback(function (groupList, groupCode, methodInfo) {
+                        return cachedLoonaCbGroupItem || NULL;
+                    }, "pointer", ["pointer", "int", "pointer"]));
+                    log("[+] Interceptor.replace installed on CardBookControl.GetGroupItem & GetMajorGroupItem!");
+                } catch (eGgi) {
+                    log("[-] Error replacing GetGroupItem: " + eGgi.message);
+                }
+
+                // 3g. CardBookScene.GetGroupItemOfIndex (0x11D1D60) -> Return LOONA for index 0
+                try {
+                    Interceptor.replace(baseAddr.add(0x11D1D60), new NativeCallback(function (scenePtr, infoPtr, index, methodInfo) {
+                        if (index === 0) return cachedLoonaCbGroupItem || NULL;
+                        return NULL;
+                    }, "pointer", ["pointer", "pointer", "int", "pointer"]));
+                    log("[+] Interceptor.replace installed on CardBookScene.GetGroupItemOfIndex (0x11D1D60)!");
+                } catch (eGgioi) {
+                    log("[-] Error replacing GetGroupItemOfIndex: " + eGgioi.message);
                 }
 
                 // 4. CardBookScene UI Refresh Safety Patches (guard against NullReferenceException on decorative elements)
@@ -7755,19 +7850,23 @@ function initIl2Cpp(module) {
                         }
 
                         // Wrap ThemeList in managed list structure
-                        var themeListManaged = Memory.alloc(64);
-                        var themeArr = il2cpp_array_new(cbThemeItemKlass, Math.max(themeItems.length + 4, 16));
-                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(themeArr, 2);
-                        for (var ti = 0; ti < themeItems.length; ti++) {
-                            themeArr.add(0x20 + ti * 8).writePointer(themeItems[ti]);
+                        var themeListManaged = createManagedList(themeItems, 'theme');
+                        if (!themeListManaged || themeListManaged.isNull()) {
+                            log("[⚠️ CARDBOOK] createManagedList('theme') returned NULL, using fallback");
+                            themeListManaged = Memory.alloc(64);
+                            var themeArr = il2cpp_array_new(cbThemeItemKlass, Math.max(themeItems.length + 4, 16));
+                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(themeArr, 2);
+                            for (var ti = 0; ti < themeItems.length; ti++) {
+                                themeArr.add(0x20 + ti * 8).writePointer(themeItems[ti]);
+                            }
+                            themeListManaged.add(0x10).writePointer(themeArr);
+                            themeListManaged.add(0x18).writeS32(themeItems.length);
                         }
-                        themeListManaged.writePointer(infoKlass);
-                        themeListManaged.add(0x10).writePointer(themeArr);
-                        themeListManaged.add(0x18).writeS32(themeItems.length);
 
                         // 4. Instantiate CardBookControl.GroupItem for LOONA (1001)
                         var loonaCbGroupItem = il2cpp_object_new(cbGroupItemKlass);
                         if (il2cpp_gchandle_new) il2cpp_gchandle_new(loonaCbGroupItem, 2);
+                        cachedLoonaCbGroupItem = loonaCbGroupItem;
                         loonaCbGroupItem.add(0x10).writePointer(loonaGroupData || NULL); // Group
                         loonaCbGroupItem.add(0x18).writePointer(NULL);                  // SubGroupList
                         loonaCbGroupItem.add(0x20).writePointer(NULL);                  // majorGroup
@@ -7787,13 +7886,16 @@ function initIl2Cpp(module) {
                         loonaCbGroupItem.add(0x68).writePointer(gradeInfo || NULL);     // MyCardBookGradeInfo
 
                         // 5. Wrap GroupList in managed list structure
-                        var groupListManaged = Memory.alloc(64);
-                        var groupArr = il2cpp_array_new(cbGroupItemKlass, 8);
-                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(groupArr, 2);
-                        groupArr.add(0x20).writePointer(loonaCbGroupItem);
-                        groupListManaged.writePointer(infoKlass);
-                        groupListManaged.add(0x10).writePointer(groupArr);
-                        groupListManaged.add(0x18).writeS32(1); // Count = 1
+                        var groupListManaged = createManagedList([loonaCbGroupItem], 'group');
+                        if (!groupListManaged || groupListManaged.isNull()) {
+                            log("[⚠️ CARDBOOK] createManagedList('group') returned NULL, using fallback");
+                            groupListManaged = Memory.alloc(64);
+                            var groupArr = il2cpp_array_new(cbGroupItemKlass, 8);
+                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(groupArr, 2);
+                            groupArr.add(0x20).writePointer(loonaCbGroupItem);
+                            groupListManaged.add(0x10).writePointer(groupArr);
+                            groupListManaged.add(0x18).writeS32(1); // Count = 1
+                        }
 
                         // 6. Populate CardBookControl.Info fields
                         info.add(0x10).writePointer(loonaCbGroupItem);   // BestCardBook
