@@ -2642,6 +2642,7 @@ function initIl2Cpp(module) {
                         if (!klass || klass.isNull()) return NULL;
                         var dp = il2cpp_object_new(klass);
                         if (!dp || dp.isNull()) return NULL;
+                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(dp, 2);
                         dp.add(0x10).writePointer(createIl2CppString("https://dalcom.local/" + relPath));
                         dp.add(0x18).writePointer(createIl2CppString(relPath));
                         dp.add(0x20).writePointer(createIl2CppString("1"));
@@ -3624,8 +3625,14 @@ function initIl2Cpp(module) {
                         if (!csvParamsKlass || csvParamsKlass.isNull()) return NULL;
                         var p = il2cpp_object_new(csvParamsKlass);
                         if (!p || p.isNull()) return NULL;
+                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(p, 2);
 
-                        var photoDp = createDownloadPath("asiudgasg/asodhsg/wadceg/" + cardId + "_l.i.bytes");
+                        try {
+                            var ctorFn = new NativeFunction(baseAddr.add(0xE49E98), "void", ["pointer", "pointer"]);
+                            ctorFn(p, NULL);
+                        } catch (eCt) {}
+
+                        var photoDp = createDownloadPath("asiudgasg/asodhsg/wadceg/" + cardId + "_s.i.bytes");
                         var tierDp = getGradeFrameDownloadPath(grade, 1);
                         var maxLvl = (grade === 4) ? 50 : 5;
                         var safeLvl = (grade === 4) ? level : Math.min(Math.max(level, 1), 5);
@@ -3647,7 +3654,7 @@ function initIl2Cpp(module) {
                         p.add(0x51).writeU8(0);
                         p.add(0x52).writeU8(0);
                         p.add(0x53).writeU8(0);
-                        p.add(0x54).writeU8(0);
+                        p.add(0x54).writeU8(0); // isLeader = 0
                         p.add(0x55).writeU8(0);
                         p.add(0x56).writeU8(0);
                         p.add(0x57).writeU8(0);
