@@ -2642,6 +2642,7 @@ function initIl2Cpp(module) {
                         if (!klass || klass.isNull()) return NULL;
                         var dp = il2cpp_object_new(klass);
                         if (!dp || dp.isNull()) return NULL;
+                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(dp, 2);
                         dp.add(0x10).writePointer(createIl2CppString("https://dalcom.local/" + relPath));
                         dp.add(0x18).writePointer(createIl2CppString(relPath));
                         dp.add(0x20).writePointer(createIl2CppString("1"));
@@ -3624,8 +3625,14 @@ function initIl2Cpp(module) {
                         if (!csvParamsKlass || csvParamsKlass.isNull()) return NULL;
                         var p = il2cpp_object_new(csvParamsKlass);
                         if (!p || p.isNull()) return NULL;
+                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(p, 2);
 
-                        var photoDp = createDownloadPath("asiudgasg/asodhsg/wadceg/" + cardId + "_l.i.bytes");
+                        try {
+                            var ctorFn = new NativeFunction(baseAddr.add(0xE49E98), "void", ["pointer", "pointer"]);
+                            ctorFn(p, NULL);
+                        } catch (eCt) {}
+
+                        var photoDp = createDownloadPath("asiudgasg/asodhsg/wadceg/" + cardId + "_s.i.bytes");
                         var tierDp = getGradeFrameDownloadPath(grade, 1);
                         var maxLvl = (grade === 4) ? 50 : 5;
                         var safeLvl = (grade === 4) ? level : Math.min(Math.max(level, 1), 5);
@@ -3647,7 +3654,7 @@ function initIl2Cpp(module) {
                         p.add(0x51).writeU8(0);
                         p.add(0x52).writeU8(0);
                         p.add(0x53).writeU8(0);
-                        p.add(0x54).writeU8(0);
+                        p.add(0x54).writeU8(0); // isLeader = 0
                         p.add(0x55).writeU8(0);
                         p.add(0x56).writeU8(0);
                         p.add(0x57).writeU8(0);
@@ -4740,15 +4747,16 @@ function initIl2Cpp(module) {
                             if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cId - 1001) % 11) + 1;
                             var artistData = loonaArtistDataMap[memberIdx] || NULL;
 
+                            var curState = sceneThis.add(0x24).readS32();
                             // Step 2: Store as selectedCardItem in scene (0x88) & preSelectedCardItem (0x98) & selectedArtistData (0x80)
                             sceneThis.add(0x88).writePointer(clickedCardItem);
                             sceneThis.add(0x98).writePointer(clickedCardItem);
                             sceneThis.add(0x80).writePointer(artistData);
 
-                            log("[🃏 ON_CARD_ITEM] Selected: cardID=" + cId + ", grade=" + gr + ", level=" + lvl + ", theme=" + meta.theme + ", memberIdx=" + memberIdx);
+                            log("[🃏 ON_CARD_ITEM] Selected: cardID=" + cId + ", grade=" + gr + ", level=" + lvl + ", theme=" + meta.theme + ", memberIdx=" + memberIdx + ", state=" + curState);
 
-                            // Step 3: Call safeSetStateMain (isReload=false means "first entry to card detail")
-                            safeSetStateMain(sceneThis, 0);
+                            // Step 3: Call safeSetStateMain (isReload=1 if already in STATE.Main, else 0)
+                            safeSetStateMain(sceneThis, (curState === 6) ? 1 : 0);
                         } catch (eOci) {
                             log("[-] Error in OnCardItem replace: " + eOci.message);
                         }
@@ -5250,31 +5258,82 @@ function initIl2Cpp(module) {
                     log("[-] Error attaching to SetStateDefault: " + eSsdHook.message);
                 }
 
-                // Hook InventoryScene.OnBack (0x10537F4) to ensure clean restoration when returning from detail view
+                // Replace InventoryScene.OnBack (0x10537F4) to ensure clean restoration and prevent null crash chain
                 try {
-                    Interceptor.attach(baseAddr.add(0x10537F4), {
-                        onEnter: function (args) {
-                            this.scene = args[0];
-                            if (!this.scene.isNull()) {
-                                this.prevState = this.scene.add(0x24).readS32();
-                                log("[🔙 ON_BACK] InventoryScene.OnBack entered! state=" + this.prevState);
-                            }
-                        },
-                        onLeave: function (retval) {
-                            if (this.scene && !this.scene.isNull()) {
-                                if (this.prevState === 6) { // was in STATE.Main
-                                    log("[🔙 ON_BACK] Returned from detail view to Default state, restoring 24 cards...");
-                                    this.scene.add(0x88).writePointer(NULL);
-                                    this.scene.add(0x98).writePointer(NULL);
-                                    this.scene.add(0x80).writePointer(NULL);
-                                    restoreDefaultDisplayCardList(this.scene);
+                    Interceptor.replace(baseAddr.add(0x10537F4), new NativeCallback(function (sceneThis, methodInfo) {
+                        try {
+                            if (sceneThis.isNull()) return;
+                            var curState = sceneThis.add(0x24).readS32();
+                            log("[🔙 ON_BACK] InventoryScene.OnBack replaced entered! state=" + curState);
+
+                            if (curState === 6 || curState === 7) { // STATE.Main (6) or STATE.Equip (7)
+                                log("[🔙 ON_BACK] Returning from detail/equip view to Default state, restoring 24 cards...");
+                                sceneThis.add(0x24).writeS32(5); // STATE.Default = 5
+                                sceneThis.add(0x88).writePointer(NULL); // selectedCardItem
+                                sceneThis.add(0x98).writePointer(NULL); // preSelectedCardItem
+                                sceneThis.add(0x80).writePointer(NULL); // selectedArtistData
+                                sceneThis.add(0x90).writePointer(NULL); // equippedCardItem
+                                sceneThis.add(0xBC).writeU8(0);
+                                sceneThis.add(0xBE).writeU8(0);
+                                sceneThis.add(0x50).writeS32(0); // extractType = All
+
+                                var sceneView = sceneThis.add(0x48).readPointer();
+                                if (!sceneView.isNull()) {
+                                    // 1. ShowDefaultLayout -> RVA 0x1055ED0
+                                    try {
+                                        var showDefFn = new NativeFunction(baseAddr.add(0x1055ED0), "void", ["pointer", "pointer"]);
+                                        showDefFn(sceneView, NULL);
+                                        log("[✅ ON_BACK] ShowDefaultLayout executed!");
+                                    } catch (eSdl) {
+                                        log("[-] Error in ShowDefaultLayout: " + eSdl.message);
+                                    }
+
+                                    // 2. SetData on groupView (0x70) -> RVA 0xF25140
+                                    try {
+                                        var groupView = sceneView.add(0x70).readPointer();
+                                        if (!groupView.isNull()) {
+                                            var invenGroupDataSetDataFn = new NativeFunction(baseAddr.add(0xF25140), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
+                                            invenGroupDataSetDataFn(groupView, 1, 0, NULL, NULL);
+                                            log("[✅ ON_BACK] InvenGroupView.SetData executed!");
+                                        }
+                                    } catch (eGv) {
+                                        log("[-] Error in InvenGroupView.SetData: " + eGv.message);
+                                    }
+
+                                    // 3. Restore displayCardList (sets 24 cards and calls InvenCardView.SetData in 0xF23384)
+                                    restoreDefaultDisplayCardList(sceneThis, true);
+
+                                    // 4. Reload EnhancedScroller -> RVA 0x125C640
+                                    try {
+                                        var cardView = sceneView.add(0x78).readPointer();
+                                        if (!cardView.isNull()) {
+                                            var scroller = cardView.add(0x38).readPointer();
+                                            if (!scroller.isNull()) {
+                                                var reloadDataFn = new NativeFunction(baseAddr.add(0x125C640), "void", ["pointer", "float", "pointer"]);
+                                                reloadDataFn(scroller, 0.0, NULL);
+                                                log("[✅ ON_BACK] EnhancedScroller.ReloadData executed!");
+                                            }
+                                        }
+                                    } catch (eScr) {
+                                        log("[-] Error in EnhancedScroller.ReloadData: " + eScr.message);
+                                    }
+                                }
+                            } else if (curState === 5) { // STATE.Default (5)
+                                log("[🔙 ON_BACK] Leaving InventoryScene, navigating back to LobbyScene (SceneId: 3)...");
+                                try {
+                                    var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
+                                    openSceneDirectFn(3, NULL, NULL);
+                                } catch (eOpen) {
+                                    log("[-] Error returning to LobbyScene: " + eOpen.message);
                                 }
                             }
+                        } catch (eOb) {
+                            log("[-] Error in replaced OnBack: " + eOb.message);
                         }
-                    });
-                    log("[+] Interceptor.attach installed on InventoryScene.OnBack (0x10537F4)!");
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.OnBack (0x10537F4)!");
                 } catch (eObHook) {
-                    log("[-] Error attaching to OnBack: " + eObHook.message);
+                    log("[-] Error replacing OnBack: " + eObHook.message);
                 }
 
                 // 9e3. InventoryScene.ExtractWithArtist (0x1058158) -> Strict filtering by member AND theme/song
@@ -5365,20 +5424,40 @@ function initIl2Cpp(module) {
 
                             var viewData = getSmallCardViewDataFn(cardItem, NULL, 1, NULL);
                             if (viewData && !viewData.isNull()) {
-                                var isCardEquipped = 0;
-                                try {
-                                    var eqItem = sceneThis.add(0x90).readPointer();
-                                    if (!eqItem.isNull()) {
-                                        var eqRaw = eqItem.add(0x10).readPointer();
-                                        var cardRaw = cardItem.add(0x10).readPointer();
-                                        if (!eqRaw.isNull() && !cardRaw.isNull()) {
-                                            if (eqRaw.add(0x10).readS64().toString() === cardRaw.add(0x10).readS64().toString()) {
-                                                isCardEquipped = 1;
-                                            }
+                                var cardRaw = cardItem.add(0x10).readPointer();
+                                var cId = (!cardRaw.isNull()) ? cardRaw.add(0x20).readS32() : 1001;
+                                var gr = (!cardRaw.isNull()) ? cardRaw.add(0x24).readS32() : 4;
+                                var lvl = (!cardRaw.isNull()) ? cardRaw.add(0x1C).readS16() : 50;
+
+                                // Ensure valid textures and tier frame are never null
+                                if (viewData.add(0x10).readPointer().isNull()) {
+                                    var pDp = createDownloadPath("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes");
+                                    viewData.add(0x10).writePointer(pDp || NULL);
+                                }
+                                if (viewData.add(0x18).readPointer().isNull()) {
+                                    var tDp = getGradeFrameDownloadPath(gr, 1);
+                                    viewData.add(0x18).writePointer(tDp || NULL);
+                                }
+                                viewData.add(0x3C).writeS32(gr); // tier
+                                viewData.add(0x40).writeU8(gr === 4 ? 1 : 0); // isRCard
+                                viewData.add(0x44).writeS32(gr === 4 ? 50 : 5); // maxLevel
+                                viewData.add(0x48).writeS32(lvl); // level
+
+                                // isEquip at 0x50 and isLeader at 0x54
+                                var eqItem = sceneThis.add(0x90).readPointer();
+                                if (!eqItem.isNull()) {
+                                    var isCardEquipped = 0;
+                                    var eqRaw = eqItem.add(0x10).readPointer();
+                                    if (!eqRaw.isNull() && !cardRaw.isNull()) {
+                                        if (eqRaw.add(0x10).readS64().toString() === cardRaw.add(0x10).readS64().toString()) {
+                                            isCardEquipped = 1;
                                         }
                                     }
-                                } catch (eEq) {}
-                                viewData.add(0x54).writeU8(isCardEquipped);
+                                    viewData.add(0x50).writeU8(isCardEquipped);
+                                } else if (!cardRaw.isNull()) {
+                                    viewData.add(0x50).writeU8(cardRaw.add(0x28).readU8() === 1 ? 1 : 0);
+                                }
+                                viewData.add(0x54).writeU8(0); // isLeader = 0
                             }
                             return viewData;
                         } catch (eB63) {
@@ -6101,18 +6180,12 @@ function initIl2Cpp(module) {
                     log("[-] Error patching SetStateWait: " + eSsw.message);
                 }
 
-                // 4. CardBookScene UI Refresh Safety Patches (guard against NullReferenceException)
+                // 4. CardBookScene UI Refresh Safety Patches (guard against NullReferenceException on decorative elements)
                 var cardBookSafetyRetRVAs = [
                     0x11D0CD4, // CardBookScene.RefreshLiveBookBtn -> ret
                     0x11D0B64, // CardBookScene.RefreshAchieveNewMark -> ret
                     0x11D0C1C, // CardBookScene.RefreshGroupNewMark -> ret
-                    0x11CFB80, // CardBookScene.RefreshOthers -> ret
-                    0x11CFE18, // CardBookScene.RefreshBestCardBook -> ret
-                    0x11D0048, // CardBookScene.RefreshFavoriteGroupFive -> ret
-                    0x11D0300, // CardBookScene.RefreshCollection -> ret
-                    0x11CF768, // CardBookScene.RefreshSetGroupViewPage -> ret
-                    0x11CFB40, // CardBookScene.RefreshGroup -> ret
-                    0x11CFDD8  // CardBookScene.RefreshSetMainView -> ret
+                    0x11CFB80  // CardBookScene.RefreshOthers -> ret
                 ];
                 cardBookSafetyRetRVAs.forEach(function (rva) {
                     try {
@@ -7511,20 +7584,100 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing InventoryScene.OnEquip: " + eOeq.message);
                 }
 
+                // --- Helper to initialize CardBookControl.SharedInfo and MyInfo ---
+                function ensureCardBookControlData() {
+                    try {
+                        ensureLoonaMocks();
+                        populateOfflineInventoryCards();
+
+                        var infoKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardBookControl/Info");
+                        var cbCardDataKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.account", "CardBookCardData");
+                        if (!infoKlass || infoKlass.isNull() || !cbCardDataKlass || cbCardDataKlass.isNull()) return;
+
+                        var info = il2cpp_object_new(infoKlass);
+                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(info, 2);
+
+                        // Build modelList (List<CardBookCardData>) with our 24 cards
+                        var listKlass = cachedListCardItemKlass || getClass("mscorlib", "System.Collections.Generic", "List`1");
+                        var modelList = il2cpp_object_new(listKlass);
+                        var cardCount = (loonaCardItems && loonaCardItems.length > 0) ? loonaCardItems.length : 0;
+                        var arr = il2cpp_array_new(cbCardDataKlass, Math.max(cardCount + 4, 16));
+                        if (il2cpp_gchandle_new) {
+                            il2cpp_gchandle_new(modelList, 2);
+                            il2cpp_gchandle_new(arr, 2);
+                        }
+                        modelList.add(0x10).writePointer(arr);
+                        modelList.add(0x18).writeS32(cardCount);
+
+                        for (var i = 0; i < cardCount; i++) {
+                            var cItem = loonaCardItems[i];
+                            var raw = cItem.add(0x10).readPointer();
+                            var cId = (!raw.isNull()) ? raw.add(0x20).readS32() : 1001;
+                            var gr = (!raw.isNull()) ? raw.add(0x24).readS32() : 4;
+                            var cdObj = il2cpp_object_new(cbCardDataKlass);
+                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(cdObj, 2);
+                            cdObj.add(0x10).writeS32(cId);
+                            cdObj.add(0x14).writeS32(gr);
+                            cdObj.add(0x18).writeS64(1600000000);
+                            arr.add(0x20 + i * 8).writePointer(cdObj);
+                        }
+
+                        // Call Info..ctor(info, true, modelList) -> RVA 0xB95B34
+                        try {
+                            var infoCtorFn = new NativeFunction(baseAddr.add(0xB95B34), "void", ["pointer", "bool", "pointer", "pointer"]);
+                            infoCtorFn(info, 1, modelList, NULL);
+                            log("[📖 CARDBOOK] Info..ctor(isMe=true, modelList) executed!");
+                        } catch (eCt) {
+                            log("[-] Error calling Info..ctor: " + eCt.message);
+                        }
+
+                        // Populate Person
+                        try {
+                            var personKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents.model", "Person");
+                            if (personKlass && !personKlass.isNull()) {
+                                var person = il2cpp_object_new(personKlass);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(person, 2);
+                                var getMeFn = new NativeFunction(baseAddr.add(0xAAC818), "pointer", ["pointer"]);
+                                var me = getMeFn(NULL);
+                                if (me && !me.isNull()) {
+                                    var pCtor = new NativeFunction(baseAddr.add(0xC172C8), "void", ["pointer", "pointer", "pointer"]);
+                                    pCtor(person, me, NULL);
+                                }
+                                info.add(0x28).writePointer(person); // Person
+                            }
+                        } catch (ePer) {
+                            log("[-] Error creating Person for CardBook: " + ePer.message);
+                        }
+
+                        // Set MyInfo (0x20) and SharedInfo (0x30)
+                        try {
+                            var setMyInfoFn = new NativeFunction(baseAddr.add(0x11C544C), "void", ["pointer", "pointer"]);
+                            setMyInfoFn(info, NULL);
+
+                            var setSharedInfoFn = new NativeFunction(baseAddr.add(0x11C55E4), "void", ["pointer", "pointer"]);
+                            setSharedInfoFn(info, NULL);
+
+                            var setIsOpenedFn = new NativeFunction(baseAddr.add(0x11C537C), "void", ["int", "pointer"]);
+                            setIsOpenedFn(1, NULL);
+                            log("[📖 CARDBOOK] CardBookControl.MyInfo and SharedInfo set successfully!");
+                        } catch (eSet) {
+                            log("[-] Error setting CardBookControl info: " + eSet.message);
+                        }
+                    } catch (eGenCb) {
+                        log("[-] Error in ensureCardBookControlData: " + eGenCb.message);
+                    }
+                }
+
                 // --- Hook CardBookScene.OnOpen (0x11CDD64) ---
                 try {
                     Interceptor.attach(baseAddr.add(0x11CDD64), {
                         onEnter: function (args) {
                             log("[📖 CARDBOOK SCENE] CardBookScene.OnOpen entered! instance: " + args[0]);
                             try {
-                                populateOfflineInventoryCards();
+                                ensureCardBookControlData();
                             } catch (ePop) {
                                 log("[-] Error populating offline cards in CardBook: " + ePop.message);
                             }
-                            try {
-                                var setCardBookOpenedFn = new NativeFunction(baseAddr.add(0x11C537C), "void", ["int", "pointer"]);
-                                setCardBookOpenedFn(1, NULL);
-                            } catch (e) {}
                         },
                         onLeave: function (retval) {
                             log("[📖 CARDBOOK SCENE] CardBookScene.OnOpen completed!");
