@@ -4758,6 +4758,96 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing OnCardItem: " + eHoci.message);
                 }
 
+                // 9e-bis. InventoryScene.OnGroupCard (0x105BDE0) -> Safe replacement for clicking equipped theme cards (OT11 grid)
+                try {
+                    var onGroupCardAddr = baseAddr.add(0x105BDE0);
+                    Interceptor.replace(onGroupCardAddr, new NativeCallback(function (sceneThis, go, methodInfo) {
+                        log("[👑 ON_GROUP_CARD] OnGroupCard REPLACE entered! scene=" + sceneThis + ", go=" + go);
+                        try {
+                            if (sceneThis.isNull() || go.isNull()) return;
+
+                            // Get slot index from GameObject name (0 to 10)
+                            var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                            var namePtr = getNameFn(go, NULL);
+                            var slotIndex = -1;
+                            if (!namePtr.isNull()) {
+                                var nLen = namePtr.add(0x10).readS32();
+                                if (nLen > 0) {
+                                    var nStr = namePtr.add(0x14).readUtf16String(nLen);
+                                    log("[👑 ON_GROUP_CARD] Clicked equipped slot name: '" + nStr + "'");
+                                    slotIndex = parseInt(nStr, 10);
+                                }
+                            }
+                            if (isNaN(slotIndex) || slotIndex < 0 || slotIndex > 10) slotIndex = 0;
+                            var targetArtistId = 1001 + slotIndex; // 1001 to 1011
+
+                            // Find equipped card for this artist from loonaCardItems
+                            var targetCardItem = NULL;
+                            if (loonaCardItems && loonaCardItems.length > 0) {
+                                for (var i = 0; i < loonaCardItems.length; i++) {
+                                    var itm = loonaCardItems[i];
+                                    if (itm.isNull()) continue;
+                                    try {
+                                        var raw = itm.add(0x10).readPointer();
+                                        if (!raw.isNull()) {
+                                            var cid = raw.add(0x20).readS32();
+                                            var isEq = (raw.add(0x28).readU8() === 1);
+                                            var cMeta = getCardMetadata(cid);
+                                            if (cMeta.artistID === targetArtistId && isEq) {
+                                                targetCardItem = itm;
+                                                break;
+                                            }
+                                        }
+                                    } catch (eItm) {}
+                                }
+                                if (targetCardItem.isNull()) {
+                                    for (var j = 0; j < loonaCardItems.length; j++) {
+                                        var itm2 = loonaCardItems[j];
+                                        if (itm2.isNull()) continue;
+                                        try {
+                                            var raw2 = itm2.add(0x10).readPointer();
+                                            if (!raw2.isNull()) {
+                                                var cid2 = raw2.add(0x20).readS32();
+                                                var cMeta2 = getCardMetadata(cid2);
+                                                if (cMeta2.artistID === targetArtistId) {
+                                                    targetCardItem = itm2;
+                                                    break;
+                                                }
+                                            }
+                                        } catch (eItm2) {}
+                                    }
+                                }
+                                if (targetCardItem.isNull() && slotIndex < loonaCardItems.length) {
+                                    targetCardItem = loonaCardItems[slotIndex];
+                                }
+                            }
+
+                            if (targetCardItem.isNull()) {
+                                log("[-] ON_GROUP_CARD: Could not find CardItem for slot " + slotIndex);
+                                return;
+                            }
+
+                            var memberIdx = slotIndex + 1;
+                            var artistData = loonaArtistDataMap[memberIdx] || NULL;
+
+                            // Set scene state fields
+                            sceneThis.add(0x88).writePointer(targetCardItem); // selectedCardItem
+                            sceneThis.add(0x98).writePointer(targetCardItem); // preSelectedCardItem
+                            sceneThis.add(0x80).writePointer(artistData);     // selectedArtistData
+                            sceneThis.add(0x90).writePointer(targetCardItem); // equippedCardItem
+                            sceneThis.add(0xBE).writeU8(0);                   // isChangeSelectedCardItem = false
+
+                            log("[👑 ON_GROUP_CARD] Transitioning to SetStateMain for member " + memberIdx);
+                            safeSetStateMain(sceneThis, 0);
+                        } catch (eOgc) {
+                            log("[-] Error in OnGroupCard replace: " + eOgc.message);
+                        }
+                    }, "void", ["pointer", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.OnGroupCard (0x105BDE0)!");
+                } catch (eHogc) {
+                    log("[-] Error replacing OnGroupCard: " + eHogc.message);
+                }
+
                 // Authentic IL2CPP List<CardItem> operations using engine methods
                 var clearCardItemList = function(listPtr) {
                     if (!listPtr || listPtr.isNull()) return;
@@ -4983,12 +5073,20 @@ function initIl2Cpp(module) {
                 var ensureMaterialCardItemList = ensureInventoryLists;
 
                 // Helper to restore all cards in displayCardList when returning to default state
-                var restoreDefaultDisplayCardList = function(sceneThis) {
+                var restoreDefaultDisplayCardList = function(sceneThis, force) {
                     try {
                         if (sceneThis.isNull() || !loonaCardItems || loonaCardItems.length === 0) return;
                         ensureMaterialCardItemList(sceneThis);
                         var dclPtr = sceneThis.add(0x58).readPointer();
                         if (dclPtr.isNull()) return;
+
+                        var currentCount = dclPtr.add(0x18).readS32();
+                        var currentExtract = sceneThis.add(0x50).readS32();
+                        if (!force && currentCount >= loonaCardItems.length && currentExtract === 0) {
+                            log("[ℹ️ RESTORE] displayCardList already contains " + currentCount + " cards and extractType=0, skipping duplicate restore!");
+                            return;
+                        }
+
                         var listItems = ensureListBuffer(dclPtr, Math.max(loonaCardItems.length, 64));
                         if (!listItems || listItems.isNull()) {
                             log("[-] restoreDefaultDisplayCardList: listItems is null and cannot be allocated!");
@@ -5746,7 +5844,19 @@ function initIl2Cpp(module) {
 
                 function loadLocalTexture2D(relPath) {
                     if (loadedTextureCache[relPath]) {
-                        return loadedTextureCache[relPath];
+                        var cached = loadedTextureCache[relPath];
+                        try {
+                            if (!cached.isNull()) {
+                                var m_CachedPtr = cached.add(0x10).readPointer();
+                                if (!m_CachedPtr.isNull()) {
+                                    return cached;
+                                }
+                            }
+                            log("[⚠️ TEXTURE] Cached Texture2D native m_CachedPtr was null/destroyed! Evicting: " + relPath);
+                        } catch (eCheck) {
+                            log("[⚠️ TEXTURE] Error checking cached ptr: " + eCheck.message);
+                        }
+                        delete loadedTextureCache[relPath];
                     }
                     try {
                         var basePath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/";
@@ -5800,8 +5910,22 @@ function initIl2Cpp(module) {
                                 var setAnisoFn = new NativeFunction(baseAddr.add(0x181A610), "void", ["pointer", "int", "pointer"]);
                                 setAnisoFn(texObj, 8, NULL);
                             } catch (eFm) {}
+
+                            // GC Pin and persist texture to avoid placeholder reversion
+                            try {
+                                if (il2cpp_gchandle_new) {
+                                    il2cpp_gchandle_new(texObj, 2); // 2 = Pinned handle
+                                }
+                                var dontDestroyOnLoadFn = new NativeFunction(baseAddr.add(0x1DC7FB4), "void", ["pointer", "pointer"]);
+                                dontDestroyOnLoadFn(texObj, NULL);
+                                var setHideFlagsFn = new NativeFunction(baseAddr.add(0x1DC7FF4), "void", ["pointer", "int", "pointer"]);
+                                setHideFlagsFn(texObj, 52, NULL); // 52 = DontSaveInEditor | DontSaveInBuild | DontUnloadUnusedAsset
+                            } catch (ePin) {
+                                log("[-] Error pinning texture " + relPath + ": " + ePin.message);
+                            }
+
                             loadedTextureCache[relPath] = texObj;
-                            log("[🖼️ TEXTURE] Loaded and cached (Trilinear/Aniso8): " + relPath);
+                            log("[🖼️ TEXTURE] Loaded and cached (Pinned/DontDestroy): " + relPath);
                             return texObj;
                         } else {
                             log("[-] LoadImage returned false for " + relPath);
@@ -6935,6 +7059,18 @@ function initIl2Cpp(module) {
                         onLeave: function (retval) {
                             if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
                                 ensureInventoryLists(activeInventorySceneInstance);
+                                try {
+                                    var dclPtr = activeInventorySceneInstance.add(0x58).readPointer();
+                                    var cnt = 0;
+                                    if (!dclPtr.isNull()) cnt = dclPtr.add(0x18).readS32();
+                                    log("[🗃️ INVENTORY SCENE] OnOpen.onLeave: displayCardList count=" + cnt);
+                                    if (cnt === 0) {
+                                        log("[🗃️ INVENTORY SCENE] displayCardList was empty on open/return! Restoring...");
+                                        restoreDefaultDisplayCardList(activeInventorySceneInstance, true);
+                                    }
+                                } catch (eOol) {
+                                    log("[-] Error in InventoryScene.OnOpen.onLeave: " + eOol.message);
+                                }
                             }
                             log("[🗃️ INVENTORY SCENE] InventoryScene.OnOpen completed!");
                         }
@@ -7380,6 +7516,11 @@ function initIl2Cpp(module) {
                     Interceptor.attach(baseAddr.add(0x11CDD64), {
                         onEnter: function (args) {
                             log("[📖 CARDBOOK SCENE] CardBookScene.OnOpen entered! instance: " + args[0]);
+                            try {
+                                populateOfflineInventoryCards();
+                            } catch (ePop) {
+                                log("[-] Error populating offline cards in CardBook: " + ePop.message);
+                            }
                             try {
                                 var setCardBookOpenedFn = new NativeFunction(baseAddr.add(0x11C537C), "void", ["int", "pointer"]);
                                 setCardBookOpenedFn(1, NULL);
