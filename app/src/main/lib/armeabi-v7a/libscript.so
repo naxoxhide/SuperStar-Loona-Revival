@@ -2805,9 +2805,8 @@ function initIl2Cpp(module) {
                     1007: "JinSoul",
                     1008: "Choerry",
                     1009: "Yves",
-                    1010: "Chuu",
-                    1011: "Go Won",
-                    1012: "Olivia Hye"
+                    1010: "Go Won",
+                    1011: "Olivia Hye"
                 };
 
                 var themeNamesMap = {
@@ -4759,6 +4758,33 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing OnCardItem: " + eHoci.message);
                 }
 
+                // Authentic IL2CPP List<CardItem> operations using engine methods
+                var clearCardItemList = function(listPtr) {
+                    if (!listPtr || listPtr.isNull()) return;
+                    try {
+                        var listClearFn = new NativeFunction(baseAddr.add(0x23CE81C), "void", ["pointer"]);
+                        listClearFn(listPtr);
+                    } catch (eClr) {
+                        try { listPtr.add(0x18).writeS32(0); } catch (eSz) {}
+                    }
+                };
+
+                var addCardItemToList = function(listPtr, cardItem) {
+                    if (!listPtr || listPtr.isNull() || !cardItem || cardItem.isNull()) return;
+                    try {
+                        var slotPtr = baseAddr.add(0x30E4000).add(0xEC0).readPointer();
+                        if (!slotPtr.isNull()) {
+                            var initMetaFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
+                            initMetaFn(slotPtr);
+                            var mi = slotPtr.readPointer();
+                            var listAddFn = new NativeFunction(baseAddr.add(0x23CE41C), "void", ["pointer", "pointer", "pointer"]);
+                            listAddFn(listPtr, cardItem, mi);
+                        }
+                    } catch (eAdd) {
+                        log("[-] Error in addCardItemToList: " + eAdd.message);
+                    }
+                };
+
                 // Helper to safely filter lower carousel (InvenCardView @ sceneView + 0x78) by member and theme
                 var safeUpdateLowerCarousel = function(sceneThis, selectedCardItem) {
                     try {
@@ -4812,25 +4838,14 @@ function initIl2Cpp(module) {
                         }
 
                         var listItems = dclPtr.add(0x10).readPointer();
-                        var requiredCap = filteredItems.length + 5;
-                        var curCap = (!listItems.isNull()) ? listItems.add(0x18).readS32() : 0;
-                        if (curCap < requiredCap && il2cpp_array_new && cachedCardItemKlass && !cachedCardItemKlass.isNull()) {
-                            var newArr = il2cpp_array_new(cachedCardItemKlass, 64);
-                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(newArr, 2);
-                            dclPtr.add(0x10).writePointer(newArr);
-                            listItems = newArr;
-                            log("[🎠 CAROUSEL] safeUpdateLowerCarousel: expanded _items to capacity 64");
-                        }
                         if (listItems.isNull()) {
                             log("[-] CAROUSEL: displayCardList._items is null!");
                             return;
                         }
 
-                        // Write filtered items into displayCardList array
                         for (var f = 0; f < filteredItems.length; f++) {
                             listItems.add(0x20 + f * 8).writePointer(filteredItems[f]);
                         }
-                        // Update displayCardList._size
                         dclPtr.add(0x18).writeS32(filteredItems.length);
 
                         // Step 3: Get sceneView (0x48) -> cardView (0x78)
@@ -4883,68 +4898,56 @@ function initIl2Cpp(module) {
                     }
                 };
 
-                // Bulletproof InventoryScene lists allocator (0x58, 0x60, 0x68, 0x70, 0x78, 0xA0)
-                var ensureInventoryLists = function(scene) {
+                // Helper to ensure materialCardItemList (0xA0) is never null in InventoryScene
+                var dummyMaterialCardItemList = null;
+                var ensureMaterialCardItemList = function(scene) {
                     try {
                         if (!scene || scene.isNull()) return;
-                        var pKlassSlot = baseAddr.add(0x310C000).add(0x7A0).readPointer();
-                        var klass = !pKlassSlot.isNull() ? pKlassSlot.readPointer() : NULL;
-                        if (!klass || klass.isNull()) {
+                        var curPtr = scene.add(0xA0).readPointer();
+                        if (curPtr.isNull()) {
+                            var matList = scene.add(0x68).readPointer();
                             var dcl = scene.add(0x58).readPointer();
-                            if (!dcl.isNull()) klass = dcl.readPointer();
-                        }
-                        if (!klass || klass.isNull()) {
-                            var mat = scene.add(0x68).readPointer();
-                            if (!mat.isNull()) klass = mat.readPointer();
-                        }
-                        if (!klass || klass.isNull()) return;
-
-                        var ctorSlot = baseAddr.add(0x30DC000).add(0x800).readPointer();
-                        var ctorMethodInfo = !ctorSlot.isNull() ? ctorSlot.readPointer() : NULL;
-                        var listCtorFn = new NativeFunction(baseAddr.add(0x23CD7B4), "void", ["pointer", "pointer"]);
-
-                        var listOffsets = [0x58, 0x60, 0x68, 0x70, 0x78, 0xA0];
-                        for (var i = 0; i < listOffsets.length; i++) {
-                            var off = listOffsets[i];
-                            var curPtr = scene.add(off).readPointer();
-                            if (curPtr.isNull()) {
-                                var newObj = il2cpp_object_new(klass);
-                                if (!newObj.isNull()) {
-                                    listCtorFn(newObj, ctorMethodInfo);
-                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(newObj, 2);
-                                    if (il2cpp_array_new && cachedCardItemKlass && !cachedCardItemKlass.isNull()) {
-                                        var newArr = il2cpp_array_new(cachedCardItemKlass, 128);
-                                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(newArr, 2);
-                                        newObj.add(0x10).writePointer(newArr);
+                            var validList = (!matList.isNull()) ? matList : dcl;
+                            if (!validList.isNull()) {
+                                var klass = validList.readPointer();
+                                if (!klass.isNull()) {
+                                    if (!dummyMaterialCardItemList || dummyMaterialCardItemList.isNull()) {
+                                        var newObj = il2cpp_object_new(klass);
+                                        if (newObj && !newObj.isNull()) {
+                                            try {
+                                                var ctorSlot = baseAddr.add(0x30DC000).add(0x800);
+                                                var initMetaFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
+                                                initMetaFn(ctorSlot);
+                                                var ctorMethodInfo = ctorSlot.readPointer();
+                                                var listCtorFn = new NativeFunction(baseAddr.add(0x23CD7B4), "void", ["pointer", "pointer"]);
+                                                listCtorFn(newObj, ctorMethodInfo);
+                                            } catch (eCt) {}
+                                            dummyMaterialCardItemList = newObj;
+                                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(newObj, 2);
+                                            log("[🗃️ INVENTORY] Created authentic IL2CPP List<CardItem> for 0xA0: " + newObj);
+                                        }
                                     }
-                                    scene.add(off).writePointer(newObj);
-                                    log("[🗃️ INVENTORY] ensureInventoryLists: initialized offset 0x" + off.toString(16) + " -> " + newObj);
+                                    if (dummyMaterialCardItemList && !dummyMaterialCardItemList.isNull()) {
+                                        scene.add(0xA0).writePointer(dummyMaterialCardItemList);
+                                        log("[🗃️ INVENTORY] Assigned materialCardItemList (0xA0) successfully!");
+                                    }
                                 }
                             }
                         }
-                    } catch (eLists) {
-                        log("[-] Error in ensureInventoryLists: " + eLists.message);
+                    } catch (eMat) {
+                        log("[-] Error ensuring materialCardItemList: " + eMat.message);
                     }
                 };
-                var ensureMaterialCardItemList = ensureInventoryLists;
+                var ensureInventoryLists = ensureMaterialCardItemList;
 
                 // Helper to restore all cards in displayCardList when returning to default state
                 var restoreDefaultDisplayCardList = function(sceneThis) {
                     try {
                         if (sceneThis.isNull() || !loonaCardItems || loonaCardItems.length === 0) return;
-                        ensureInventoryLists(sceneThis);
+                        ensureMaterialCardItemList(sceneThis);
                         var dclPtr = sceneThis.add(0x58).readPointer();
                         if (dclPtr.isNull()) return;
                         var listItems = dclPtr.add(0x10).readPointer();
-                        var requiredCap = loonaCardItems.length + 10;
-                        var curCap = (!listItems.isNull()) ? listItems.add(0x18).readS32() : 0;
-                        if (curCap < requiredCap && il2cpp_array_new && cachedCardItemKlass && !cachedCardItemKlass.isNull()) {
-                            var newArr = il2cpp_array_new(cachedCardItemKlass, 128);
-                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(newArr, 2);
-                            dclPtr.add(0x10).writePointer(newArr);
-                            listItems = newArr;
-                            log("[🗃️ INVENTORY] restoreDefaultDisplayCardList: expanded _items to capacity 128");
-                        }
                         if (listItems.isNull()) return;
 
                         for (var i = 0; i < loonaCardItems.length; i++) {
@@ -5019,7 +5022,8 @@ function initIl2Cpp(module) {
                                     if (!r.isNull()) {
                                         var cid2 = r.add(0x20).readS32();
                                         var isE2 = (r.add(0x28).readU8() === 1);
-                                        if (((cid2 - 1001) % 11) === mSlot && isE2) {
+                                        var cMeta2 = getCardMetadata(cid2);
+                                        if (cMeta2.artistID === meta.artistID && isE2) {
                                             equippedCardItem = itm;
                                         }
                                     }
@@ -6712,15 +6716,7 @@ function initIl2Cpp(module) {
                                     // 0. Restore card list in default view
                                     restoreDefaultDisplayCardList(activeInventorySceneInstance);
 
-                                    // 1. Native OnUpdateCardCount (0x1054BB4)
-                                    var onUpdateCardCountFn = new NativeFunction(baseAddr.add(0x1054BB4), "void", ["pointer", "pointer"]);
-                                    onUpdateCardCountFn(activeInventorySceneInstance, NULL);
-
-                                    // 2. Native SetGroupViewCount (0x1053E18)
-                                    var setGroupViewCountFn = new NativeFunction(baseAddr.add(0x1053E18), "void", ["pointer"]);
-                                    setGroupViewCountFn(activeInventorySceneInstance);
-
-                                    // 3. Sort text "High" on InvenSortView
+                                    // 1. Sort text "High" on InvenSortView
                                     var sceneView = activeInventorySceneInstance.add(0x48).readPointer();
                                     if (!sceneView.isNull()) {
                                         var sortView = sceneView.add(0x80).readPointer();
