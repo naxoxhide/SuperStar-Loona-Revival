@@ -4837,15 +4837,9 @@ function initIl2Cpp(module) {
                             return;
                         }
 
-                        var listItems = dclPtr.add(0x10).readPointer();
-                        if (listItems.isNull()) {
-                            log("[-] CAROUSEL: displayCardList._items is null!");
-                            return;
-                        }
-
-                        var curCap = listItems.add(0x18).readS32();
-                        if (curCap < filteredItems.length) {
-                            log("[-] CAROUSEL: listItems capacity " + curCap + " < " + filteredItems.length + ", skipping direct write");
+                        var listItems = ensureListBuffer(dclPtr, Math.max(filteredItems.length, 64));
+                        if (!listItems || listItems.isNull()) {
+                            log("[-] CAROUSEL: displayCardList._items is null and cannot be allocated!");
                             return;
                         }
 
@@ -4866,28 +4860,8 @@ function initIl2Cpp(module) {
                             return;
                         }
 
-                        // Read the existing onEventListener delegate (0x90 in InvenCardView)
-                        var eventListener = cardView.add(0x90).readPointer();
-                        log("[🎠 CAROUSEL] Existing onEventListener delegate: " + eventListener);
-                        if (eventListener.isNull()) {
-                            try {
-                                var dKlassSlot = baseAddr.add(0x30FC000).add(0x690).readPointer();
-                                var dKlass = !dKlassSlot.isNull() ? dKlassSlot.readPointer() : NULL;
-                                var mPtrSlot = baseAddr.add(0x3104000).add(0x918).readPointer();
-                                var mPtr = !mPtrSlot.isNull() ? mPtrSlot.readPointer() : NULL;
-                                if (dKlass && !dKlass.isNull() && mPtr && !mPtr.isNull()) {
-                                    var newDel = il2cpp_object_new(dKlass);
-                                    var dCtorFn = new NativeFunction(baseAddr.add(0xB52D54), "void", ["pointer", "pointer", "pointer", "pointer"]);
-                                    dCtorFn(newDel, sceneThis, mPtr, NULL);
-                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(newDel, 0);
-                                    eventListener = newDel;
-                                    cardView.add(0x90).writePointer(eventListener);
-                                    log("[🎠 CAROUSEL] Created fallback delegate for cardView: " + eventListener);
-                                }
-                            } catch (eDel) {
-                                log("[-] Error creating fallback delegate: " + eDel.message);
-                            }
-                        }
+                        // Read or create delegate
+                        var eventListener = ensureCardViewEventListener(sceneThis, cardView);
 
                         // Step 4: Invoke InvenCardView.SetData(maxCount, isIntensify=false, eventListener) -> RVA 0xF23384
                         var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
@@ -4902,6 +4876,62 @@ function initIl2Cpp(module) {
                     } catch (eCar) {
                         log("[-] Error in safeUpdateLowerCarousel: " + eCar.message);
                     }
+                };
+
+                // Helper to ensure an IL2CPP List<CardItem> has an allocated _items array with at least minCap elements
+                var ensureListBuffer = function(listPtr, minCap) {
+                    try {
+                        if (!listPtr || listPtr.isNull()) return NULL;
+                        var itemsPtr = listPtr.add(0x10).readPointer();
+                        var curCap = (!itemsPtr.isNull()) ? itemsPtr.add(0x18).readS32() : 0;
+                        if (itemsPtr.isNull() || curCap < minCap) {
+                            if (!cachedCardItemKlass || cachedCardItemKlass.isNull()) {
+                                var itemSlot = baseAddr.add(0x31F3060).readPointer();
+                                if (!itemSlot.isNull()) cachedCardItemKlass = itemSlot;
+                                if (!cachedCardItemKlass || cachedCardItemKlass.isNull()) {
+                                    cachedCardItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "InventoryControl/CardItem");
+                                }
+                            }
+                            if (il2cpp_array_new && cachedCardItemKlass && !cachedCardItemKlass.isNull()) {
+                                var allocCap = Math.max(minCap, 64);
+                                var newArr = il2cpp_array_new(cachedCardItemKlass, allocCap);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(newArr, 2);
+                                listPtr.add(0x10).writePointer(newArr);
+                                log("[🗃️ BUFFER] Expanded list buffer " + listPtr + " from cap " + curCap + " to " + allocCap);
+                                return newArr;
+                            }
+                        }
+                        return itemsPtr;
+                    } catch (eBf) {
+                        log("[-] Error in ensureListBuffer: " + eBf.message);
+                        return NULL;
+                    }
+                };
+
+                // Helper to ensure InvenCardView onEventListener delegate is valid
+                var ensureCardViewEventListener = function(sceneThis, cardView) {
+                    if (!cardView || cardView.isNull()) return NULL;
+                    var eventListener = cardView.add(0x90).readPointer();
+                    if (eventListener.isNull() && !sceneThis.isNull()) {
+                        try {
+                            var dKlassSlot = baseAddr.add(0x30FC000).add(0x690).readPointer();
+                            var dKlass = !dKlassSlot.isNull() ? dKlassSlot.readPointer() : NULL;
+                            var mPtrSlot = baseAddr.add(0x3104000).add(0x918).readPointer();
+                            var mPtr = !mPtrSlot.isNull() ? mPtrSlot.readPointer() : NULL;
+                            if (dKlass && !dKlass.isNull() && mPtr && !mPtr.isNull()) {
+                                var newDel = il2cpp_object_new(dKlass);
+                                var dCtorFn = new NativeFunction(baseAddr.add(0xB52D54), "void", ["pointer", "pointer", "pointer", "pointer"]);
+                                dCtorFn(newDel, sceneThis, mPtr, NULL);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(newDel, 0);
+                                eventListener = newDel;
+                                cardView.add(0x90).writePointer(eventListener);
+                                log("[🗃️ DELEGATE] Created fallback delegate for cardView: " + eventListener);
+                            }
+                        } catch (eDel) {
+                            log("[-] Error creating fallback delegate: " + eDel.message);
+                        }
+                    }
+                    return eventListener;
                 };
 
                 // Helper to ensure all required card lists are initialized with valid buffer capacity (64)
@@ -4937,14 +4967,13 @@ function initIl2Cpp(module) {
                                 if (!newObj.isNull()) {
                                     listCtorFn(newObj, ctorMethodInfo);
                                     if (il2cpp_gchandle_new) il2cpp_gchandle_new(newObj, 2);
-                                    if (il2cpp_array_new && cachedCardItemKlass && !cachedCardItemKlass.isNull()) {
-                                        var newArr = il2cpp_array_new(cachedCardItemKlass, 64);
-                                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(newArr, 2);
-                                        newObj.add(0x10).writePointer(newArr);
-                                    }
                                     scene.add(off).writePointer(newObj);
+                                    curPtr = newObj;
                                     log("[🗃️ INVENTORY] ensureInventoryLists: initialized offset 0x" + off.toString(16) + " -> " + newObj);
                                 }
+                            }
+                            if (!curPtr.isNull()) {
+                                ensureListBuffer(curPtr, 64);
                             }
                         }
                     } catch (eLists) {
@@ -4960,10 +4989,9 @@ function initIl2Cpp(module) {
                         ensureMaterialCardItemList(sceneThis);
                         var dclPtr = sceneThis.add(0x58).readPointer();
                         if (dclPtr.isNull()) return;
-                        var listItems = dclPtr.add(0x10).readPointer();
-                        var curCap = listItems.add(0x18).readS32();
-                        if (curCap < loonaCardItems.length) {
-                            log("[-] restoreDefaultDisplayCardList: listItems capacity " + curCap + " < " + loonaCardItems.length + ", skipping direct write to avoid buffer corruption");
+                        var listItems = ensureListBuffer(dclPtr, Math.max(loonaCardItems.length, 64));
+                        if (!listItems || listItems.isNull()) {
+                            log("[-] restoreDefaultDisplayCardList: listItems is null and cannot be allocated!");
                             return;
                         }
 
@@ -4977,7 +5005,7 @@ function initIl2Cpp(module) {
                         if (!sceneView.isNull()) {
                             var cardView = sceneView.add(0x78).readPointer();
                             if (!cardView.isNull()) {
-                                var eventListener = cardView.add(0x90).readPointer();
+                                var eventListener = ensureCardViewEventListener(sceneThis, cardView);
                                 var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
                                 setDataFn(cardView, loonaCardItems.length, 0, eventListener, NULL);
                                 var refreshFn = new NativeFunction(baseAddr.add(0xF233B8), "void", ["pointer", "bool", "pointer"]);
@@ -7821,6 +7849,15 @@ function initIl2Cpp(module) {
                             log("[🛡️ UNITY PATCH] Patched 0x288B50 to b #0x288c84 (bypassed bad registration crash)");
                         } catch (bpe) {
                             log("[-] Error patching 0x288B50: " + bpe.message);
+                        }
+
+                        // Neutralize crash at 0x2DAEE8 (null sprite buffer dereference during Canvas/Scroller rebuild)
+                        try {
+                            Memory.protect(unityMod.base.add(0x2DAEC8), 4, "rwx");
+                            unityMod.base.add(0x2DAEC8).writeU32(0xF9401B08); // ldr x8, [x24, #0x30] (checks buffer instead of count)
+                            log("[🛡️ UNITY PATCH] Patched 0x2DAEC8 to 'ldr x8, [x24, #0x30]' (null sprite buffer guard)!");
+                        } catch (uSpErr) {
+                            log("[-] Error patching 0x2DAEC8: " + uSpErr.message);
                         }
 
                         // Safeguard 0x28b3ac against NULL pointer dereference
