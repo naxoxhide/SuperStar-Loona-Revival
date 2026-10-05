@@ -4867,12 +4867,6 @@ function initIl2Cpp(module) {
                         var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
                         setDataFn(cardView, filteredItems.length, 0, eventListener, NULL);
                         log("[✅ CAROUSEL] InvenCardView.SetData called with count=" + filteredItems.length);
-
-                        // Step 5: Invoke InvenCardView.Refresh(isMaterialCardLight=false) -> RVA 0xF233B8
-                        var refreshFn = new NativeFunction(baseAddr.add(0xF233B8), "void", ["pointer", "bool", "pointer"]);
-                        refreshFn(cardView, 0, NULL);
-                        log("[✅ CAROUSEL] InvenCardView.Refresh called successfully!");
-
                     } catch (eCar) {
                         log("[-] Error in safeUpdateLowerCarousel: " + eCar.message);
                     }
@@ -4909,23 +4903,38 @@ function initIl2Cpp(module) {
                 };
 
                 // Helper to ensure InvenCardView onEventListener delegate is valid
+                var cachedMethodInfoBuf = NULL;
                 var ensureCardViewEventListener = function(sceneThis, cardView) {
                     if (!cardView || cardView.isNull()) return NULL;
                     var eventListener = cardView.add(0x90).readPointer();
-                    if (eventListener.isNull() && !sceneThis.isNull()) {
+                    if (!eventListener.isNull()) {
+                        try {
+                            var fnPtr = eventListener.add(0x10).readPointer();
+                            if (fnPtr.equals(baseAddr.add(0x105F448))) {
+                                return eventListener;
+                            }
+                        } catch (eChk) {}
+                    }
+
+                    if (!sceneThis.isNull()) {
                         try {
                             var dKlassSlot = baseAddr.add(0x30FC000).add(0x690).readPointer();
-                            var dKlass = !dKlassSlot.isNull() ? dKlassSlot.readPointer() : NULL;
-                            var mPtrSlot = baseAddr.add(0x3104000).add(0x918).readPointer();
-                            var mPtr = !mPtrSlot.isNull() ? mPtrSlot.readPointer() : NULL;
-                            if (dKlass && !dKlass.isNull() && mPtr && !mPtr.isNull()) {
+                            var dKlass = (!dKlassSlot.isNull()) ? dKlassSlot.readPointer() : NULL;
+                            if (!dKlass || dKlass.isNull()) {
+                                dKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "InvenCardCellView/OnEventListener");
+                            }
+                            if (dKlass && !dKlass.isNull()) {
                                 var newDel = il2cpp_object_new(dKlass);
                                 var dCtorFn = new NativeFunction(baseAddr.add(0xB52D54), "void", ["pointer", "pointer", "pointer", "pointer"]);
-                                dCtorFn(newDel, sceneThis, mPtr, NULL);
+                                if (!cachedMethodInfoBuf || cachedMethodInfoBuf.isNull()) {
+                                    cachedMethodInfoBuf = Memory.alloc(16);
+                                    cachedMethodInfoBuf.writePointer(baseAddr.add(0x105F448));
+                                }
+                                dCtorFn(newDel, sceneThis, cachedMethodInfoBuf, NULL);
                                 if (il2cpp_gchandle_new) il2cpp_gchandle_new(newDel, 0);
                                 eventListener = newDel;
                                 cardView.add(0x90).writePointer(eventListener);
-                                log("[🗃️ DELEGATE] Created fallback delegate for cardView: " + eventListener);
+                                log("[🗃️ DELEGATE] Successfully created genuine delegate pointing to 0x105F448: " + eventListener);
                             }
                         } catch (eDel) {
                             log("[-] Error creating fallback delegate: " + eDel.message);
@@ -5008,8 +5017,7 @@ function initIl2Cpp(module) {
                                 var eventListener = ensureCardViewEventListener(sceneThis, cardView);
                                 var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
                                 setDataFn(cardView, loonaCardItems.length, 0, eventListener, NULL);
-                                var refreshFn = new NativeFunction(baseAddr.add(0xF233B8), "void", ["pointer", "bool", "pointer"]);
-                                refreshFn(cardView, 0, NULL);
+                                log("[✅ RESTORE] SetData called on InvenCardView with count=" + loonaCardItems.length);
                             }
                         }
                         log("[✅ RESTORE] Restored displayCardList to all " + loonaCardItems.length + " cards!");
@@ -5023,6 +5031,7 @@ function initIl2Cpp(module) {
                     log("[🗃️ SET_STATE_MAIN] safeSetStateMain entered! isReload=" + isReload + ", scene=" + sceneThis);
                     try {
                         if (sceneThis.isNull()) return;
+                        sceneThis.add(0x24).writeS32(6); // InventoryScene.STATE.Main = 6
                         ensureMaterialCardItemList(sceneThis);
 
                         var selectedCardItem = sceneThis.add(0x88).readPointer();
@@ -5156,6 +5165,33 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.attach installed on InventoryScene.SetStateDefault (0x1053B88)!");
                 } catch (eSsdHook) {
                     log("[-] Error attaching to SetStateDefault: " + eSsdHook.message);
+                }
+
+                // Hook InventoryScene.OnBack (0x10537F4) to ensure clean restoration when returning from detail view
+                try {
+                    Interceptor.attach(baseAddr.add(0x10537F4), {
+                        onEnter: function (args) {
+                            this.scene = args[0];
+                            if (!this.scene.isNull()) {
+                                this.prevState = this.scene.add(0x24).readS32();
+                                log("[🔙 ON_BACK] InventoryScene.OnBack entered! state=" + this.prevState);
+                            }
+                        },
+                        onLeave: function (retval) {
+                            if (this.scene && !this.scene.isNull()) {
+                                if (this.prevState === 6) { // was in STATE.Main
+                                    log("[🔙 ON_BACK] Returned from detail view to Default state, restoring 24 cards...");
+                                    this.scene.add(0x88).writePointer(NULL);
+                                    this.scene.add(0x98).writePointer(NULL);
+                                    this.scene.add(0x80).writePointer(NULL);
+                                    restoreDefaultDisplayCardList(this.scene);
+                                }
+                            }
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on InventoryScene.OnBack (0x10537F4)!");
+                } catch (eObHook) {
+                    log("[-] Error attaching to OnBack: " + eObHook.message);
                 }
 
                 // 9e3. InventoryScene.ExtractWithArtist (0x1058158) -> Strict filtering by member AND theme/song
@@ -5325,22 +5361,73 @@ function initIl2Cpp(module) {
                     log("[-] Error protecting UpdateDisplayCardList / patching 0x1054A04: " + eUdclProtect.message);
                 }
 
-                // InventoryScene.SetStateWait (0x10556C0) null protections & ARM64 patches
+                // InventoryScene.SetStateWait (0x10556C0) -> Immediate offline transition to SetStateWaitDone
                 try {
-                    // 1. Patch 0x1055B80: change 'cbz x22, #0x1055db4' to 'cbz x22, #0x1055c08' (skip null item in theme type loop)
-                    Memory.protect(baseAddr.add(0x1055B80), 4, 'rwx');
-                    baseAddr.add(0x1055B80).writeByteArray([0x56, 0x04, 0x00, 0xB4]);
+                    // Safety patch in SetStateWaitDone (0x1055ECC): if sceneView is null, branch to 0x1055EAC instead of throwing exception
+                    try {
+                        Memory.protect(baseAddr.add(0x1055ECC), 4, "rwx");
+                        baseAddr.add(0x1055ECC).writeByteArray([0xFA, 0xFF, 0xFF, 0x17]); // b #0x1055eac
+                        log("[🛡️ INVENTORY PATCH] Patched SetStateWaitDone 0x1055ECC with safe branch to 0x1055EAC!");
+                    } catch (eSswdPatch) {
+                        log("[-] Error patching SetStateWaitDone 0x1055ECC: " + eSswdPatch.message);
+                    }
 
-                    // 2. Patch 0x1055DAC..0x1055DB8: replace 'bl #0xa43cc0' throw sites with 'b #0x1055da8' (safe ret epilogue)
-                    Memory.protect(baseAddr.add(0x1055DAC), 16, 'rwx');
-                    baseAddr.add(0x1055DAC).writeByteArray([0xFF, 0xFF, 0xFF, 0x17]); // b #0x1055da8
-                    baseAddr.add(0x1055DB0).writeByteArray([0xFE, 0xFF, 0xFF, 0x17]); // b #0x1055da8
-                    baseAddr.add(0x1055DB4).writeByteArray([0xFD, 0xFF, 0xFF, 0x17]); // b #0x1055da8
-                    baseAddr.add(0x1055DB8).writeByteArray([0xFC, 0xFF, 0xFF, 0x17]); // b #0x1055da8
+                    Interceptor.replace(baseAddr.add(0x10556C0), new NativeCallback(function (sceneThis, methodInfo) {
+                        log("[🗃️ INVENTORY] SetStateWait entered -> executing instant offline transition!");
+                        try {
+                            if (sceneThis.isNull()) return;
 
-                    log("[🛡️ INVENTORY PATCH] Patched SetStateWait 0x1055B80 & 0x1055DAC-DB8 with safe skips and ret!");
-                } catch (eSswPatch) {
-                    log("[-] Error patching SetStateWait: " + eSswPatch.message);
+                            // Ensure lists
+                            ensureInventoryLists(sceneThis);
+                            ensureMaterialCardItemList(sceneThis);
+
+                            // Complete fade immediately so screen does not remain white
+                            try {
+                                var fadeCompleteFn = new NativeFunction(baseAddr.add(0xB3E230), "void", ["pointer"]);
+                                fadeCompleteFn(NULL);
+                                log("[✅ INVENTORY] FadeControl.Complete invoked!");
+                            } catch (eFd) {
+                                log("[-] Error completing fade: " + eFd.message);
+                            }
+
+                            // Invoke SetStateWaitDone (0x1055E14)
+                            try {
+                                var setStateWaitDoneFn = new NativeFunction(baseAddr.add(0x1055E14), "void", ["pointer", "pointer"]);
+                                setStateWaitDoneFn(sceneThis, NULL);
+                                log("[✅ INVENTORY] SetStateWaitDone invoked successfully!");
+                            } catch (eSwd) {
+                                log("[-] Error invoking SetStateWaitDone: " + eSwd.message);
+                                // Fallback: direct SetStateDefault
+                                var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
+                                setStateDefaultFn(sceneThis, 1, 1, NULL);
+                                restoreDefaultDisplayCardList(sceneThis);
+                            }
+                        } catch (eWait) {
+                            log("[-] Error in SetStateWait replacement: " + eWait.message);
+                        }
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.SetStateWait (0x10556C0)!");
+                } catch (eSswReplace) {
+                    log("[-] Error replacing SetStateWait: " + eSswReplace.message);
+                }
+
+                // Global PreloadTexture (0xAD2A48) -> Immediate callback execution in offline mode
+                try {
+                    Interceptor.replace(baseAddr.add(0xAD2A48), new NativeCallback(function (enumerator, callback, methodInfo) {
+                        log("[🖼️ PRELOAD] PreloadTexture intercepted offline! callback=" + callback);
+                        if (!callback.isNull()) {
+                            try {
+                                var invokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer"]);
+                                invokeFn(callback);
+                                log("[✅ PRELOAD] Callback invoked immediately!");
+                            } catch (eInv) {
+                                log("[-] Error invoking preload callback: " + eInv.message);
+                            }
+                        }
+                    }, "void", ["pointer", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on PreloadTexture (0xAD2A48)!");
+                } catch (ePltReplace) {
+                    log("[-] Error replacing PreloadTexture: " + ePltReplace.message);
                 }
 
                 // GC Liveness TraverseObject null-class protection (0x9F8DBC)
@@ -7673,6 +7760,10 @@ function initIl2Cpp(module) {
                                                 var curScene = staticFields.add(0x20).readPointer();
                                                 if (!curScene.isNull() && sceneId === 4) {
                                                     log("[🔙 BACK CMD] Closing detail and returning to Inventory main view!");
+                                                    curScene.add(0x88).writePointer(NULL);
+                                                    curScene.add(0x98).writePointer(NULL);
+                                                    curScene.add(0x80).writePointer(NULL);
+                                                    curScene.add(0x24).writeS32(5); // STATE.Default = 5
                                                     ensureMaterialCardItemList(curScene);
                                                     var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
                                                     setStateDefaultFn(curScene, 0, 0, NULL);
