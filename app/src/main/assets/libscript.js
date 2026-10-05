@@ -5006,12 +5006,7 @@ function initIl2Cpp(module) {
                     if (!cardView || cardView.isNull()) return NULL;
                     var eventListener = cardView.add(0x90).readPointer();
                     if (!eventListener.isNull()) {
-                        try {
-                            var fnPtr = eventListener.add(0x10).readPointer();
-                            if (fnPtr.equals(baseAddr.add(0x105F448))) {
-                                return eventListener;
-                            }
-                        } catch (eChk) {}
+                        return eventListener;
                     }
 
                     if (!sceneThis.isNull()) {
@@ -5021,14 +5016,12 @@ function initIl2Cpp(module) {
                             if (!dKlass || dKlass.isNull()) {
                                 dKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "InvenCardCellView/OnEventListener");
                             }
-                            if (dKlass && !dKlass.isNull()) {
+                            var methodSlot = baseAddr.add(0x3104000).add(0x918).readPointer();
+                            var methodPtr = (!methodSlot.isNull()) ? methodSlot.readPointer() : NULL;
+                            if (dKlass && !dKlass.isNull() && methodPtr && !methodPtr.isNull()) {
                                 var newDel = il2cpp_object_new(dKlass);
                                 var dCtorFn = new NativeFunction(baseAddr.add(0xB52D54), "void", ["pointer", "pointer", "pointer", "pointer"]);
-                                if (!cachedMethodInfoBuf || cachedMethodInfoBuf.isNull()) {
-                                    cachedMethodInfoBuf = Memory.alloc(16);
-                                    cachedMethodInfoBuf.writePointer(baseAddr.add(0x105F448));
-                                }
-                                dCtorFn(newDel, sceneThis, cachedMethodInfoBuf, NULL);
+                                dCtorFn(newDel, sceneThis, methodPtr, NULL);
                                 if (il2cpp_gchandle_new) il2cpp_gchandle_new(newDel, 0);
                                 eventListener = newDel;
                                 cardView.add(0x90).writePointer(eventListener);
@@ -5111,10 +5104,13 @@ function initIl2Cpp(module) {
                         if (!sceneView.isNull()) {
                             var cardView = sceneView.add(0x78).readPointer();
                             if (!cardView.isNull()) {
+                                var scroller = cardView.add(0x40).readPointer();
                                 var eventListener = ensureCardViewEventListener(sceneThis, cardView);
-                                var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
-                                setDataFn(cardView, loonaCardItems.length, 0, eventListener, NULL);
-                                log("[✅ RESTORE] SetData called on InvenCardView with count=" + loonaCardItems.length);
+                                if (!scroller.isNull() && eventListener && !eventListener.isNull()) {
+                                    var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
+                                    setDataFn(cardView, loonaCardItems.length, 0, eventListener, NULL);
+                                    log("[✅ RESTORE] SetData called on InvenCardView with count=" + loonaCardItems.length);
+                                }
                             }
                         }
                         log("[✅ RESTORE] Restored displayCardList to all " + loonaCardItems.length + " cards!");
@@ -5302,27 +5298,12 @@ function initIl2Cpp(module) {
 
                                     // 3. Restore displayCardList (sets 24 cards and calls InvenCardView.SetData in 0xF23384)
                                     restoreDefaultDisplayCardList(sceneThis, true);
-
-                                    // 4. Reload EnhancedScroller -> RVA 0x125C640
-                                    try {
-                                        var cardView = sceneView.add(0x78).readPointer();
-                                        if (!cardView.isNull()) {
-                                            var scroller = cardView.add(0x38).readPointer();
-                                            if (!scroller.isNull()) {
-                                                var reloadDataFn = new NativeFunction(baseAddr.add(0x125C640), "void", ["pointer", "float", "pointer"]);
-                                                reloadDataFn(scroller, 0.0, NULL);
-                                                log("[✅ ON_BACK] EnhancedScroller.ReloadData executed!");
-                                            }
-                                        }
-                                    } catch (eScr) {
-                                        log("[-] Error in EnhancedScroller.ReloadData: " + eScr.message);
-                                    }
                                 }
                             } else if (curState === 5) { // STATE.Default (5)
                                 log("[🔙 ON_BACK] Leaving InventoryScene, navigating back to LobbyScene (SceneId: 3)...");
                                 try {
-                                    var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
-                                    openSceneDirectFn(3, NULL, NULL);
+                                    var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                                    openSceneDirectFn(3, NULL, NULL, NULL);
                                 } catch (eOpen) {
                                     log("[-] Error returning to LobbyScene: " + eOpen.message);
                                 }
@@ -5334,6 +5315,40 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on InventoryScene.OnBack (0x10537F4)!");
                 } catch (eObHook) {
                     log("[-] Error replacing OnBack: " + eObHook.message);
+                }
+
+                // Direct transition to CardBookScene (SceneId: 5) avoiding crash in uninitialized SelectMyCollectionPopup
+                try {
+                    Interceptor.replace(baseAddr.add(0xACC8B8), new NativeCallback(function (callback, openCallBack, methodInfo) {
+                        log("[📖 CARDBOOK] Intercepted ViewControl.OpenMyCollectionPopupOrCardBookScene -> Direct SceneControl.OpenScene(5)!");
+                        var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                        openSceneFn(5, NULL, NULL, NULL);
+                    }, "void", ["pointer", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on ViewControl.OpenMyCollectionPopupOrCardBookScene (0xACC8B8)!");
+                } catch (eCbDirect) {
+                    log("[-] Error replacing OpenMyCollectionPopupOrCardBookScene: " + eCbDirect.message);
+                }
+
+                try {
+                    Interceptor.replace(baseAddr.add(0x105DE08), new NativeCallback(function (sceneThis, methodInfo) {
+                        log("[📖 CARDBOOK] Intercepted InventoryScene.OnMyCollection -> Direct SceneControl.OpenScene(5)!");
+                        var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                        openSceneFn(5, NULL, NULL, NULL);
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.OnMyCollection (0x105DE08)!");
+                } catch (eInvenCol) {
+                    log("[-] Error replacing InventoryScene.OnMyCollection: " + eInvenCol.message);
+                }
+
+                try {
+                    Interceptor.replace(baseAddr.add(0xB4C628), new NativeCallback(function (sceneThis, methodInfo) {
+                        log("[📖 CARDBOOK] Intercepted LobbyScene.OnMyCollection -> Direct SceneControl.OpenScene(5)!");
+                        var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                        openSceneFn(5, NULL, NULL, NULL);
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on LobbyScene.OnMyCollection (0xB4C628)!");
+                } catch (eLobbyCol) {
+                    log("[-] Error replacing LobbyScene.OnMyCollection: " + eLobbyCol.message);
                 }
 
                 // 9e3. InventoryScene.ExtractWithArtist (0x1058158) -> Strict filtering by member AND theme/song
@@ -7598,14 +7613,13 @@ function initIl2Cpp(module) {
                         if (il2cpp_gchandle_new) il2cpp_gchandle_new(info, 2);
 
                         // Build modelList (List<CardBookCardData>) with our 24 cards
-                        var listKlass = cachedListCardItemKlass || getClass("mscorlib", "System.Collections.Generic", "List`1");
-                        var modelList = il2cpp_object_new(listKlass);
                         var cardCount = (loonaCardItems && loonaCardItems.length > 0) ? loonaCardItems.length : 0;
                         var arr = il2cpp_array_new(cbCardDataKlass, Math.max(cardCount + 4, 16));
                         if (il2cpp_gchandle_new) {
-                            il2cpp_gchandle_new(modelList, 2);
                             il2cpp_gchandle_new(arr, 2);
                         }
+                        var modelList = Memory.alloc(64);
+                        modelList.writePointer(infoKlass);
                         modelList.add(0x10).writePointer(arr);
                         modelList.add(0x18).writeS32(cardCount);
 
@@ -7620,6 +7634,18 @@ function initIl2Cpp(module) {
                             cdObj.add(0x14).writeS32(gr);
                             cdObj.add(0x18).writeS64(1600000000);
                             arr.add(0x20 + i * 8).writePointer(cdObj);
+                        }
+
+                        // Ensure InventoryControl class is initialized before Info..ctor accesses it
+                        try {
+                            var invenKlassSlot = baseAddr.add(0x30ED000).add(0x358).readPointer();
+                            if (!invenKlassSlot.isNull()) {
+                                var runtimeInitFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
+                                runtimeInitFn(invenKlassSlot);
+                                log("[📖 CARDBOOK] Initialized InventoryControl class for CardBook!");
+                            }
+                        } catch (eInitInven) {
+                            log("[-] Error initializing InventoryControl: " + eInitInven.message);
                         }
 
                         // Call Info..ctor(info, true, modelList) -> RVA 0xB95B34
