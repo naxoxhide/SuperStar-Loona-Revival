@@ -6,6 +6,41 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ✅ CHECKPOINT 11 — Estabilización Integral de CardBookScene (SceneId: 5), Renderizado de Temas LOONA, CardBookDetailPopup y Navegación Bidireccional Limpia (2026-10-06)
+
+**Estado verificado y validado en sesión activa en emulador (`127.0.0.1:5555`) con PID 11890:**
+
+1. **Resolución de la Causa Raíz de Pantalla en Blanco en `CardBookScene` (SceneId: 5):**
+   - En `CardBookScene.RefreshSetMainView` (RVA `0x11CFDD8`), `RefreshCollection` (RVA `0x11D0300`) invocaba `CardBookMainView.SetMainView` (RVA `0x11CD508`).
+   - Esta ejecutaba `SetRefreshCardCollection` (RVA `0x11CD560`) y `SetRefreshThemeCollection` (RVA `0x11CD6F8`), que realizaban comprobaciones de logros indexando `CollectionAchievementDataControl`. Al no estar poblados por el servidor, `cmp w9, w23` fallaba y bifurcaba a `0x1FF9000` (`ThrowArgumentOutOfRangeException`).
+   - La excepción no capturada provocaba que `libc.so!abort` fuera invocado, interrumpiendo la ejecución antes de `SetStateWaitDone` (RVA `0x11CF1CC`) y dejando los canvas desactivados.
+   - **Solución implementada:** Parcheo a `ret` de los RVAs de seguridad `cardBookSafetyRetRVAs` (incluyendo `0x11CD560`, `0x11CD6F8`, `0x11D446C`, `0x11D0914`, `0xB3BBB4`, `0xB3E230`, `0xB3DEA4`, `0xB3E004`).
+
+2. **Inicialización y Poblado de Datos Legítimos de CardBook:**
+   - Invocación de `CollectionPointDataControl.Open()` (RVA `0xDA5F44`) dentro de `ensureCardBookControlData()` para garantizar la creación legítima del diccionario `BasicGradePoint`.
+   - Generación estructurada de `CardBookControl.Info`, `GroupItem` (LOONA 1001), `CardbookGradeInfo` (Grade R50, 2400 puntos), `ThemeList` (9 temas LOONA con `ThemeItem`), y registro en `CardBookControl.MyInfo` y `CardBookControl.SharedInfo`.
+   - Interceptación y reemplazo de `AssetControl.PreloadTexture` (RVA `0xAD2A48`) para ejecutar callbacks directamente sin dependencias de red CDN.
+
+3. **Apertura Táctil de Detalle de Temas/Álbumes (`CardBookDetailPopup`):**
+   - Al pulsar sobre el banner LOONA o enviar comando `cb:detail`, `OnBestCardBook` (RVA `0x11D2268`) invoca `CardBookScene.OpenDetailPopup` (RVA `0x11CF9C0`).
+   - Dentro del callback `<OpenDetailPopup>b__0` (RVA `0xE40874`), la rutina verificaba `UserDataControl.get_CardFavoriteGroupList()` (RVA `0xAB240C`). Al ser nulo en entorno offline, la instrucción en `0xE40F08` (`cbz x0, #0xe41168`) provocaba un `ThrowNullReferenceException` (`LR = 0xE4116C`), abortando el proceso.
+   - **Solución implementada:** Parche de byte en `0xE40F08` (`mov w8, #1; strb w8, [x21, #0xf0]; b #0xe40f2c` -> `0x28, 0x00, 0x80, 0x52, 0xa8, 0xc2, 0x03, 0x39, 0x07, 0x00, 0x00, 0x14`), neutralizando la comprobación nula y seteando `isFavorite = true`.
+   - `CardBookDetailPopup` se despliega 100% operativo en pantalla con barra de progreso, insignia dorada R, puntos `2400 / 2400` y panel de temas.
+
+4. **Cierre Seguro de Detalle y Navegación Bidireccional Limpia:**
+   - En el callback de cierre `<OpenDetailPopup>b__4` (RVA `0xE4173C`), se aplicó parche a `ret` (`0xc0, 0x03, 0x5f, 0xd6`) junto a `0xE415E4` (receipt callback), previniendo excepciones al cerrar el popup.
+   - Al tocar el botón `X`, `CardBookDetailPopup` se cierra limpiamente retornando a `CardBookScene` (Scene 5).
+   - Al invocar `back` (`CardBookScene.OnBack` @ RVA `0x11CEF00`), Unity regresa limpiamente a `LobbyScene` (Scene 3) sin fugas de memoria ni cuelgues.
+
+5. **Evidencia Visual y Pruebas de QA:**
+   - **Vista Principal de CardBook:** [docs/walkthroughs/media/screen_cardbook_ok.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_cardbook_ok.png) — Encabezado "MY CARD BOOK", LOONA R MAX, Paneles All Cards & All Themes.
+   - **Vista de Grupo en CardBook:** [docs/walkthroughs/media/screen_cb_group_ok.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_cb_group_ok.png) — Paginador 1/1, Slot LOONA con icono Dalcomsoft.
+   - **Detalle de Álbum y Temas LOONA (`CardBookDetailPopup`):** [docs/walkthroughs/media/screen_cb_detail_ok.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_cb_detail_ok.png) — Muestra `CardBookDetailPopup`, progreso `2400 / 2400`, insignia R dorada y panel de colección.
+   - **Retorno Limpio a CardBookScene tras Cerrar Detalle:** [docs/walkthroughs/media/screen_cb_after_detail_close.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_cb_after_detail_close.png) — Cierre limpio tras presionar botón `X`.
+   - **Navegación Bidireccional a LobbyScene:** [docs/walkthroughs/media/screen_lobby_after_cb.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_lobby_after_cb.png) — Regreso impecable a LobbyScene tras ejecutar `back`.
+
+---
+
 ### ✅ CHECKPOINT 10 — Estabilización Integral de InventoryScene y Navegación Bidireccional de Cartas (2026-10-05)
 
 **Estado verificado y validado en sesión activa en emulador (`127.0.0.1:5555`):**

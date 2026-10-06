@@ -6315,13 +6315,38 @@ function initIl2Cpp(module) {
                         log("[📖 CARDBOOK] SetStateWait intercepted -> instantly populating CardBook and activating UI!");
                         try {
                             ensureCardBookControlData();
+                        } catch (eEd) {
+                            log("[-] Error in ensureCardBookControlData: " + eEd.message);
+                        }
+                        try {
                             var refreshMainFn = new NativeFunction(baseAddr.add(0x11CFDD8), "void", ["pointer", "bool", "pointer"]);
                             refreshMainFn(sceneThis, 1, NULL);
+                            log("[📖 CARDBOOK] RefreshSetMainView(true) cleanly executed!");
+                        } catch (eRm) {
+                            log("[-] Error in RefreshSetMainView: " + eRm.message);
+                        }
+                        try {
                             var waitDoneFn = new NativeFunction(baseAddr.add(0x11CF1CC), "void", ["pointer", "pointer"]);
                             waitDoneFn(sceneThis, NULL);
-                            log("[📖 CARDBOOK] RefreshSetMainView(true) and SetStateWaitDone cleanly executed!");
-                        } catch (eWait) {
-                            log("[-] Error in CardBook SetStateWait: " + eWait.message);
+                            log("[📖 CARDBOOK] SetStateWaitDone cleanly executed!");
+                        } catch (eWd) {
+                            log("[-] Error in SetStateWaitDone: " + eWd.message);
+                        }
+                        try {
+                            var sceneView = sceneThis.add(0x48).readPointer();
+                            if (!sceneView.isNull()) {
+                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                var svGo = getGoFn(sceneView, NULL);
+                                if (!svGo.isNull()) setActFn(svGo, 1, NULL);
+                                var mainView = sceneView.add(0xE0).readPointer();
+                                if (!mainView.isNull()) {
+                                    var mvGo = getGoFn(mainView, NULL);
+                                    if (!mvGo.isNull()) setActFn(mvGo, 1, NULL);
+                                }
+                            }
+                        } catch (eAct) {
+                            log("[-] Error activating CardBook sceneView/mainView: " + eAct.message);
                         }
                     }, "void", ["pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on CardBookScene.SetStateWait (0x11CF378)!");
@@ -6406,7 +6431,15 @@ function initIl2Cpp(module) {
                     0x11D0B64, // CardBookScene.RefreshAchieveNewMark -> ret
                     0x11D0C1C, // CardBookScene.RefreshGroupNewMark -> ret
                     0x11CFB80, // CardBookScene.RefreshOthers -> ret
-                    0xB98210   // CardBookControl.GroupItem.ExtractTexturePath -> ret
+                    0x11CD560, // CardBookMainView.SetRefreshCardCollection -> ret (prevent ArgumentOutOfRangeException on empty CardAchievementList)
+                    0x11CD6F8, // CardBookMainView.SetRefreshThemeCollection -> ret (prevent ArgumentOutOfRangeException on empty ThemeAchievementList)
+                    0x11D446C, // CardBookView.RafreshTabMainNewMark -> ret
+                    0x11D0914, // CardBookView.RefreshGroupNewMark -> ret
+                    0xB98210,  // CardBookControl.GroupItem.ExtractTexturePath -> ret
+                    0xB3BBB4,  // IndicatorPopup.Active -> ret
+                    0xB3E230,  // IndicatorPopup.Deactive -> ret
+                    0xB3DEA4,  // IndicatorPopup.ActiveWithSmooth -> ret
+                    0xB3E004   // IndicatorPopup.ActiveTwo -> ret
                 ];
                 cardBookSafetyRetRVAs.forEach(function (rva) {
                     try {
@@ -6452,6 +6485,29 @@ function initIl2Cpp(module) {
                     log("[+] Byte patch on CardBookControl.VerifyFavoriteGroupCode (0x11C6CEC): mov w0, #1; ret");
                 } catch (eVfgc) {
                     log("[-] Error patching VerifyFavoriteGroupCode: " + eVfgc.message);
+                }
+
+                // 10. AssetControl.PreloadTexture (0xAD2A48) -> Safe immediate callback
+                try {
+                    Interceptor.replace(baseAddr.add(0xAD2A48), new NativeCallback(function (enumerator, callback, methodInfo) {
+                        log("[📦 PRELOAD] PreloadTexture intercepted -> triggering callback safely!");
+                        if (!callback.isNull()) {
+                            try {
+                                var methodPtr = callback.add(0x10).readPointer();
+                                var target = callback.add(0x20).readPointer();
+                                if (!methodPtr.isNull()) {
+                                    var cbFn = new NativeFunction(methodPtr, "void", ["pointer", "pointer"]);
+                                    cbFn(target, NULL);
+                                    log("[📦 PRELOAD] Callback successfully executed!");
+                                }
+                            } catch (eCb) {
+                                log("[-] Error executing PreloadTexture callback: " + eCb.message);
+                            }
+                        }
+                    }, "void", ["pointer", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on AssetControl.PreloadTexture (0xAD2A48)!");
+                } catch (ePt) {
+                    log("[-] Error replacing PreloadTexture: " + ePt.message);
                 }
 
                 // Proxy CardControl.Data primary identity getters
@@ -7802,6 +7858,15 @@ function initIl2Cpp(module) {
                         ensureLoonaMocks();
                         populateOfflineInventoryCards();
 
+                        // Initialize CollectionPointDataControl (BasicGradePoint dictionary)
+                        try {
+                            var cpOpenFn = new NativeFunction(baseAddr.add(0xDA5F44), "void", []);
+                            cpOpenFn();
+                            log("[📖 CARDBOOK] CollectionPointDataControl.Open() initialized!");
+                        } catch (eCpo) {
+                            log("[-] Error initializing CollectionPointDataControl: " + eCpo.message);
+                        }
+
                         var infoKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardBookControl/Info");
                         var cbGroupItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardBookControl/GroupItem");
                         var cbGradeInfoKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardBookControl/CardbookGradeInfo");
@@ -8299,6 +8364,37 @@ function initIl2Cpp(module) {
                                                         var cbBackFn = new NativeFunction(baseAddr.add(0x11CEDE8), "void", ["pointer", "pointer"]);
                                                         cbBackFn(curScene, NULL);
                                                     }
+                                                }
+                                            } else if (cmdRaw === "cb:group") {
+                                                var curScene = staticFields.add(0x20).readPointer();
+                                                if (!curScene.isNull() && sceneId === 5) {
+                                                    log("[📖 CARDBOOK CMD] Switching to Group View tab (1)!");
+                                                    var sceneView = curScene.add(0x48).readPointer();
+                                                    if (!sceneView.isNull()) {
+                                                        var setTabFn = new NativeFunction(baseAddr.add(0x11CF5BC), "int", ["pointer", "int", "pointer"]);
+                                                        setTabFn(sceneView, 1, NULL);
+                                                        var refreshGrpPageFn = new NativeFunction(baseAddr.add(0x11CF768), "void", ["pointer", "int", "bool", "pointer"]);
+                                                        refreshGrpPageFn(curScene, 0, 1, NULL);
+                                                    }
+                                                }
+                                            } else if (cmdRaw === "cb:main") {
+                                                var curScene = staticFields.add(0x20).readPointer();
+                                                if (!curScene.isNull() && sceneId === 5) {
+                                                    log("[📖 CARDBOOK CMD] Switching to Main View tab (0)!");
+                                                    var sceneView = curScene.add(0x48).readPointer();
+                                                    if (!sceneView.isNull()) {
+                                                        var setTabFn = new NativeFunction(baseAddr.add(0x11CF5BC), "int", ["pointer", "int", "pointer"]);
+                                                        setTabFn(sceneView, 0, NULL);
+                                                        var refreshMainFn = new NativeFunction(baseAddr.add(0x11CFDD8), "void", ["pointer", "bool", "pointer"]);
+                                                        refreshMainFn(curScene, 1, NULL);
+                                                    }
+                                                }
+                                            } else if (cmdRaw === "cb:detail") {
+                                                var curScene = staticFields.add(0x20).readPointer();
+                                                if (!curScene.isNull() && sceneId === 5) {
+                                                    log("[📖 CARDBOOK CMD] Triggering OnBestCardBook (Detail Popup)!");
+                                                    var onBcbFn = new NativeFunction(baseAddr.add(0x11D2268), "void", ["pointer", "pointer"]);
+                                                    onBcbFn(curScene, NULL);
                                                 }
                                             } else {
                                                 var targetScene = parseInt(cmdRaw);
