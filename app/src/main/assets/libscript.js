@@ -5017,13 +5017,16 @@ function initIl2Cpp(module) {
                             return;
                         }
 
+                        log("[🎠 CAROUSEL] sceneThis=" + sceneThis + " sceneView=" + sceneView + " cardView=" + cardView + " filteredCount=" + filteredItems.length);
                         // Read or create delegate
                         var eventListener = ensureCardViewEventListener(sceneThis, cardView);
+                        log("[🎠 CAROUSEL] eventListener=" + eventListener);
 
                         // Step 4: Invoke InvenCardView.SetData(maxCount, isIntensify=false, eventListener) -> RVA 0xF23384
                         var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
                         setDataFn(cardView, filteredItems.length, 0, eventListener, NULL);
-                        log("[✅ CAROUSEL] InvenCardView.SetData called with count=" + filteredItems.length);
+                        sanitizeCardScroller(cardView);
+                        log("[✅ CAROUSEL] InvenCardView.SetData called with count=" + filteredItems.length + " (now maxCount=" + cardView.add(0x98).readS32() + ")");
                     } catch (eCar) {
                         log("[-] Error in safeUpdateLowerCarousel: " + eCar.message);
                     }
@@ -5132,8 +5135,63 @@ function initIl2Cpp(module) {
                 };
                 var ensureMaterialCardItemList = ensureInventoryLists;
 
+                // Helper: restore EnhancedScroller container invariant [FirstPadder, cells..., LastPadder].
+                // EnhancedScroller inserts new cells at SetSiblingIndex(childCount - 2), assuming LastPadder is the last child.
+                // A half-built cell left by an aborted ReloadData breaks this and pushes every cell behind LastPadder (off-viewport).
+                var sanitizeCardScroller = function(cardView) {
+                    try {
+                        if (!cardView || cardView.isNull()) return;
+                        var scroller = cardView.add(0x40).readPointer();
+                        if (scroller.isNull()) return;
+                        var container = scroller.add(0xC8).readPointer();
+                        var padF = scroller.add(0xF0).readPointer();
+                        var padL = scroller.add(0xF8).readPointer();
+                        if (container.isNull() || padF.isNull() || padL.isNull()) return;
+                        var trFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                        var goFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                        var actSelfFn = new NativeFunction(baseAddr.add(0x1DBAE44), "bool", ["pointer", "pointer"]);
+                        var childCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
+                        var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                        var firstSibFn = new NativeFunction(baseAddr.add(0x181ED30), "void", ["pointer", "pointer"]);
+                        var lastSibFn = new NativeFunction(baseAddr.add(0x181ED70), "void", ["pointer", "pointer"]);
+
+                        var padFT = trFn(padF, NULL);
+                        var padLT = trFn(padL, NULL);
+                        var tracked = {};
+                        tracked[padFT.toString()] = true;
+                        tracked[padLT.toString()] = true;
+                        var acv = scroller.add(0x120).readPointer();
+                        if (!acv.isNull()) {
+                            var acvCount = acv.add(0x18).readS32();
+                            var acvData = acv.add(0x10).readPointer();
+                            for (var i = 0; i < acvCount && !acvData.isNull(); i++) {
+                                var cell = acvData.add(0x20 + i * 8).readPointer();
+                                if (!cell.isNull()) tracked[trFn(cell, NULL).toString()] = true;
+                            }
+                        }
+                        var n = childCountFn(container, NULL);
+                        var strays = 0;
+                        for (var c = 0; c < n; c++) {
+                            var ch = getChildFn(container, c, NULL);
+                            if (ch.isNull() || tracked[ch.toString()]) continue;
+                            var chGo = goFn(ch, NULL);
+                            if (!chGo.isNull() && actSelfFn(chGo, NULL)) {
+                                setActFn(chGo, 0, NULL);
+                                strays++;
+                            }
+                        }
+                        firstSibFn(padFT, NULL);
+                        lastSibFn(padLT, NULL);
+                        if (strays > 0) log("[🧹 SCROLLER] Deactivated " + strays + " untracked stray child(ren) in InvenCardView container");
+                    } catch (eSan) {
+                        log("[-] Error in sanitizeCardScroller: " + eSan.message);
+                    }
+                };
+
                 // Helper to restore all cards in displayCardList when returning to default state
-                var restoreDefaultDisplayCardList = function(sceneThis, force) {
+                // skipSetData=true only fills the native list (used while the view is not ready yet; SetData there aborts mid-ReloadData)
+                var restoreDefaultDisplayCardList = function(sceneThis, force, skipSetData) {
                     try {
                         if (sceneThis.isNull() || !loonaCardItems || loonaCardItems.length === 0) return;
                         ensureMaterialCardItemList(sceneThis);
@@ -5158,6 +5216,10 @@ function initIl2Cpp(module) {
                         }
                         dclPtr.add(0x18).writeS32(loonaCardItems.length);
                         sceneThis.add(0x50).writeS32(0); // EXTRACT_TYPE.All
+                        if (skipSetData) {
+                            log("[✅ RESTORE] displayCardList filled with " + loonaCardItems.length + " cards (SetData deferred)");
+                            return;
+                        }
 
                         var sceneView = sceneThis.add(0x48).readPointer();
                         if (!sceneView.isNull()) {
@@ -5168,6 +5230,7 @@ function initIl2Cpp(module) {
                                 if (!scroller.isNull() && eventListener && !eventListener.isNull()) {
                                     var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
                                     setDataFn(cardView, loonaCardItems.length, 0, eventListener, NULL);
+                                    sanitizeCardScroller(cardView);
                                     log("[✅ RESTORE] SetData called on InvenCardView with count=" + loonaCardItems.length);
                                 }
                             }
@@ -5175,6 +5238,120 @@ function initIl2Cpp(module) {
                         log("[✅ RESTORE] Restored displayCardList to all " + loonaCardItems.length + " cards!");
                     } catch (eR) {
                         log("[-] Error restoring displayCardList: " + eR.message);
+                    }
+                };
+
+                // Diagnostic: dump real runtime state of InvenCardView (sceneView+0x78), its EnhancedScroller and active cells
+                var diagCarousel = function(sceneThis) {
+                    try {
+                        var dGo = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var dTr = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                        var dActSelf = new NativeFunction(baseAddr.add(0x1DBAE44), "bool", ["pointer", "pointer"]);
+                        var dActHier = new NativeFunction(baseAddr.add(0x1DBAE84), "bool", ["pointer", "pointer"]);
+                        var dEnabled = new NativeFunction(baseAddr.add(0x1DB3CBC), "bool", ["pointer", "pointer"]);
+                        var dRect = new NativeFunction(baseAddr.add(0x180D6E0), ["float", "float", "float", "float"], ["pointer", "pointer"]);
+                        var dSize = new NativeFunction(baseAddr.add(0x180DB70), ["float", "float"], ["pointer", "pointer"]);
+                        var dScale = new NativeFunction(baseAddr.add(0x181DF78), ["float", "float", "float"], ["pointer", "pointer"]);
+                        var dPos = new NativeFunction(baseAddr.add(0x180DE48), ["float", "float", "float"], ["pointer", "pointer"]);
+                        var dChildCount = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
+                        var dColor = new NativeFunction(baseAddr.add(0x1614760), ["float", "float", "float", "float"], ["pointer", "pointer"]);
+                        var dTex = new NativeFunction(baseAddr.add(0x194C06C), "pointer", ["pointer", "pointer"]);
+                        var f2 = function(a) { return a.map(function(v) { return v.toFixed(1); }).join(","); };
+                        var goInfo = function(comp) {
+                            if (!comp || comp.isNull()) return "null";
+                            var g = dGo(comp, NULL);
+                            if (g.isNull()) return "noGO";
+                            return "self=" + dActSelf(g, NULL) + " hier=" + dActHier(g, NULL);
+                        };
+                        var rtInfo = function(rt) {
+                            if (!rt || rt.isNull()) return "null";
+                            return "rect=[" + f2(dRect(rt, NULL)) + "] size=[" + f2(dSize(rt, NULL)) + "] pos=[" + f2(dPos(rt, NULL)) + "] scale=[" + f2(dScale(rt, NULL)) + "]";
+                        };
+
+                        var sceneView = sceneThis.add(0x48).readPointer();
+                        var cardView = sceneView.add(0x78).readPointer();
+                        log("[🩺 DIAG] cardView=" + cardView + " GO(" + goInfo(cardView) + ") RT " + rtInfo(dTr(cardView, NULL)));
+                        log("[🩺 DIAG] baseSizes bg=[" + cardView.add(0x70).readFloat().toFixed(1) + "," + cardView.add(0x74).readFloat().toFixed(1) +
+                            "] list=[" + cardView.add(0x78).readFloat().toFixed(1) + "," + cardView.add(0x7C).readFloat().toFixed(1) +
+                            "] bgZero=[" + cardView.add(0x80).readFloat().toFixed(1) + "," + cardView.add(0x84).readFloat().toFixed(1) +
+                            "] listZero=[" + cardView.add(0x88).readFloat().toFixed(1) + "," + cardView.add(0x8C).readFloat().toFixed(1) +
+                            "] maxCount=" + cardView.add(0x98).readS32() + " showLight=" + cardView.add(0x9C).readU8());
+                        var bgObj = cardView.add(0x58).readPointer();
+                        var listObj = cardView.add(0x60).readPointer();
+                        log("[🩺 DIAG] backgroundObj GO(" + goInfo(bgObj) + ") " + rtInfo(bgObj));
+                        log("[🩺 DIAG] ListObj GO(" + goInfo(listObj) + ") " + rtInfo(listObj));
+
+                        var scroller = cardView.add(0x40).readPointer();
+                        if (scroller.isNull()) { log("[🩺 DIAG] scroller NULL"); return; }
+                        log("[🩺 DIAG] scroller GO(" + goInfo(scroller) + ") enabled=" + dEnabled(scroller, NULL) +
+                            " delegate=" + scroller.add(0xD8).readPointer() + " scrollRect=" + scroller.add(0xB0).readPointer() +
+                            " reload=" + scroller.add(0xE0).readU8() + " scrollPos=" + scroller.add(0x118).readFloat().toFixed(1) +
+                            " active[" + scroller.add(0x128).readS32() + ".." + scroller.add(0x12C).readS32() + "] lastRectSize=" + scroller.add(0x14C).readFloat().toFixed(1));
+                        log("[🩺 DIAG] scrollRectTransform " + rtInfo(scroller.add(0xB8).readPointer()));
+                        var container = scroller.add(0xC8).readPointer();
+                        log("[🩺 DIAG] container GO(" + goInfo(container) + ") children=" + (container.isNull() ? -1 : dChildCount(container, NULL)) + " " + rtInfo(container));
+                        if (!container.isNull()) {
+                            var dGetChild = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                            var dName = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                            var nChild = dChildCount(container, NULL);
+                            for (var ch = 0; ch < nChild; ch++) {
+                                var cT = dGetChild(container, ch, NULL);
+                                if (cT.isNull()) continue;
+                                var cNm = "";
+                                try { cNm = readIl2CppString(dName(cT, NULL)); } catch (eNm) {}
+                                log("[🩺 DIAG]  child[" + ch + "] '" + cNm + "' " + cT + " GO(" + goInfo(cT) + ") " + rtInfo(cT));
+                            }
+                        }
+                        var padF = scroller.add(0xF0).readPointer();
+                        var padL = scroller.add(0xF8).readPointer();
+                        log("[🩺 DIAG] firstPadder=" + padF + " lastPadder=" + padL + " recycledContainer=" + scroller.add(0x100).readPointer());
+
+                        var acv = scroller.add(0x120).readPointer();
+                        var acvCount = acv.isNull() ? 0 : acv.add(0x18).readS32();
+                        var acvData = acv.isNull() ? NULL : acv.add(0x10).readPointer();
+                        log("[🩺 DIAG] activeCellViews count=" + acvCount);
+                        for (var i = 0; i < acvCount && i < 16; i++) {
+                            var cell = acvData.add(0x20 + i * 8).readPointer();
+                            if (cell.isNull()) continue;
+                            var item = cell.add(0x38).readPointer();
+                            var lsnr = cell.add(0x50).readPointer();
+                            var lsnrTarget = (!lsnr.isNull()) ? lsnr.add(0x10).readPointer() : NULL;
+                            var lsnrMethod = (!lsnr.isNull()) ? lsnr.add(0x18).readPointer() : NULL;
+                            var lsnrRva = (!lsnrMethod.isNull()) ? " RVA 0x" + lsnrMethod.sub(baseAddr).toString(16) : "";
+                            var line = "[🩺 DIAG] cell#" + i + " " + cell + " dataIdx=" + cell.add(0x24).readS32() + " GO(" + goInfo(cell) + ") RT " + rtInfo(dTr(cell, NULL)) +
+                                " inst=" + cell.add(0x4C).readU8() + " listener=" + lsnr + "(" + lsnrTarget + "," + lsnrMethod + lsnrRva + ") item=" + item;
+                            log(line);
+                            if (!item.isNull()) {
+                                var photo = item.add(0x58).readPointer();
+                                var tier = item.add(0x68).readPointer();
+                                var eff = item.add(0xC8).readPointer();
+                                log("[🩺 DIAG]    item GO(" + goInfo(item) + ") RT " + rtInfo(dTr(item, NULL)) + " params=" + item.add(0x48).readPointer());
+                                if (!photo.isNull()) {
+                                    var pTex = dTex(photo, NULL);
+                                    var pTexNm = (!pTex.isNull()) ? readIl2CppString(dName(pTex, NULL)) : "null";
+                                    log("[🩺 DIAG]    photo GO(" + goInfo(photo) + ") en=" + dEnabled(photo, NULL) + " tex=" + pTex + "('" + pTexNm + "') color=[" + f2(dColor(photo, NULL)) + "] " + rtInfo(dTr(photo, NULL)));
+                                }
+                                if (!tier.isNull()) {
+                                    var tTex = dTex(tier, NULL);
+                                    var tTexNm = (!tTex.isNull()) ? readIl2CppString(dName(tTex, NULL)) : "null";
+                                    log("[🩺 DIAG]    tier GO(" + goInfo(tier) + ") en=" + dEnabled(tier, NULL) + " tex=" + tTex + "('" + tTexNm + "') color=[" + f2(dColor(tier, NULL)) + "]");
+                                }
+                                if (!eff.isNull()) log("[🩺 DIAG]    ImageEfftect GO(" + goInfo(eff) + ") en=" + dEnabled(eff, NULL) + " " + rtInfo(dTr(eff, NULL)));
+                                var itemTr = dTr(item, NULL);
+                                if (!itemTr.isNull()) {
+                                    var nItemCh = dChildCount(itemTr, NULL);
+                                    for (var ic = 0; ic < nItemCh; ic++) {
+                                        var icT = dGetChild(itemTr, ic, NULL);
+                                        if (icT.isNull()) continue;
+                                        var icNm = "";
+                                        try { icNm = readIl2CppString(dName(icT, NULL)); } catch (eIn) {}
+                                        log("[🩺 DIAG]      itemChild[" + ic + "] '" + icNm + "' " + icT + " GO(" + goInfo(icT) + ") " + rtInfo(icT));
+                                    }
+                                }
+                            }
+                        }
+                    } catch (eDiag) {
+                        log("[-] Error in diagCarousel: " + eDiag.message);
                     }
                 };
 
@@ -5571,6 +5748,24 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing <UpdateDisplayCardList>b__63_0: " + eB63Hook.message);
                 }
 
+                // Trace: EnhancedScroller.ReloadData (0x125C640) -> correlate scroller reloads with cell generation
+                try {
+                    Interceptor.attach(baseAddr.add(0x125C640), {
+                        onEnter: function (args) {
+                            this.sc = args[0];
+                        },
+                        onLeave: function () {
+                            try {
+                                var sc = this.sc;
+                                var acv = sc.add(0x120).readPointer();
+                                log("[🔁 RELOAD] scroller=" + sc + " delegate=" + sc.add(0xD8).readPointer() + " active[" + sc.add(0x128).readS32() + ".." + sc.add(0x12C).readS32() + "] acv=" + (acv.isNull() ? -1 : acv.add(0x18).readS32()) + " lastRectSize=" + sc.add(0x14C).readFloat().toFixed(1));
+                            } catch (eRl) {}
+                        }
+                    });
+                } catch (eRlH) {
+                    log("[-] Error tracing ReloadData: " + eRlH.message);
+                }
+
                 // 9e6. CardView.get_IsMaterialCard (0x13939A8) -> Safe null check protection
                 try {
                     Interceptor.replace(baseAddr.add(0x13939A8), new NativeCallback(function (thisPtr, methodInfo) {
@@ -5622,7 +5817,7 @@ function initIl2Cpp(module) {
                                 log("[🗃️ UPDATE_DISPLAY_CARD_LIST] onLeave: count=" + count + ", extractType=" + extractType);
                                 if (count === 0 && extractType === 0) {
                                     log("[🗃️ UPDATE_DISPLAY_CARD_LIST] displayCardList was left empty! Restoring all 24 cards...");
-                                    restoreDefaultDisplayCardList(this.scene, true);
+                                    restoreDefaultDisplayCardList(this.scene, true, true);
                                 }
                             } catch (eUdclLeave) {
                                 log("[-] Error in UpdateDisplayCardList.onLeave: " + eUdclLeave.message);
@@ -8385,6 +8580,9 @@ function initIl2Cpp(module) {
                                                 } else {
                                                     log("[-] CARD CMD failed: not in InventoryScene (sceneId=" + sceneId + ", instance=" + curScene + ")");
                                                 }
+                                            } else if (cmdRaw === "diag") {
+                                                var curScene = staticFields.add(0x20).readPointer();
+                                                if (!curScene.isNull() && sceneId === 4) diagCarousel(curScene);
                                             } else if (cmdRaw === "change") {
                                                 var curScene = staticFields.add(0x20).readPointer();
                                                 if (!curScene.isNull() && sceneId === 4) {
