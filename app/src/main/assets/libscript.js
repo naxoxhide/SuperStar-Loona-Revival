@@ -5093,6 +5093,15 @@ function initIl2Cpp(module) {
                         setDataFn(cardView, filteredItems.length, 0, eventListener, NULL);
                         sanitizeCardScroller(cardView);
 
+                        // Immediately trigger InvenCardView.Refresh(isReload=false) -> RVA 0xF233B8 to re-render active cells
+                        try {
+                            var refreshScrollerFn = new NativeFunction(baseAddr.add(0xF233B8), "void", ["pointer", "bool", "pointer"]);
+                            refreshScrollerFn(cardView, 0, NULL);
+                            log("[✅ CAROUSEL] InvenCardView.Refresh called to refresh active cells!");
+                        } catch (eRf) {
+                            log("[-] Error calling InvenCardView.Refresh: " + eRf.message);
+                        }
+
                         log("[✅ CAROUSEL] InvenCardView.SetData & Refresh called with count=" + filteredItems.length + " (now maxCount=" + cardView.add(0x98).readS32() + ")");
                     } catch (eCar) {
                         log("[-] Error in safeUpdateLowerCarousel: " + eCar.message);
