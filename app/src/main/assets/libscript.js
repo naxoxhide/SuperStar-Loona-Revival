@@ -5088,21 +5088,42 @@ function initIl2Cpp(module) {
                         var eventListener = ensureCardViewEventListener(sceneThis, cardView);
                         log("[🎠 CAROUSEL] eventListener=" + eventListener);
 
-                        // Step 4: Invoke InvenCardView.SetData(maxCount, isIntensify=false, eventListener) -> RVA 0xF23384
-                        var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
-                        setDataFn(cardView, filteredItems.length, 0, eventListener, NULL);
-                        sanitizeCardScroller(cardView);
+                        // Ensure cardView GameObject is active
+                        var getGoFnBase = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var setActFnBase = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                        var cvGo = getGoFnBase(cardView, NULL);
+                        if (!cvGo.isNull()) setActFnBase(cvGo, 1, NULL);
 
-                        // Immediately trigger InvenCardView.Refresh(isReload=false) -> RVA 0xF233B8 to re-render active cells
-                        try {
-                            var refreshScrollerFn = new NativeFunction(baseAddr.add(0xF233B8), "void", ["pointer", "bool", "pointer"]);
-                            refreshScrollerFn(cardView, 0, NULL);
-                            log("[✅ CAROUSEL] InvenCardView.Refresh called to refresh active cells!");
-                        } catch (eRf) {
-                            log("[-] Error calling InvenCardView.Refresh: " + eRf.message);
+                        // Directly write InvenCardView properties
+                        cardView.add(0x98).writeS32(filteredItems.length); // maxCount
+                        cardView.add(0x90).writePointer(eventListener);     // onEventListener
+                        cardView.add(0x9C).writeU8(0);                      // isShowLight
+
+                        // Step 4: Reload scroller cleanly without triggering Canvas.ForceUpdateCanvases
+                        var scroller = cardView.add(0x40).readPointer();
+                        if (!scroller.isNull()) {
+                            var scGo = getGoFnBase(scroller, NULL);
+                            if (!scGo.isNull()) setActFnBase(scGo, 1, NULL);
+
+                            try {
+                                var reloadKeepPosFn = new NativeFunction(baseAddr.add(0x125C750), "void", ["pointer", "bool", "pointer"]);
+                                reloadKeepPosFn(scroller, 0, NULL);
+                                log("[✅ CAROUSEL] ReloadDataKeepPosition(0) completed!");
+                            } catch (eRk) {
+                                log("[-] Error in ReloadDataKeepPosition: " + eRk.message);
+                            }
+
+                            try {
+                                var resetCellsFn = new NativeFunction(baseAddr.add(0x125D768), "void", ["pointer", "pointer"]);
+                                resetCellsFn(scroller, NULL);
+                                log("[✅ CAROUSEL] _ResetVisibleCellViews called successfully!");
+                            } catch (eRcv) {
+                                log("[-] Error in _ResetVisibleCellViews: " + eRcv.message);
+                            }
+
+                            scroller.add(0xE1).writeU8(1); // ensure _refreshActive stays true for LateUpdate
+                            sanitizeCardScroller(cardView);
                         }
-
-                        log("[✅ CAROUSEL] InvenCardView.SetData & Refresh called with count=" + filteredItems.length + " (now maxCount=" + cardView.add(0x98).readS32() + ")");
 
                         // Step 5: Update cardCountText (cardView+0x38) to display "<count> / 200"
                         try {
