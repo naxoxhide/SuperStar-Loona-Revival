@@ -8715,6 +8715,171 @@ function initIl2Cpp(module) {
                 var openSceneFn = new NativeFunction(baseAddr.add(0xD52B04), 'void', ['pointer', 'pointer', 'pointer', 'pointer']);
                 var completeLoadingFn = new NativeFunction(baseAddr.add(0xB3E230), 'void', ['pointer']);
 
+                var executeSceneCommand = function(cmdRaw, sceneOverride) {
+                    try {
+                        if (!cmdRaw) return;
+                        log("[🚀 SCENE CMD EXEC] Executing: '" + cmdRaw + "'");
+
+                        var curScene = (sceneOverride && !sceneOverride.isNull()) ? sceneOverride : NULL;
+                        var sceneId = globalSceneId;
+                        if (!curScene || curScene.isNull()) {
+                            if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                curScene = activeInventorySceneInstance;
+                                sceneId = 4;
+                            } else {
+                                try {
+                                    var klassPtr = baseAddr.add(0x3146538).readPointer();
+                                    if (!klassPtr.isNull() && !klassPtr.readPointer().isNull()) {
+                                        var staticFields = klassPtr.readPointer().add(0xB8).readPointer();
+                                        if (!staticFields.isNull()) {
+                                            sceneId = staticFields.add(0x10).readS32();
+                                            curScene = staticFields.add(0x20).readPointer();
+                                        }
+                                    }
+                                } catch (eCs) {}
+                            }
+                        }
+
+                        if (cmdRaw.indexOf("card:") === 0) {
+                            var cardArg = cmdRaw.substring(5).trim();
+                            log("[🃏 CARD CMD] Triggering card select for arg: '" + cardArg + "' on scene: " + curScene);
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                var targetCardItem = NULL;
+                                try {
+                                    var cardIdx = parseInt(cardArg, 10);
+                                    var dclPtr = curScene.add(0x58).readPointer();
+                                    if (!dclPtr.isNull()) {
+                                        var listItems = dclPtr.add(0x10).readPointer();
+                                        var listSize = dclPtr.add(0x18).readS32();
+                                        if (isNaN(cardIdx) || cardIdx < 0 || cardIdx >= listSize) cardIdx = 0;
+                                        if (!listItems.isNull() && listSize > 0) {
+                                            targetCardItem = listItems.add(0x20 + cardIdx * 8).readPointer();
+                                            log("[🃏 CARD CMD] Selected CardItem[" + cardIdx + "] = " + targetCardItem + " (out of " + listSize + ")");
+                                        }
+                                    }
+                                } catch (eDclCmd) {
+                                    log("[-] Error reading displayCardList in CARD CMD: " + eDclCmd.message);
+                                }
+                                if ((!targetCardItem || targetCardItem.isNull()) && loonaCardItems && loonaCardItems.length > 0) {
+                                    targetCardItem = loonaCardItems[0];
+                                }
+                                if (targetCardItem && !targetCardItem.isNull()) {
+                                    var rawCard = targetCardItem.add(0x10).readPointer();
+                                    var cId = rawCard.add(0x20).readS32();
+                                    var meta = getCardMetadata(cId);
+                                    var memberIdx = (meta.artistID >= 1000) ? (meta.artistID - 1000) : meta.artistID;
+                                    if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cId - 1001) % 11) + 1;
+                                    var artistData = loonaArtistDataMap[memberIdx] || NULL;
+
+                                    curScene.add(0x88).writePointer(targetCardItem);
+                                    curScene.add(0x98).writePointer(targetCardItem);
+                                    curScene.add(0x80).writePointer(artistData);
+                                    safeSetStateMain(curScene, 0);
+                                    log("[🎉 CARD CMD SUCCESS] safeSetStateMain(0) invoked on InventoryScene for cardID=" + cId + ", theme=" + meta.theme);
+                                }
+                            } else {
+                                log("[-] CARD CMD failed: curScene is null or sceneId != 4 (sceneId=" + sceneId + ", instance=" + curScene + ")");
+                            }
+                        } else if (cmdRaw === "diag") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) diagCarousel(curScene);
+                        } else if (cmdRaw === "change") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                log("[🗃️ CHANGE CMD] Triggering OnChange directly!");
+                                var onChangeFn = new NativeFunction(baseAddr.add(0x105A61C), "void", ["pointer", "pointer"]);
+                                onChangeFn(curScene, NULL);
+                            }
+                        } else if (cmdRaw === "equip") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                log("[🗃️ EQUIP CMD] Triggering OnEquip directly!");
+                                var onEquipFn = new NativeFunction(baseAddr.add(0x105AFC8), "void", ["pointer", "pointer"]);
+                                onEquipFn(curScene, NULL);
+                            }
+                        } else if (cmdRaw === "back" || cmdRaw === "close") {
+                            if (curScene && !curScene.isNull()) {
+                                if (sceneId === 4) {
+                                    log("[🔙 BACK CMD] Closing detail via InventoryScene.OnBack!");
+                                    var onBackFn = new NativeFunction(baseAddr.add(0x10537F4), "void", ["pointer", "pointer"]);
+                                    onBackFn(curScene, NULL);
+                                } else if (sceneId === 5) {
+                                    log("[🔙 BACK CMD] Closing CardBook via CardBookScene.OnBack!");
+                                    var cbBackFn = new NativeFunction(baseAddr.add(0x11CEDE8), "void", ["pointer", "pointer"]);
+                                    cbBackFn(curScene, NULL);
+                                }
+                            }
+                        } else {
+                            var targetScene = parseInt(cmdRaw, 10);
+                            if (!isNaN(targetScene) && targetScene >= 1 && targetScene <= 13) {
+                                log("[🚀 SCENE CMD] Switching to SceneId: " + targetScene);
+                                if (curScene && !curScene.isNull()) {
+                                    if ((sceneId === 2 || sceneId === 3) && targetScene === 4) {
+                                        log("[🚀 SCENE CMD] Invoking LobbyScene.OnInventory (0xB4C418) cleanly on LobbyScene: " + curScene);
+                                        var onInvenFn = new NativeFunction(baseAddr.add(0xB4C418), 'void', ['pointer', 'pointer']);
+                                        onInvenFn(curScene, NULL);
+                                    } else {
+                                        log("[🚀 SCENE CMD] Invoking Scene.SetStateOpenScene (0xD5338C) on curScene: " + curScene + " -> target: " + targetScene);
+                                        var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
+                                        setStateOpenSceneFn(curScene, targetScene, NULL, NULL, NULL);
+                                    }
+                                } else {
+                                    log("[🚀 SCENE CMD] curScene is null, invoking SceneControl.OpenScene direct (0xD534BC)");
+                                    var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), 'void', ['int', 'pointer', 'pointer']);
+                                    openSceneDirectFn(targetScene, NULL, NULL);
+                                }
+                            }
+                        }
+                    } catch (eExecCmd) {
+                        log("[-] Error in executeSceneCommand: " + eExecCmd.message);
+                    }
+                };
+
+                // Standalone command watcher: uses POSIX access & unlink + File.readText, completely independent of SceneControl.Update
+                var accessPtr = Module.findExportByName("libc.so", "access");
+                var unlinkPtr = Module.findExportByName("libc.so", "unlink");
+                var accessFn = accessPtr ? new NativeFunction(accessPtr, "int", ["pointer", "int"]) : null;
+                var unlinkFn = unlinkPtr ? new NativeFunction(unlinkPtr, "int", ["pointer"]) : null;
+                var cmdPathCStr = Memory.allocUtf8String("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt");
+
+                var pendingSceneCommand = null;
+
+                setInterval(function () {
+                    try {
+                        if (accessFn && accessFn(cmdPathCStr, 0) === 0) {
+                            var content = null;
+                            try {
+                                var f = new File("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt", "r");
+                                content = f.readText();
+                                f.close();
+                            } catch (eF) {}
+                            if (unlinkFn) unlinkFn(cmdPathCStr);
+                            if (content) {
+                                var cmdTrim = content.replace(/['"]/g, '').trim();
+                                if (cmdTrim.length > 0) {
+                                    pendingSceneCommand = cmdTrim;
+                                    log("[🚀 SCENE CMD QUEUED] Queued for Unity Main Thread: '" + cmdTrim + "'");
+                                }
+                            }
+                        }
+                    } catch (eW) {}
+                }, 100);
+
+                // Scene.Update (0xD5330C) -> runs every frame on the Unity Main Thread for whichever scene is active!
+                try {
+                    Interceptor.attach(baseAddr.add(0xD5330C), {
+                        onEnter: function (args) {
+                            if (pendingSceneCommand) {
+                                var cmd = pendingSceneCommand;
+                                pendingSceneCommand = null;
+                                var activeScene = args[0];
+                                log("[🚀 MAIN THREAD DISPATCH] Executing '" + cmd + "' on active Scene: " + activeScene);
+                                executeSceneCommand(cmd, activeScene);
+                            }
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on Scene.Update (0xD5330C) for main-thread command dispatch!");
+                } catch (eScUp) {
+                    log("[-] Error attaching to Scene.Update: " + eScUp.message);
+                }
+
                 Interceptor.attach(baseAddr.add(0xD55EE8), {
                     onEnter: function (args) {
                         sceneUpdateCounter++;
@@ -8818,7 +8983,7 @@ function initIl2Cpp(module) {
                                 }
                             }
 
-                            // Check scene navigation command file every 30 frames (zero allocation check via cached File.Exists)
+                            // Check scene navigation command file every 30 frames (fallback)
                             if (sceneUpdateCounter % 30 === 0) {
                                 try {
                                     if (!cachedCmdPathStr || cachedCmdPathStr.isNull()) {
@@ -8837,163 +9002,11 @@ function initIl2Cpp(module) {
                                             il2cpp_runtime_invoke(cachedDeleteMethod, NULL, cmdReusableBuf, excReusableBuf);
                                             if (!txtObj.isNull()) {
                                                 var cmdRaw = readIl2CppString(txtObj).replace(/['"]/g, '').trim();
-                                                log("[🚀 SCENE CMD] Read command: '" + cmdRaw + "'");
-                                            if (cmdRaw.indexOf("card:") === 0) {
-                                                var cardArg = cmdRaw.substring(5).trim();
-                                                log("[🃏 CARD CMD] Triggering card select for arg: '" + cardArg + "'");
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull() && sceneId === 4) {
-                                                    var targetCardItem = NULL;
-                                                    try {
-                                                        if (cardArg.indexOf("obj:") === 0) {
-                                                            var targetObjStr = cardArg.substring(4).trim();
-                                                            if (loonaCardItems) {
-                                                                for (var ci = 0; ci < loonaCardItems.length; ci++) {
-                                                                    var cItem = loonaCardItems[ci];
-                                                                    var raw = cItem.add(0x10).readPointer();
-                                                                    if (!raw.isNull() && raw.add(0x10).readS64().toString() === targetObjStr) {
-                                                                        targetCardItem = cItem;
-                                                                        log("[🃏 CARD CMD] Resolved by ObjectID: " + targetObjStr);
-                                                                        break;
-                                                                    }
-                                                                }
-                                                            }
-                                                        } else if (cardArg.indexOf("id:") === 0) {
-                                                            var targetCid = parseInt(cardArg.substring(3).trim(), 10);
-                                                            if (loonaCardItems) {
-                                                                for (var ci = 0; ci < loonaCardItems.length; ci++) {
-                                                                    var cItem = loonaCardItems[ci];
-                                                                    var raw = cItem.add(0x10).readPointer();
-                                                                    if (!raw.isNull() && raw.add(0x20).readS32() === targetCid) {
-                                                                        targetCardItem = cItem;
-                                                                        log("[🃏 CARD CMD] Resolved by CardID: " + targetCid);
-                                                                        break;
-                                                                    }
-                                                                }
-                                                            }
-                                                        } else {
-                                                            var cardIdx = parseInt(cardArg, 10);
-                                                            var dclPtr = curScene.add(0x58).readPointer();
-                                                            if (!dclPtr.isNull()) {
-                                                                var listItems = dclPtr.add(0x10).readPointer();
-                                                                var listSize = dclPtr.add(0x18).readS32();
-                                                                if (isNaN(cardIdx) || cardIdx < 0 || cardIdx >= listSize) cardIdx = 0;
-                                                                if (!listItems.isNull() && listSize > 0) {
-                                                                    targetCardItem = listItems.add(0x20 + cardIdx * 8).readPointer();
-                                                                    log("[🃏 CARD CMD] Selected CardItem[" + cardIdx + "] = " + targetCardItem + " (out of " + listSize + ")");
-                                                                }
-                                                            }
-                                                        }
-                                                    } catch (eDclCmd) {
-                                                        log("[-] Error reading displayCardList in CARD CMD: " + eDclCmd.message);
-                                                    }
-                                                    if (targetCardItem.isNull() && loonaCardItems && loonaCardItems.length > 0) {
-                                                        targetCardItem = loonaCardItems[0];
-                                                    }
-                                                    if (!targetCardItem.isNull()) {
-                                                        var rawCard = targetCardItem.add(0x10).readPointer();
-                                                        var cId = rawCard.add(0x20).readS32();
-                                                        var meta = getCardMetadata(cId);
-                                                        var memberIdx = (meta.artistID >= 1000) ? (meta.artistID - 1000) : meta.artistID;
-                                                        if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cId - 1001) % 11) + 1;
-                                                        var artistData = loonaArtistDataMap[memberIdx] || NULL;
-
-                                                        curScene.add(0x88).writePointer(targetCardItem);
-                                                        curScene.add(0x98).writePointer(targetCardItem);
-                                                        curScene.add(0x80).writePointer(artistData);
-                                                        safeSetStateMain(curScene, 0);
-                                                        log("[🎉 CARD CMD SUCCESS] safeSetStateMain(0) invoked on InventoryScene for cardID=" + cId + ", theme=" + meta.theme);
-                                                    }
-                                                } else {
-                                                    log("[-] CARD CMD failed: not in InventoryScene (sceneId=" + sceneId + ", instance=" + curScene + ")");
-                                                }
-                                            } else if (cmdRaw === "diag") {
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull() && sceneId === 4) diagCarousel(curScene);
-                                            } else if (cmdRaw === "change") {
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull() && sceneId === 4) {
-                                                    log("[🗃️ CHANGE CMD] Triggering OnChange directly!");
-                                                    var onChangeFn = new NativeFunction(baseAddr.add(0x105A61C), "void", ["pointer", "pointer"]);
-                                                    onChangeFn(curScene, NULL);
-                                                }
-                                            } else if (cmdRaw === "equip") {
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull() && sceneId === 4) {
-                                                    log("[🗃️ EQUIP CMD] Triggering OnEquip directly!");
-                                                    var onEquipFn = new NativeFunction(baseAddr.add(0x105AFC8), "void", ["pointer", "pointer"]);
-                                                    onEquipFn(curScene, NULL);
-                                                }
-                                            } else if (cmdRaw === "back" || cmdRaw === "close") {
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull()) {
-                                                    if (sceneId === 4) {
-                                                        log("[🔙 BACK CMD] Closing detail via InventoryScene.OnBack!");
-                                                        var onBackFn = new NativeFunction(baseAddr.add(0x10537F4), "void", ["pointer", "pointer"]);
-                                                        onBackFn(curScene, NULL);
-                                                    } else if (sceneId === 5) {
-                                                        log("[🔙 BACK CMD] Closing CardBook via CardBookScene.OnBack!");
-                                                        var cbBackFn = new NativeFunction(baseAddr.add(0x11CEDE8), "void", ["pointer", "pointer"]);
-                                                        cbBackFn(curScene, NULL);
-                                                    }
-                                                }
-                                            } else if (cmdRaw === "cb:group") {
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull() && sceneId === 5) {
-                                                    log("[📖 CARDBOOK CMD] Switching to Group View tab (1)!");
-                                                    var sceneView = curScene.add(0x48).readPointer();
-                                                    if (!sceneView.isNull()) {
-                                                        var setTabFn = new NativeFunction(baseAddr.add(0x11CF5BC), "int", ["pointer", "int", "pointer"]);
-                                                        setTabFn(sceneView, 1, NULL);
-                                                        var refreshGrpPageFn = new NativeFunction(baseAddr.add(0x11CF768), "void", ["pointer", "int", "bool", "pointer"]);
-                                                        refreshGrpPageFn(curScene, 0, 1, NULL);
-                                                    }
-                                                }
-                                            } else if (cmdRaw === "cb:main") {
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull() && sceneId === 5) {
-                                                    log("[📖 CARDBOOK CMD] Switching to Main View tab (0)!");
-                                                    var sceneView = curScene.add(0x48).readPointer();
-                                                    if (!sceneView.isNull()) {
-                                                        var setTabFn = new NativeFunction(baseAddr.add(0x11CF5BC), "int", ["pointer", "int", "pointer"]);
-                                                        setTabFn(sceneView, 0, NULL);
-                                                        var refreshMainFn = new NativeFunction(baseAddr.add(0x11CFDD8), "void", ["pointer", "bool", "pointer"]);
-                                                        refreshMainFn(curScene, 1, NULL);
-                                                    }
-                                                }
-                                            } else if (cmdRaw === "cb:detail") {
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull() && sceneId === 5) {
-                                                    log("[📖 CARDBOOK CMD] Triggering OnBestCardBook (Detail Popup)!");
-                                                    var onBcbFn = new NativeFunction(baseAddr.add(0x11D2268), "void", ["pointer", "pointer"]);
-                                                    onBcbFn(curScene, NULL);
-                                                }
-                                            } else {
-                                                var targetScene = parseInt(cmdRaw);
-                                                if (!isNaN(targetScene) && targetScene >= 1 && targetScene <= 13) {
-                                                    log("[🚀 SCENE CMD] Received command to switch to SceneId: " + targetScene);
-                                                    var curScene = staticFields.add(0x20).readPointer();
-                                                    if (!curScene.isNull()) {
-                                                        if ((sceneId === 2 || sceneId === 3) && targetScene === 4) {
-                                                            log("[🚀 SCENE CMD] Invoking LobbyScene.OnInventory (0xB4C418) cleanly on LobbyScene: " + curScene);
-                                                            var onInvenFn = new NativeFunction(baseAddr.add(0xB4C418), 'void', ['pointer', 'pointer']);
-                                                            onInvenFn(curScene, NULL);
-                                                        } else {
-                                                            log("[🚀 SCENE CMD] Invoking Scene.SetStateOpenScene (0xD5338C) on curScene: " + curScene + " -> target: " + targetScene);
-                                                            var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
-                                                            setStateOpenSceneFn(curScene, targetScene, NULL, NULL, NULL);
-                                                        }
-                                                    } else {
-                                                        log("[🚀 SCENE CMD] curScene is null, invoking SceneControl.OpenScene direct (0xD534BC)");
-                                                        var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), 'void', ['int', 'pointer', 'pointer']);
-                                                        openSceneDirectFn(targetScene, NULL, NULL);
-                                                    }
-                                                }
+                                                executeSceneCommand(cmdRaw);
                                             }
                                         }
                                     }
-                                }
-                            } catch (eCmd) {}
+                                } catch (eCmd) {}
                             }
 
                             // Auto-Enlace / Activador Seguro de LobbyScene ONLY when isDone or already unloaded
