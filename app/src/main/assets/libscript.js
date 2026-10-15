@@ -5795,8 +5795,7 @@ function initIl2Cpp(module) {
                         log("[🔙 ON_BACK] handleInventoryBack entered! state=" + curState);
 
                         if (curState === 6 || curState === 7) { // STATE.Main (6) or STATE.Equip (7)
-                            log("[🔙 ON_BACK] Returning from detail/equip view to Default state, restoring 24 cards...");
-                            sceneThis.add(0x24).writeS32(5); // STATE.Default = 5
+                            log("[🔙 ON_BACK] Returning from detail/equip view to Default state via SetStateDefault...");
                             sceneThis.add(0x88).writePointer(NULL); // selectedCardItem
                             sceneThis.add(0x98).writePointer(NULL); // preSelectedCardItem
                             sceneThis.add(0x80).writePointer(NULL); // selectedArtistData
@@ -5805,31 +5804,12 @@ function initIl2Cpp(module) {
                             sceneThis.add(0xBE).writeU8(0);
                             sceneThis.add(0x50).writeS32(0); // extractType = All
 
-                            var sceneView = sceneThis.add(0x48).readPointer();
-                            if (!sceneView.isNull()) {
-                                // 1. ShowDefaultLayout -> RVA 0x1055ED0
-                                try {
-                                    var showDefFn = new NativeFunction(baseAddr.add(0x1055ED0), "void", ["pointer", "pointer"]);
-                                    showDefFn(sceneView, NULL);
-                                    log("[✅ ON_BACK] ShowDefaultLayout executed!");
-                                } catch (eSdl) {
-                                    log("[-] Error in ShowDefaultLayout: " + eSdl.message);
-                                }
-
-                                // 2. SetData on groupView (0x70) -> RVA 0xF25140
-                                try {
-                                    var groupView = sceneView.add(0x70).readPointer();
-                                    if (!groupView.isNull()) {
-                                        var invenGroupDataSetDataFn = new NativeFunction(baseAddr.add(0xF25140), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
-                                        invenGroupDataSetDataFn(groupView, 1, 0, NULL, NULL);
-                                        log("[✅ ON_BACK] InvenGroupView.SetData executed!");
-                                    }
-                                } catch (eGv) {
-                                    log("[-] Error in InvenGroupView.SetData: " + eGv.message);
-                                }
-
-                                // 3. Restore displayCardList (sets 24 cards and calls InvenCardView.SetData in 0xF23384)
-                                restoreDefaultDisplayCardList(sceneThis, true);
+                            try {
+                                var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
+                                setStateDefaultFn(sceneThis, 1, 0, NULL);
+                                log("[✅ ON_BACK] SetStateDefault(1, 0) executed!");
+                            } catch (eSsd) {
+                                log("[-] Error calling SetStateDefault in OnBack: " + eSsd.message);
                             }
                         } else if (curState === 5) { // STATE.Default (5)
                             log("[🔙 ON_BACK] Leaving InventoryScene, navigating back to LobbyScene (SceneId: 3)...");
