@@ -3731,10 +3731,12 @@ function initIl2Cpp(module) {
                             p = getSmallFn(baseItem, NULL, 0, NULL);
                         }
                         if (!p || p.isNull()) {
-                            var csvParamsKlass = baseAddr.add(0x311C000).add(8).readPointer().readPointer();
-                            if (csvParamsKlass && !csvParamsKlass.isNull()) {
-                                p = il2cpp_object_new(csvParamsKlass);
-                            }
+                            try {
+                                var csvParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardSmallView/Params");
+                                if (csvParamsKlass && !csvParamsKlass.isNull()) {
+                                    p = il2cpp_object_new(csvParamsKlass);
+                                }
+                            } catch (eCsvK) {}
                         }
                         if (!p || p.isNull()) return NULL;
                         if (il2cpp_gchandle_new) il2cpp_gchandle_new(p, 2);
@@ -3783,10 +3785,12 @@ function initIl2Cpp(module) {
                             p = getSmallFn(baseItem, NULL, 0, NULL);
                         }
                         if (!p || p.isNull()) {
-                            var csvParamsKlass = baseAddr.add(0x311C000).add(8).readPointer().readPointer();
-                            if (csvParamsKlass && !csvParamsKlass.isNull()) {
-                                p = il2cpp_object_new(csvParamsKlass);
-                            }
+                            try {
+                                var csvParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardSmallView/Params");
+                                if (csvParamsKlass && !csvParamsKlass.isNull()) {
+                                    p = il2cpp_object_new(csvParamsKlass);
+                                }
+                            } catch (eCsvK) {}
                         }
                         if (!p || p.isNull()) return NULL;
 
@@ -4244,18 +4248,29 @@ function initIl2Cpp(module) {
 
                             // 5. Call native UpdateGrade(view, p) (0xF246B4)
                             try {
-                                var updateGradeFn = new NativeFunction(baseAddr.add(0xF246B4), "void", ["pointer", "pointer"]);
-                                updateGradeFn(view, p);
-                                log("[✅ GROUP_ITEM_VIEW] Native UpdateGrade executed successfully!");
+                                var gradeSprites = view.add(0x80).readPointer();
+                                var gradeImg = view.add(0x88).readPointer();
+                                if (!gradeSprites.isNull() && !gradeImg.isNull()) {
+                                    var updateGradeFn = new NativeFunction(baseAddr.add(0xF246B4), "void", ["pointer", "pointer"]);
+                                    updateGradeFn(view, p);
+                                    log("[✅ GROUP_ITEM_VIEW] Native UpdateGrade executed successfully!");
+                                } else {
+                                    log("[-] Skipping UpdateGrade: gradeSprites/gradeImg not yet initialized");
+                                }
                             } catch (eUg) {
                                 log("[-] Error executing native UpdateGrade: " + eUg.message);
                             }
 
                             // 6. Call native UpdateTheme(view, p) (0xF248E8)
                             try {
-                                var updateThemeFn = new NativeFunction(baseAddr.add(0xF248E8), "void", ["pointer", "pointer"]);
-                                updateThemeFn(view, p);
-                                log("[✅ GROUP_ITEM_VIEW] Native UpdateTheme executed successfully!");
+                                var themeRaw = view.add(0xC0).readPointer();
+                                if (!themeRaw.isNull()) {
+                                    var updateThemeFn = new NativeFunction(baseAddr.add(0xF248E8), "void", ["pointer", "pointer"]);
+                                    updateThemeFn(view, p);
+                                    log("[✅ GROUP_ITEM_VIEW] Native UpdateTheme executed successfully!");
+                                } else {
+                                    log("[-] Skipping UpdateTheme: themeRaw not yet initialized");
+                                }
                             } catch (eUt) {
                                 log("[-] Error executing native UpdateTheme: " + eUt.message);
                             }
@@ -6214,34 +6229,6 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing InvenCardCellView.RefreshCellView: " + eHrcv.message);
                 }
 
-                // ButtonCache.set_Interactable (0xE9B528) -> Suppress disabled image (silver [-] bar) activation
-                try {
-                    Interceptor.attach(baseAddr.add(0xE9B528), {
-                        onEnter: function (args) {
-                            this.btnCache = args[0];
-                            this.val = args[1].toInt32();
-                        },
-                        onLeave: function () {
-                            if (this.val === 0 && this.btnCache && !this.btnCache.isNull()) {
-                                try {
-                                    var disImg = this.btnCache.add(0x58).readPointer();
-                                    if (!disImg.isNull()) {
-                                        var getGoFnBase = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                                        var setActFnBase = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                                        var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
-                                        setEnabledFn(disImg, 0, NULL);
-                                        var g = getGoFnBase(disImg, NULL);
-                                        if (!g.isNull()) setActFnBase(g, 0, NULL);
-                                    }
-                                } catch (eDis) {}
-                            }
-                        }
-                    });
-                    log("[+] Interceptor.attach installed on ButtonCache.set_Interactable (0xE9B528)!");
-                } catch (eBci) {
-                    log("[-] Error attaching to ButtonCache.set_Interactable: " + eBci.message);
-                }
-
                 // InvenCardCellView.set_LightVisible (0xF21424) -> Suppress white light overlay permanently
                 try {
                     Interceptor.replace(baseAddr.add(0xF21424), new NativeCallback(function (cell, val, methodInfo) {
@@ -6250,13 +6237,7 @@ function initIl2Cpp(module) {
                         try {
                             var lightImg = cell.add(0x58).readPointer();
                             if (!lightImg.isNull()) {
-                                var getGoFnBase = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                                var setActFnBase = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                                var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
-                                setEnabledFn(lightImg, 0, NULL);
-                                var lGo = getGoFnBase(lightImg, NULL);
-                                if (!lGo.isNull()) setActFnBase(lGo, 0, NULL);
-                                try { lightImg.add(0x2C).writeFloat(0.0); } catch (eAl4) {}
+                                lightImg.add(0x2C).writeFloat(0.0);
                             }
                         } catch (e) {}
                     }, "void", ["pointer", "bool", "pointer"]));
