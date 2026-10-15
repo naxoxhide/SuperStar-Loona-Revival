@@ -5103,6 +5103,18 @@ function initIl2Cpp(module) {
                         }
 
                         log("[✅ CAROUSEL] InvenCardView.SetData & Refresh called with count=" + filteredItems.length + " (now maxCount=" + cardView.add(0x98).readS32() + ")");
+
+                        // Step 5: Update cardCountText (cardView+0x38) to display "<count> / 200"
+                        try {
+                            var cardCountText = cardView.add(0x38).readPointer();
+                            if (!cardCountText.isNull()) {
+                                var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                setTextFn(cardCountText, createIl2CppString(filteredItems.length + " / 200"), NULL);
+                                log("[✅ CAROUSEL] Updated cardCountText to: " + filteredItems.length + " / 200");
+                            }
+                        } catch (eCct) {
+                            log("[-] Error updating cardCountText: " + eCct.message);
+                        }
                     } catch (eCar) {
                         log("[-] Error in safeUpdateLowerCarousel: " + eCar.message);
                     }
@@ -5292,6 +5304,16 @@ function initIl2Cpp(module) {
                                     setDataFn(cardView, loonaCardItems.length, 0, eventListener, NULL);
                                     sanitizeCardScroller(cardView);
                                     log("[✅ RESTORE] SetData called on InvenCardView with count=" + loonaCardItems.length);
+
+                                    // Restore cardCountText to loonaCardItems.length / 200
+                                    try {
+                                        var cardCountText = cardView.add(0x38).readPointer();
+                                        if (!cardCountText.isNull()) {
+                                            var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                            setTextFn(cardCountText, createIl2CppString(loonaCardItems.length + " / 200"), NULL);
+                                            log("[✅ RESTORE] Restored cardCountText to: " + loonaCardItems.length + " / 200");
+                                        }
+                                    } catch (eCctR) {}
                                 }
                             }
                         }
@@ -5548,7 +5570,7 @@ function initIl2Cpp(module) {
                         onLeave: function (retval) {
                             if (this.scene && !this.scene.isNull()) {
                                 log("[🗃️ SET_STATE_DEFAULT] onLeave triggered, restoring all 24 cards to displayCardList!");
-                                restoreDefaultDisplayCardList(this.scene, true);
+                                restoreDefaultDisplayCardList(this.scene, true, true);
                             }
                         }
                     });
@@ -5983,7 +6005,30 @@ function initIl2Cpp(module) {
 
                             var scene = (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) ? activeInventorySceneInstance : NULL;
 
-                            // 1. Invoke b__63_0 directly to populate CardSmallView with textures, tier frames, and hide ImageEfftect
+                            // Extract card information for this dataIndex
+                            var cId = 1001, gr = 4, lvl = 50;
+                            if (scene && !scene.isNull()) {
+                                var dclPtr = scene.add(0x58).readPointer();
+                                if (!dclPtr.isNull()) {
+                                    var size = dclPtr.add(0x18).readS32();
+                                    if (dataIdx >= 0 && dataIdx < size) {
+                                        var listItems = dclPtr.add(0x10).readPointer();
+                                        if (!listItems.isNull()) {
+                                            var cardItem = listItems.add(0x20 + dataIdx * 8).readPointer();
+                                            if (!cardItem.isNull()) {
+                                                var cardRaw = cardItem.add(0x10).readPointer();
+                                                if (!cardRaw.isNull()) {
+                                                    cId = cardRaw.add(0x20).readS32();
+                                                    gr = cardRaw.add(0x24).readS32();
+                                                    lvl = cardRaw.add(0x1C).readS16();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 1. Invoke b__63_0 directly to populate CardSmallView params
                             var b63Fn = new NativeFunction(baseAddr.add(0x105F448), "pointer", ["pointer", "pointer", "int", "pointer"]);
                             var viewData = b63Fn(scene, item, dataIdx, NULL);
 
@@ -5993,7 +6038,63 @@ function initIl2Cpp(module) {
                                 refreshWithMarkFn(item, viewData, NULL);
                             }
 
-                            // 3. Selection glow/frame on cell (highlight inspected card at index 0 when in detail view)
+                            // 3. Post-RefreshWithMark: directly assign Photo and Tier textures to overcome Hide() reset
+                            try {
+                                var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+
+                                // Set Photo texture
+                                var photoRawImg = item.add(0x58).readPointer();
+                                if (!photoRawImg.isNull()) {
+                                    var cFolder = (cId < 10000) ? "weoihxd" : "wadceg";
+                                    var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/" + cFolder + "/" + cId + "_s.i.bytes") ||
+                                                   loadLocalTexture2D("asiudgasg/asodhsg/" + cFolder + "/" + cId + "_l.i.bytes") ||
+                                                   loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") ||
+                                                   loadLocalTexture2D("asiudgasg/asodhsg/weoihxd/" + cId + "_s.i.bytes");
+                                    if (photoTex && !photoTex.isNull()) {
+                                        setTextureFn(photoRawImg, photoTex, NULL);
+                                        setEnabledFn(photoRawImg, 1, NULL);
+                                        var pGo = getGoFnBase(photoRawImg, NULL);
+                                        if (!pGo.isNull()) setActFnBase(pGo, 1, NULL);
+                                    }
+                                }
+
+                                // Set Tier frame texture
+                                var tierRawImg = item.add(0x68).readPointer();
+                                if (!tierRawImg.isNull()) {
+                                    var gLetter = (gr === 4) ? "r" : (gr === 3) ? "s" : (gr === 2) ? "a" : (gr === 1) ? "b" : "c";
+                                    var tierRelPath = (gr === 1) ? "0b_s.i.bytes" : ("0_" + gLetter + "_s.i.bytes");
+                                    var tierTex = loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/" + tierRelPath) ||
+                                                  loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gLetter + "_s.i.bytes");
+                                    if (tierTex && !tierTex.isNull()) {
+                                        setTextureFn(tierRawImg, tierTex, NULL);
+                                        setEnabledFn(tierRawImg, 1, NULL);
+                                        var tGo = getGoFnBase(tierRawImg, NULL);
+                                        if (!tGo.isNull()) setActFnBase(tGo, 1, NULL);
+                                    }
+                                }
+
+                                // Set Star vs Number level display
+                                try {
+                                    var setStarVisFn = new NativeFunction(baseAddr.add(0x1388C58), "void", ["pointer", "int", "pointer"]);
+                                    var setNumVisFn = new NativeFunction(baseAddr.add(0x1393D68), "void", ["pointer", "int", "pointer"]);
+                                    if (gr === 4) {
+                                        setStarVisFn(item, 0, NULL);
+                                        setNumVisFn(item, 1, NULL);
+                                        var numberBox = item.add(0x80).readPointer();
+                                        if (!numberBox.isNull()) {
+                                            var setValFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "uint32", "pointer"]);
+                                            setValFn(numberBox, lvl, NULL);
+                                        }
+                                    } else {
+                                        setStarVisFn(item, 1, NULL);
+                                        setNumVisFn(item, 0, NULL);
+                                    }
+                                } catch (eLvl) {}
+                            } catch (eTexOverride) {
+                                log("[-] Error overriding textures on item: " + eTexOverride.message);
+                            }
+
+                            // 4. Selection glow/frame on cell (highlight inspected card at index 0 when in detail view)
                             var curState = (scene && !scene.isNull()) ? scene.add(0x24).readS32() : 5;
                             try {
                                 var setLightVisFn = new NativeFunction(baseAddr.add(0xF21424), "void", ["pointer", "bool", "pointer"]);
@@ -6004,7 +6105,7 @@ function initIl2Cpp(module) {
                                 }
                             } catch (eSlv) {}
 
-                            // 4. Eliminate button artifacts: hide box (gray slot) and disabled ([-] bar) while keeping button interactable for clicks
+                            // 5. Eliminate button artifacts: hide box (gray slot) and disabled ([-] bar) while keeping button interactable for clicks
                             try {
                                 var btnCache = cell.add(0x30).readPointer();
                                 if (!btnCache.isNull()) {
@@ -6013,6 +6114,9 @@ function initIl2Cpp(module) {
                                     if (!btnComp.isNull()) {
                                         var setTransFn = new NativeFunction(baseAddr.add(0x1954714), "void", ["pointer", "int", "pointer"]);
                                         setTransFn(btnComp, 0, NULL);
+                                        // Ensure interactable so clicking cell works
+                                        var setInteractableFn = new NativeFunction(baseAddr.add(0x19549D4), "void", ["pointer", "bool", "pointer"]);
+                                        setInteractableFn(btnComp, 1, NULL);
                                     }
 
                                     // Make box 100% transparent & disabled
@@ -6052,7 +6156,7 @@ function initIl2Cpp(module) {
                                 }
                             } catch (eBtn) {}
 
-                            // 5. Hide ImageEfftect (offset 0xC8 in CardSmallView)
+                            // 6. Hide ImageEfftect (offset 0xC8 in CardSmallView) and Effect (offset 0x88)
                             try {
                                 var imgEff = item.add(0xC8).readPointer();
                                 if (!imgEff.isNull()) {
@@ -6060,9 +6164,11 @@ function initIl2Cpp(module) {
                                     var effGo = getGoFnBase(imgEff, NULL);
                                     if (!effGo.isNull()) setActFnBase(effGo, 0, NULL);
                                 }
+                                var setEffectVisFn = new NativeFunction(baseAddr.add(0x1383F90), "void", ["pointer", "bool", "pointer"]);
+                                setEffectVisFn(item, 0, NULL);
                             } catch (eEff) {}
 
-                            // 6. Ensure item transform localScale is (1, 1, 1)
+                            // 7. Ensure item transform localScale is (1, 1, 1)
                             try {
                                 var trFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
                                 var itemTr = trFn(item, NULL);
