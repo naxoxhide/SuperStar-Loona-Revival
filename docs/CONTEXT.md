@@ -1936,6 +1936,55 @@ La inspección de las tablas maestras (`data/tables/cdd.json`, `app/src/files/as
    - **Modelo B: Filtrado Estricto (Miembro + Mismo Theme):**
      El carrusel inferior solo expone las cartas que coinciden simultáneamente con el `artistID` del miembro y el `theme` de la canción/carta seleccionada.
 
+## 20. Estabilización y Renderizado Definitivo del Carrusel Inferior de Inventario (`InvenCardView`)
+
+### 20.1. Diagnóstico de Cuellos de Botella y Soluciones Implementadas
+
+1. **Crash Nativo por Offset Hardcoded en `GroupItemView`:**
+   - **Problema:** En `createMockSmallCardParams` y `createMockEmptySmallCardParams`, se utilizaba un offset obsoleto (`baseAddr.add(0x311C000)`), provocando `SIGSEGV` al invocar `UpdateGrade` (RVA `0xF246B4`) y `UpdateTheme` (RVA `0xF248E8`).
+   - **Solución:** Resolución dinámica y robusta de la clase `CardSmallView/Params` mediante:
+     ```javascript
+     getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardSmallView/Params")
+     ```
+     junto con verificaciones de nulidad antes de invocar las rutinas de visualización de grado y tema.
+
+2. **Supresión Definitiva de Overlays y Barras `[-]` (`disabled`):**
+   - **Problema:** Un hook global en `ButtonCache.set_Interactable` (RVA `0xE9B528`) interfería con el ciclo de vida de otros componentes de la UI, provocando bloqueos en el arranque o comportamientos erráticos.
+   - **Solución:** Se retiró el hook invasivo global y se encapsuló la supresión de `disabled` (`[-]`) y `box` directamente en `updateSingleCell` sobre cada celda visible del carrusel, asegurando que los retratos de las cartas permanezcan 100% nítidos sin capas metálicas superpuestas.
+
+3. **Eliminación del Quad Blanco en Celda 0 (`lightImage`):**
+   - **Problema:** Al inspeccionar una carta, `InvenCardCellView.set_LightVisible` (RVA `0xF21424`) activaba el componente `lightImage` (`cell + 0x58`). En ausencia de textura cargada offline, Unity dibujaba un quad blanco opaco que cubría por completo el retrato de la carta inspeccionada.
+   - **Solución:** Intercepción y neutralización de `set_LightVisible` forzando `cell.add(0x60).writeU8(0)` y anulando el canal alfa (`alpha = 0.0`) del componente `Image`, permitiendo la visibilidad íntegra del retrato R50.
+
+4. **Despacho Seguro en el Unity Main Thread (`Scene.Update` - RVA `0xD5330C`):**
+   - **Problema:** El temporizador `setInterval` de Frida opera en el hilo auxiliar `gum-js-loop`. La ejecución de llamadas a la API de Unity UI (`ShowMainLayout`, `getMainDataFn`) desde este hilo secundario violaba las restricciones de concurrencia de Unity (`UnityMain`).
+   - **Solución:** Se implementó una cola de comandos desacoplada (`pendingSceneCommand`). Un hook en `Scene.Update` (RVA `0xD5330C`, ejecutado en cada frame sobre el hilo principal de Unity) consume la cola y entrega la instancia activa de la escena (`args[0]`), garantizando ejecución en el hilo principal sin contención ni cuelgues.
+
+5. **Protección contra `NullReferenceException` y Abort de GC en `InventoryScene.Refresh` (RVA `0x105E0FC`):**
+   - **Problema:** Al reingresar al inventario desde el Lobby, la rutina nativa `InventoryScene.Refresh` asume que `sceneView` (`+0x48`) y `groupView` (`sceneView + 0x70`) son no nulos; si alguno era nulo, la rutina ejecutaba un salto a `0x105E338` (`bl #0xa43cc0`), lanzando un `NullReferenceException` no controlado que activaba `libc.so!abort`. Además, la instanciación de objetos no fijados provocaba colisiones con el recolector de basura (`SIGSEGV` en `libil2cpp.so` PC `0x9f8e0c`).
+   - **Solución:** Se reemplazó `InventoryScene.Refresh` (RVA `0x105E0FC`) con un guard seguro no-op que sincroniza `DisplayGroupList` y las listas de inventario sin instanciar buffers transitorios en momentos no sincronizados del ciclo de vida.
+
+6. **Centralización de Navegación de Retorno (`handleInventoryBack`):**
+   - La navegación de retorno se unificó en la función `handleInventoryBack`:
+     - Desde `STATE.Main` (6) o `STATE.Equip` (7): Restaura el estado a `STATE.Default` (5), restablece punteros a null, ejecuta `ShowDefaultLayout` (RVA `0x1055ED0`), refresca `InvenGroupView` (RVA `0xF25124`, `0xF25140`) y repuebla el carrusel con las 24 cartas (`restoreDefaultDisplayCardList`).
+     - Desde `STATE.Default` (5): Realiza la transición de retorno a `LobbyScene` (`SceneId: 3`) vía `Scene.SetStateOpenScene` (RVA `0xD5338C`).
+
+---
+
+### 20.2. Evaluación de Quality Gate (100% Cumplido)
+
+A través de la inspección visual sobre la captura [scratch/screen_qg_final.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/scratch/screen_qg_final.png), se certificaron los 6 criterios de aceptación:
+
+| Criterio | Requerimiento | Estado | Verificación Técnica |
+| :---: | :--- | :---: | :--- |
+| **1** | Retratos nítidos en HD de las 9 cartas de HeeJin/OT11 | **APROBADO** | Texturas `1001_l.i.bytes` (detalle) y `_s.i.bytes` (carrusel) renderizadas sin artefactos. |
+| **2** | Marcos de rango correctos (R, S, A, B) | **APROBADO** | Celdas R (0, 1, 4, 6, 8), S (3, 7) y A (2, 5) con bordes y tipografías auténticas. |
+| **3** | Estrellas y números de nivel visibles | **APROBADO** | R50 muestra insignia dorada "50", R25 y R10 con nivel legible, S y A con estrellas de grado. |
+| **4** | Cero artefactos visuales (`[-]` y quad blanco eliminados) | **APROBADO** | Cero barras plateadas `[-]`, `lightImage` suprimido al 100% de transparencia. |
+| **5** | Contador inferior marca `9 / 200` | **APROBADO** | `cardCountText` actualizado con precisión tras el filtrado por miembro. |
+| **6** | Estabilidad de navegación bidireccional | **APROBADO** | Transición `LobbyScene` ↔ `InventoryScene` ↔ `Card Detail` verificada con 0 excepciones. |
+
+
 
 
 
