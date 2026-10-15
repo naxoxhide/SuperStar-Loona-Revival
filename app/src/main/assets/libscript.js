@@ -5787,63 +5787,72 @@ function initIl2Cpp(module) {
                     log("[-] Error attaching to SetStateDefault: " + eSsdHook.message);
                 }
 
+                // Centralized and bulletproof handleInventoryBack
+                var handleInventoryBack = function (sceneThis) {
+                    try {
+                        if (!sceneThis || sceneThis.isNull()) return;
+                        var curState = sceneThis.add(0x24).readS32();
+                        log("[🔙 ON_BACK] handleInventoryBack entered! state=" + curState);
+
+                        if (curState === 6 || curState === 7) { // STATE.Main (6) or STATE.Equip (7)
+                            log("[🔙 ON_BACK] Returning from detail/equip view to Default state, restoring 24 cards...");
+                            sceneThis.add(0x24).writeS32(5); // STATE.Default = 5
+                            sceneThis.add(0x88).writePointer(NULL); // selectedCardItem
+                            sceneThis.add(0x98).writePointer(NULL); // preSelectedCardItem
+                            sceneThis.add(0x80).writePointer(NULL); // selectedArtistData
+                            sceneThis.add(0x90).writePointer(NULL); // equippedCardItem
+                            sceneThis.add(0xBC).writeU8(0);
+                            sceneThis.add(0xBE).writeU8(0);
+                            sceneThis.add(0x50).writeS32(0); // extractType = All
+
+                            var sceneView = sceneThis.add(0x48).readPointer();
+                            if (!sceneView.isNull()) {
+                                // 1. ShowDefaultLayout -> RVA 0x1055ED0
+                                try {
+                                    var showDefFn = new NativeFunction(baseAddr.add(0x1055ED0), "void", ["pointer", "pointer"]);
+                                    showDefFn(sceneView, NULL);
+                                    log("[✅ ON_BACK] ShowDefaultLayout executed!");
+                                } catch (eSdl) {
+                                    log("[-] Error in ShowDefaultLayout: " + eSdl.message);
+                                }
+
+                                // 2. SetData on groupView (0x70) -> RVA 0xF25140
+                                try {
+                                    var groupView = sceneView.add(0x70).readPointer();
+                                    if (!groupView.isNull()) {
+                                        var invenGroupDataSetDataFn = new NativeFunction(baseAddr.add(0xF25140), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
+                                        invenGroupDataSetDataFn(groupView, 1, 0, NULL, NULL);
+                                        log("[✅ ON_BACK] InvenGroupView.SetData executed!");
+                                    }
+                                } catch (eGv) {
+                                    log("[-] Error in InvenGroupView.SetData: " + eGv.message);
+                                }
+
+                                // 3. Restore displayCardList (sets 24 cards and calls InvenCardView.SetData in 0xF23384)
+                                restoreDefaultDisplayCardList(sceneThis, true);
+                            }
+                        } else if (curState === 5) { // STATE.Default (5)
+                            log("[🔙 ON_BACK] Leaving InventoryScene, navigating back to LobbyScene (SceneId: 3)...");
+                            try {
+                                var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
+                                setStateOpenSceneFn(sceneThis, 3, NULL, NULL, NULL);
+                            } catch (eOpen) {
+                                log("[-] Error returning to LobbyScene via SetStateOpenScene: " + eOpen.message);
+                                try {
+                                    var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
+                                    openSceneDirectFn(3, NULL, NULL);
+                                } catch (eOsd) {}
+                            }
+                        }
+                    } catch (eOb) {
+                        log("[-] Error in handleInventoryBack: " + eOb.message);
+                    }
+                };
+
                 // Replace InventoryScene.OnBack (0x10537F4) to ensure clean restoration and prevent null crash chain
                 try {
                     Interceptor.replace(baseAddr.add(0x10537F4), new NativeCallback(function (sceneThis, methodInfo) {
-                        try {
-                            if (sceneThis.isNull()) return;
-                            var curState = sceneThis.add(0x24).readS32();
-                            log("[🔙 ON_BACK] InventoryScene.OnBack replaced entered! state=" + curState);
-
-                            if (curState === 6 || curState === 7) { // STATE.Main (6) or STATE.Equip (7)
-                                log("[🔙 ON_BACK] Returning from detail/equip view to Default state, restoring 24 cards...");
-                                sceneThis.add(0x24).writeS32(5); // STATE.Default = 5
-                                sceneThis.add(0x88).writePointer(NULL); // selectedCardItem
-                                sceneThis.add(0x98).writePointer(NULL); // preSelectedCardItem
-                                sceneThis.add(0x80).writePointer(NULL); // selectedArtistData
-                                sceneThis.add(0x90).writePointer(NULL); // equippedCardItem
-                                sceneThis.add(0xBC).writeU8(0);
-                                sceneThis.add(0xBE).writeU8(0);
-                                sceneThis.add(0x50).writeS32(0); // extractType = All
-
-                                var sceneView = sceneThis.add(0x48).readPointer();
-                                if (!sceneView.isNull()) {
-                                    // 1. ShowDefaultLayout -> RVA 0x1055ED0
-                                    try {
-                                        var showDefFn = new NativeFunction(baseAddr.add(0x1055ED0), "void", ["pointer", "pointer"]);
-                                        showDefFn(sceneView, NULL);
-                                        log("[✅ ON_BACK] ShowDefaultLayout executed!");
-                                    } catch (eSdl) {
-                                        log("[-] Error in ShowDefaultLayout: " + eSdl.message);
-                                    }
-
-                                    // 2. SetData on groupView (0x70) -> RVA 0xF25140
-                                    try {
-                                        var groupView = sceneView.add(0x70).readPointer();
-                                        if (!groupView.isNull()) {
-                                            var invenGroupDataSetDataFn = new NativeFunction(baseAddr.add(0xF25140), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
-                                            invenGroupDataSetDataFn(groupView, 1, 0, NULL, NULL);
-                                            log("[✅ ON_BACK] InvenGroupView.SetData executed!");
-                                        }
-                                    } catch (eGv) {
-                                        log("[-] Error in InvenGroupView.SetData: " + eGv.message);
-                                    }
-
-                                    // 3. Restore displayCardList (sets 24 cards and calls InvenCardView.SetData in 0xF23384)
-                                    restoreDefaultDisplayCardList(sceneThis, true);
-                                }
-                            } else if (curState === 5) { // STATE.Default (5)
-                                log("[🔙 ON_BACK] Leaving InventoryScene, navigating back to LobbyScene (SceneId: 3)...");
-                                try {
-                                    var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
-                                    openSceneDirectFn(3, NULL, NULL, NULL);
-                                } catch (eOpen) {
-                                    log("[-] Error returning to LobbyScene: " + eOpen.message);
-                                }
-                            }
-                        } catch (eOb) {
-                            log("[-] Error in replaced OnBack: " + eOb.message);
-                        }
+                        handleInventoryBack(sceneThis);
                     }, "void", ["pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on InventoryScene.OnBack (0x10537F4)!");
                 } catch (eObHook) {
@@ -7387,16 +7396,47 @@ function initIl2Cpp(module) {
                 }
 
                 try {
-                    Interceptor.attach(baseAddr.add(0x105E0FC), {
-                        onEnter: function (args) {
-                            log("[🗃️ INVENTORY SCENE] Refresh (0x105E0FC) entered, ensuring DisplayGroupList and lists...");
+                    Interceptor.replace(baseAddr.add(0x105E0FC), new NativeCallback(function (sceneThis, methodInfo) {
+                        try {
+                            if (!sceneThis || sceneThis.isNull()) return;
+                            log("[🗃️ INVENTORY SCENE] Safe Refresh (0x105E0FC) entered!");
                             ensureDisplayGroupList();
-                            ensureInventoryLists(args[0]);
+                            ensureInventoryLists(sceneThis);
+                            var sceneView = sceneThis.add(0x48).readPointer();
+                            if (sceneView.isNull()) {
+                                log("[🗃️ INVENTORY SCENE] Safe Refresh: sceneView is null, skipping view updates cleanly!");
+                                return;
+                            }
+                            var groupView = sceneView.add(0x70).readPointer();
+                            if (groupView.isNull()) {
+                                log("[🗃️ INVENTORY SCENE] Safe Refresh: groupView is null, skipping view updates cleanly!");
+                                return;
+                            }
+
+                            // Safe groupView refresh
+                            try {
+                                var invenGroupDataSetDataFn = new NativeFunction(baseAddr.add(0xF25140), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
+                                invenGroupDataSetDataFn(groupView, 1, 0, NULL, NULL);
+                            } catch (eGv) {}
+
+                            // Safe update card count and list
+                            try {
+                                var onUpdateCountFn = new NativeFunction(baseAddr.add(0x1054BB4), "void", ["pointer", "pointer"]);
+                                onUpdateCountFn(sceneThis, NULL);
+                            } catch (eCnt) {}
+
+                            try {
+                                var updateCardListFn = new NativeFunction(baseAddr.add(0x10542F4), "void", ["pointer", "bool", "int", "bool", "pointer"]);
+                                updateCardListFn(sceneThis, 1, 0, 1, NULL);
+                            } catch (eUcl) {}
+                            log("[✅ INVENTORY SCENE] Safe Refresh completed!");
+                        } catch (eRef) {
+                            log("[-] Error in safe InventoryScene.Refresh: " + eRef.message);
                         }
-                    });
-                    log("[+] Interceptor.attach installed on InventoryScene.Refresh (0x105E0FC)!");
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.Refresh (0x105E0FC)!");
                 } catch (eIsr) {
-                    log("[-] Error attaching to InventoryScene.Refresh: " + eIsr.message);
+                    log("[-] Error replacing InventoryScene.Refresh: " + eIsr.message);
                 }
 
                 // Proxy ThemeControl.Data.get_EffectType (0xC89B28)
@@ -8797,9 +8837,8 @@ function initIl2Cpp(module) {
                         } else if (cmdRaw === "back" || cmdRaw === "close") {
                             if (curScene && !curScene.isNull()) {
                                 if (sceneId === 4) {
-                                    log("[🔙 BACK CMD] Closing detail via InventoryScene.OnBack!");
-                                    var onBackFn = new NativeFunction(baseAddr.add(0x10537F4), "void", ["pointer", "pointer"]);
-                                    onBackFn(curScene, NULL);
+                                    log("[🔙 BACK CMD] Closing detail via handleInventoryBack!");
+                                    handleInventoryBack(curScene);
                                 } else if (sceneId === 5) {
                                     log("[🔙 BACK CMD] Closing CardBook via CardBookScene.OnBack!");
                                     var cbBackFn = new NativeFunction(baseAddr.add(0x11CEDE8), "void", ["pointer", "pointer"]);
