@@ -2142,6 +2142,66 @@ Se validó la reorganización mediante captura en vivo y extracción de la franj
   - Celdas 0 a 10: Las 11 cartas equipadas de LOONA en orden correlativo (HeeJin a Go Won), todas portando el checkmark azul ✓ en la esquina superior derecha.
   - Celda 11+: Cartas no equipadas (HeeJin Prism R50, HeeJin A1, HyunJin S1).
 
+---
+
+## 24. Arquitectura de Datos y Estadísticas de Cartas (`cbd.bin`, `cid.bin`, `cgd.bin`, `cdd.bin`) y Sistema de Intensify / Power Up
+
+### 24.1. Localización y Mapeo de Archivos de Configuración Binarios (`sdisgkdc`)
+En el motor Dalcomsoft, los atributos, bonificaciones, precios y probabilidades de las cartas están cifrados con AES-256-ECB / Base64 / GZip en la carpeta `app/src/files/asiudgasg/sdisgkdc/`:
+
+1. **`cbd.bin` (`CardBalanceData` - 119 Registros):**
+   - Define las estadísticas base para cada uno de los 119 niveles del juego:
+     - Grado C (Niveles 1 a 5): Códigos 0 a 4 (`minScore`: 10 a 22, `maxScore`: 12 a 24, `minEnergy`: 10 a 22, `maxEnergy`: 12 a 24).
+     - Grado B (Niveles 1 a 5): Códigos 5 a 9 (`minScore`: 25 a 37, `maxScore`: 27 a 39, `minEnergy`: 25 a 37, `maxEnergy`: 27 a 39).
+     - Grado A (Niveles 1 a 5): Códigos 10 a 14 (`minScore`: 40 a 60, `maxScore`: 44 a 64, `minEnergy`: 40 a 60, `maxEnergy`: 44 a 64).
+     - Grado S (Niveles 1 a 5): Códigos 15 a 19 (`minScore`: 65 a 93, `maxScore`: 71 a 99, `minEnergy`: 65 a 93, `maxEnergy`: 71 a 99).
+     - Grado R (Niveles 1 a 99 / 50 en SSLO): Códigos 20 a 118. R1 arranca en `score: 101, energy: 100`, alcanzando `score: 199, energy: 100` en R50 (código 69).
+   - `prizmScore: 10`: Bonificación fija de +10 puntos al multiplicador base de la carta para cartas Prismáticas.
+
+2. **`cgd.bin` (`CardGradeBonusData` - 5 Registros):**
+   - Configuración de bonificación por grado (C=0, B=1, A=2, S=3, R=4):
+     - Grado C: `gradeValue: 0.0`, `abilityValue: 10,000`, `cardBookValue: 1`.
+     - Grado B: `gradeValue: 1.0`, `abilityValue: 20,000`, `cardBookValue: 2`.
+     - Grado A: `gradeValue: 2.5`, `abilityValue: 30,000`, `cardBookValue: 3`.
+     - Grado S: `gradeValue: 4.0`, `abilityValue: 50,000`, `cardBookValue: 4`.
+     - Grado R: `gradeValue: 5.0`, `abilityValue: 100,000`, `cardBookValue: 0`.
+
+3. **`cid.bin` (`CardIntensifyData`):**
+   - Matriz completa de probabilidad de éxito (`Rate` en %) y costo en Rhythm Points (`Price`) para subir de nivel:
+     - Costos en RP: C1 = 93 RP ... C5 = 107 RP; B1 = 110 RP ... B5 = 126 RP; A1 = 131 RP ... A5 = 149 RP; S1 = 154 RP ... S5 = 175 RP; R1 = 176 RP ... R50 = 225 RP.
+     - Tasa de éxito: Calculada dinámicamente según la diferencia de grado entre la carta objetivo y las cartas consumidas como material (ej. usar cartas S o R para alimentar otorga mayores probabilidades que cartas C o B).
+
+4. **`csd.bin` (`CardSellData`):**
+   - Precio de venta de cartas en RP por grado: C = 200 RP, B = 400 RP, A = 600 RP, S = 800 RP, R = 1,200 RP.
+
+5. **`cdd.bin` (`CardData` - 1,467 Cartas):**
+   - Diccionario de cartas con metadata: `groupID`, `artistID`, `theme`, `type` (normal / limited / event), `prism`, rutas a assets en CDN (`cardImageSmall`, `cardImageLarge`).
+
+6. **`player_profile.json` (Persistencia Local Standalone):**
+   - Contiene la colección real del jugador (`inventoryCards`), reflejando para cada carta `objectID`, `cardID`, `grade`, `level`, `score`, `energy`, `isEquip`, `isLock`, `isPrism`.
+
+### 24.2. Impacto de las Estadísticas en la Puntuación Musical
+1. **Bonificación de Inicio (`Start Grade Bonus`):**
+   - Determinado por el `Group Grade` de las 11 cartas equipadas. Si todas son Grado R, la partida inicia inmediatamente con **+500,000 puntos** (`gradeScore`) antes de presionar la primera nota.
+2. **Puntuación por Nota (`Note Multiplier`):**
+   - Cada nota ejecutada (Super Perfect, Perfect, Good) se pondera por el `score` de la integrante activa:
+     $$\text{NotaScore} = \text{BaseNote} \times (\text{CardScore} + \text{PrismBonus})$$
+     Una carta R50 con score 199 aporta casi 20 veces más puntos por nota que una carta C1 con score 10.
+3. **Resistencia y Supervivencia (`Energy`):**
+   - Los fallos (Miss) descuentan vida de la barra de salud, y la recuperación se basa en la `energy` de la carta. Una carta R50 tiene el valor máximo (`energy = 100`), otorgando una barra de vida prácticamente inmune a descalificaciones.
+
+### 24.3. Flujo Nativo de Subida de Nivel (`Intensify`) y Subida de Grado (`Grade Up`)
+- **Flujo de Intensify (Power Up):**
+  1. En `InvenCardMainView`, el botón `Power Up` (`btnIntensify` @ offset `0x50`) dispara el evento `EVENT.Intensify = 2`, llamando a `InventoryScene.OnEquipCardIntensify` (RVA `0x578603`).
+  2. Unity abre `InvenCardIntensifyView` (RVA `0xF22024`) permitiendo seleccionar hasta 5 cartas de material.
+  3. Al pulsar `OnTry` (RVA `0xF22758`), el cliente nativo invoca `InventoryControl.Intensify` (RVA `0xF1DCCC`).
+  4. En el cliente original, este enviaba un paquete RPC `Card.intensify` al servidor.
+  5. En modo offline standalone, se intercepta `InventoryControl.Intensify` para calcular localmente el resultado (`SUCCESS` o `FAILED`), deducir los RP del jugador, remover las cartas material de `player_profile.json`, incrementar el nivel y actualizar `score` y `energy` consultando la tabla `cbd.bin`.
+  6. Se despliega el popup nativo de resultado `CardIntensifyPopup` con las animaciones y sonidos correspondientes (`soundSucceed`, `soundFailed`).
+- **Flujo de Grade Up (Evolución de Rango C5->B1, B5->A1, A5->S1, S5->R1):**
+  - Requiere dos cartas del mismo miembro y mismo grado al nivel 5 máximo. Al fusionarlas, se invoca `GradeUpPopup` desplegando la carta en su nuevo grado.
+
+
 
 
 
