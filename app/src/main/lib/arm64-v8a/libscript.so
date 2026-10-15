@@ -6318,7 +6318,12 @@ function initIl2Cpp(module) {
                         try {
                             var lightImg = cell.add(0x58).readPointer();
                             if (!lightImg.isNull()) {
-                                lightImg.add(0x2C).writeFloat(0.0);
+                                var getGoFnBase = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                var setActFnBase = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
+                                setEnabledFn(lightImg, 0, NULL);
+                                var lGo = getGoFnBase(lightImg, NULL);
+                                if (!lGo.isNull()) setActFnBase(lGo, 0, NULL);
                             }
                         } catch (e) {}
                     }, "void", ["pointer", "bool", "pointer"]));
@@ -7740,6 +7745,38 @@ function initIl2Cpp(module) {
 
                         log("[✅ INVENTORY] Successfully populated " + addedCount + " LOONA cards into CardMap!");
 
+                        // Sort loonaCardItems to match canonical inventory order:
+                        // 1. Unequipped cards with lower grade (A, S) come first (1001 A, 1002 S)
+                        // 2. Equipped Grade R cards in member order (1001..1011)
+                        // 3. Prism cards (1012)
+                        loonaCardItems.sort(function(itemA, itemB) {
+                            var rawA = itemA.add(0x10).readPointer();
+                            var rawB = itemB.add(0x10).readPointer();
+                            var cIdA = rawA.add(0x20).readS32();
+                            var cIdB = rawB.add(0x20).readS32();
+                            var grA = rawA.add(0x24).readS32();
+                            var grB = rawB.add(0x24).readS32();
+                            var isPrismA = (rawA.add(0x2A).readU8() === 1);
+                            var isPrismB = (rawB.add(0x2A).readU8() === 1);
+                            var isEqA = (rawA.add(0x28).readU8() === 1);
+                            var isEqB = (rawB.add(0x28).readU8() === 1);
+
+                            var isLowA = (!isEqA && grA < 4);
+                            var isLowB = (!isEqB && grB < 4);
+                            if (isLowA !== isLowB) return isLowA ? -1 : 1;
+                            if (isLowA && isLowB) {
+                                if (grA !== grB) return grA - grB; // Grade 2 (A) before Grade 3 (S)
+                                return cIdA - cIdB;
+                            }
+
+                            var mA = ((cIdA - 1001) % 11);
+                            var mB = ((cIdB - 1001) % 11);
+                            if (mA !== mB) return mA - mB;
+
+                            if (isPrismA !== isPrismB) return isPrismA ? 1 : -1;
+                            return grB - grA;
+                        });
+
                         var loonaEquippedCards = [];
                         var memberFilled = {};
                         for (var k = 0; k < loonaCardItems.length; k++) {
@@ -7928,17 +7965,64 @@ function initIl2Cpp(module) {
                             log("[🗃️ INVENTORY VIEW] ShowDefaultLayout completed! Updating UI texts and card count...");
                             try {
                                 if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
-                                    // 1. Sort text "High" on InvenSortView
-                                    var sceneView = activeInventorySceneInstance.add(0x48).readPointer();
-                                    if (!sceneView.isNull()) {
-                                        var sortView = sceneView.add(0x80).readPointer();
-                                        if (!sortView.isNull()) {
-                                            var sortText = sortView.add(0x40).readPointer();
-                                            if (!sortText.isNull()) {
-                                                var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
-                                                setTextFn(sortText, createIl2CppString("High"), NULL);
+                                        // 1. Sort text "High" on InvenSortView
+                                        var sceneView = activeInventorySceneInstance.add(0x48).readPointer();
+                                        if (!sceneView.isNull()) {
+                                            var sortView = sceneView.add(0x80).readPointer();
+                                            if (!sortView.isNull()) {
+                                                var sortText = sortView.add(0x40).readPointer();
+                                                if (!sortText.isNull()) {
+                                                    var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                                    setTextFn(sortText, createIl2CppString("High"), NULL);
+                                                }
                                             }
-                                        }
+
+                                            // Inspect and ensure btnBack (sceneView + 0x88)
+                                            try {
+                                                var btnBack = sceneView.add(0x88).readPointer();
+                                                if (!btnBack.isNull()) {
+                                                    var bGo = btnBack.add(0x10).readPointer();
+                                                    var bBtn = btnBack.add(0x48).readPointer();
+                                                    var bBox = btnBack.add(0x50).readPointer();
+                                                    var bDis = btnBack.add(0x58).readPointer();
+                                                    var bLbl = btnBack.add(0x60).readPointer();
+                                                    log("[🔍 BTN_BACK] ptr=" + btnBack + " go=" + bGo + " btn=" + bBtn + " box=" + bBox + " dis=" + bDis + " lbl=" + bLbl);
+                                                    if (!bGo.isNull()) {
+                                                        var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                                                        setActFn(bGo, 1, NULL);
+                                                    }
+                                                    if (!bDis.isNull()) {
+                                                        var disGo = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"])(bDis, NULL);
+                                                        var disAct = new NativeFunction(baseAddr.add(0x1DB3D4C), "int", ["pointer"])(bDis);
+                                                        log("[🔍 BTN_BACK DIS] disGo=" + disGo + " act=" + disAct);
+                                                        new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"])(disGo, 0, NULL);
+                                                        new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"])(bDis, 0, NULL);
+                                                    }
+                                                    if (!bBox.isNull()) {
+                                                        var boxGo = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"])(bBox, NULL);
+                                                        var boxAct = new NativeFunction(baseAddr.add(0x1DB3D4C), "int", ["pointer"])(bBox);
+                                                        log("[🔍 BTN_BACK BOX] boxGo=" + boxGo + " act=" + boxAct + " col=" + bBox.add(0x20).readFloat() + "," + bBox.add(0x24).readFloat() + "," + bBox.add(0x28).readFloat() + "," + bBox.add(0x2C).readFloat());
+                                                    }
+                                                    if (!bGo.isNull()) {
+                                                        var trFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                                        var bTr = trFn(bGo, NULL);
+                                                        var getChildCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
+                                                        var getChildFn = new NativeFunction(baseAddr.add(0x181ED28), "pointer", ["pointer", "int", "pointer"]);
+                                                        var getNameFn = new NativeFunction(baseAddr.add(0x1DB64F0), "pointer", ["pointer", "pointer"]);
+                                                        var cc = getChildCountFn(bTr, NULL);
+                                                        log("[🔍 BTN_BACK TR] name=" + readIl2CppString(getNameFn(bGo, NULL)) + " childCount=" + cc);
+                                                        for (var ci = 0; ci < cc; ci++) {
+                                                            var cTr = getChildFn(bTr, ci, NULL);
+                                                            var cGo = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"])(cTr, NULL);
+                                                            var cName = readIl2CppString(getNameFn(cGo, NULL));
+                                                            var cAct = new NativeFunction(baseAddr.add(0x1DB3D4C), "int", ["pointer"])(cTr);
+                                                            log("[🔍 BTN_BACK CHILD " + ci + "] name=" + cName + " act=" + cAct);
+                                                        }
+                                                    }
+                                                }
+                                            } catch (eBtnB) {
+                                                log("[-] Error inspecting btnBack: " + eBtnB.message);
+                                            }
 
                                         // Inspect Card Count & Group Count Text GameObjects
                                         var getTextFn = new NativeFunction(baseAddr.add(0x21A5FBC), "pointer", ["pointer"]);

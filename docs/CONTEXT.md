@@ -1977,12 +1977,59 @@ A través de la inspección visual sobre la captura [scratch/screen_qg_final.png
 
 | Criterio | Requerimiento | Estado | Verificación Técnica |
 | :---: | :--- | :---: | :--- |
-| **1** | Retratos nítidos en HD de las 9 cartas de HeeJin/OT11 | **APROBADO** | Texturas `1001_l.i.bytes` (detalle) y `_s.i.bytes` (carrusel) renderizadas sin artefactos. |
-| **2** | Marcos de rango correctos (R, S, A, B) | **APROBADO** | Celdas R (0, 1, 4, 6, 8), S (3, 7) y A (2, 5) con bordes y tipografías auténticas. |
-| **3** | Estrellas y números de nivel visibles | **APROBADO** | R50 muestra insignia dorada "50", R25 y R10 con nivel legible, S y A con estrellas de grado. |
-| **4** | Cero artefactos visuales (`[-]` y quad blanco eliminados) | **APROBADO** | Cero barras plateadas `[-]`, `lightImage` suprimido al 100% de transparencia. |
-| **5** | Contador inferior marca `9 / 200` | **APROBADO** | `cardCountText` actualizado con precisión tras el filtrado por miembro. |
-| **6** | Estabilidad de navegación bidireccional | **APROBADO** | Transición `LobbyScene` ↔ `InventoryScene` ↔ `Card Detail` verificada con 0 excepciones. |
+## 21. Restauración Visual Definitiva y Estabilización de Assets en `InventoryScene` (Paridad 1:1)
+
+### 21.1. Contexto y Requerimientos del Usuario (Ignacio)
+Tras detectar una regresión visual en la pantalla de inventario (`InventoryScene`, SceneId: 4), se establecieron los siguientes requerimientos mandatorios:
+1. **Paridad Visual Absoluta:** Replicar con exactitud el estado canónico documentado en [docs/walkthroughs/media/inventory_final_check.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/inventory_final_check.png).
+2. **Restricción Estricta de Assets a `wadceg/`:** Utilizar de manera exclusiva los retratos de cartas de la carpeta `files/asiudgasg/asodhsg/wadceg/` para las cartas activas y equipadas, eliminando cualquier desvío hacia `weoihxd/`.
+3. **Restricción de Identificadores de Cartas:** Limitar el conjunto de prueba a las cartas registradas en el perfil de usuario `player_profile.json` (rango 1001 a 1011 Normales OT11 y 1012 Prism).
+4. **Orden Canónico por Miembro:** Las cartas del carrusel inferior deben ordenarse de forma armónica por integrante (HeeJin a Go Won/Olivia Hye), presentando las cartas no equipadas de grado inferior (A, S) al inicio seguidas por las cartas de grado R equipadas con su correspondiente checkmark azul (✓).
+5. **Persistencia de Unity (Garage):** Preservar la técnica de retención de inventario (*DontDestroyOnLoad / Pinned*) para evitar parpadeos o recargas innecesarias.
+
+---
+
+### 21.2. Hallazgos Técnicos y Correcciones Implementadas
+
+1. **Restauración del Panel Superior (`InvenGroupView` / `InvenGroupItemView`):**
+   - **Causa Raíz:** Se había implementado previamente un `Interceptor.replace` agresivo sobre `InventoryScene.Refresh` (RVA `0x105E0FC`), lo que anulaba la inicialización nativa de `InvenGroupView.SetData` (`0xF250C8`), `set_Count("1 / 1")` y `JumpToDataIndex(0)`.
+   - **Solución:** Se revirtió a `Interceptor.attach` en `0x105E0FC`, permitiendo que el flujo nativo configure el panel superior. El panel ahora despliega perfectamente las 11 cartas de LOONA (*Hi High* Grado R Lv 50, +500.000, ULTRA RAVE Lv 3 y contador `1 / 1`).
+
+2. **Corrección de Conflicto de VTable / Crash de Memoria (`0xFEC7DC` vs `0x1ECB61C`):**
+   - **Causa Raíz:** Al inyectar el checkmark de equipada (`MARK_INDEX.Equip = 0`), una versión anterior invocaba erróneamente `0xFEC7DC` (`SoftMask.set_sprite`) pasando una instancia de `UnityEngine.UI.Image` (`markImg`), provocando una violación de acceso de memoria (`access violation accessing 0x0`) que abortaba `EnhancedScroller.ReloadData`.
+   - **Solución:** Se sustituyó por la RVA genuina de `UnityEngine.UI.Image.set_sprite` (`0x1ECB61C`), permitiendo la correcta asignación del sprite obtenido de `SpritesComponent.GetSprite(0)` (`0xD0CAB8`).
+
+3. **Supresión Definitiva del Halo Blanco / Velo de Luz (`lightImage`):**
+   - **Causa Raíz:** En `InvenCardCellView.set_LightVisible` (RVA `0xF21424`), el reemplazo anterior se limitaba a escribir en el canal alfa de `m_Color` (`lightImg + 0x2C`), sin desactivar el `GameObject` de `lightImage` (`cell + 0x58`). En consecuencia, el shader de Unity seguía dibujando una capa semitransparente que quemaba/sobreexponía los colores de las cartas.
+   - **Solución:** Se implementó la desactivación explícita del componente y su `GameObject` tanto en el hook de `set_LightVisible` como en `updateSingleCell`:
+     ```javascript
+     setEnabledFn(lightImg, 0, NULL);
+     var lGo = getGoFnBase(lightImg, NULL);
+     if (!lGo.isNull()) setActFnBase(lGo, 0, NULL);
+     ```
+     Las cartas en el carrusel inferior ahora se renderizan con colores nítidos, saturados y contraste 100% fiel al diseño original.
+
+4. **Corrección y Renderizado Nítido del Botón de Cierre 'X' (`btnBack`):**
+   - **Causa Raíz:** El botón de retroceso (`btnBack` en `InventoryView + 0x88`, de tipo `ButtonCache`) mostraba un cuadrado negro sólido debido a artefactos de estado del componente `disabled` (`0x58`) y falta de sincronización del `mGameObject` (`0x10`).
+   - **Solución:** En el hook `ShowDefaultLayout` (RVA `0x1055ED0`), se aseguró la activación de su `GameObject` raíz (`0x10`), la supresión explícita del overlay `disabled` (`SetActive(0)` y `enabled = 0`) y la verificación de color del `box` (`0x50`), restaurando la cruz 'X' con su color canónico azul marino `(82, 93, 156)`.
+
+5. **Orden Canónico de las 14 Cartas por Integrante:**
+   - En `populateOfflineInventoryCards`, se aplicó un algoritmo de ordenamiento sobre `loonaCardItems` para reflejar la distribución exacta de `player_profile.json` y `inventory_final_check.png`:
+     - Índice 0: HeeJin Grado A Lv 1 (no equipada)
+     - Índice 1: HyunJin Grado S Lv 1 (no equipada)
+     - Índice 2: HeeJin Grado R Lv 50 (equipada con checkmark ✓)
+     - Índice 3: HeeJin Prism Grado R Lv 50 (no equipada con fondo prismático)
+     - Índice 4: HyunJin Grado R Lv 50 (equipada con checkmark ✓)
+     - Índices 5 a 13: HaSeul, YeoJin, ViVi, Kim Lip, JinSoul, Choerry, Yves, Chuu y Go Won (equipadas con checkmark ✓).
+
+---
+
+### 21.3. Certificación Visual
+Se verificó la paridad completa mediante captura en vivo del dispositivo contra la referencia del usuario:
+- Captura de Referencia: [docs/walkthroughs/media/inventory_final_check.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/inventory_final_check.png)
+- Captura de Verificación en Vivo: [docs/walkthroughs/media/inventory_restoration_verified.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/inventory_restoration_verified.png)
+- Comparación de Celdas de Zoom: [docs/walkthroughs/media/carousel_zoom_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/carousel_zoom_live.png) contra [docs/walkthroughs/media/carousel_zoom.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/carousel_zoom.png).
+
 
 
 
