@@ -2201,6 +2201,26 @@ En el motor Dalcomsoft, los atributos, bonificaciones, precios y probabilidades 
 - **Flujo de Grade Up (Evolución de Rango C5->B1, B5->A1, A5->S1, S5->R1):**
   - Requiere dos cartas del mismo miembro y mismo grado al nivel 5 máximo. Al fusionarlas, se invoca `GradeUpPopup` desplegando la carta en su nuevo grado.
 
+### 24.4. Implementación y Validación de la Fase 1 (Balance e Interceptación de Consultas)
+1. **Despliegue de Tablas Maestras:**
+   - Desencriptación de `cbd.bin`, `cid.bin`, `cgd.bin`, `csd.bin`, `cdd.bin` mediante AES-256-ECB (`WnFKN1v_gUcgmUVZnjjjGXGwk557zBSO`) + Base64 + GZip.
+   - Guardadas en `app/src/main/assets/data/` y transferidas a `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/`.
+2. **Implementación del Motor de Balance en Frida (`libscript.js`):**
+   - Función `loadOfflineCardDataTables()` para carga perezosa y cacheo en memoria de las matrices `cbd`, `cid`, `cgd`, `csd`.
+   - Función `getCardBaseStats(grade, level, isPrism)` que mapea con exactitud matemática `code = (gr < 4) ? (gr * 5 + lvl - 1) : (20 + lvl - 1)` y retorna `score` y `energy` oficiales más el bono prism (+10).
+   - Función `getIntensifyPriceAndRate(targetGrade, targetLevel, matGrade, matLevel)` que resuelve precios en RP y porcentajes de éxito (%) exactos desde `cid.bin`.
+   - Función `getCardSellPrice(grade)` para valor de venta por rango según `csd.bin`.
+3. **Hooks Nativos en `CardIntensifyControl`:**
+   - `get_IsOpened` (RVA `0x137F644`): Retorna `1` (true) para habilitar el subsistema.
+   - `Open` (RVA `0x137F7E0`): Bypass offline seguro que previene descargas o errores de red.
+   - `GetCode` (RVA `0x13819A4`): Retorna el código de nivel Dalcomsoft correspondiente.
+   - `Find(short code, short subCode)` (RVA `0x1381780`): Creación en memoria de `CardIntensifyControl.Item` con campos `Rate` (`+0x10`) y `Price` (`+0x18`).
+   - `Find(CardGrade, short, CardGrade, short)` (RVA `0x1383BDC`): Redirección delegada.
+4. **Verificación Visual y Operativa en Runtime:**
+   - Comprobación visual en emulador: cartas A1 renderizan Score 40 / Energy 40; cartas R50 renderizan Score 199 / Energy 100 con total fidelidad.
+   - Apertura verificada de `InvenCardIntensifyView` (con 5 ranuras de material, etiqueta de probabilidad, botón RECOMMEND y botón TRY con costo de RP).
+
+
 
 
 

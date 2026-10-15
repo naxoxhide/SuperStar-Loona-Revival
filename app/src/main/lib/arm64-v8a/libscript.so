@@ -2759,21 +2759,58 @@ function initIl2Cpp(module) {
                 // 📊 CARD STATS (cbd.json) & METADATA (cdd.json, tmd.json) ENGINE
                 // =========================================================================
                 var cbdCache = null;
-                function getCardBaseStats(grade, level, isPrism) {
+                var cidCache = null;
+                var cgdCache = null;
+                var csdCache = null;
+
+                function loadOfflineCardDataTables() {
                     if (!cbdCache) {
                         try {
-                            var raw = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/cbd.json");
-                            if (raw) cbdCache = JSON.parse(raw);
-                        } catch (e) {}
+                            var rawCbd = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/cbd.json") ||
+                                         readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/cbd.json");
+                            if (rawCbd) {
+                                cbdCache = JSON.parse(rawCbd);
+                                log("[📊 CBD] Loaded cbd.json: " + cbdCache.length + " card balance levels cached!");
+                            }
+                        } catch (eCbd) { log("[-] Error loading cbd.json: " + eCbd.message); }
                     }
-                    var code = 0;
+                    if (!cidCache) {
+                        try {
+                            var rawCid = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/cid.json") ||
+                                         readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/cid.json");
+                            if (rawCid) {
+                                cidCache = JSON.parse(rawCid);
+                                log("[📊 CID] Loaded cid.json: " + cidCache.length + " intensify matrix entries cached!");
+                            }
+                        } catch (eCid) { log("[-] Error loading cid.json: " + eCid.message); }
+                    }
+                    if (!cgdCache) {
+                        try {
+                            var rawCgd = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/cgd.json") ||
+                                         readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/cgd.json");
+                            if (rawCgd) {
+                                cgdCache = JSON.parse(rawCgd);
+                                log("[📊 CGD] Loaded cgd.json: " + cgdCache.length + " card grade bonus entries cached!");
+                            }
+                        } catch (eCgd) {}
+                    }
+                    if (!csdCache) {
+                        try {
+                            var rawCsd = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/csd.json") ||
+                                         readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/csd.json");
+                            if (rawCsd) {
+                                csdCache = JSON.parse(rawCsd);
+                                log("[📊 CSD] Loaded csd.json: " + csdCache.length + " card sell entries cached!");
+                            }
+                        } catch (eCsd) {}
+                    }
+                }
+
+                function getCardBaseStats(grade, level, isPrism) {
+                    loadOfflineCardDataTables();
                     level = Math.max(1, parseInt(level, 10) || 1);
                     grade = parseInt(grade, 10) || 0;
-                    if (grade === 0) code = Math.min(4, level - 1);
-                    else if (grade === 1) code = 5 + Math.min(4, level - 1);
-                    else if (grade === 2) code = 10 + Math.min(4, level - 1);
-                    else if (grade === 3) code = 15 + Math.min(4, level - 1);
-                    else if (grade === 4) code = 20 + Math.min(98, level - 1);
+                    var code = (grade < 4) ? (grade * 5 + Math.min(4, level - 1)) : (20 + Math.min(98, level - 1));
 
                     var score = 100;
                     var energy = 100;
@@ -2782,7 +2819,7 @@ function initIl2Cpp(module) {
                         score = item.minScore + (isPrism ? (item.prizmScore || 10) : 0);
                         energy = item.minEnergy || 100;
                     } else {
-                        // Official Dalcomsoft formulas as fallback
+                        // Official Dalcomsoft fallback formulas
                         if (grade === 0) { score = 10 + (level - 1) * 3; energy = score; }
                         else if (grade === 1) { score = 25 + (level - 1) * 3; energy = score; }
                         else if (grade === 2) { score = 40 + (level - 1) * 5; energy = score; }
@@ -2791,6 +2828,46 @@ function initIl2Cpp(module) {
                         if (isPrism) score += 10;
                     }
                     return { score: score, energy: energy };
+                }
+
+                function getIntensifyPriceAndRate(targetGrade, targetLevel, matGrade, matLevel) {
+                    loadOfflineCardDataTables();
+                    targetLevel = Math.max(1, parseInt(targetLevel, 10) || 1);
+                    targetGrade = parseInt(targetGrade, 10) || 0;
+                    matLevel = Math.max(1, parseInt(matLevel, 10) || 1);
+                    matGrade = parseInt(matGrade, 10) || 0;
+
+                    var targetCode = (targetGrade < 4) ? (targetGrade * 5 + Math.min(4, targetLevel - 1)) : (20 + Math.min(98, targetLevel - 1));
+                    var gradeLetters = ["C", "B", "A", "S", "R"];
+                    var matKey = (gradeLetters[matGrade] || "C") + matLevel;
+                    var priceKey = matKey + "Price";
+
+                    var rate = 70.0;
+                    var price = 100;
+
+                    if (cidCache && cidCache[targetCode]) {
+                        var row = cidCache[targetCode];
+                        if (row[matKey] !== undefined && row[matKey] >= 0) rate = row[matKey];
+                        if (row[priceKey] !== undefined && row[priceKey] > 0) price = row[priceKey];
+                    } else {
+                        // Fallback pricing and rate by grade comparison
+                        var basePrices = [93, 110, 131, 154, 176];
+                        price = (basePrices[targetGrade] || 100) + (targetLevel - 1) * 2;
+                        if (matGrade > targetGrade) rate = 100.0;
+                        else if (matGrade === targetGrade) rate = 70.0;
+                        else rate = Math.max(10.0, 30.0 - (targetGrade - matGrade) * 10.0);
+                    }
+                    return { rate: rate, price: price };
+                }
+
+                function getCardSellPrice(grade) {
+                    loadOfflineCardDataTables();
+                    var gr = parseInt(grade, 10) || 0;
+                    if (csdCache && csdCache[gr] && csdCache[gr].price) {
+                        return csdCache[gr].price;
+                    }
+                    var defaultSellPrices = [200, 400, 600, 800, 1200];
+                    return defaultSellPrices[gr] || 200;
                 }
 
                 var cddCache = null;
@@ -8626,6 +8703,125 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing InventoryScene.OnEquip: " + eOeq.message);
                 }
 
+                // =========================================================================
+                // ⚡ CARD INTENSIFY CONTROL (0x137F644, 0x137F7E0, 0x13819A4, 0x1381780)
+                // =========================================================================
+                try {
+                    // 1. CardIntensifyControl.get_IsOpened (0x137F644) -> return 1
+                    Interceptor.replace(baseAddr.add(0x137F644), new NativeCallback(function() {
+                        return 1;
+                    }, "bool", []));
+
+                    // 2. CardIntensifyControl.Open (0x137F7E0) -> safe no-op
+                    Interceptor.replace(baseAddr.add(0x137F7E0), new NativeCallback(function() {
+                        log("[⚡ INTENSIFY] CardIntensifyControl.Open() invoked safely offline!");
+                    }, "void", []));
+
+                    // 3. CardIntensifyControl.GetCode (0x13819A4) -> returns formula code (short)
+                    Interceptor.replace(baseAddr.add(0x13819A4), new NativeCallback(function(grade, level) {
+                        var gr = parseInt(grade, 10) || 0;
+                        var lvl = Math.max(1, parseInt(level, 10) || 1);
+                        var code = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
+                        return code;
+                    }, "int16", ["int", "int16"]));
+
+                    // 4. CardIntensifyControl.Find(short code, short subCode) (0x1381780) -> returns Item*
+                    var cachedCardIntensifyItemKlass = NULL;
+                    Interceptor.replace(baseAddr.add(0x1381780), new NativeCallback(function(code, subCode) {
+                        try {
+                            if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) {
+                                cachedCardIntensifyItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardIntensifyControl/Item");
+                            }
+                            if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) return NULL;
+
+                            var itemObj = il2cpp_object_new(cachedCardIntensifyItemKlass);
+                            if (!itemObj || itemObj.isNull()) return NULL;
+                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(itemObj, 2);
+
+                            var subGrade = 0;
+                            var subLvl = 1;
+                            if (subCode < 5) { subGrade = 0; subLvl = subCode + 1; }
+                            else if (subCode < 10) { subGrade = 1; subLvl = subCode - 5 + 1; }
+                            else if (subCode < 15) { subGrade = 2; subLvl = subCode - 10 + 1; }
+                            else if (subCode < 20) { subGrade = 3; subLvl = subCode - 15 + 1; }
+                            else { subGrade = 4; subLvl = subCode - 20 + 1; }
+
+                            var gradeLetters = ["C", "B", "A", "S", "R"];
+                            var matKey = (gradeLetters[subGrade] || "C") + subLvl;
+                            var priceKey = matKey + "Price";
+
+                            var rate = 70.0;
+                            var price = 100;
+                            loadOfflineCardDataTables();
+
+                            if (cidCache && cidCache[code]) {
+                                var row = cidCache[code];
+                                if (row[matKey] !== undefined && row[matKey] >= 0) rate = row[matKey];
+                                if (row[priceKey] !== undefined && row[priceKey] > 0) price = row[priceKey];
+                            } else {
+                                var basePrices = [93, 110, 131, 154, 176];
+                                price = (basePrices[subGrade] || 100) + (subLvl - 1) * 2;
+                                rate = (subGrade >= 4) ? 50.0 : 70.0;
+                            }
+
+                            itemObj.add(0x10).writeDouble(rate);
+                            itemObj.add(0x18).writeS32(price);
+                            itemObj.add(0x1C).writeU8(0); // isMaterial = false
+
+                            log("[⚡ INTENSIFY FIND] code=" + code + ", subCode=" + subCode + " (" + matKey + ") -> Rate=" + rate.toFixed(1) + "%, Price=" + price + " RP");
+                            return itemObj;
+                        } catch (eFind) {
+                            log("[-] Error in CardIntensifyControl.Find: " + eFind.message);
+                            return NULL;
+                        }
+                    }, "pointer", ["int16", "int16"]));
+
+                    // 5. CardIntensifyControl.Find(CardGrade, short, CardGrade, short) (0x1383BDC) -> returns Item*
+                    Interceptor.replace(baseAddr.add(0x1383BDC), new NativeCallback(function(grade, level, subGrade, subLevel) {
+                        try {
+                            var gr = parseInt(grade, 10) || 0;
+                            var lvl = Math.max(1, parseInt(level, 10) || 1);
+                            var sGr = parseInt(subGrade, 10) || 0;
+                            var sLvl = Math.max(1, parseInt(subLevel, 10) || 1);
+
+                            var code = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
+                            var subCode = (sGr < 4) ? (sGr * 5 + Math.min(4, sLvl - 1)) : (20 + Math.min(98, sLvl - 1));
+
+                            var findFn = new NativeFunction(baseAddr.add(0x1381780), "pointer", ["int16", "int16"]);
+                            return findFn(code, subCode);
+                        } catch (eFind4) {
+                            log("[-] Error in CardIntensifyControl.Find(4 args): " + eFind4.message);
+                            return NULL;
+                        }
+                    }, "pointer", ["int", "int16", "int", "int16"]));
+
+                    log("[+] CardIntensifyControl hooks installed successfully!");
+                } catch (eCicHooks) {
+                    log("[-] Error installing CardIntensifyControl hooks: " + eCicHooks.message);
+                }
+
+                // InventoryScene.OnIntensify (0x105A97C)
+                try {
+                    Interceptor.attach(baseAddr.add(0x105A97C), {
+                        onEnter: function(args) {
+                            log("[⚡ INVENTORY] InventoryScene.OnIntensify called! instance=" + args[0]);
+                        }
+                    });
+                } catch (eOi) {
+                    log("[-] Error hooking InventoryScene.OnIntensify: " + eOi.message);
+                }
+
+                // InventoryScene.SetStateIntensify (0x1056BCC)
+                try {
+                    Interceptor.attach(baseAddr.add(0x1056BCC), {
+                        onEnter: function(args) {
+                            log("[⚡ INVENTORY] InventoryScene.SetStateIntensify called! isReload=" + args[1] + ", isUpdate=" + args[2]);
+                        }
+                    });
+                } catch (eSsi) {
+                    log("[-] Error hooking InventoryScene.SetStateIntensify: " + eSsi.message);
+                }
+
                 // --- Helper to initialize CardBookControl.SharedInfo and MyInfo ---
                 function ensureCardBookControlData() {
                     try {
@@ -8992,6 +9188,12 @@ function initIl2Cpp(module) {
                                 log("[🗃️ CHANGE CMD] Triggering OnChange directly!");
                                 var onChangeFn = new NativeFunction(baseAddr.add(0x105A61C), "void", ["pointer", "pointer"]);
                                 onChangeFn(curScene, NULL);
+                            }
+                        } else if (cmdRaw === "intensify") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                log("[⚡ INTENSIFY CMD] Triggering OnIntensify directly!");
+                                var onIntensifyFn = new NativeFunction(baseAddr.add(0x105A97C), "void", ["pointer", "pointer"]);
+                                onIntensifyFn(curScene, NULL);
                             }
                         } else if (cmdRaw === "equip") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
