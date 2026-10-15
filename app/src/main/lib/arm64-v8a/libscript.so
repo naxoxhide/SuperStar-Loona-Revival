@@ -577,6 +577,18 @@ function initIl2Cpp(module) {
                         isPrism: false
                     });
                 }
+                // 1 Prism card (1012 - HeeJin Prism)
+                invCards.push({
+                    objectID: 100012,
+                    cardID: 1012,
+                    grade: 4,
+                    level: 50,
+                    energy: 100,
+                    score: 100,
+                    isEquip: false,
+                    isLock: false,
+                    isPrism: true
+                });
                 // 2 extra cards in inventory (unequipped) to verify selective checkmarking
                 invCards.push({
                     objectID: 100013,
@@ -618,7 +630,7 @@ function initIl2Cpp(module) {
                     },
                     inventoryCards: invCards,
                     equipedCards: {
-                        "1001": [100001, 100002, 100003, 100004, 100005, 100006, 100007, 100008, 100009, 100010, 100011, 100012]
+                        "1001": [100001, 100002, 100003, 100004, 100005, 100006, 100007, 100008, 100009, 100010, 100011]
                     }
                 };
             }
@@ -890,7 +902,34 @@ function initIl2Cpp(module) {
                         } catch (ePrf) {}
                     }, "void", ["int", "pointer"]));
                 } catch (ePcs) {}
-                log("[🛡️ USER GUARD] UserControl null guards (Nickname, NicknameChanger, ProfileCode, ObjectID, Headphone) successfully installed!");
+                try {
+                    // Diamonds
+                    Interceptor.replace(baseAddr.add(0xAB1658), new NativeCallback(function (methodInfo) { return 100000; }, "int", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xAB1470), new NativeCallback(function (methodInfo) { return 100000; }, "int", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xAB1840), new NativeCallback(function (methodInfo) { return 200000; }, "int", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xAB1960), new NativeCallback(function (amount, methodInfo) { return 1; }, "int", ["int", "pointer"]));
+                    // Rhythm Points (RP)
+                    Interceptor.replace(baseAddr.add(0xAB1094), new NativeCallback(function (methodInfo) { return 500000; }, "int", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xAB0EAC), new NativeCallback(function (methodInfo) { return 500000; }, "int", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xAB127C), new NativeCallback(function (methodInfo) { return 1000000; }, "int", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xAB139C), new NativeCallback(function (amount, methodInfo) { return 1; }, "int", ["int", "pointer"]));
+                    // Headphones
+                    Interceptor.replace(baseAddr.add(0xAB0C5C), new NativeCallback(function (methodInfo) { return 20; }, "int", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xAB0D7C), new NativeCallback(function (amount, methodInfo) { return 1; }, "int", ["int", "pointer"]));
+                    // Inventory capacity
+                    Interceptor.replace(baseAddr.add(0xAB1C1C), new NativeCallback(function (methodInfo) { return 200; }, "int", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xAB1B4C), new NativeCallback(function (methodInfo) { return 0; }, "int", ["pointer"]));
+                    // Dalcom Coins
+                    Interceptor.replace(baseAddr.add(0xAB33FC), new NativeCallback(function (methodInfo) { return 50000; }, "int", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xAB35E4), new NativeCallback(function (methodInfo) { return 50000; }, "int", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xAB37CC), new NativeCallback(function (methodInfo) { return 100000; }, "int", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xAB38EC), new NativeCallback(function (amount, methodInfo) { return 1; }, "int", ["int", "pointer"]));
+                    // Theme changer & leader
+                    Interceptor.replace(baseAddr.add(0xAB39C0), new NativeCallback(function (methodInfo) { return 10; }, "int", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xAB42E0), new NativeCallback(function (methodInfo) { return 1; }, "int", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xAB4408), new NativeCallback(function (methodInfo) { return 1; }, "int", ["pointer"]));
+                } catch (eDia) {}
+                log("[🛡️ USER GUARD] UserControl null guards (Nickname, RP, Diamond, Headphones, DalcomCoin, Inven, ProfileCode) successfully installed!");
             } catch (eUserG) {
                 log("[-] Error installing UserControl guards: " + eUserG.message);
             }
@@ -1618,9 +1657,9 @@ function initIl2Cpp(module) {
                 log("[📦 ASSET] <FilterDownloadFirstPackingFile>d__68.MoveNext intercepted -> completing with true");
                 try {
                     var initMetadata = new NativeFunction(baseAddr.add(0xA43BE8), 'void', ['pointer']);
-                    var methodInfoTable = baseAddr.add(0x3113000).add(0xFE0).readPointer();
-                    initMetadata(methodInfoTable);
-                    var methodInfo = methodInfoTable.readPointer();
+                    var methodInfoSlot = baseAddr.add(0x30F3000).add(0xC90).readPointer();
+                    initMetadata(methodInfoSlot);
+                    var methodInfo = methodInfoSlot.readPointer();
                     var setResultFn = new NativeFunction(baseAddr.add(0x2175900), 'void', ['pointer', 'bool', 'pointer']);
                     setResultFn(sm.add(8), 1, methodInfo);
                     sm.writeS32(-2);
@@ -3117,8 +3156,9 @@ function initIl2Cpp(module) {
                         ccd.add(0x48).writePointer(NULL);
                         ccd.add(0x50).writeU8(1);
                         ccd.add(0x51).writeU8(1);
-                        ccd.add(0x58).writePointer(createDownloadPath("asiudgasg/asodhsg/wadceg/" + cardId + "_s.i.bytes"));
-                        ccd.add(0x60).writePointer(createDownloadPath("asiudgasg/asodhsg/wadceg/" + cardId + "_l.i.bytes"));
+                        var cardFolder = "wadceg";
+                        ccd.add(0x58).writePointer(createDownloadPath("asiudgasg/asodhsg/" + cardFolder + "/" + cardId + "_s.i.bytes"));
+                        ccd.add(0x60).writePointer(createDownloadPath("asiudgasg/asodhsg/" + cardFolder + "/" + cardId + "_l.i.bytes"));
                         try {
                             var cdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "CardData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "CardData");
                             if (cdKlass && !cdKlass.isNull()) {
@@ -3126,8 +3166,8 @@ function initIl2Cpp(module) {
                                 if (il2cpp_gchandle_new && !cd.isNull()) il2cpp_gchandle_new(cd, 2);
                                 cd.add(0x10).writeS32(cardId);
                                 cd.add(0x14).writeS32(isPrism ? 1 : 0); // type = 1 for prism
-                                cd.add(0x20).writePointer(createIl2CppString("asiudgasg/asodhsg/wadceg/" + cardId + "_s.i.bytes")); // cardImageSmall
-                                cd.add(0x28).writePointer(createIl2CppString("asiudgasg/asodhsg/wadceg/" + cardId + "_l.i.bytes")); // cardImageLarge
+                                cd.add(0x20).writePointer(createIl2CppString("asiudgasg/asodhsg/" + cardFolder + "/" + cardId + "_s.i.bytes")); // cardImageSmall
+                                cd.add(0x28).writePointer(createIl2CppString("asiudgasg/asodhsg/" + cardFolder + "/" + cardId + "_l.i.bytes")); // cardImageLarge
                                 cd.add(0x30).writeS32(themeId); // theme = themeId
                                 cd.add(0x70).writeS32(1001); // group = 1001
                                 cd.add(0x74).writeS32(memberIdx); // artist = memberIdx
@@ -3224,7 +3264,8 @@ function initIl2Cpp(module) {
                             var cd = thisPtr.add(0x10).readPointer();
                             var cId = (!cd.isNull()) ? cd.add(0x10).readS32() : 1001;
                             if (cId <= 0) cId = 1001;
-                            var dp = createDownloadPath("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes");
+                            var folder = "wadceg";
+                            var dp = createDownloadPath("asiudgasg/asodhsg/" + folder + "/" + cId + "_s.i.bytes");
                             if (dp && !dp.isNull()) {
                                 thisPtr.add(0x58).writePointer(dp);
                                 return dp;
@@ -3246,7 +3287,8 @@ function initIl2Cpp(module) {
                             var cd = thisPtr.add(0x10).readPointer();
                             var cId = (!cd.isNull()) ? cd.add(0x10).readS32() : 1001;
                             if (cId <= 0) cId = 1001;
-                            var dp = createDownloadPath("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
+                            var folder = "wadceg";
+                            var dp = createDownloadPath("asiudgasg/asodhsg/" + folder + "/" + cId + "_l.i.bytes");
                             if (dp && !dp.isNull()) {
                                 thisPtr.add(0x60).writePointer(dp);
                                 return dp;
@@ -3268,7 +3310,8 @@ function initIl2Cpp(module) {
                             var cd = thisPtr.add(0x10).readPointer();
                             var cId = (!cd.isNull()) ? cd.add(0x10).readS32() : 1001;
                             if (cId <= 0) cId = 1001;
-                            var dp = createDownloadPath("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
+                            var folder = "wadceg";
+                            var dp = createDownloadPath("asiudgasg/asodhsg/" + folder + "/" + cId + "_l.i.bytes");
                             if (dp && !dp.isNull()) {
                                 thisPtr.add(0x68).writePointer(dp);
                                 return dp;
@@ -3680,18 +3723,38 @@ function initIl2Cpp(module) {
 
                 function createMockSmallCardParams(cardId, grade, level, isEquip) {
                     try {
-                        var csvParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardSmallView/Params");
-                        if (!csvParamsKlass || csvParamsKlass.isNull()) return NULL;
-                        var p = il2cpp_object_new(csvParamsKlass);
+                        var baseItem = NULL;
+                        if (loonaCardItems && loonaCardItems.length > 0) {
+                            for (var i = 0; i < loonaCardItems.length; i++) {
+                                var it = loonaCardItems[i];
+                                if (it && !it.isNull()) {
+                                    var r = it.add(0x10).readPointer();
+                                    if (!r.isNull() && r.add(0x20).readS32() === cardId) {
+                                        baseItem = it;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!baseItem || baseItem.isNull()) baseItem = loonaCardItems[0];
+                        }
+                        var p = NULL;
+                        if (baseItem && !baseItem.isNull()) {
+                            var getSmallFn = new NativeFunction(baseAddr.add(0xABEB30), "pointer", ["pointer", "pointer", "bool", "pointer"]);
+                            p = getSmallFn(baseItem, NULL, 0, NULL);
+                        }
+                        if (!p || p.isNull()) {
+                            try {
+                                var csvParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardSmallView/Params");
+                                if (csvParamsKlass && !csvParamsKlass.isNull()) {
+                                    p = il2cpp_object_new(csvParamsKlass);
+                                }
+                            } catch (eCsvK) {}
+                        }
                         if (!p || p.isNull()) return NULL;
                         if (il2cpp_gchandle_new) il2cpp_gchandle_new(p, 2);
 
-                        try {
-                            var ctorFn = new NativeFunction(baseAddr.add(0xE49E98), "void", ["pointer", "pointer"]);
-                            ctorFn(p, NULL);
-                        } catch (eCt) {}
-
-                        var photoDp = createDownloadPath("asiudgasg/asodhsg/wadceg/" + cardId + "_s.i.bytes");
+                        var cFolder = "wadceg";
+                        var photoDp = createDownloadPath("asiudgasg/asodhsg/" + cFolder + "/" + cardId + "_s.i.bytes");
                         var tierDp = getGradeFrameDownloadPath(grade, 1);
                         var maxLvl = (grade === 4) ? 50 : 5;
                         var safeLvl = (grade === 4) ? level : Math.min(Math.max(level, 1), 5);
@@ -3726,9 +3789,21 @@ function initIl2Cpp(module) {
 
                 function createMockEmptySmallCardParams(cardId) {
                     try {
-                        var csvParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardSmallView/Params");
-                        if (!csvParamsKlass || csvParamsKlass.isNull()) return NULL;
-                        var p = il2cpp_object_new(csvParamsKlass);
+                        var baseItem = NULL;
+                        if (loonaCardItems && loonaCardItems.length > 0) baseItem = loonaCardItems[0];
+                        var p = NULL;
+                        if (baseItem && !baseItem.isNull()) {
+                            var getSmallFn = new NativeFunction(baseAddr.add(0xABEB30), "pointer", ["pointer", "pointer", "bool", "pointer"]);
+                            p = getSmallFn(baseItem, NULL, 0, NULL);
+                        }
+                        if (!p || p.isNull()) {
+                            try {
+                                var csvParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardSmallView/Params");
+                                if (csvParamsKlass && !csvParamsKlass.isNull()) {
+                                    p = il2cpp_object_new(csvParamsKlass);
+                                }
+                            } catch (eCsvK) {}
+                        }
                         if (!p || p.isNull()) return NULL;
 
                         var photoDp = createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/" + cardId + "_l.i.bytes");
@@ -3776,7 +3851,8 @@ function initIl2Cpp(module) {
                             ctorFn(p, NULL);
                         } catch (eCt) {}
 
-                        var photoDp = createDownloadPath("asiudgasg/asodhsg/wadceg/" + cardId + "_l.i.bytes");
+                        var cFolder = "wadceg";
+                        var photoDp = createDownloadPath("asiudgasg/asodhsg/" + cFolder + "/" + cardId + "_l.i.bytes");
                         var tierDp = getGradeFrameDownloadPath(grade, 0);
 
                         p.add(0x10).writePointer(photoDp || NULL);
@@ -4131,6 +4207,46 @@ function initIl2Cpp(module) {
                                                         setNumVis(cardSmallView, 0);
                                                     }
                                                 } catch (eVisEq) {}
+
+                                                // Deactivate ImageEfftect (horizontal gray line artifact)
+                                                try {
+                                                    var imgEff = cardSmallView.add(0xC8).readPointer();
+                                                    if (!imgEff.isNull()) {
+                                                        var effGo = getGameObjectFn(imgEff, NULL);
+                                                        if (!effGo.isNull()) setActiveFn(effGo, 0, NULL);
+                                                    }
+                                                } catch (eEff) {}
+
+                                                // Direct texture injection strictly from wadceg (unity garage pinned)
+                                                try {
+                                                    var photoRawImg = cardSmallView.add(0x58).readPointer();
+                                                    if (!photoRawImg.isNull()) {
+                                                        var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") ||
+                                                                       loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
+                                                        if (photoTex && !photoTex.isNull()) {
+                                                            var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                                                            setTextureFn(photoRawImg, photoTex, NULL);
+                                                            var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
+                                                            setEnabledFn(photoRawImg, 1, NULL);
+                                                            var pGo = getGameObjectFn(photoRawImg, NULL);
+                                                            if (!pGo.isNull()) setActiveFn(pGo, 1, NULL);
+                                                        }
+                                                    }
+
+                                                    var tierRawImg = cardSmallView.add(0x68).readPointer();
+                                                    if (!tierRawImg.isNull()) {
+                                                        var gLetter = (gr === 4) ? "r" : (gr === 3) ? "s" : (gr === 2) ? "a" : (gr === 1) ? "b" : "c";
+                                                        var tierTex = loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gLetter + "_s.i.bytes");
+                                                        if (tierTex && !tierTex.isNull()) {
+                                                            var setTextureFn2 = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                                                            setTextureFn2(tierRawImg, tierTex, NULL);
+                                                            var setEnabledFn2 = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
+                                                            setEnabledFn2(tierRawImg, 1, NULL);
+                                                            var tGo = getGameObjectFn(tierRawImg, NULL);
+                                                            if (!tGo.isNull()) setActiveFn(tGo, 1, NULL);
+                                                        }
+                                                    }
+                                                } catch (ePhotoInj) {}
                                             } else {
                                                 // Slot IS UNEQUIPPED: show empty placeholder from sdhgauwehdnu
                                                 var emptyCardId = 1001 + mIdx;
@@ -4184,18 +4300,29 @@ function initIl2Cpp(module) {
 
                             // 5. Call native UpdateGrade(view, p) (0xF246B4)
                             try {
-                                var updateGradeFn = new NativeFunction(baseAddr.add(0xF246B4), "void", ["pointer", "pointer"]);
-                                updateGradeFn(view, p);
-                                log("[✅ GROUP_ITEM_VIEW] Native UpdateGrade executed successfully!");
+                                var gradeSprites = view.add(0x80).readPointer();
+                                var gradeImg = view.add(0x88).readPointer();
+                                if (!gradeSprites.isNull() && !gradeImg.isNull()) {
+                                    var updateGradeFn = new NativeFunction(baseAddr.add(0xF246B4), "void", ["pointer", "pointer"]);
+                                    updateGradeFn(view, p);
+                                    log("[✅ GROUP_ITEM_VIEW] Native UpdateGrade executed successfully!");
+                                } else {
+                                    log("[-] Skipping UpdateGrade: gradeSprites/gradeImg not yet initialized");
+                                }
                             } catch (eUg) {
                                 log("[-] Error executing native UpdateGrade: " + eUg.message);
                             }
 
                             // 6. Call native UpdateTheme(view, p) (0xF248E8)
                             try {
-                                var updateThemeFn = new NativeFunction(baseAddr.add(0xF248E8), "void", ["pointer", "pointer"]);
-                                updateThemeFn(view, p);
-                                log("[✅ GROUP_ITEM_VIEW] Native UpdateTheme executed successfully!");
+                                var themeRaw = view.add(0xC0).readPointer();
+                                if (!themeRaw.isNull()) {
+                                    var updateThemeFn = new NativeFunction(baseAddr.add(0xF248E8), "void", ["pointer", "pointer"]);
+                                    updateThemeFn(view, p);
+                                    log("[✅ GROUP_ITEM_VIEW] Native UpdateTheme executed successfully!");
+                                } else {
+                                    log("[-] Skipping UpdateTheme: themeRaw not yet initialized");
+                                }
                             } catch (eUt) {
                                 log("[-] Error executing native UpdateTheme: " + eUt.message);
                             }
@@ -4942,6 +5069,179 @@ function initIl2Cpp(module) {
                     }
                 };
 
+                // Dedicated renderer to inject local textures, stars/levels, and suppress disabled button artifacts on card cells
+                var updateSingleCell = function(cell, cardItem, dataIdx, isInspected) {
+                    try {
+                        if (!cell || cell.isNull() || !cardItem || cardItem.isNull()) return;
+
+                        var rawC = cardItem.add(0x10).readPointer();
+                        if (rawC.isNull()) return;
+                        var cId = rawC.add(0x20).readS32();
+                        var gr = rawC.add(0x24).readS32();
+                        var lvl = rawC.add(0x1C).readS16();
+
+                        var getGoFnBase = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var setActFnBase = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                        var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
+                        var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+
+                        // 1. Ensure cell GameObject is active
+                        var cellGo = getGoFnBase(cell, NULL);
+                        if (!cellGo.isNull()) setActFnBase(cellGo, 1, NULL);
+
+                        // 2. Hide ButtonCache artifacts: disabled ([-] bar) and box (gray slot) while keeping button interactable
+                        var btnCache = cell.add(0x30).readPointer();
+                        if (!btnCache.isNull()) {
+                            var disImg = btnCache.add(0x58).readPointer();
+                            if (!disImg.isNull()) {
+                                setEnabledFn(disImg, 0, NULL);
+                                var disGo = getGoFnBase(disImg, NULL);
+                                if (!disGo.isNull()) setActFnBase(disGo, 0, NULL);
+                                try { disImg.add(0x2C).writeFloat(0.0); } catch (e) {}
+                            }
+
+                            var boxImg = btnCache.add(0x50).readPointer();
+                            if (!boxImg.isNull()) {
+                                setEnabledFn(boxImg, 0, NULL);
+                                var boxGo = getGoFnBase(boxImg, NULL);
+                                if (!boxGo.isNull()) setActFnBase(boxGo, 0, NULL);
+                                try { boxImg.add(0x2C).writeFloat(0.0); } catch (e) {}
+                            }
+
+                            var btnComp = btnCache.add(0x48).readPointer();
+                            if (!btnComp.isNull()) {
+                                var setTransFn = new NativeFunction(baseAddr.add(0x1954714), "void", ["pointer", "int", "pointer"]);
+                                setTransFn(btnComp, 0, NULL); // Transition = None
+                                var setInteractableFn = new NativeFunction(baseAddr.add(0x19549D4), "void", ["pointer", "bool", "pointer"]);
+                                setInteractableFn(btnComp, 1, NULL); // Keep clickable!
+                            }
+
+                            var lbl = btnCache.add(0x60).readPointer();
+                            if (!lbl.isNull()) { var g = getGoFnBase(lbl, NULL); if (!g.isNull()) setActFnBase(g, 0, NULL); }
+                            var pBox = btnCache.add(0x68).readPointer();
+                            if (!pBox.isNull()) { var g = getGoFnBase(pBox, NULL); if (!g.isNull()) setActFnBase(g, 0, NULL); }
+                            var pLbl = btnCache.add(0x70).readPointer();
+                            if (!pLbl.isNull()) { var g = getGoFnBase(pLbl, NULL); if (!g.isNull()) setActFnBase(g, 0, NULL); }
+                        }
+
+                        // 3. Render CardSmallView (item @ cell + 0x38)
+                        var item = cell.add(0x38).readPointer();
+                        if (!item.isNull()) {
+                            var itemGo = getGoFnBase(item, NULL);
+                            if (!itemGo.isNull()) setActFnBase(itemGo, 1, NULL);
+
+                            // 3a. Portrait Photo (item + 0x58)
+                            var photoRawImg = item.add(0x58).readPointer();
+                            if (!photoRawImg.isNull()) {
+                                var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") ||
+                                               loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
+                                if (photoTex && !photoTex.isNull()) {
+                                    setTextureFn(photoRawImg, photoTex, NULL);
+                                    setEnabledFn(photoRawImg, 1, NULL);
+                                    var pGo = getGoFnBase(photoRawImg, NULL);
+                                    if (!pGo.isNull()) setActFnBase(pGo, 1, NULL);
+                                }
+                            }
+
+                            // 3b. Tier Frame (item + 0x68)
+                            var tierRawImg = item.add(0x68).readPointer();
+                            if (!tierRawImg.isNull()) {
+                                var gLetter = (gr === 4) ? "r" : (gr === 3) ? "s" : (gr === 2) ? "a" : (gr === 1) ? "b" : "c";
+                                var tierRelPath = (gr === 1) ? "0b_s.i.bytes" : ("0_" + gLetter + "_s.i.bytes");
+                                var tierTex = loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/" + tierRelPath) ||
+                                              loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gLetter + "_s.i.bytes");
+                                if (tierTex && !tierTex.isNull()) {
+                                    setTextureFn(tierRawImg, tierTex, NULL);
+                                    setEnabledFn(tierRawImg, 1, NULL);
+                                    var tGo = getGoFnBase(tierRawImg, NULL);
+                                    if (!tGo.isNull()) setActFnBase(tGo, 1, NULL);
+                                }
+                            }
+
+                            // 3c. Level Display: Stars vs Number
+                            try {
+                                var setStarVisFn = new NativeFunction(baseAddr.add(0x1388C58), "void", ["pointer", "int", "pointer"]);
+                                var setNumVisFn = new NativeFunction(baseAddr.add(0x1393D68), "void", ["pointer", "int", "pointer"]);
+                                if (gr === 4) {
+                                    setStarVisFn(item, 0, NULL);
+                                    setNumVisFn(item, 1, NULL);
+                                    var numBox = item.add(0x80).readPointer();
+                                    if (!numBox.isNull()) {
+                                        var setValFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "uint32", "pointer"]);
+                                        setValFn(numBox, lvl, NULL);
+                                    }
+                                } else {
+                                    setStarVisFn(item, 1, NULL);
+                                    setNumVisFn(item, 0, NULL);
+                                }
+                            } catch (eLvl) {}
+
+                            // 3d. Hide ImageEfftect (item + 0xC8) and Effect (item + 0x88)
+                            try {
+                                var imgEff = item.add(0xC8).readPointer();
+                                if (!imgEff.isNull()) {
+                                    setEnabledFn(imgEff, 0, NULL);
+                                    var effGo = getGoFnBase(imgEff, NULL);
+                                    if (!effGo.isNull()) setActFnBase(effGo, 0, NULL);
+                                }
+                                var setEffectVisFn = new NativeFunction(baseAddr.add(0x1383F90), "void", ["pointer", "bool", "pointer"]);
+                                setEffectVisFn(item, 0, NULL);
+                            } catch (eEff) {}
+
+                            // 3e. Ensure transform scale (1, 1, 1)
+                            try {
+                                var trFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                var itemTr = trFn(item, NULL);
+                                if (!itemTr.isNull()) {
+                                    var setScaleFn = new NativeFunction(baseAddr.add(0x181E028), "void", ["pointer", "float", "float", "float", "pointer"]);
+                                    setScaleFn(itemTr, 1.0, 1.0, 1.0, NULL);
+                                }
+                            } catch (eSc) {}
+
+                            // 3f. Equip Checkmark (mark @ item + 0xC0, markSprites @ item + 0xB8)
+                            try {
+                                var markImg = item.add(0xC0).readPointer();
+                                var markSprites = item.add(0xB8).readPointer();
+                                var isEquip = (rawC.add(0x28).readU8() === 1);
+                                if (!markImg.isNull()) {
+                                    if (isEquip && !markSprites.isNull()) {
+                                        var getSpriteFn = new NativeFunction(baseAddr.add(0xD0CAB8), "pointer", ["pointer", "int", "pointer"]);
+                                        var equipSprite = getSpriteFn(markSprites, 0, NULL); // MARK_INDEX.Equip = 0
+                                        if (!equipSprite.isNull()) {
+                                            var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
+                                            setSpriteFn(markImg, equipSprite, NULL);
+                                        }
+                                        setEnabledFn(markImg, 1, NULL);
+                                        var mGo = getGoFnBase(markImg, NULL);
+                                        if (!mGo.isNull()) setActFnBase(mGo, 1, NULL);
+                                    } else {
+                                        setEnabledFn(markImg, 0, NULL);
+                                        var mGo = getGoFnBase(markImg, NULL);
+                                        if (!mGo.isNull()) setActFnBase(mGo, 0, NULL);
+                                    }
+                                }
+                            } catch (eMark) {}
+                        }
+
+                        // 4. Selection light: completely suppress white light overlay
+                        try {
+                            var setLightVisFn = new NativeFunction(baseAddr.add(0xF21424), "void", ["pointer", "bool", "pointer"]);
+                            setLightVisFn(cell, 0, NULL);
+                            var lightImg = cell.add(0x58).readPointer();
+                            if (!lightImg.isNull()) {
+                                setEnabledFn(lightImg, 0, NULL);
+                                var lGo = getGoFnBase(lightImg, NULL);
+                                if (!lGo.isNull()) setActFnBase(lGo, 0, NULL);
+                                try { lightImg.add(0x2C).writeFloat(0.0); } catch (eAl3) {}
+                            }
+                        } catch (eLgt) {}
+
+                        log("[✅ RENDER CELL] idx=" + dataIdx + " cId=" + cId + " gr=" + gr + " lvl=" + lvl + " isInspected=" + isInspected);
+                    } catch (eRnd) {
+                        log("[-] Error in updateSingleCell: " + eRnd.message);
+                    }
+                };
+
                 // Helper to safely filter lower carousel (InvenCardView @ sceneView + 0x78) by member and theme
                 var safeUpdateLowerCarousel = function(sceneThis, selectedCardItem) {
                     try {
@@ -4958,8 +5258,8 @@ function initIl2Cpp(module) {
 
                         log("[🎠 CAROUSEL] Filtering lower cards for selCard=" + selCardId + " (artist=" + selArtist + ", theme=" + selTheme + ", obj=" + selObjIdStr + ")");
 
-                        // Step 1: Collect matching cards from loonaCardItems
-                        var filteredItems = [];
+                        // Step 1: Collect matching cards: ALWAYS include the inspected card first!
+                        var filteredItems = [selectedCardItem];
                         if (loonaCardItems && loonaCardItems.length > 0) {
                             for (var i = 0; i < loonaCardItems.length; i++) {
                                 var cItem = loonaCardItems[i];
@@ -4969,14 +5269,14 @@ function initIl2Cpp(module) {
                                 if (rawC.isNull()) continue;
 
                                 var cObjIdStr = rawC.add(0x10).readS64().toString();
-                                // Exclude the inspected card itself
+                                // Skip the inspected card (already placed at index 0)
                                 if (cObjIdStr === selObjIdStr) continue;
 
                                 var cCardId = rawC.add(0x20).readS32();
                                 var cMeta = getCardMetadata(cCardId);
 
-                                // Strict filter: same member (artist) AND same theme
-                                if (cMeta.artistID === selArtist && cMeta.theme === selTheme) {
+                                // Filter: all cards belonging to the same member (artistID)
+                                if (cMeta.artistID === selArtist) {
                                     filteredItems.push(cItem);
                                     log("[🎠 CAROUSEL MATCH] Added candidate cardID=" + cCardId + " obj=" + cObjIdStr + " theme=" + cMeta.theme);
                                 }
@@ -5017,13 +5317,85 @@ function initIl2Cpp(module) {
                             return;
                         }
 
+                        activeInventorySceneInstance = sceneThis;
+                        try {
+                            var setGroupBtnAreaFn = new NativeFunction(baseAddr.add(0xF233E0), "void", ["pointer", "bool", "pointer"]);
+                            setGroupBtnAreaFn(cardView, 1, NULL);
+                        } catch (eGrp) {}
+
+                        log("[🎠 CAROUSEL] sceneThis=" + sceneThis + " sceneView=" + sceneView + " cardView=" + cardView + " filteredCount=" + filteredItems.length);
                         // Read or create delegate
                         var eventListener = ensureCardViewEventListener(sceneThis, cardView);
+                        log("[🎠 CAROUSEL] eventListener=" + eventListener);
 
-                        // Step 4: Invoke InvenCardView.SetData(maxCount, isIntensify=false, eventListener) -> RVA 0xF23384
-                        var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
-                        setDataFn(cardView, filteredItems.length, 0, eventListener, NULL);
-                        log("[✅ CAROUSEL] InvenCardView.SetData called with count=" + filteredItems.length);
+                        // Ensure cardView GameObject is active
+                        var getGoFnBase = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var setActFnBase = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                        var cvGo = getGoFnBase(cardView, NULL);
+                        if (!cvGo.isNull()) setActFnBase(cvGo, 1, NULL);
+
+                        // Directly write InvenCardView properties
+                        cardView.add(0x98).writeS32(filteredItems.length); // maxCount
+                        cardView.add(0x90).writePointer(eventListener);     // onEventListener
+                        cardView.add(0x9C).writeU8(0);                      // isShowLight
+
+                        // Step 4: Reload scroller cleanly without triggering Canvas.ForceUpdateCanvases
+                        var scroller = cardView.add(0x40).readPointer();
+                        if (!scroller.isNull()) {
+                            var scGo = getGoFnBase(scroller, NULL);
+                            if (!scGo.isNull()) setActFnBase(scGo, 1, NULL);
+
+                            try {
+                                var reloadKeepPosFn = new NativeFunction(baseAddr.add(0x125C750), "void", ["pointer", "bool", "pointer"]);
+                                reloadKeepPosFn(scroller, 0, NULL);
+                                log("[✅ CAROUSEL] ReloadDataKeepPosition(0) completed!");
+                            } catch (eRk) {
+                                log("[-] Error in ReloadDataKeepPosition: " + eRk.message);
+                            }
+
+                            try {
+                                var resetCellsFn = new NativeFunction(baseAddr.add(0x125D768), "void", ["pointer", "pointer"]);
+                                resetCellsFn(scroller, NULL);
+                                log("[✅ CAROUSEL] _ResetVisibleCellViews called successfully!");
+                            } catch (eRcv) {
+                                log("[-] Error in _ResetVisibleCellViews: " + eRcv.message);
+                            }
+
+                            scroller.add(0xE1).writeU8(1); // ensure _refreshActive stays true for LateUpdate
+                            sanitizeCardScroller(cardView);
+
+                            // Directly update all active cells in scroller with local textures & suppressed artifacts
+                            try {
+                                var acv = scroller.add(0x120).readPointer();
+                                if (!acv.isNull()) {
+                                    var acvCount = acv.add(0x18).readS32();
+                                    var acvData = acv.add(0x10).readPointer();
+                                    log("[🎠 CAROUSEL] Directly applying textures & clean state on " + acvCount + " active carousel cells");
+                                    for (var cIdx = 0; cIdx < acvCount; cIdx++) {
+                                        var cCell = acvData.add(0x20 + cIdx * 8).readPointer();
+                                        if (cCell.isNull()) continue;
+                                        var dIdx = cCell.add(0x24).readS32();
+                                        if (dIdx >= 0 && dIdx < filteredItems.length) {
+                                            updateSingleCell(cCell, filteredItems[dIdx], dIdx, (dIdx === 0));
+                                        }
+                                    }
+                                }
+                            } catch (eActUpdate) {
+                                log("[-] Error applying textures to active carousel cells: " + eActUpdate.message);
+                            }
+                        }
+
+                        // Step 5: Update cardCountText (cardView+0x38) to display "<count> / 200"
+                        try {
+                            var cardCountText = cardView.add(0x38).readPointer();
+                            if (!cardCountText.isNull()) {
+                                var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                setTextFn(cardCountText, createIl2CppString(filteredItems.length + " / 200"), NULL);
+                                log("[✅ CAROUSEL] Updated cardCountText to: " + filteredItems.length + " / 200");
+                            }
+                        } catch (eCct) {
+                            log("[-] Error updating cardCountText: " + eCct.message);
+                        }
                     } catch (eCar) {
                         log("[-] Error in safeUpdateLowerCarousel: " + eCar.message);
                     }
@@ -5032,8 +5404,12 @@ function initIl2Cpp(module) {
                 // Helper to ensure an IL2CPP List<CardItem> has an allocated _items array with at least minCap elements
                 var ensureListBuffer = function(listPtr, minCap) {
                     try {
-                        if (!listPtr || listPtr.isNull()) return NULL;
+                        if (!listPtr || listPtr.isNull() || listPtr.compare(ptr(0x10000)) <= 0) return NULL;
+                        if (Process.arch === "arm64" && listPtr.compare(ptr("0x8000000000")) >= 0) return NULL;
                         var itemsPtr = listPtr.add(0x10).readPointer();
+                        if (!itemsPtr.isNull() && (itemsPtr.compare(ptr(0x10000)) <= 0 || (Process.arch === "arm64" && itemsPtr.compare(ptr("0x8000000000")) >= 0))) {
+                            itemsPtr = NULL;
+                        }
                         var curCap = (!itemsPtr.isNull()) ? itemsPtr.add(0x18).readS32() : 0;
                         if (itemsPtr.isNull() || curCap < minCap) {
                             if (!cachedCardItemKlass || cachedCardItemKlass.isNull()) {
@@ -5065,6 +5441,9 @@ function initIl2Cpp(module) {
                     if (!cardView || cardView.isNull()) return NULL;
                     var eventListener = cardView.add(0x90).readPointer();
                     if (!eventListener.isNull()) {
+                        if (!sceneThis.isNull() && eventListener.add(0x20).readPointer().isNull()) {
+                            eventListener.add(0x20).writePointer(sceneThis);
+                        }
                         return eventListener;
                     }
 
@@ -5097,7 +5476,8 @@ function initIl2Cpp(module) {
                 var cachedListCardItemKlass = NULL;
                 var ensureInventoryLists = function(scene) {
                     try {
-                        if (!scene || scene.isNull()) return;
+                        if (!scene || scene.isNull() || scene.compare(ptr(0x10000)) <= 0) return;
+                        if (Process.arch === "arm64" && scene.compare(ptr("0x8000000000")) >= 0) return;
 
                         var klass = NULL;
                         var dcl = scene.add(0x58).readPointer();
@@ -5132,10 +5512,36 @@ function initIl2Cpp(module) {
                 };
                 var ensureMaterialCardItemList = ensureInventoryLists;
 
+                // Helper: restore EnhancedScroller container invariant [FirstPadder, cells..., LastPadder].
+                // EnhancedScroller inserts new cells at SetSiblingIndex(childCount - 2), assuming LastPadder is the last child.
+                var sanitizeCardScroller = function(cardView) {
+                    try {
+                        if (!cardView || cardView.isNull()) return;
+                        var scroller = cardView.add(0x40).readPointer();
+                        if (scroller.isNull()) return;
+                        var container = scroller.add(0xC8).readPointer();
+                        var padF = scroller.add(0xF0).readPointer();
+                        var padL = scroller.add(0xF8).readPointer();
+                        if (container.isNull() || padF.isNull() || padL.isNull()) return;
+                        var trFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                        var firstSibFn = new NativeFunction(baseAddr.add(0x181ED30), "void", ["pointer", "pointer"]);
+                        var lastSibFn = new NativeFunction(baseAddr.add(0x181ED70), "void", ["pointer", "pointer"]);
+
+                        var padFT = (!padF.isNull()) ? trFn(padF, NULL) : NULL;
+                        var padLT = (!padL.isNull()) ? trFn(padL, NULL) : NULL;
+                        if (!padFT.isNull()) firstSibFn(padFT, NULL);
+                        if (!padLT.isNull()) lastSibFn(padLT, NULL);
+                    } catch (eSan) {
+                        log("[-] Error in sanitizeCardScroller: " + eSan.message);
+                    }
+                };
+
                 // Helper to restore all cards in displayCardList when returning to default state
-                var restoreDefaultDisplayCardList = function(sceneThis, force) {
+                // skipSetData=true only fills the native list (used while the view is not ready yet; SetData there aborts mid-ReloadData)
+                var restoreDefaultDisplayCardList = function(sceneThis, force, skipSetData) {
                     try {
                         if (sceneThis.isNull() || !loonaCardItems || loonaCardItems.length === 0) return;
+                        activeInventorySceneInstance = sceneThis;
                         ensureMaterialCardItemList(sceneThis);
                         var dclPtr = sceneThis.add(0x58).readPointer();
                         if (dclPtr.isNull()) return;
@@ -5158,17 +5564,37 @@ function initIl2Cpp(module) {
                         }
                         dclPtr.add(0x18).writeS32(loonaCardItems.length);
                         sceneThis.add(0x50).writeS32(0); // EXTRACT_TYPE.All
+                        if (skipSetData) {
+                            log("[✅ RESTORE] displayCardList filled with " + loonaCardItems.length + " cards (SetData deferred)");
+                            return;
+                        }
 
                         var sceneView = sceneThis.add(0x48).readPointer();
                         if (!sceneView.isNull()) {
                             var cardView = sceneView.add(0x78).readPointer();
                             if (!cardView.isNull()) {
+                                try {
+                                    var setGroupBtnAreaFn = new NativeFunction(baseAddr.add(0xF233E0), "void", ["pointer", "bool", "pointer"]);
+                                    setGroupBtnAreaFn(cardView, 1, NULL);
+                                } catch (eGrp) {}
+
                                 var scroller = cardView.add(0x40).readPointer();
                                 var eventListener = ensureCardViewEventListener(sceneThis, cardView);
                                 if (!scroller.isNull() && eventListener && !eventListener.isNull()) {
                                     var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
                                     setDataFn(cardView, loonaCardItems.length, 0, eventListener, NULL);
+                                    sanitizeCardScroller(cardView);
                                     log("[✅ RESTORE] SetData called on InvenCardView with count=" + loonaCardItems.length);
+
+                                    // Restore cardCountText to loonaCardItems.length / 200
+                                    try {
+                                        var cardCountText = cardView.add(0x38).readPointer();
+                                        if (!cardCountText.isNull()) {
+                                            var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                            setTextFn(cardCountText, createIl2CppString(loonaCardItems.length + " / 200"), NULL);
+                                            log("[✅ RESTORE] Restored cardCountText to: " + loonaCardItems.length + " / 200");
+                                        }
+                                    } catch (eCctR) {}
                                 }
                             }
                         }
@@ -5178,11 +5604,126 @@ function initIl2Cpp(module) {
                     }
                 };
 
+                // Diagnostic: dump real runtime state of InvenCardView (sceneView+0x78), its EnhancedScroller and active cells
+                var diagCarousel = function(sceneThis) {
+                    try {
+                        var dGo = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var dTr = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                        var dActSelf = new NativeFunction(baseAddr.add(0x1DBAE44), "bool", ["pointer", "pointer"]);
+                        var dActHier = new NativeFunction(baseAddr.add(0x1DBAE84), "bool", ["pointer", "pointer"]);
+                        var dEnabled = new NativeFunction(baseAddr.add(0x1DB3CBC), "bool", ["pointer", "pointer"]);
+                        var dRect = new NativeFunction(baseAddr.add(0x180D6E0), ["float", "float", "float", "float"], ["pointer", "pointer"]);
+                        var dSize = new NativeFunction(baseAddr.add(0x180DB70), ["float", "float"], ["pointer", "pointer"]);
+                        var dScale = new NativeFunction(baseAddr.add(0x181DF78), ["float", "float", "float"], ["pointer", "pointer"]);
+                        var dPos = new NativeFunction(baseAddr.add(0x180DE48), ["float", "float", "float"], ["pointer", "pointer"]);
+                        var dChildCount = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
+                        var dColor = new NativeFunction(baseAddr.add(0x1614760), ["float", "float", "float", "float"], ["pointer", "pointer"]);
+                        var dTex = new NativeFunction(baseAddr.add(0x194C06C), "pointer", ["pointer", "pointer"]);
+                        var f2 = function(a) { return a.map(function(v) { return v.toFixed(1); }).join(","); };
+                        var goInfo = function(comp) {
+                            if (!comp || comp.isNull()) return "null";
+                            var g = dGo(comp, NULL);
+                            if (g.isNull()) return "noGO";
+                            return "self=" + dActSelf(g, NULL) + " hier=" + dActHier(g, NULL);
+                        };
+                        var rtInfo = function(rt) {
+                            if (!rt || rt.isNull()) return "null";
+                            return "rect=[" + f2(dRect(rt, NULL)) + "] size=[" + f2(dSize(rt, NULL)) + "] pos=[" + f2(dPos(rt, NULL)) + "] scale=[" + f2(dScale(rt, NULL)) + "]";
+                        };
+
+                        var sceneView = sceneThis.add(0x48).readPointer();
+                        var cardView = sceneView.add(0x78).readPointer();
+                        log("[🩺 DIAG] cardView=" + cardView + " GO(" + goInfo(cardView) + ") RT " + rtInfo(dTr(cardView, NULL)));
+                        log("[🩺 DIAG] baseSizes bg=[" + cardView.add(0x70).readFloat().toFixed(1) + "," + cardView.add(0x74).readFloat().toFixed(1) +
+                            "] list=[" + cardView.add(0x78).readFloat().toFixed(1) + "," + cardView.add(0x7C).readFloat().toFixed(1) +
+                            "] bgZero=[" + cardView.add(0x80).readFloat().toFixed(1) + "," + cardView.add(0x84).readFloat().toFixed(1) +
+                            "] listZero=[" + cardView.add(0x88).readFloat().toFixed(1) + "," + cardView.add(0x8C).readFloat().toFixed(1) +
+                            "] maxCount=" + cardView.add(0x98).readS32() + " showLight=" + cardView.add(0x9C).readU8());
+                        var bgObj = cardView.add(0x58).readPointer();
+                        var listObj = cardView.add(0x60).readPointer();
+                        log("[🩺 DIAG] backgroundObj GO(" + goInfo(bgObj) + ") " + rtInfo(bgObj));
+                        log("[🩺 DIAG] ListObj GO(" + goInfo(listObj) + ") " + rtInfo(listObj));
+
+                        var scroller = cardView.add(0x40).readPointer();
+                        if (scroller.isNull()) { log("[🩺 DIAG] scroller NULL"); return; }
+                        log("[🩺 DIAG] scroller GO(" + goInfo(scroller) + ") enabled=" + dEnabled(scroller, NULL) +
+                            " delegate=" + scroller.add(0xD8).readPointer() + " scrollRect=" + scroller.add(0xB0).readPointer() +
+                            " reload=" + scroller.add(0xE0).readU8() + " scrollPos=" + scroller.add(0x118).readFloat().toFixed(1) +
+                            " active[" + scroller.add(0x128).readS32() + ".." + scroller.add(0x12C).readS32() + "] lastRectSize=" + scroller.add(0x14C).readFloat().toFixed(1));
+                        log("[🩺 DIAG] scrollRectTransform " + rtInfo(scroller.add(0xB8).readPointer()));
+                        var container = scroller.add(0xC8).readPointer();
+                        log("[🩺 DIAG] container GO(" + goInfo(container) + ") children=" + (container.isNull() ? -1 : dChildCount(container, NULL)) + " " + rtInfo(container));
+                        if (!container.isNull()) {
+                            var dGetChild = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                            var dName = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                            var nChild = dChildCount(container, NULL);
+                            for (var ch = 0; ch < nChild; ch++) {
+                                var cT = dGetChild(container, ch, NULL);
+                                if (cT.isNull()) continue;
+                                var cNm = "";
+                                try { cNm = readIl2CppString(dName(cT, NULL)); } catch (eNm) {}
+                                log("[🩺 DIAG]  child[" + ch + "] '" + cNm + "' " + cT + " GO(" + goInfo(cT) + ") " + rtInfo(cT));
+                            }
+                        }
+                        var padF = scroller.add(0xF0).readPointer();
+                        var padL = scroller.add(0xF8).readPointer();
+                        log("[🩺 DIAG] firstPadder=" + padF + " lastPadder=" + padL + " recycledContainer=" + scroller.add(0x100).readPointer());
+
+                        var acv = scroller.add(0x120).readPointer();
+                        var acvCount = acv.isNull() ? 0 : acv.add(0x18).readS32();
+                        var acvData = acv.isNull() ? NULL : acv.add(0x10).readPointer();
+                        log("[🩺 DIAG] activeCellViews count=" + acvCount);
+                        for (var i = 0; i < acvCount && i < 16; i++) {
+                            var cell = acvData.add(0x20 + i * 8).readPointer();
+                            if (cell.isNull()) continue;
+                            var item = cell.add(0x38).readPointer();
+                            var lsnr = cell.add(0x50).readPointer();
+                            var lsnrTarget = (!lsnr.isNull()) ? lsnr.add(0x10).readPointer() : NULL;
+                            var lsnrMethod = (!lsnr.isNull()) ? lsnr.add(0x18).readPointer() : NULL;
+                            var lsnrRva = (!lsnrMethod.isNull()) ? " RVA 0x" + lsnrMethod.sub(baseAddr).toString(16) : "";
+                            var line = "[🩺 DIAG] cell#" + i + " " + cell + " dataIdx=" + cell.add(0x24).readS32() + " GO(" + goInfo(cell) + ") RT " + rtInfo(dTr(cell, NULL)) +
+                                " inst=" + cell.add(0x4C).readU8() + " listener=" + lsnr + "(" + lsnrTarget + "," + lsnrMethod + lsnrRva + ") item=" + item;
+                            log(line);
+                            if (!item.isNull()) {
+                                var photo = item.add(0x58).readPointer();
+                                var tier = item.add(0x68).readPointer();
+                                var eff = item.add(0xC8).readPointer();
+                                log("[🩺 DIAG]    item GO(" + goInfo(item) + ") RT " + rtInfo(dTr(item, NULL)) + " params=" + item.add(0x48).readPointer());
+                                if (!photo.isNull()) {
+                                    var pTex = dTex(photo, NULL);
+                                    var pTexNm = (!pTex.isNull()) ? readIl2CppString(dName(pTex, NULL)) : "null";
+                                    log("[🩺 DIAG]    photo GO(" + goInfo(photo) + ") en=" + dEnabled(photo, NULL) + " tex=" + pTex + "('" + pTexNm + "') color=[" + f2(dColor(photo, NULL)) + "] " + rtInfo(dTr(photo, NULL)));
+                                }
+                                if (!tier.isNull()) {
+                                    var tTex = dTex(tier, NULL);
+                                    var tTexNm = (!tTex.isNull()) ? readIl2CppString(dName(tTex, NULL)) : "null";
+                                    log("[🩺 DIAG]    tier GO(" + goInfo(tier) + ") en=" + dEnabled(tier, NULL) + " tex=" + tTex + "('" + tTexNm + "') color=[" + f2(dColor(tier, NULL)) + "]");
+                                }
+                                if (!eff.isNull()) log("[🩺 DIAG]    ImageEfftect GO(" + goInfo(eff) + ") en=" + dEnabled(eff, NULL) + " " + rtInfo(dTr(eff, NULL)));
+                                var itemTr = dTr(item, NULL);
+                                if (!itemTr.isNull()) {
+                                    var nItemCh = dChildCount(itemTr, NULL);
+                                    for (var ic = 0; ic < nItemCh; ic++) {
+                                        var icT = dGetChild(itemTr, ic, NULL);
+                                        if (icT.isNull()) continue;
+                                        var icNm = "";
+                                        try { icNm = readIl2CppString(dName(icT, NULL)); } catch (eIn) {}
+                                        log("[🩺 DIAG]      itemChild[" + ic + "] '" + icNm + "' " + icT + " GO(" + goInfo(icT) + ") " + rtInfo(icT));
+                                    }
+                                }
+                            }
+                        }
+                    } catch (eDiag) {
+                        log("[-] Error in diagCarousel: " + eDiag.message);
+                    }
+                };
+
                 // 9e2. InventoryScene.SetStateMain (0x1053FB0) -> Safe replacement preventing null crash chain
                 function safeSetStateMain(sceneThis, isReload) {
                     log("[🗃️ SET_STATE_MAIN] safeSetStateMain entered! isReload=" + isReload + ", scene=" + sceneThis);
                     try {
                         if (sceneThis.isNull()) return;
+                        activeInventorySceneInstance = sceneThis;
                         sceneThis.add(0x24).writeS32(6); // InventoryScene.STATE.Main = 6
                         ensureMaterialCardItemList(sceneThis);
 
@@ -5297,7 +5838,7 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing SetStateMain: " + eSsmHook.message);
                 }
 
-                // Hook InventoryScene.SetStateDefault (0x1053B88) to protect null pointer crash
+                // Hook InventoryScene.SetStateDefault (0x1053B88) to protect null pointer crash & restore cards
                 try {
                     Interceptor.attach(baseAddr.add(0x1053B88), {
                         onEnter: function (args) {
@@ -5306,6 +5847,12 @@ function initIl2Cpp(module) {
                                 log("[🗃️ SET_STATE_DEFAULT] onEnter triggered, verifying materialCardItemList");
                                 ensureMaterialCardItemList(this.scene);
                             }
+                        },
+                        onLeave: function (retval) {
+                            if (this.scene && !this.scene.isNull()) {
+                                log("[🗃️ SET_STATE_DEFAULT] onLeave triggered, restoring all 24 cards to displayCardList!");
+                                restoreDefaultDisplayCardList(this.scene, true, true);
+                            }
                         }
                     });
                     log("[+] Interceptor.attach installed on InventoryScene.SetStateDefault (0x1053B88)!");
@@ -5313,63 +5860,74 @@ function initIl2Cpp(module) {
                     log("[-] Error attaching to SetStateDefault: " + eSsdHook.message);
                 }
 
+                // Centralized and bulletproof handleInventoryBack
+                var handleInventoryBack = function (sceneThis) {
+                    try {
+                        if (!sceneThis || sceneThis.isNull()) return;
+                        var curState = sceneThis.add(0x24).readS32();
+                        log("[🔙 ON_BACK] handleInventoryBack entered! state=" + curState);
+
+                        if (curState === 6 || curState === 7) { // STATE.Main (6) or STATE.Equip (7)
+                            log("[🔙 ON_BACK] Returning from detail/equip view to Default state, restoring 24 cards...");
+                            sceneThis.add(0x24).writeS32(5); // STATE.Default = 5
+                            sceneThis.add(0x88).writePointer(NULL); // selectedCardItem
+                            sceneThis.add(0x98).writePointer(NULL); // preSelectedCardItem
+                            sceneThis.add(0x80).writePointer(NULL); // selectedArtistData
+                            sceneThis.add(0x90).writePointer(NULL); // equippedCardItem
+                            sceneThis.add(0xBC).writeU8(0);
+                            sceneThis.add(0xBE).writeU8(0);
+                            sceneThis.add(0x50).writeS32(0); // extractType = All
+
+                            var sceneView = sceneThis.add(0x48).readPointer();
+                            if (!sceneView.isNull()) {
+                                // 1. ShowDefaultLayout -> RVA 0x1055ED0
+                                try {
+                                    var showDefFn = new NativeFunction(baseAddr.add(0x1055ED0), "void", ["pointer", "pointer"]);
+                                    showDefFn(sceneView, NULL);
+                                    log("[✅ ON_BACK] ShowDefaultLayout executed!");
+                                } catch (eSdl) {
+                                    log("[-] Error in ShowDefaultLayout: " + eSdl.message);
+                                }
+
+                                // 2. Refresh & JumpToDataIndex on groupView (0x70)
+                                try {
+                                    var groupView = sceneView.add(0x70).readPointer();
+                                    if (!groupView.isNull()) {
+                                        var invenGroupRefreshFn = new NativeFunction(baseAddr.add(0xF25124), "void", ["pointer", "pointer"]);
+                                        invenGroupRefreshFn(groupView, NULL);
+                                        var invenGroupJumpFn = new NativeFunction(baseAddr.add(0xF25140), "void", ["pointer", "int", "bool", "pointer"]);
+                                        invenGroupJumpFn(groupView, 0, 0, NULL);
+                                        log("[✅ ON_BACK] InvenGroupView.Refresh and JumpToDataIndex executed!");
+                                    }
+                                } catch (eGv) {
+                                    log("[-] Error in InvenGroupView refresh: " + eGv.message);
+                                }
+
+                                // 3. Restore displayCardList (sets 24 cards and calls InvenCardView.SetData in 0xF23384)
+                                restoreDefaultDisplayCardList(sceneThis, true);
+                            }
+                        } else if (curState === 5) { // STATE.Default (5)
+                            log("[🔙 ON_BACK] Leaving InventoryScene, navigating back to LobbyScene (SceneId: 3)...");
+                            try {
+                                var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
+                                setStateOpenSceneFn(sceneThis, 3, NULL, NULL, NULL);
+                            } catch (eOpen) {
+                                log("[-] Error returning to LobbyScene via SetStateOpenScene: " + eOpen.message);
+                                try {
+                                    var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
+                                    openSceneDirectFn(3, NULL, NULL);
+                                } catch (eOsd) {}
+                            }
+                        }
+                    } catch (eOb) {
+                        log("[-] Error in handleInventoryBack: " + eOb.message);
+                    }
+                };
+
                 // Replace InventoryScene.OnBack (0x10537F4) to ensure clean restoration and prevent null crash chain
                 try {
                     Interceptor.replace(baseAddr.add(0x10537F4), new NativeCallback(function (sceneThis, methodInfo) {
-                        try {
-                            if (sceneThis.isNull()) return;
-                            var curState = sceneThis.add(0x24).readS32();
-                            log("[🔙 ON_BACK] InventoryScene.OnBack replaced entered! state=" + curState);
-
-                            if (curState === 6 || curState === 7) { // STATE.Main (6) or STATE.Equip (7)
-                                log("[🔙 ON_BACK] Returning from detail/equip view to Default state, restoring 24 cards...");
-                                sceneThis.add(0x24).writeS32(5); // STATE.Default = 5
-                                sceneThis.add(0x88).writePointer(NULL); // selectedCardItem
-                                sceneThis.add(0x98).writePointer(NULL); // preSelectedCardItem
-                                sceneThis.add(0x80).writePointer(NULL); // selectedArtistData
-                                sceneThis.add(0x90).writePointer(NULL); // equippedCardItem
-                                sceneThis.add(0xBC).writeU8(0);
-                                sceneThis.add(0xBE).writeU8(0);
-                                sceneThis.add(0x50).writeS32(0); // extractType = All
-
-                                var sceneView = sceneThis.add(0x48).readPointer();
-                                if (!sceneView.isNull()) {
-                                    // 1. ShowDefaultLayout -> RVA 0x1055ED0
-                                    try {
-                                        var showDefFn = new NativeFunction(baseAddr.add(0x1055ED0), "void", ["pointer", "pointer"]);
-                                        showDefFn(sceneView, NULL);
-                                        log("[✅ ON_BACK] ShowDefaultLayout executed!");
-                                    } catch (eSdl) {
-                                        log("[-] Error in ShowDefaultLayout: " + eSdl.message);
-                                    }
-
-                                    // 2. SetData on groupView (0x70) -> RVA 0xF25140
-                                    try {
-                                        var groupView = sceneView.add(0x70).readPointer();
-                                        if (!groupView.isNull()) {
-                                            var invenGroupDataSetDataFn = new NativeFunction(baseAddr.add(0xF25140), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
-                                            invenGroupDataSetDataFn(groupView, 1, 0, NULL, NULL);
-                                            log("[✅ ON_BACK] InvenGroupView.SetData executed!");
-                                        }
-                                    } catch (eGv) {
-                                        log("[-] Error in InvenGroupView.SetData: " + eGv.message);
-                                    }
-
-                                    // 3. Restore displayCardList (sets 24 cards and calls InvenCardView.SetData in 0xF23384)
-                                    restoreDefaultDisplayCardList(sceneThis, true);
-                                }
-                            } else if (curState === 5) { // STATE.Default (5)
-                                log("[🔙 ON_BACK] Leaving InventoryScene, navigating back to LobbyScene (SceneId: 3)...");
-                                try {
-                                    var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
-                                    openSceneDirectFn(3, NULL, NULL, NULL);
-                                } catch (eOpen) {
-                                    log("[-] Error returning to LobbyScene: " + eOpen.message);
-                                }
-                            }
-                        } catch (eOb) {
-                            log("[-] Error in replaced OnBack: " + eOb.message);
-                        }
+                        handleInventoryBack(sceneThis);
                     }, "void", ["pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on InventoryScene.OnBack (0x10537F4)!");
                 } catch (eObHook) {
@@ -5460,23 +6018,127 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing ExtractWithArtist: " + eHewa.message);
                 }
 
-                // 9e4. Safe material stubs to prevent KeyVault.get_MaterialCardInfo null ref in UpdateDisplayCardList
-                try {
-                    // CardItem.get_IsMaterialCard (0xB55F08) -> return false (0)
-                    Interceptor.replace(baseAddr.add(0xB55F08), new NativeCallback(function (thisPtr, methodInfo) {
-                        return 0;
-                    }, "int", ["pointer", "pointer"]));
-                    // CardControl.Data.get_IsMaterial (0xE4340C) -> return false (0)
-                    Interceptor.replace(baseAddr.add(0xE4340C), new NativeCallback(function (thisPtr, methodInfo) {
-                        return 0;
-                    }, "int", ["pointer", "pointer"]));
-                    // KeyVault.get_MaterialCardInfo (0x1061598) -> return NULL
-                    Interceptor.replace(baseAddr.add(0x1061598), new NativeCallback(function (methodInfo) {
-                        return NULL;
-                    }, "pointer", ["pointer"]));
-                    log("[+] Safe offline stubs installed for IsMaterialCard & KeyVault (0xB55F08, 0xE4340C, 0x1061598)!");
-                } catch (eMatStub) {
-                    log("[-] Error installing material stubs: " + eMatStub.message);
+
+
+                // Native Texture2D loader with disk cache (available to cell views and SetCdnTexture)
+                var loadedTextureCache = {};
+
+                function loadLocalTexture2D(relPath) {
+                    if (loadedTextureCache[relPath]) {
+                        var cached = loadedTextureCache[relPath];
+                        try {
+                            if (!cached.isNull()) {
+                                var m_CachedPtr = cached.add(0x10).readPointer();
+                                if (!m_CachedPtr.isNull()) {
+                                    return cached;
+                                }
+                            }
+                            log("[⚠️ TEXTURE] Cached Texture2D native m_CachedPtr was null/destroyed! Evicting: " + relPath);
+                        } catch (eCheck) {
+                            log("[⚠️ TEXTURE] Error checking cached ptr: " + eCheck.message);
+                        }
+                        delete loadedTextureCache[relPath];
+                    }
+                    try {
+                        var basePath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/";
+                        var fullPath = basePath + relPath;
+
+                        var fileExistsFn = new NativeFunction(baseAddr.add(0x1F01DF4), "bool", ["pointer", "pointer"]);
+                        var fileReadAllBytesFn = new NativeFunction(baseAddr.add(0x1F0268C), "pointer", ["pointer", "pointer"]);
+
+                        var pathStr = createIl2CppString(fullPath);
+                        var exists = fileExistsFn(pathStr, NULL);
+
+                        if (!exists) {
+                            fullPath = fullPath + ".png";
+                            pathStr = createIl2CppString(fullPath);
+                            exists = fileExistsFn(pathStr, NULL);
+                        }
+
+                        if (!exists && relPath.indexOf(".i.bytes") !== -1) {
+                            fullPath = basePath + relPath.replace(".i.bytes", ".png");
+                            pathStr = createIl2CppString(fullPath);
+                            exists = fileExistsFn(pathStr, NULL);
+                        }
+
+                        if (!exists && relPath.indexOf("wadceg/") !== -1) {
+                            var altPath = relPath.replace("wadceg/", "weoihxd/");
+                            fullPath = basePath + altPath;
+                            pathStr = createIl2CppString(fullPath);
+                            exists = fileExistsFn(pathStr, NULL);
+                            if (!exists) {
+                                fullPath = fullPath + ".png";
+                                pathStr = createIl2CppString(fullPath);
+                                exists = fileExistsFn(pathStr, NULL);
+                            }
+                        }
+
+                        if (!exists && relPath.indexOf("weoihxd/") !== -1) {
+                            var altPath = relPath.replace("weoihxd/", "wadceg/");
+                            fullPath = basePath + altPath;
+                            pathStr = createIl2CppString(fullPath);
+                            exists = fileExistsFn(pathStr, NULL);
+                            if (!exists) {
+                                fullPath = fullPath + ".png";
+                                pathStr = createIl2CppString(fullPath);
+                                exists = fileExistsFn(pathStr, NULL);
+                            }
+                        }
+
+                        if (!exists) {
+                            log("[-] loadLocalTexture2D: file does not exist: " + relPath);
+                            return NULL;
+                        }
+
+                        var bytesObj = fileReadAllBytesFn(pathStr, NULL);
+                        if (!bytesObj || bytesObj.isNull()) {
+                            log("[-] loadLocalTexture2D: ReadAllBytes returned null for: " + fullPath);
+                            return NULL;
+                        }
+
+                        // Create Texture2D(2, 2)
+                        var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
+                        if (!tex2dClass || tex2dClass.isNull()) return NULL;
+                        var texObj = il2cpp_object_new(tex2dClass);
+                        if (!texObj || texObj.isNull()) return NULL;
+
+                        var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
+                        texCtorFn(texObj, 2, 2, NULL);
+
+                        // ImageConversion.LoadImage(texObj, bytesObj, NULL) -> RVA 0x25B3E90
+                        var loadImageFn = new NativeFunction(baseAddr.add(0x25B3E90), "bool", ["pointer", "pointer", "pointer"]);
+                        var ok = loadImageFn(texObj, bytesObj, NULL);
+                        if (ok) {
+                            try {
+                                var setFilterModeFn = new NativeFunction(baseAddr.add(0x181A580), "void", ["pointer", "int", "pointer"]);
+                                setFilterModeFn(texObj, 2, NULL); // FilterMode.Trilinear = 2
+                                var setAnisoFn = new NativeFunction(baseAddr.add(0x181A610), "void", ["pointer", "int", "pointer"]);
+                                setAnisoFn(texObj, 8, NULL);
+                            } catch (eFm) {}
+
+                            // GC Pin and persist texture to avoid placeholder reversion
+                            try {
+                                if (il2cpp_gchandle_new) {
+                                    il2cpp_gchandle_new(texObj, 2); // 2 = Pinned handle
+                                }
+                                var dontDestroyOnLoadFn = new NativeFunction(baseAddr.add(0x1DC7FB4), "void", ["pointer", "pointer"]);
+                                dontDestroyOnLoadFn(texObj, NULL);
+                                var setHideFlagsFn = new NativeFunction(baseAddr.add(0x1DC7FF4), "void", ["pointer", "int", "pointer"]);
+                                setHideFlagsFn(texObj, 52, NULL); // 52 = DontSaveInEditor | DontSaveInBuild | DontUnloadUnusedAsset
+                            } catch (ePin) {
+                                log("[-] Error pinning texture " + relPath + ": " + ePin.message);
+                            }
+
+                            loadedTextureCache[relPath] = texObj;
+                            log("[🖼️ TEXTURE] Loaded and cached (Pinned/DontDestroy): " + relPath);
+                            return texObj;
+                        } else {
+                            log("[-] LoadImage returned false for " + relPath);
+                        }
+                    } catch (eLt) {
+                        log("[-] Error in loadLocalTexture2D for " + relPath + ": " + eLt.message);
+                    }
+                    return NULL;
                 }
 
                 // 9e5. InventoryScene.<UpdateDisplayCardList>b__63_0 (0x105F448) -> Safe cell data provider preventing IndexOutOfRangeException
@@ -5484,11 +6146,14 @@ function initIl2Cpp(module) {
                     var getSmallCardViewDataFn = new NativeFunction(baseAddr.add(0xABEB30), "pointer", ["pointer", "pointer", "bool", "pointer"]);
                     Interceptor.replace(baseAddr.add(0x105F448), new NativeCallback(function (sceneThis, view, index, methodInfo) {
                         try {
-                            if (sceneThis.isNull()) return NULL;
+                            if (sceneThis.isNull()) {
+                                sceneThis = (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) ? activeInventorySceneInstance : NULL;
+                            }
+                            if (!sceneThis || sceneThis.isNull()) return NULL;
                             var dclPtr = sceneThis.add(0x58).readPointer();
                             if (dclPtr.isNull()) return NULL;
                             var size = dclPtr.add(0x18).readS32();
-                            log("[🎠 B63] index=" + index + ", size=" + size);
+                            log("[🎠 B63] index=" + index + ", size=" + size + ", view=" + view + ", scene=" + sceneThis);
                             if (index < 0 || index >= size) return NULL; // Bounds protection against EnhancedScroller race/reclaim
 
                             var listItems = dclPtr.add(0x10).readPointer();
@@ -5496,43 +6161,93 @@ function initIl2Cpp(module) {
                             var cardItem = listItems.add(0x20 + index * 8).readPointer();
                             if (cardItem.isNull()) return NULL;
 
-                            var viewData = getSmallCardViewDataFn(cardItem, NULL, 1, NULL);
-                            if (viewData && !viewData.isNull()) {
-                                var cardRaw = cardItem.add(0x10).readPointer();
-                                var cId = (!cardRaw.isNull()) ? cardRaw.add(0x20).readS32() : 1001;
-                                var gr = (!cardRaw.isNull()) ? cardRaw.add(0x24).readS32() : 4;
-                                var lvl = (!cardRaw.isNull()) ? cardRaw.add(0x1C).readS16() : 50;
+                            var cardRaw = cardItem.add(0x10).readPointer();
+                            var cId = (!cardRaw.isNull()) ? cardRaw.add(0x20).readS32() : 1001;
+                            var gr = (!cardRaw.isNull()) ? cardRaw.add(0x24).readS32() : 4;
+                            var lvl = (!cardRaw.isNull()) ? cardRaw.add(0x1C).readS16() : 50;
 
-                                // Ensure valid textures and tier frame are never null
-                                if (viewData.add(0x10).readPointer().isNull()) {
-                                    var pDp = createDownloadPath("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes");
-                                    viewData.add(0x10).writePointer(pDp || NULL);
+                            // Equipped check
+                            var isCardEquipped = 0;
+                            var eqItem = sceneThis.add(0x90).readPointer();
+                            if (!eqItem.isNull()) {
+                                var eqRaw = eqItem.add(0x10).readPointer();
+                                if (!eqRaw.isNull() && !cardRaw.isNull()) {
+                                    if (eqRaw.add(0x10).readS64().toString() === cardRaw.add(0x10).readS64().toString()) {
+                                        isCardEquipped = 1;
+                                    }
                                 }
-                                if (viewData.add(0x18).readPointer().isNull()) {
-                                    var tDp = getGradeFrameDownloadPath(gr, 1);
-                                    viewData.add(0x18).writePointer(tDp || NULL);
-                                }
-                                viewData.add(0x3C).writeS32(gr); // tier
-                                viewData.add(0x40).writeU8(gr === 4 ? 1 : 0); // isRCard
-                                viewData.add(0x44).writeS32(gr === 4 ? 50 : 5); // maxLevel
-                                viewData.add(0x48).writeS32(lvl); // level
+                            } else if (!cardRaw.isNull()) {
+                                isCardEquipped = (cardRaw.add(0x28).readU8() === 1) ? 1 : 0;
+                            }
 
-                                // isEquip at 0x50 and isLeader at 0x54
-                                var eqItem = sceneThis.add(0x90).readPointer();
-                                if (!eqItem.isNull()) {
-                                    var isCardEquipped = 0;
-                                    var eqRaw = eqItem.add(0x10).readPointer();
-                                    if (!eqRaw.isNull() && !cardRaw.isNull()) {
-                                        if (eqRaw.add(0x10).readS64().toString() === cardRaw.add(0x10).readS64().toString()) {
-                                            isCardEquipped = 1;
+                            // Clean CardSmallView.Params with isStencil=0, isGray=0
+                            var viewData = createMockSmallCardParams(cId, gr, lvl, isCardEquipped);
+                            if (!viewData || viewData.isNull()) {
+                                viewData = getSmallCardViewDataFn(cardItem, NULL, 0, NULL);
+                            }
+
+                            // Deactivate visual artifacts & ensure active tier & photo visibility on cell view
+                            if (!view.isNull()) {
+                                try {
+                                    // 1. Deactivate ImageEfftect (the horizontal gray line [-] artifact)
+                                    var imgEff = view.add(0xC8).readPointer();
+                                    if (!imgEff.isNull()) {
+                                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                        var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                        var effGo = getGoFn(imgEff, NULL);
+                                        if (!effGo.isNull()) setActFn(effGo, 0, NULL);
+                                    }
+                                } catch (eEff) {}
+
+                                try {
+                                    // 2. Ensure Photo and Tier frame visibility & textures
+                                    var setPhotoVisFn = new NativeFunction(baseAddr.add(0x138F3A0), "void", ["pointer", "int", "pointer"]);
+                                    setPhotoVisFn(view, 1, NULL);
+                                    var setTierVisFn = new NativeFunction(baseAddr.add(0x1393AAC), "void", ["pointer", "int", "pointer"]);
+                                    setTierVisFn(view, 1, NULL);
+
+                                    var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                                    var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
+                                    var getGoFn2 = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                    var setActFn2 = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+
+                                    var photoRawImg = view.add(0x58).readPointer();
+                                    if (!photoRawImg.isNull()) {
+                                        var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") ||
+                                                       loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
+                                        if (photoTex && !photoTex.isNull()) {
+                                            setTextureFn(photoRawImg, photoTex, NULL);
+                                            setEnabledFn(photoRawImg, 1, NULL);
+                                            var pGo = getGoFn2(photoRawImg, NULL);
+                                            if (!pGo.isNull()) setActFn2(pGo, 1, NULL);
                                         }
                                     }
-                                    viewData.add(0x50).writeU8(isCardEquipped);
-                                } else if (!cardRaw.isNull()) {
-                                    viewData.add(0x50).writeU8(cardRaw.add(0x28).readU8() === 1 ? 1 : 0);
-                                }
-                                viewData.add(0x54).writeU8(0); // isLeader = 0
+
+                                    var tierRawImg = view.add(0x68).readPointer();
+                                    if (!tierRawImg.isNull()) {
+                                        var gLetter = (gr === 4) ? "r" : (gr === 3) ? "s" : (gr === 2) ? "a" : (gr === 1) ? "b" : "c";
+                                        var tierTex = loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gLetter + "_s.i.bytes");
+                                        if (tierTex && !tierTex.isNull()) {
+                                            setTextureFn(tierRawImg, tierTex, NULL);
+                                            setEnabledFn(tierRawImg, 1, NULL);
+                                            var tGo = getGoFn2(tierRawImg, NULL);
+                                            if (!tGo.isNull()) setActFn2(tGo, 1, NULL);
+                                        }
+                                    }
+
+                                    // 3. Set Star vs Number level display
+                                    var setStarVisFn = new NativeFunction(baseAddr.add(0x1388C58), "void", ["pointer", "int", "pointer"]);
+                                    var setNumVisFn = new NativeFunction(baseAddr.add(0x1393D68), "void", ["pointer", "int", "pointer"]);
+                                    if (gr === 4) {
+                                        setStarVisFn(view, 0, NULL);
+                                        setNumVisFn(view, 1, NULL);
+                                    } else {
+                                        setStarVisFn(view, 1, NULL);
+                                        setNumVisFn(view, 0, NULL);
+                                    }
+                                } catch (eVs) {}
                             }
+
                             return viewData;
                         } catch (eB63) {
                             log("[-] Error in b__63_0: " + eB63.message);
@@ -5542,6 +6257,92 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on InventoryScene.<UpdateDisplayCardList>b__63_0 (0x105F448)!");
                 } catch (eB63Hook) {
                     log("[-] Error replacing <UpdateDisplayCardList>b__63_0: " + eB63Hook.message);
+                }
+
+                // InvenCardCellView.SetData (0xF21510) -> Ensure listener at offset 0x50 is preserved across cell reuse
+                try {
+                    Interceptor.attach(baseAddr.add(0xF21510), {
+                        onEnter: function (args) {
+                            var cell = args[0];
+                            var lsnr = args[1];
+                            if (!cell.isNull() && !lsnr.isNull()) {
+                                cell.add(0x50).writePointer(lsnr);
+                            }
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on InvenCardCellView.SetData (0xF21510)!");
+                } catch (eHsd) {
+                    log("[-] Error attaching to InvenCardCellView.SetData: " + eHsd.message);
+                }
+
+                // InvenCardCellView.RefreshCellView (0xF2136C) -> Bulletproof cell renderer invoking updateSingleCell directly
+                try {
+                    Interceptor.replace(baseAddr.add(0xF2136C), new NativeCallback(function (cell, methodInfo) {
+                        try {
+                            if (cell.isNull()) return;
+
+                            var dataIdx = cell.add(0x24).readS32();
+                            var scene = (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) ? activeInventorySceneInstance : NULL;
+                            var cardItem = NULL;
+                            if (scene && !scene.isNull()) {
+                                var dclPtr = scene.add(0x58).readPointer();
+                                if (!dclPtr.isNull()) {
+                                    var size = dclPtr.add(0x18).readS32();
+                                    if (dataIdx >= 0 && dataIdx < size) {
+                                        var listItems = dclPtr.add(0x10).readPointer();
+                                        if (!listItems.isNull()) {
+                                            cardItem = listItems.add(0x20 + dataIdx * 8).readPointer();
+                                        }
+                                    }
+                                }
+                            }
+                            var curState = (scene && !scene.isNull()) ? scene.add(0x24).readS32() : 5;
+                            var isInspected = (curState === 6 && dataIdx === 0);
+                            if (cardItem && !cardItem.isNull()) {
+                                updateSingleCell(cell, cardItem, dataIdx, isInspected);
+                            }
+                        } catch (eRcv) {
+                            log("[-] Error in RefreshCellView replacement: " + eRcv.message);
+                        }
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InvenCardCellView.RefreshCellView (0xF2136C)!");
+                } catch (eHrcv) {
+                    log("[-] Error replacing InvenCardCellView.RefreshCellView: " + eHrcv.message);
+                }
+
+                // InvenCardCellView.set_LightVisible (0xF21424) -> Suppress white light overlay permanently
+                try {
+                    Interceptor.replace(baseAddr.add(0xF21424), new NativeCallback(function (cell, val, methodInfo) {
+                        if (cell.isNull()) return;
+                        cell.add(0x60).writeU8(0);
+                        try {
+                            var lightImg = cell.add(0x58).readPointer();
+                            if (!lightImg.isNull()) {
+                                lightImg.add(0x2C).writeFloat(0.0);
+                            }
+                        } catch (e) {}
+                    }, "void", ["pointer", "bool", "pointer"]));
+                    log("[+] Interceptor.replace installed on InvenCardCellView.set_LightVisible (0xF21424)!");
+                } catch (eSlvHook) {
+                    log("[-] Error replacing set_LightVisible: " + eSlvHook.message);
+                }
+
+                // Trace: EnhancedScroller.ReloadData (0x125C640) -> correlate scroller reloads with cell generation
+                try {
+                    Interceptor.attach(baseAddr.add(0x125C640), {
+                        onEnter: function (args) {
+                            this.sc = args[0];
+                        },
+                        onLeave: function () {
+                            try {
+                                var sc = this.sc;
+                                var acv = sc.add(0x120).readPointer();
+                                log("[🔁 RELOAD] scroller=" + sc + " delegate=" + sc.add(0xD8).readPointer() + " active[" + sc.add(0x128).readS32() + ".." + sc.add(0x12C).readS32() + "] acv=" + (acv.isNull() ? -1 : acv.add(0x18).readS32()) + " lastRectSize=" + sc.add(0x14C).readFloat().toFixed(1));
+                            } catch (eRl) {}
+                        }
+                    });
+                } catch (eRlH) {
+                    log("[-] Error tracing ReloadData: " + eRlH.message);
                 }
 
                 // 9e6. CardView.get_IsMaterialCard (0x13939A8) -> Safe null check protection
@@ -5579,12 +6380,27 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.attach(baseAddr.add(0x10542F4), {
                         onEnter: function (args) {
-                            var scene = args[0];
-                            var isGroup = args[1].toInt32();
-                            var type = args[2].toInt32();
-                            var isReload = args[3].toInt32();
-                            log("[🗃️ UPDATE_DISPLAY_CARD_LIST] Entered: scene=" + scene + ", isGroup=" + isGroup + ", type=" + type + ", isReload=" + isReload);
-                            ensureInventoryLists(scene);
+                            this.scene = args[0];
+                            this.isGroup = args[1].toInt32();
+                            this.type = args[2].toInt32();
+                            this.isReload = args[3].toInt32();
+                            log("[🗃️ UPDATE_DISPLAY_CARD_LIST] Entered: scene=" + this.scene + ", isGroup=" + this.isGroup + ", type=" + this.type + ", isReload=" + this.isReload);
+                            ensureInventoryLists(this.scene);
+                        },
+                        onLeave: function (retval) {
+                            try {
+                                if (!this.scene || this.scene.isNull()) return;
+                                var dclPtr = this.scene.add(0x58).readPointer();
+                                var count = (!dclPtr.isNull()) ? dclPtr.add(0x18).readS32() : 0;
+                                var extractType = this.scene.add(0x50).readS32();
+                                log("[🗃️ UPDATE_DISPLAY_CARD_LIST] onLeave: count=" + count + ", extractType=" + extractType);
+                                if (count === 0 && extractType === 0) {
+                                    log("[🗃️ UPDATE_DISPLAY_CARD_LIST] displayCardList was left empty! Restoring all 24 cards...");
+                                    restoreDefaultDisplayCardList(this.scene, true, true);
+                                }
+                            } catch (eUdclLeave) {
+                                log("[-] Error in UpdateDisplayCardList.onLeave: " + eUdclLeave.message);
+                            }
                         }
                     });
                     log("[+] Interceptor.attach installed on InventoryScene.UpdateDisplayCardList (0x10542F4)!");
@@ -5631,12 +6447,14 @@ function initIl2Cpp(module) {
                                 var setStateWaitDoneFn = new NativeFunction(baseAddr.add(0x1055E14), "void", ["pointer", "pointer"]);
                                 setStateWaitDoneFn(sceneThis, NULL);
                                 log("[✅ INVENTORY] SetStateWaitDone invoked successfully!");
+                                // Restore all 24 cards after transition to Default state
+                                restoreDefaultDisplayCardList(sceneThis, true);
                             } catch (eSwd) {
                                 log("[-] Error invoking SetStateWaitDone: " + eSwd.message);
                                 // Fallback: direct SetStateDefault
                                 var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
                                 setStateDefaultFn(sceneThis, 1, 1, NULL);
-                                restoreDefaultDisplayCardList(sceneThis);
+                                restoreDefaultDisplayCardList(sceneThis, true);
                             }
                         } catch (eWait) {
                             log("[-] Error in SetStateWait replacement: " + eWait.message);
@@ -5653,9 +6471,17 @@ function initIl2Cpp(module) {
                         log("[🖼️ PRELOAD] PreloadTexture intercepted offline! callback=" + callback);
                         if (!callback.isNull()) {
                             try {
-                                var invokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer"]);
-                                invokeFn(callback);
-                                log("[✅ PRELOAD] Callback invoked immediately!");
+                                var methodPtr = callback.add(0x10).readPointer();
+                                var target = callback.add(0x20).readPointer();
+                                if (!methodPtr.isNull()) {
+                                    var cbFn = new NativeFunction(methodPtr, "void", ["pointer", "pointer"]);
+                                    cbFn(target, NULL);
+                                    log("[✅ PRELOAD] Callback executed directly and safely!");
+                                } else {
+                                    var invokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer"]);
+                                    invokeFn(callback);
+                                    log("[✅ PRELOAD] Callback invoked via Action.Invoke!");
+                                }
                             } catch (eInv) {
                                 log("[-] Error invoking preload callback: " + eInv.message);
                             }
@@ -5664,28 +6490,6 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on PreloadTexture (0xAD2A48)!");
                 } catch (ePltReplace) {
                     log("[-] Error replacing PreloadTexture: " + ePltReplace.message);
-                }
-
-                // GC Liveness TraverseObject null-class protection (0x9F8DBC)
-                try {
-                    Interceptor.attach(baseAddr.add(0x9F8DBC), {
-                        onEnter: function (args) {
-                            var obj = args[0];
-                            if (!obj.isNull()) {
-                                try {
-                                    var klass = obj.readPointer();
-                                    if (klass.isNull()) {
-                                        args[0] = NULL;
-                                    }
-                                } catch (eTr) {
-                                    args[0] = NULL;
-                                }
-                            }
-                        }
-                    });
-                    log("[+] GC Liveness TraverseObject guard installed at 0x9F8DBC!");
-                } catch (eTrHook) {
-                    log("[-] Error installing TraverseObject guard: " + eTrHook.message);
                 }
 
                 // 9f. InventoryControl.CheckIntensifyEvent (0xF2C14C) -> Safe offline stub to prevent NullRef in SetStateMain
@@ -5993,102 +6797,6 @@ function initIl2Cpp(module) {
                 }
 
                 // 10. URLsControl.SetCdnTexture (0x163A9E8) -> Native Texture2D loader with disk cache
-                var loadedTextureCache = {};
-
-                function loadLocalTexture2D(relPath) {
-                    if (loadedTextureCache[relPath]) {
-                        var cached = loadedTextureCache[relPath];
-                        try {
-                            if (!cached.isNull()) {
-                                var m_CachedPtr = cached.add(0x10).readPointer();
-                                if (!m_CachedPtr.isNull()) {
-                                    return cached;
-                                }
-                            }
-                            log("[⚠️ TEXTURE] Cached Texture2D native m_CachedPtr was null/destroyed! Evicting: " + relPath);
-                        } catch (eCheck) {
-                            log("[⚠️ TEXTURE] Error checking cached ptr: " + eCheck.message);
-                        }
-                        delete loadedTextureCache[relPath];
-                    }
-                    try {
-                        var basePath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/";
-                        var fullPath = basePath + relPath;
-
-                        var fileExistsFn = new NativeFunction(baseAddr.add(0x1F01DF4), "bool", ["pointer", "pointer"]);
-                        var fileReadAllBytesFn = new NativeFunction(baseAddr.add(0x1F0268C), "pointer", ["pointer", "pointer"]);
-
-                        var pathStr = createIl2CppString(fullPath);
-                        var exists = fileExistsFn(pathStr, NULL);
-
-                        if (!exists) {
-                            fullPath = fullPath + ".png";
-                            pathStr = createIl2CppString(fullPath);
-                            exists = fileExistsFn(pathStr, NULL);
-                        }
-
-                        if (!exists && relPath.indexOf(".i.bytes") !== -1) {
-                            fullPath = basePath + relPath.replace(".i.bytes", ".png");
-                            pathStr = createIl2CppString(fullPath);
-                            exists = fileExistsFn(pathStr, NULL);
-                        }
-
-                        if (!exists) {
-                            log("[-] loadLocalTexture2D: file does not exist: " + relPath);
-                            return NULL;
-                        }
-
-                        var bytesObj = fileReadAllBytesFn(pathStr, NULL);
-                        if (!bytesObj || bytesObj.isNull()) {
-                            log("[-] loadLocalTexture2D: ReadAllBytes returned null for: " + fullPath);
-                            return NULL;
-                        }
-
-                        // Create Texture2D(2, 2)
-                        var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
-                        if (!tex2dClass || tex2dClass.isNull()) return NULL;
-                        var texObj = il2cpp_object_new(tex2dClass);
-                        if (!texObj || texObj.isNull()) return NULL;
-
-                        var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
-                        texCtorFn(texObj, 2, 2, NULL);
-
-                        // ImageConversion.LoadImage(texObj, bytesObj, NULL) -> RVA 0x25B3E90
-                        var loadImageFn = new NativeFunction(baseAddr.add(0x25B3E90), "bool", ["pointer", "pointer", "pointer"]);
-                        var ok = loadImageFn(texObj, bytesObj, NULL);
-                        if (ok) {
-                            try {
-                                var setFilterModeFn = new NativeFunction(baseAddr.add(0x181A580), "void", ["pointer", "int", "pointer"]);
-                                setFilterModeFn(texObj, 2, NULL); // FilterMode.Trilinear = 2
-                                var setAnisoFn = new NativeFunction(baseAddr.add(0x181A610), "void", ["pointer", "int", "pointer"]);
-                                setAnisoFn(texObj, 8, NULL);
-                            } catch (eFm) {}
-
-                            // GC Pin and persist texture to avoid placeholder reversion
-                            try {
-                                if (il2cpp_gchandle_new) {
-                                    il2cpp_gchandle_new(texObj, 2); // 2 = Pinned handle
-                                }
-                                var dontDestroyOnLoadFn = new NativeFunction(baseAddr.add(0x1DC7FB4), "void", ["pointer", "pointer"]);
-                                dontDestroyOnLoadFn(texObj, NULL);
-                                var setHideFlagsFn = new NativeFunction(baseAddr.add(0x1DC7FF4), "void", ["pointer", "int", "pointer"]);
-                                setHideFlagsFn(texObj, 52, NULL); // 52 = DontSaveInEditor | DontSaveInBuild | DontUnloadUnusedAsset
-                            } catch (ePin) {
-                                log("[-] Error pinning texture " + relPath + ": " + ePin.message);
-                            }
-
-                            loadedTextureCache[relPath] = texObj;
-                            log("[🖼️ TEXTURE] Loaded and cached (Pinned/DontDestroy): " + relPath);
-                            return texObj;
-                        } else {
-                            log("[-] LoadImage returned false for " + relPath);
-                        }
-                    } catch (eLt) {
-                        log("[-] Error in loadLocalTexture2D for " + relPath + ": " + eLt.message);
-                    }
-                    return NULL;
-                }
-
                 try {
                     var setCdnTextureAddr = baseAddr.add(0x163A9E8);
                     Interceptor.replace(setCdnTextureAddr, new NativeCallback(function (target, path, emptyTexture, handleResult, autoSize, autoEnabled, processing, methodInfo) {
@@ -6124,7 +6832,8 @@ function initIl2Cpp(module) {
                                             var cleanUrl = fullUrl.split("?")[0];
                                             if (urlToCardMap && urlToCardMap[cleanUrl]) {
                                                 var uInfo = urlToCardMap[cleanUrl];
-                                                relPath = "asiudgasg/asodhsg/wadceg/" + uInfo.cId + "_" + uInfo.type + ".i.bytes";
+                                                var uFolder = "wadceg";
+                                                relPath = "asiudgasg/asodhsg/" + uFolder + "/" + uInfo.cId + "_" + uInfo.type + ".i.bytes";
                                             }
                                         }
                                     }
@@ -6134,17 +6843,18 @@ function initIl2Cpp(module) {
                             if (!relPath || relPath.length === 0) return NULL;
 
                             // Ownership Check: wadceg vs sdhgauwehdnu
-                            if (relPath.indexOf("wadceg/") !== -1 || relPath.indexOf("sdhgauwehdnu/") !== -1) {
+                            if (relPath.indexOf("wadceg/") !== -1 || relPath.indexOf("weoihxd/") !== -1 || relPath.indexOf("sdhgauwehdnu/") !== -1) {
                                 var match = relPath.match(/(\d+)_([sl])\.i\.bytes/);
                                 if (match) {
                                     var cId = parseInt(match[1]);
-                                    var folder = "wadceg";
+                                    var defaultFolder = "wadceg";
+                                    var folder = defaultFolder;
                                     if (relPath.indexOf("sdhgauwehdnu/") !== -1) {
                                         folder = "sdhgauwehdnu";
                                     } else {
-                                        var existsInWadceg = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes") !== null ||
-                                                             loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") !== null;
-                                        folder = (accountOwnedCards[cId] || existsInWadceg) ? "wadceg" : "sdhgauwehdnu";
+                                        var existsInOwned = loadLocalTexture2D("asiudgasg/asodhsg/" + defaultFolder + "/" + cId + "_l.i.bytes") !== null ||
+                                                             loadLocalTexture2D("asiudgasg/asodhsg/" + defaultFolder + "/" + cId + "_s.i.bytes") !== null;
+                                        folder = (accountOwnedCards[cId] || existsInOwned) ? defaultFolder : "sdhgauwehdnu";
                                     }
                                     // High-Definition Upgrade: prefer _l over _s for maximum visual sharpness
                                     var highResPath = "asiudgasg/asodhsg/" + folder + "/" + cId + "_l.i.bytes";
@@ -6204,11 +6914,13 @@ function initIl2Cpp(module) {
                                             cbFn(targetObj, 1, tex, NULL);
                                             log("[✅ CDN_CALLBACK] Successfully called handleResult callback for targetObj: " + targetObj);
                                         }
-                                        // Extra assurance: If targetObj is CardView/CardLargeView, explicitly call set_PhotoVisible(targetObj, 1)
+                                        // Extra assurance: If targetObj is CardView/CardLargeView, explicitly call set_PhotoVisible and set_TierVisible
                                         if (!targetObj.isNull()) {
                                             try {
                                                 var setPhotoVisFn = new NativeFunction(baseAddr.add(0x138F3A0), "void", ["pointer", "int", "pointer"]);
                                                 setPhotoVisFn(targetObj, 1, NULL);
+                                                var setTierVisFn = new NativeFunction(baseAddr.add(0x1393AAC), "void", ["pointer", "int", "pointer"]);
+                                                setTierVisFn(targetObj, 1, NULL);
                                             } catch (eSpv) {}
                                         }
                                     } catch (eCb) {
@@ -6439,7 +7151,9 @@ function initIl2Cpp(module) {
                     0xB3BBB4,  // IndicatorPopup.Active -> ret
                     0xB3E230,  // IndicatorPopup.Deactive -> ret
                     0xB3DEA4,  // IndicatorPopup.ActiveWithSmooth -> ret
-                    0xB3E004   // IndicatorPopup.ActiveTwo -> ret
+                    0xB3E004,  // IndicatorPopup.ActiveTwo -> ret
+                    0xE4173C,  // CardBookScene.<OpenDetailPopup>b__4 (Close result callback) -> ret
+                    0xE415E4   // CardBookScene.<OpenDetailPopup>b__3 (Receipt callback) -> ret
                 ];
                 cardBookSafetyRetRVAs.forEach(function (rva) {
                     try {
@@ -6487,27 +7201,18 @@ function initIl2Cpp(module) {
                     log("[-] Error patching VerifyFavoriteGroupCode: " + eVfgc.message);
                 }
 
-                // 10. AssetControl.PreloadTexture (0xAD2A48) -> Safe immediate callback
+                // 10. CardBookScene.<OpenDetailPopup>b__0 (0xE40F08) -> mov w8, #1; strb w8, [x21, #0xf0]; b #0xe40f2c
+                // Bypass null check on UserDataControl.CardFavoriteGroupList when opening CardBookDetailPopup
                 try {
-                    Interceptor.replace(baseAddr.add(0xAD2A48), new NativeCallback(function (enumerator, callback, methodInfo) {
-                        log("[📦 PRELOAD] PreloadTexture intercepted -> triggering callback safely!");
-                        if (!callback.isNull()) {
-                            try {
-                                var methodPtr = callback.add(0x10).readPointer();
-                                var target = callback.add(0x20).readPointer();
-                                if (!methodPtr.isNull()) {
-                                    var cbFn = new NativeFunction(methodPtr, "void", ["pointer", "pointer"]);
-                                    cbFn(target, NULL);
-                                    log("[📦 PRELOAD] Callback successfully executed!");
-                                }
-                            } catch (eCb) {
-                                log("[-] Error executing PreloadTexture callback: " + eCb.message);
-                            }
-                        }
-                    }, "void", ["pointer", "pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on AssetControl.PreloadTexture (0xAD2A48)!");
-                } catch (ePt) {
-                    log("[-] Error replacing PreloadTexture: " + ePt.message);
+                    Memory.protect(baseAddr.add(0xE40F08), 12, "rwx");
+                    baseAddr.add(0xE40F08).writeByteArray([
+                        0x28, 0x00, 0x80, 0x52, // mov w8, #1
+                        0xa8, 0xc2, 0x03, 0x39, // strb w8, [x21, #0xf0]
+                        0x07, 0x00, 0x00, 0x14  // b 0xe40f2c (+0x1c = 7 instructions)
+                    ]);
+                    log("[+] Byte patch on CardBookScene.<OpenDetailPopup>b__0 (0xE40F08): bypass favorite group list check");
+                } catch (eOdp) {
+                    log("[-] Error patching OpenDetailPopup callback: " + eOdp.message);
                 }
 
                 // Proxy CardControl.Data primary identity getters
@@ -6572,29 +7277,6 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing InventoryControl.SetCurrentGroup: " + eScg.message);
                 }
 
-                // Proxy InventoryControl.FindToGroupItem (0xF29604)
-                try {
-                    Interceptor.replace(baseAddr.add(0xF29604), new NativeCallback(function (groupCode, methodInfo) {
-                        if (loonaGroupItemObj && !loonaGroupItemObj.isNull()) {
-                            return loonaGroupItemObj;
-                        }
-                        return NULL;
-                    }, "pointer", ["int", "pointer"]));
-                    log("[+] Interceptor.replace installed on InventoryControl.FindToGroupItem (0xF29604)!");
-                } catch (eFtgi) {
-                    log("[-] Error replacing FindToGroupItem: " + eFtgi.message);
-                }
-
-                // Proxy InventoryControl.get_SelectedGroupCode (0xF26F64)
-                try {
-                    Interceptor.replace(baseAddr.add(0xF26F64), new NativeCallback(function (methodInfo) {
-                        return 1001;
-                    }, "int", ["pointer"]));
-                    log("[+] Interceptor.replace installed on InventoryControl.get_SelectedGroupCode (0xF26F64)!");
-                } catch (eSgc) {
-                    log("[-] Error replacing get_SelectedGroupCode: " + eSgc.message);
-                }
-
                 // Proxy InventoryControl.get_selectedGroupCode (0xF26C40)
                 try {
                     Interceptor.replace(baseAddr.add(0xF26C40), new NativeCallback(function (methodInfo) {
@@ -6603,16 +7285,6 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on InventoryControl.get_selectedGroupCode (0xF26C40)!");
                 } catch (eSgc2) {
                     log("[-] Error replacing get_selectedGroupCode: " + eSgc2.message);
-                }
-
-                // Proxy GroupControl.Data.get_EmblemPath (0xCA4F3C)
-                try {
-                    Interceptor.replace(baseAddr.add(0xCA4F3C), new NativeCallback(function (thisPtr, methodInfo) {
-                        return createDownloadPath("asiudgasg/asodhsg/aweoijs/1001.i.bytes");
-                    }, "pointer", ["pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on GroupControl.Data.get_EmblemPath (0xCA4F3C)!");
-                } catch (eGep) {
-                    log("[-] Error replacing GroupControl.Data.get_EmblemPath: " + eGep.message);
                 }
 
                 // Proxy ThemeControl.Data.get_SmallNameImagePath (0xC89BCC)
@@ -6707,45 +7379,50 @@ function initIl2Cpp(module) {
                 }
 
                 // Bulletproof DisplayGroupList initializer & updater (0xF28CE8)
+                var cachedDglInstance = NULL;
                 var ensureDisplayGroupList = function() {
                     try {
-                        var getDglFn = new NativeFunction(baseAddr.add(0xF2770C), "pointer", ["pointer"]);
-                        var dgl = getDglFn(NULL);
-                        if (dgl.isNull()) {
-                            // Slot 0x30EDFE8 is the exact TypeInfo for List<InventoryControl.GroupItem>
-                            var pKlassSlot = baseAddr.add(0x30ED000).add(0xFE8).readPointer();
-                            var klass = !pKlassSlot.isNull() ? pKlassSlot.readPointer() : NULL;
-                            if (klass && !klass.isNull()) {
-                                var newDgl = il2cpp_object_new(klass);
-                                if (!newDgl.isNull()) {
-                                    var ctorSlot = baseAddr.add(0x30D5000).add(0x3B8).readPointer();
-                                    var ctorMethodInfo = !ctorSlot.isNull() ? ctorSlot.readPointer() : NULL;
-                                    var ctorFn = new NativeFunction(baseAddr.add(0x23CD7B4), "void", ["pointer", "pointer"]);
-                                    ctorFn(newDgl, ctorMethodInfo);
-                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(newDgl, 0);
-                                    var setDglFn = new NativeFunction(baseAddr.add(0xF27770), "void", ["pointer", "pointer"]);
-                                    setDglFn(newDgl, NULL);
-                                    dgl = newDgl;
-                                    log("[🃏 INVENTORY] Created authentic IL2CPP List<GroupItem> for DisplayGroupList: " + newDgl);
+                        if (!cachedDglInstance.isNull() && cachedDglInstance.compare(ptr(0x10000)) > 0) {
+                            return cachedDglInstance;
+                        }
+                        ensureLoonaMocks();
+                        var listKlass = getClass("mscorlib", "System.Collections.Generic", "List`1");
+                        if (listKlass && !listKlass.isNull()) {
+                            var newDgl = il2cpp_object_new(listKlass);
+                            if (!newDgl.isNull()) {
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(newDgl, 2);
+                                var arrKlass = (loonaGroupItemObj && !loonaGroupItemObj.isNull()) ? loonaGroupItemObj.readPointer() : listKlass;
+                                var arr = il2cpp_array_new(arrKlass, 8);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(arr, 2);
+                                newDgl.add(0x10).writePointer(arr);
+                                if (loonaGroupItemObj && !loonaGroupItemObj.isNull()) {
+                                    arr.add(0x20).writePointer(loonaGroupItemObj);
+                                    newDgl.add(0x18).writeS32(1);
+                                } else {
+                                    newDgl.add(0x18).writeS32(0);
                                 }
+                                var setDglFn = new NativeFunction(baseAddr.add(0xF27770), "void", ["pointer", "pointer"]);
+                                setDglFn(newDgl, NULL);
+                                cachedDglInstance = newDgl;
+                                log("[🃏 INVENTORY] Created authentic IL2CPP List<GroupItem> for DisplayGroupList: " + newDgl + " (count=" + newDgl.add(0x18).readS32() + ")");
+                                return newDgl;
                             }
                         }
-                        if (!dgl.isNull() && loonaGroupItemObj && !loonaGroupItemObj.isNull()) {
-                            var count = dgl.add(0x18).readS32();
-                            if (count === 0) {
-                                var mSlot = baseAddr.add(0x31390F8).readPointer();
-                                var addMethodInfo = !mSlot.isNull() ? mSlot.readPointer() : NULL;
-                                var listAddFn = new NativeFunction(baseAddr.add(0x23CE41C), "void", ["pointer", "pointer", "pointer"]);
-                                listAddFn(dgl, loonaGroupItemObj, addMethodInfo);
-                                log("[🃏 INVENTORY] Added loonaGroupItemObj to DisplayGroupList! Count: " + dgl.add(0x18).readS32());
-                            }
-                        }
-                        return dgl;
                     } catch (eEdgl) {
                         log("[-] Error in ensureDisplayGroupList: " + eEdgl.message);
-                        return NULL;
                     }
+                    return cachedDglInstance;
                 };
+
+                // Hook InventoryControl.get_DisplayGroupList (0xF2770C) to never return null
+                try {
+                    Interceptor.replace(baseAddr.add(0xF2770C), new NativeCallback(function (methodInfo) {
+                        return ensureDisplayGroupList();
+                    }, "pointer", ["pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryControl.get_DisplayGroupList (0xF2770C)!");
+                } catch (eGetDglHk) {
+                    log("[-] Error replacing get_DisplayGroupList: " + eGetDglHk.message);
+                }
 
                 try {
                     Interceptor.replace(baseAddr.add(0xF28CE8), new NativeCallback(function (isForceSortAlphabet, methodInfo) {
@@ -6835,8 +7512,8 @@ function initIl2Cpp(module) {
 
                 function dictSet(dictObj, keyVal, valObj, isKeyInt64) {
                     try {
-                        if (!dictObj || dictObj.isNull()) {
-                            log("[-] dictSet: dictObj is null!");
+                        if (!dictObj || dictObj.isNull() || dictObj.compare(ptr(0x10000)) < 0) {
+                            log("[-] dictSet: dictObj is invalid or null: " + dictObj);
                             return false;
                         }
                         var dictKlass = dictObj.readPointer();
@@ -6949,39 +7626,16 @@ function initIl2Cpp(module) {
                         isInventoryPopulated = true;
                         ensureLoonaMocks();
 
-                        var getCardMapFn = new NativeFunction(baseAddr.add(0xF2751C), "pointer", ["pointer"]);
-                        var cardMap = getCardMapFn(NULL);
-                        if (cardMap.isNull()) {
-                            log("[-] CardMap is null! Allocating fresh Dictionary<long, CardItem>...");
-                            try {
-                                var dictSlot = baseAddr.add(0x30FF100).readPointer();
-                                var dictKlass = !dictSlot.isNull() ? dictSlot.readPointer() : NULL;
-                                if (!dictKlass || dictKlass.isNull()) {
-                                    var dSlotOld = baseAddr.add(0x31E1020).readPointer();
-                                    if (!dSlotOld.isNull()) dictKlass = dSlotOld;
-                                }
-                                if (!dictKlass || dictKlass.isNull()) {
-                                    dictKlass = getClass("mscorlib", "System.Collections.Generic", "Dictionary`2");
-                                }
-                                if (dictKlass && !dictKlass.isNull()) {
-                                    cardMap = il2cpp_object_new(dictKlass);
-                                    var ctorSlot = baseAddr.add(0x310ACC0).readPointer();
-                                    var dictCtorMethodInfo = !ctorSlot.isNull() ? ctorSlot.readPointer() : NULL;
-                                    var dictCtorFn = new NativeFunction(baseAddr.add(0x234F4C8), "void", ["pointer", "int", "pointer"]);
-                                    dictCtorFn(cardMap, 16, dictCtorMethodInfo);
-                                    var setCardMapFn = new NativeFunction(baseAddr.add(0xF27580), "void", ["pointer", "pointer"]);
-                                    setCardMapFn(cardMap, NULL);
-                                    log("[🃏 INVENTORY] Created fresh Dictionary<long, CardItem> and assigned to CardMap: " + cardMap);
-                                }
-                            } catch (dErr) {
-                                log("[-] Error allocating Dictionary: " + dErr.message);
-                            }
+                        try {
+                            var openCardFn = new NativeFunction(baseAddr.add(0xF27DA8), "void", ["pointer"]);
+                            openCardFn(NULL);
+                            log("[🃏 INVENTORY] Native InventoryControl.OpenCard() executed!");
+                        } catch (eOc) {
+                            log("[-] Error in OpenCard: " + eOc.message);
                         }
 
-                        if (cardMap.isNull()) {
-                            log("[-] CardMap could not be initialized. Aborting card populator.");
-                            return;
-                        }
+                        var getCardMapFn = new NativeFunction(baseAddr.add(0xF2751C), "pointer", ["pointer"]);
+                        var cardMap = getCardMapFn(NULL);
 
                         var profile = loadPlayerProfile();
                         if (!profile || !profile.inventoryCards || profile.inventoryCards.length === 0) {
@@ -7014,12 +7668,15 @@ function initIl2Cpp(module) {
                         cachedCardKlass = cardKlass;
                         cachedCardItemKlass = cardItemKlass;
 
-                        log("[🃏 INVENTORY] Populating " + profile.inventoryCards.length + " LOONA cards into CardMap (" + cardMap + ")...");
+                        var validCards = profile.inventoryCards.filter(function(c) {
+                            return c && c.cardID >= 1001 && c.cardID <= 1021;
+                        });
+                        log("[🃏 INVENTORY] Populating " + validCards.length + " LOONA cards into CardMap (" + cardMap + ")...");
                         var addedCount = 0;
                         loonaCardItems = [];
 
-                        for (var i = 0; i < profile.inventoryCards.length; i++) {
-                            var cData = profile.inventoryCards[i];
+                        for (var i = 0; i < validCards.length; i++) {
+                            var cData = validCards[i];
                             try {
                                 // 1. Create Card managed instance
                                 var cardObj = il2cpp_object_new(cardKlass);
@@ -7067,13 +7724,14 @@ function initIl2Cpp(module) {
 
                                 loonaCardItems.push(cardItemObj);
 
-                                // 3. Add to CardMap Dictionary via dictSet
-                                var added = dictSet(cardMap, objId, cardItemObj, true);
-                                if (added) {
+                                // 3. Add to CardMap Dictionary via Native AddCard (0xF2A210)
+                                try {
+                                    var addCardNativeFn = new NativeFunction(baseAddr.add(0xF2A210), "void", ["pointer"]);
+                                    addCardNativeFn(cardItemObj);
                                     addedCount++;
                                     log("[🃏 CARD " + (i + 1) + "] Added cardID=" + cId + " grade=" + gr + " lvl=" + lvl + " objID=" + objId);
-                                } else {
-                                    log("[-] Failed to add cardID=" + cId + " to cardMap!");
+                                } catch (eAc) {
+                                    log("[-] Failed to add cardID=" + cId + " via AddCard: " + eAc.message);
                                 }
                             } catch (cErr) {
                                 log("[-] Error creating card " + i + ": " + cErr.message);
@@ -7117,23 +7775,10 @@ function initIl2Cpp(module) {
                             log("[🃏 INVENTORY] InventoryControl.set_IsOpened(true) called!");
                         } catch (ioe) {}
 
-                        // Ensure GroupMap contains Group 1001 (LOONA)
+                        // Ensure GroupItem and DisplayGroupList
                         try {
-                            var getGroupMapFn = new NativeFunction(baseAddr.add(0xF27380), "pointer", ["pointer"]);
-                            var groupMap = getGroupMapFn(NULL);
-                            if (groupMap.isNull()) {
-                                try {
-                                    var grpDictKlass = getClass("mscorlib", "System.Collections.Generic", "Dictionary`2");
-                                    if (grpDictKlass && !grpDictKlass.isNull()) {
-                                        groupMap = il2cpp_object_new(grpDictKlass);
-                                        var setGroupMapFn = new NativeFunction(baseAddr.add(0xF273E4), "void", ["pointer", "pointer"]);
-                                        setGroupMapFn(groupMap, NULL);
-                                    }
-                                } catch (eGmd) {}
-                            }
-
                             var groupItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "InventoryControl/GroupItem");
-                            if (groupItemKlass && !groupItemKlass.isNull() && !groupMap.isNull()) {
+                            if (groupItemKlass && !groupItemKlass.isNull()) {
                                 var groupItemObj = il2cpp_object_new(groupItemKlass);
                                 groupItemObj.add(0x10).writePointer(loonaGroupData || NULL);
                                 groupItemObj.add(0x18).writePointer(NULL);
@@ -7150,34 +7795,9 @@ function initIl2Cpp(module) {
                                 groupItemObj.add(0x58).writeS32(0);
                                 groupItemObj.add(0x5C).writeS32(0);
                                 loonaGroupItemObj = groupItemObj;
-
-                                dictSet(groupMap, 1001, groupItemObj, false);
-                                log("[🃏 INVENTORY] Added LOONA GroupItem(1001) to GroupMap! loonaGroupItemObj=" + loonaGroupItemObj);
-
-                                var updateDisplayGroupListFn = new NativeFunction(baseAddr.add(0xF28CE8), "void", ["int", "pointer"]);
-                                updateDisplayGroupListFn(0, NULL);
-                                log("[🃏 INVENTORY] UpdateDisplayGroupList(false) executed!");
-
-                                // Check DisplayGroupList
-                                var getDglFn = new NativeFunction(baseAddr.add(0xF2770C), "pointer", ["pointer"]);
-                                var dgl = getDglFn(NULL);
-                                if (!dgl.isNull()) {
-                                    var dglCount = dgl.add(0x18).readS32();
-                                    log("[🃏 INVENTORY] DisplayGroupList count after update: " + dglCount);
-                                    if (dglCount === 0) {
-                                        log("[🃏 INVENTORY] DisplayGroupList count is 0, adding LOONA GroupItem manually...");
-                                        try {
-                                            var mSlot = baseAddr.add(0x31390F8).readPointer();
-                                            var addMethodInfo = !mSlot.isNull() ? mSlot.readPointer() : NULL;
-                                            var listAddFn = new NativeFunction(baseAddr.add(0x23CE41C), "void", ["pointer", "pointer", "pointer"]);
-                                            listAddFn(dgl, groupItemObj, addMethodInfo);
-                                            log("[🃏 INVENTORY] Manually added GroupItem to DisplayGroupList! New count: " + dgl.add(0x18).readS32());
-                                        } catch (eLa) {
-                                            log("[-] Error manually adding to DisplayGroupList: " + eLa.message);
-                                        }
-                                    }
-                                }
+                                log("[🃏 INVENTORY] Created LOONA GroupItem(1001)! loonaGroupItemObj=" + loonaGroupItemObj);
                             }
+                            ensureDisplayGroupList();
                         } catch (eGme) {
                             log("[-] Error verifying GroupMap: " + eGme.message);
                         }
@@ -7403,12 +8023,9 @@ function initIl2Cpp(module) {
                                 try {
                                     var dclPtr = activeInventorySceneInstance.add(0x58).readPointer();
                                     var cnt = 0;
-                                    if (!dclPtr.isNull()) cnt = dclPtr.add(0x18).readS32();
                                     log("[🗃️ INVENTORY SCENE] OnOpen.onLeave: displayCardList count=" + cnt);
-                                    if (cnt === 0) {
-                                        log("[🗃️ INVENTORY SCENE] displayCardList was empty on open/return! Restoring...");
-                                        restoreDefaultDisplayCardList(activeInventorySceneInstance, true);
-                                    }
+                                    log("[🗃️ INVENTORY SCENE] Ensuring displayCardList and calling InvenCardView.SetData...");
+                                    restoreDefaultDisplayCardList(activeInventorySceneInstance, true);
                                 } catch (eOol) {
                                     log("[-] Error in InventoryScene.OnOpen.onLeave: " + eOol.message);
                                 }
@@ -8146,6 +8763,170 @@ function initIl2Cpp(module) {
                 var openSceneFn = new NativeFunction(baseAddr.add(0xD52B04), 'void', ['pointer', 'pointer', 'pointer', 'pointer']);
                 var completeLoadingFn = new NativeFunction(baseAddr.add(0xB3E230), 'void', ['pointer']);
 
+                var executeSceneCommand = function(cmdRaw, sceneOverride) {
+                    try {
+                        if (!cmdRaw) return;
+                        log("[🚀 SCENE CMD EXEC] Executing: '" + cmdRaw + "'");
+
+                        var curScene = (sceneOverride && !sceneOverride.isNull()) ? sceneOverride : NULL;
+                        var sceneId = globalSceneId;
+                        if (!curScene || curScene.isNull()) {
+                            if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                curScene = activeInventorySceneInstance;
+                                sceneId = 4;
+                            } else {
+                                try {
+                                    var klassPtr = baseAddr.add(0x3146538).readPointer();
+                                    if (!klassPtr.isNull() && !klassPtr.readPointer().isNull()) {
+                                        var staticFields = klassPtr.readPointer().add(0xB8).readPointer();
+                                        if (!staticFields.isNull()) {
+                                            sceneId = staticFields.add(0x10).readS32();
+                                            curScene = staticFields.add(0x20).readPointer();
+                                        }
+                                    }
+                                } catch (eCs) {}
+                            }
+                        }
+
+                        if (cmdRaw.indexOf("card:") === 0) {
+                            var cardArg = cmdRaw.substring(5).trim();
+                            log("[🃏 CARD CMD] Triggering card select for arg: '" + cardArg + "' on scene: " + curScene);
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                var targetCardItem = NULL;
+                                try {
+                                    var cardIdx = parseInt(cardArg, 10);
+                                    var dclPtr = curScene.add(0x58).readPointer();
+                                    if (!dclPtr.isNull()) {
+                                        var listItems = dclPtr.add(0x10).readPointer();
+                                        var listSize = dclPtr.add(0x18).readS32();
+                                        if (isNaN(cardIdx) || cardIdx < 0 || cardIdx >= listSize) cardIdx = 0;
+                                        if (!listItems.isNull() && listSize > 0) {
+                                            targetCardItem = listItems.add(0x20 + cardIdx * 8).readPointer();
+                                            log("[🃏 CARD CMD] Selected CardItem[" + cardIdx + "] = " + targetCardItem + " (out of " + listSize + ")");
+                                        }
+                                    }
+                                } catch (eDclCmd) {
+                                    log("[-] Error reading displayCardList in CARD CMD: " + eDclCmd.message);
+                                }
+                                if ((!targetCardItem || targetCardItem.isNull()) && loonaCardItems && loonaCardItems.length > 0) {
+                                    targetCardItem = loonaCardItems[0];
+                                }
+                                if (targetCardItem && !targetCardItem.isNull()) {
+                                    var rawCard = targetCardItem.add(0x10).readPointer();
+                                    var cId = rawCard.add(0x20).readS32();
+                                    var meta = getCardMetadata(cId);
+                                    var memberIdx = (meta.artistID >= 1000) ? (meta.artistID - 1000) : meta.artistID;
+                                    if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cId - 1001) % 11) + 1;
+                                    var artistData = loonaArtistDataMap[memberIdx] || NULL;
+
+                                    curScene.add(0x88).writePointer(targetCardItem);
+                                    curScene.add(0x98).writePointer(targetCardItem);
+                                    curScene.add(0x80).writePointer(artistData);
+                                    safeSetStateMain(curScene, 0);
+                                    log("[🎉 CARD CMD SUCCESS] safeSetStateMain(0) invoked on InventoryScene for cardID=" + cId + ", theme=" + meta.theme);
+                                }
+                            } else {
+                                log("[-] CARD CMD failed: curScene is null or sceneId != 4 (sceneId=" + sceneId + ", instance=" + curScene + ")");
+                            }
+                        } else if (cmdRaw === "diag") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) diagCarousel(curScene);
+                        } else if (cmdRaw === "change") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                log("[🗃️ CHANGE CMD] Triggering OnChange directly!");
+                                var onChangeFn = new NativeFunction(baseAddr.add(0x105A61C), "void", ["pointer", "pointer"]);
+                                onChangeFn(curScene, NULL);
+                            }
+                        } else if (cmdRaw === "equip") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                log("[🗃️ EQUIP CMD] Triggering OnEquip directly!");
+                                var onEquipFn = new NativeFunction(baseAddr.add(0x105AFC8), "void", ["pointer", "pointer"]);
+                                onEquipFn(curScene, NULL);
+                            }
+                        } else if (cmdRaw === "back" || cmdRaw === "close") {
+                            if (curScene && !curScene.isNull()) {
+                                if (sceneId === 4) {
+                                    log("[🔙 BACK CMD] Closing detail via handleInventoryBack!");
+                                    handleInventoryBack(curScene);
+                                } else if (sceneId === 5) {
+                                    log("[🔙 BACK CMD] Closing CardBook via CardBookScene.OnBack!");
+                                    var cbBackFn = new NativeFunction(baseAddr.add(0x11CEDE8), "void", ["pointer", "pointer"]);
+                                    cbBackFn(curScene, NULL);
+                                }
+                            }
+                        } else {
+                            var targetScene = parseInt(cmdRaw, 10);
+                            if (!isNaN(targetScene) && targetScene >= 1 && targetScene <= 13) {
+                                log("[🚀 SCENE CMD] Switching to SceneId: " + targetScene);
+                                if (curScene && !curScene.isNull()) {
+                                    if ((sceneId === 2 || sceneId === 3) && targetScene === 4) {
+                                        log("[🚀 SCENE CMD] Invoking LobbyScene.OnInventory (0xB4C418) cleanly on LobbyScene: " + curScene);
+                                        var onInvenFn = new NativeFunction(baseAddr.add(0xB4C418), 'void', ['pointer', 'pointer']);
+                                        onInvenFn(curScene, NULL);
+                                    } else {
+                                        log("[🚀 SCENE CMD] Invoking Scene.SetStateOpenScene (0xD5338C) on curScene: " + curScene + " -> target: " + targetScene);
+                                        var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
+                                        setStateOpenSceneFn(curScene, targetScene, NULL, NULL, NULL);
+                                    }
+                                } else {
+                                    log("[🚀 SCENE CMD] curScene is null, invoking SceneControl.OpenScene direct (0xD534BC)");
+                                    var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), 'void', ['int', 'pointer', 'pointer']);
+                                    openSceneDirectFn(targetScene, NULL, NULL);
+                                }
+                            }
+                        }
+                    } catch (eExecCmd) {
+                        log("[-] Error in executeSceneCommand: " + eExecCmd.message);
+                    }
+                };
+
+                // Standalone command watcher: uses POSIX access & unlink + File.readText, completely independent of SceneControl.Update
+                var accessPtr = Module.findExportByName("libc.so", "access");
+                var unlinkPtr = Module.findExportByName("libc.so", "unlink");
+                var accessFn = accessPtr ? new NativeFunction(accessPtr, "int", ["pointer", "int"]) : null;
+                var unlinkFn = unlinkPtr ? new NativeFunction(unlinkPtr, "int", ["pointer"]) : null;
+                var cmdPathCStr = Memory.allocUtf8String("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt");
+
+                var pendingSceneCommand = null;
+
+                setInterval(function () {
+                    try {
+                        if (accessFn && accessFn(cmdPathCStr, 0) === 0) {
+                            var content = null;
+                            try {
+                                var f = new File("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt", "r");
+                                content = f.readText();
+                                f.close();
+                            } catch (eF) {}
+                            if (unlinkFn) unlinkFn(cmdPathCStr);
+                            if (content) {
+                                var cmdTrim = content.replace(/['"]/g, '').trim();
+                                if (cmdTrim.length > 0) {
+                                    pendingSceneCommand = cmdTrim;
+                                    log("[🚀 SCENE CMD QUEUED] Queued for Unity Main Thread: '" + cmdTrim + "'");
+                                }
+                            }
+                        }
+                    } catch (eW) {}
+                }, 100);
+
+                // Scene.Update (0xD5330C) -> runs every frame on the Unity Main Thread for whichever scene is active!
+                try {
+                    Interceptor.attach(baseAddr.add(0xD5330C), {
+                        onEnter: function (args) {
+                            if (pendingSceneCommand) {
+                                var cmd = pendingSceneCommand;
+                                pendingSceneCommand = null;
+                                var activeScene = args[0];
+                                log("[🚀 MAIN THREAD DISPATCH] Executing '" + cmd + "' on active Scene: " + activeScene);
+                                executeSceneCommand(cmd, activeScene);
+                            }
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on Scene.Update (0xD5330C) for main-thread command dispatch!");
+                } catch (eScUp) {
+                    log("[-] Error attaching to Scene.Update: " + eScUp.message);
+                }
+
                 Interceptor.attach(baseAddr.add(0xD55EE8), {
                     onEnter: function (args) {
                         sceneUpdateCounter++;
@@ -8249,7 +9030,7 @@ function initIl2Cpp(module) {
                                 }
                             }
 
-                            // Check scene navigation command file every 30 frames (zero allocation check via cached File.Exists)
+                            // Check scene navigation command file every 30 frames (fallback)
                             if (sceneUpdateCounter % 30 === 0) {
                                 try {
                                     if (!cachedCmdPathStr || cachedCmdPathStr.isNull()) {
@@ -8268,160 +9049,11 @@ function initIl2Cpp(module) {
                                             il2cpp_runtime_invoke(cachedDeleteMethod, NULL, cmdReusableBuf, excReusableBuf);
                                             if (!txtObj.isNull()) {
                                                 var cmdRaw = readIl2CppString(txtObj).replace(/['"]/g, '').trim();
-                                                log("[🚀 SCENE CMD] Read command: '" + cmdRaw + "'");
-                                            if (cmdRaw.indexOf("card:") === 0) {
-                                                var cardArg = cmdRaw.substring(5).trim();
-                                                log("[🃏 CARD CMD] Triggering card select for arg: '" + cardArg + "'");
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull() && sceneId === 4) {
-                                                    var targetCardItem = NULL;
-                                                    try {
-                                                        if (cardArg.indexOf("obj:") === 0) {
-                                                            var targetObjStr = cardArg.substring(4).trim();
-                                                            if (loonaCardItems) {
-                                                                for (var ci = 0; ci < loonaCardItems.length; ci++) {
-                                                                    var cItem = loonaCardItems[ci];
-                                                                    var raw = cItem.add(0x10).readPointer();
-                                                                    if (!raw.isNull() && raw.add(0x10).readS64().toString() === targetObjStr) {
-                                                                        targetCardItem = cItem;
-                                                                        log("[🃏 CARD CMD] Resolved by ObjectID: " + targetObjStr);
-                                                                        break;
-                                                                    }
-                                                                }
-                                                            }
-                                                        } else if (cardArg.indexOf("id:") === 0) {
-                                                            var targetCid = parseInt(cardArg.substring(3).trim(), 10);
-                                                            if (loonaCardItems) {
-                                                                for (var ci = 0; ci < loonaCardItems.length; ci++) {
-                                                                    var cItem = loonaCardItems[ci];
-                                                                    var raw = cItem.add(0x10).readPointer();
-                                                                    if (!raw.isNull() && raw.add(0x20).readS32() === targetCid) {
-                                                                        targetCardItem = cItem;
-                                                                        log("[🃏 CARD CMD] Resolved by CardID: " + targetCid);
-                                                                        break;
-                                                                    }
-                                                                }
-                                                            }
-                                                        } else {
-                                                            var cardIdx = parseInt(cardArg, 10);
-                                                            var dclPtr = curScene.add(0x58).readPointer();
-                                                            if (!dclPtr.isNull()) {
-                                                                var listItems = dclPtr.add(0x10).readPointer();
-                                                                var listSize = dclPtr.add(0x18).readS32();
-                                                                if (isNaN(cardIdx) || cardIdx < 0 || cardIdx >= listSize) cardIdx = 0;
-                                                                if (!listItems.isNull() && listSize > 0) {
-                                                                    targetCardItem = listItems.add(0x20 + cardIdx * 8).readPointer();
-                                                                    log("[🃏 CARD CMD] Selected CardItem[" + cardIdx + "] = " + targetCardItem + " (out of " + listSize + ")");
-                                                                }
-                                                            }
-                                                        }
-                                                    } catch (eDclCmd) {
-                                                        log("[-] Error reading displayCardList in CARD CMD: " + eDclCmd.message);
-                                                    }
-                                                    if (targetCardItem.isNull() && loonaCardItems && loonaCardItems.length > 0) {
-                                                        targetCardItem = loonaCardItems[0];
-                                                    }
-                                                    if (!targetCardItem.isNull()) {
-                                                        var rawCard = targetCardItem.add(0x10).readPointer();
-                                                        var cId = rawCard.add(0x20).readS32();
-                                                        var meta = getCardMetadata(cId);
-                                                        var memberIdx = (meta.artistID >= 1000) ? (meta.artistID - 1000) : meta.artistID;
-                                                        if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cId - 1001) % 11) + 1;
-                                                        var artistData = loonaArtistDataMap[memberIdx] || NULL;
-
-                                                        curScene.add(0x88).writePointer(targetCardItem);
-                                                        curScene.add(0x98).writePointer(targetCardItem);
-                                                        curScene.add(0x80).writePointer(artistData);
-                                                        safeSetStateMain(curScene, 0);
-                                                        log("[🎉 CARD CMD SUCCESS] safeSetStateMain(0) invoked on InventoryScene for cardID=" + cId + ", theme=" + meta.theme);
-                                                    }
-                                                } else {
-                                                    log("[-] CARD CMD failed: not in InventoryScene (sceneId=" + sceneId + ", instance=" + curScene + ")");
-                                                }
-                                            } else if (cmdRaw === "change") {
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull() && sceneId === 4) {
-                                                    log("[🗃️ CHANGE CMD] Triggering OnChange directly!");
-                                                    var onChangeFn = new NativeFunction(baseAddr.add(0x105A61C), "void", ["pointer", "pointer"]);
-                                                    onChangeFn(curScene, NULL);
-                                                }
-                                            } else if (cmdRaw === "equip") {
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull() && sceneId === 4) {
-                                                    log("[🗃️ EQUIP CMD] Triggering OnEquip directly!");
-                                                    var onEquipFn = new NativeFunction(baseAddr.add(0x105AFC8), "void", ["pointer", "pointer"]);
-                                                    onEquipFn(curScene, NULL);
-                                                }
-                                            } else if (cmdRaw === "back" || cmdRaw === "close") {
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull()) {
-                                                    if (sceneId === 4) {
-                                                        log("[🔙 BACK CMD] Closing detail via InventoryScene.OnBack!");
-                                                        var onBackFn = new NativeFunction(baseAddr.add(0x10537F4), "void", ["pointer", "pointer"]);
-                                                        onBackFn(curScene, NULL);
-                                                    } else if (sceneId === 5) {
-                                                        log("[🔙 BACK CMD] Closing CardBook via CardBookScene.OnBack!");
-                                                        var cbBackFn = new NativeFunction(baseAddr.add(0x11CEDE8), "void", ["pointer", "pointer"]);
-                                                        cbBackFn(curScene, NULL);
-                                                    }
-                                                }
-                                            } else if (cmdRaw === "cb:group") {
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull() && sceneId === 5) {
-                                                    log("[📖 CARDBOOK CMD] Switching to Group View tab (1)!");
-                                                    var sceneView = curScene.add(0x48).readPointer();
-                                                    if (!sceneView.isNull()) {
-                                                        var setTabFn = new NativeFunction(baseAddr.add(0x11CF5BC), "int", ["pointer", "int", "pointer"]);
-                                                        setTabFn(sceneView, 1, NULL);
-                                                        var refreshGrpPageFn = new NativeFunction(baseAddr.add(0x11CF768), "void", ["pointer", "int", "bool", "pointer"]);
-                                                        refreshGrpPageFn(curScene, 0, 1, NULL);
-                                                    }
-                                                }
-                                            } else if (cmdRaw === "cb:main") {
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull() && sceneId === 5) {
-                                                    log("[📖 CARDBOOK CMD] Switching to Main View tab (0)!");
-                                                    var sceneView = curScene.add(0x48).readPointer();
-                                                    if (!sceneView.isNull()) {
-                                                        var setTabFn = new NativeFunction(baseAddr.add(0x11CF5BC), "int", ["pointer", "int", "pointer"]);
-                                                        setTabFn(sceneView, 0, NULL);
-                                                        var refreshMainFn = new NativeFunction(baseAddr.add(0x11CFDD8), "void", ["pointer", "bool", "pointer"]);
-                                                        refreshMainFn(curScene, 1, NULL);
-                                                    }
-                                                }
-                                            } else if (cmdRaw === "cb:detail") {
-                                                var curScene = staticFields.add(0x20).readPointer();
-                                                if (!curScene.isNull() && sceneId === 5) {
-                                                    log("[📖 CARDBOOK CMD] Triggering OnBestCardBook (Detail Popup)!");
-                                                    var onBcbFn = new NativeFunction(baseAddr.add(0x11D2268), "void", ["pointer", "pointer"]);
-                                                    onBcbFn(curScene, NULL);
-                                                }
-                                            } else {
-                                                var targetScene = parseInt(cmdRaw);
-                                                if (!isNaN(targetScene) && targetScene >= 1 && targetScene <= 13) {
-                                                    log("[🚀 SCENE CMD] Received command to switch to SceneId: " + targetScene);
-                                                    var curScene = staticFields.add(0x20).readPointer();
-                                                    if (!curScene.isNull()) {
-                                                        if (sceneId === 3 && targetScene === 4) {
-                                                            log("[🚀 SCENE CMD] Invoking LobbyScene.OnInventory (0xB4C418) cleanly on LobbyScene: " + curScene);
-                                                            var onInvenFn = new NativeFunction(baseAddr.add(0xB4C418), 'void', ['pointer', 'pointer']);
-                                                            onInvenFn(curScene, NULL);
-                                                        } else {
-                                                            log("[🚀 SCENE CMD] Invoking Scene.SetStateOpenScene (0xD5338C) on curScene: " + curScene + " -> target: " + targetScene);
-                                                            var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
-                                                            setStateOpenSceneFn(curScene, targetScene, NULL, NULL, NULL);
-                                                        }
-                                                    } else {
-                                                        log("[🚀 SCENE CMD] curScene is null, invoking SceneControl.OpenScene direct (0xD534BC)");
-                                                        var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), 'void', ['int', 'pointer', 'pointer']);
-                                                        openSceneDirectFn(targetScene, NULL, NULL);
-                                                    }
-                                                }
+                                                executeSceneCommand(cmdRaw);
                                             }
                                         }
                                     }
-                                }
-                            } catch (eCmd) {}
+                                } catch (eCmd) {}
                             }
 
                             // Auto-Enlace / Activador Seguro de LobbyScene ONLY when isDone or already unloaded

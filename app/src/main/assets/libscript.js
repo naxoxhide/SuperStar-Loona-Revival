@@ -577,6 +577,18 @@ function initIl2Cpp(module) {
                         isPrism: false
                     });
                 }
+                // 1 Prism card (1012 - HeeJin Prism)
+                invCards.push({
+                    objectID: 100012,
+                    cardID: 1012,
+                    grade: 4,
+                    level: 50,
+                    energy: 100,
+                    score: 100,
+                    isEquip: false,
+                    isLock: false,
+                    isPrism: true
+                });
                 // 2 extra cards in inventory (unequipped) to verify selective checkmarking
                 invCards.push({
                     objectID: 100013,
@@ -618,7 +630,7 @@ function initIl2Cpp(module) {
                     },
                     inventoryCards: invCards,
                     equipedCards: {
-                        "1001": [100001, 100002, 100003, 100004, 100005, 100006, 100007, 100008, 100009, 100010, 100011, 100012]
+                        "1001": [100001, 100002, 100003, 100004, 100005, 100006, 100007, 100008, 100009, 100010, 100011]
                     }
                 };
             }
@@ -3144,7 +3156,7 @@ function initIl2Cpp(module) {
                         ccd.add(0x48).writePointer(NULL);
                         ccd.add(0x50).writeU8(1);
                         ccd.add(0x51).writeU8(1);
-                        var cardFolder = (cardId < 10000) ? "weoihxd" : "wadceg";
+                        var cardFolder = "wadceg";
                         ccd.add(0x58).writePointer(createDownloadPath("asiudgasg/asodhsg/" + cardFolder + "/" + cardId + "_s.i.bytes"));
                         ccd.add(0x60).writePointer(createDownloadPath("asiudgasg/asodhsg/" + cardFolder + "/" + cardId + "_l.i.bytes"));
                         try {
@@ -3252,7 +3264,7 @@ function initIl2Cpp(module) {
                             var cd = thisPtr.add(0x10).readPointer();
                             var cId = (!cd.isNull()) ? cd.add(0x10).readS32() : 1001;
                             if (cId <= 0) cId = 1001;
-                            var folder = (cId < 10000) ? "weoihxd" : "wadceg";
+                            var folder = "wadceg";
                             var dp = createDownloadPath("asiudgasg/asodhsg/" + folder + "/" + cId + "_s.i.bytes");
                             if (dp && !dp.isNull()) {
                                 thisPtr.add(0x58).writePointer(dp);
@@ -3275,7 +3287,7 @@ function initIl2Cpp(module) {
                             var cd = thisPtr.add(0x10).readPointer();
                             var cId = (!cd.isNull()) ? cd.add(0x10).readS32() : 1001;
                             if (cId <= 0) cId = 1001;
-                            var folder = (cId < 10000) ? "weoihxd" : "wadceg";
+                            var folder = "wadceg";
                             var dp = createDownloadPath("asiudgasg/asodhsg/" + folder + "/" + cId + "_l.i.bytes");
                             if (dp && !dp.isNull()) {
                                 thisPtr.add(0x60).writePointer(dp);
@@ -3298,7 +3310,7 @@ function initIl2Cpp(module) {
                             var cd = thisPtr.add(0x10).readPointer();
                             var cId = (!cd.isNull()) ? cd.add(0x10).readS32() : 1001;
                             if (cId <= 0) cId = 1001;
-                            var folder = (cId < 10000) ? "weoihxd" : "wadceg";
+                            var folder = "wadceg";
                             var dp = createDownloadPath("asiudgasg/asodhsg/" + folder + "/" + cId + "_l.i.bytes");
                             if (dp && !dp.isNull()) {
                                 thisPtr.add(0x68).writePointer(dp);
@@ -3741,7 +3753,7 @@ function initIl2Cpp(module) {
                         if (!p || p.isNull()) return NULL;
                         if (il2cpp_gchandle_new) il2cpp_gchandle_new(p, 2);
 
-                        var cFolder = (cardId < 10000) ? "weoihxd" : "wadceg";
+                        var cFolder = "wadceg";
                         var photoDp = createDownloadPath("asiudgasg/asodhsg/" + cFolder + "/" + cardId + "_s.i.bytes");
                         var tierDp = getGradeFrameDownloadPath(grade, 1);
                         var maxLvl = (grade === 4) ? 50 : 5;
@@ -3839,7 +3851,7 @@ function initIl2Cpp(module) {
                             ctorFn(p, NULL);
                         } catch (eCt) {}
 
-                        var cFolder = (cardId < 10000) ? "weoihxd" : "wadceg";
+                        var cFolder = "wadceg";
                         var photoDp = createDownloadPath("asiudgasg/asodhsg/" + cFolder + "/" + cardId + "_l.i.bytes");
                         var tierDp = getGradeFrameDownloadPath(grade, 0);
 
@@ -4195,6 +4207,46 @@ function initIl2Cpp(module) {
                                                         setNumVis(cardSmallView, 0);
                                                     }
                                                 } catch (eVisEq) {}
+
+                                                // Deactivate ImageEfftect (horizontal gray line artifact)
+                                                try {
+                                                    var imgEff = cardSmallView.add(0xC8).readPointer();
+                                                    if (!imgEff.isNull()) {
+                                                        var effGo = getGameObjectFn(imgEff, NULL);
+                                                        if (!effGo.isNull()) setActiveFn(effGo, 0, NULL);
+                                                    }
+                                                } catch (eEff) {}
+
+                                                // Direct texture injection strictly from wadceg (unity garage pinned)
+                                                try {
+                                                    var photoRawImg = cardSmallView.add(0x58).readPointer();
+                                                    if (!photoRawImg.isNull()) {
+                                                        var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") ||
+                                                                       loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
+                                                        if (photoTex && !photoTex.isNull()) {
+                                                            var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                                                            setTextureFn(photoRawImg, photoTex, NULL);
+                                                            var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
+                                                            setEnabledFn(photoRawImg, 1, NULL);
+                                                            var pGo = getGameObjectFn(photoRawImg, NULL);
+                                                            if (!pGo.isNull()) setActiveFn(pGo, 1, NULL);
+                                                        }
+                                                    }
+
+                                                    var tierRawImg = cardSmallView.add(0x68).readPointer();
+                                                    if (!tierRawImg.isNull()) {
+                                                        var gLetter = (gr === 4) ? "r" : (gr === 3) ? "s" : (gr === 2) ? "a" : (gr === 1) ? "b" : "c";
+                                                        var tierTex = loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gLetter + "_s.i.bytes");
+                                                        if (tierTex && !tierTex.isNull()) {
+                                                            var setTextureFn2 = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                                                            setTextureFn2(tierRawImg, tierTex, NULL);
+                                                            var setEnabledFn2 = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
+                                                            setEnabledFn2(tierRawImg, 1, NULL);
+                                                            var tGo = getGameObjectFn(tierRawImg, NULL);
+                                                            if (!tGo.isNull()) setActiveFn(tGo, 1, NULL);
+                                                        }
+                                                    }
+                                                } catch (ePhotoInj) {}
                                             } else {
                                                 // Slot IS UNEQUIPPED: show empty placeholder from sdhgauwehdnu
                                                 var emptyCardId = 1001 + mIdx;
@@ -5081,11 +5133,8 @@ function initIl2Cpp(module) {
                             // 3a. Portrait Photo (item + 0x58)
                             var photoRawImg = item.add(0x58).readPointer();
                             if (!photoRawImg.isNull()) {
-                                var cFolder = (cId < 10000) ? "weoihxd" : "wadceg";
-                                var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/" + cFolder + "/" + cId + "_s.i.bytes") ||
-                                               loadLocalTexture2D("asiudgasg/asodhsg/" + cFolder + "/" + cId + "_l.i.bytes") ||
-                                               loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") ||
-                                               loadLocalTexture2D("asiudgasg/asodhsg/weoihxd/" + cId + "_s.i.bytes");
+                                var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") ||
+                                               loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
                                 if (photoTex && !photoTex.isNull()) {
                                     setTextureFn(photoRawImg, photoTex, NULL);
                                     setEnabledFn(photoRawImg, 1, NULL);
@@ -5148,6 +5197,30 @@ function initIl2Cpp(module) {
                                     setScaleFn(itemTr, 1.0, 1.0, 1.0, NULL);
                                 }
                             } catch (eSc) {}
+
+                            // 3f. Equip Checkmark (mark @ item + 0xC0, markSprites @ item + 0xB8)
+                            try {
+                                var markImg = item.add(0xC0).readPointer();
+                                var markSprites = item.add(0xB8).readPointer();
+                                var isEquip = (rawC.add(0x28).readU8() === 1);
+                                if (!markImg.isNull()) {
+                                    if (isEquip && !markSprites.isNull()) {
+                                        var getSpriteFn = new NativeFunction(baseAddr.add(0xD0CAB8), "pointer", ["pointer", "int", "pointer"]);
+                                        var equipSprite = getSpriteFn(markSprites, 0, NULL); // MARK_INDEX.Equip = 0
+                                        if (!equipSprite.isNull()) {
+                                            var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
+                                            setSpriteFn(markImg, equipSprite, NULL);
+                                        }
+                                        setEnabledFn(markImg, 1, NULL);
+                                        var mGo = getGoFnBase(markImg, NULL);
+                                        if (!mGo.isNull()) setActFnBase(mGo, 1, NULL);
+                                    } else {
+                                        setEnabledFn(markImg, 0, NULL);
+                                        var mGo = getGoFnBase(markImg, NULL);
+                                        if (!mGo.isNull()) setActFnBase(mGo, 0, NULL);
+                                    }
+                                }
+                            } catch (eMark) {}
                         }
 
                         // 4. Selection light: completely suppress white light overlay
@@ -6138,13 +6211,10 @@ function initIl2Cpp(module) {
                                     var getGoFn2 = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                                     var setActFn2 = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
 
-                                    var cFolder = (cId < 10000) ? "weoihxd" : "wadceg";
                                     var photoRawImg = view.add(0x58).readPointer();
                                     if (!photoRawImg.isNull()) {
-                                        var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/" + cFolder + "/" + cId + "_s.i.bytes") ||
-                                                       loadLocalTexture2D("asiudgasg/asodhsg/" + cFolder + "/" + cId + "_l.i.bytes") ||
-                                                       loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") ||
-                                                       loadLocalTexture2D("asiudgasg/asodhsg/weoihxd/" + cId + "_s.i.bytes");
+                                        var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") ||
+                                                       loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
                                         if (photoTex && !photoTex.isNull()) {
                                             setTextureFn(photoRawImg, photoTex, NULL);
                                             setEnabledFn(photoRawImg, 1, NULL);
@@ -6762,7 +6832,7 @@ function initIl2Cpp(module) {
                                             var cleanUrl = fullUrl.split("?")[0];
                                             if (urlToCardMap && urlToCardMap[cleanUrl]) {
                                                 var uInfo = urlToCardMap[cleanUrl];
-                                                var uFolder = (uInfo.cId < 10000) ? "weoihxd" : "wadceg";
+                                                var uFolder = "wadceg";
                                                 relPath = "asiudgasg/asodhsg/" + uFolder + "/" + uInfo.cId + "_" + uInfo.type + ".i.bytes";
                                             }
                                         }
@@ -6772,12 +6842,12 @@ function initIl2Cpp(module) {
 
                             if (!relPath || relPath.length === 0) return NULL;
 
-                            // Ownership Check: wadceg/weoihxd vs sdhgauwehdnu
+                            // Ownership Check: wadceg vs sdhgauwehdnu
                             if (relPath.indexOf("wadceg/") !== -1 || relPath.indexOf("weoihxd/") !== -1 || relPath.indexOf("sdhgauwehdnu/") !== -1) {
                                 var match = relPath.match(/(\d+)_([sl])\.i\.bytes/);
                                 if (match) {
                                     var cId = parseInt(match[1]);
-                                    var defaultFolder = (cId < 10000) ? "weoihxd" : "wadceg";
+                                    var defaultFolder = "wadceg";
                                     var folder = defaultFolder;
                                     if (relPath.indexOf("sdhgauwehdnu/") !== -1) {
                                         folder = "sdhgauwehdnu";
@@ -7207,29 +7277,6 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing InventoryControl.SetCurrentGroup: " + eScg.message);
                 }
 
-                // Proxy InventoryControl.FindToGroupItem (0xF29604)
-                try {
-                    Interceptor.replace(baseAddr.add(0xF29604), new NativeCallback(function (groupCode, methodInfo) {
-                        if (loonaGroupItemObj && !loonaGroupItemObj.isNull()) {
-                            return loonaGroupItemObj;
-                        }
-                        return NULL;
-                    }, "pointer", ["int", "pointer"]));
-                    log("[+] Interceptor.replace installed on InventoryControl.FindToGroupItem (0xF29604)!");
-                } catch (eFtgi) {
-                    log("[-] Error replacing FindToGroupItem: " + eFtgi.message);
-                }
-
-                // Proxy InventoryControl.get_SelectedGroupCode (0xF26F64)
-                try {
-                    Interceptor.replace(baseAddr.add(0xF26F64), new NativeCallback(function (methodInfo) {
-                        return 1001;
-                    }, "int", ["pointer"]));
-                    log("[+] Interceptor.replace installed on InventoryControl.get_SelectedGroupCode (0xF26F64)!");
-                } catch (eSgc) {
-                    log("[-] Error replacing get_SelectedGroupCode: " + eSgc.message);
-                }
-
                 // Proxy InventoryControl.get_selectedGroupCode (0xF26C40)
                 try {
                     Interceptor.replace(baseAddr.add(0xF26C40), new NativeCallback(function (methodInfo) {
@@ -7238,16 +7285,6 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on InventoryControl.get_selectedGroupCode (0xF26C40)!");
                 } catch (eSgc2) {
                     log("[-] Error replacing get_selectedGroupCode: " + eSgc2.message);
-                }
-
-                // Proxy GroupControl.Data.get_EmblemPath (0xCA4F3C)
-                try {
-                    Interceptor.replace(baseAddr.add(0xCA4F3C), new NativeCallback(function (thisPtr, methodInfo) {
-                        return createDownloadPath("asiudgasg/asodhsg/aweoijs/1001.i.bytes");
-                    }, "pointer", ["pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on GroupControl.Data.get_EmblemPath (0xCA4F3C)!");
-                } catch (eGep) {
-                    log("[-] Error replacing GroupControl.Data.get_EmblemPath: " + eGep.message);
                 }
 
                 // Proxy ThemeControl.Data.get_SmallNameImagePath (0xC89BCC)
@@ -7398,17 +7435,16 @@ function initIl2Cpp(module) {
                 }
 
                 try {
-                    Interceptor.replace(baseAddr.add(0x105E0FC), new NativeCallback(function (sceneThis, methodInfo) {
-                        try {
-                            if (!sceneThis || sceneThis.isNull()) return;
+                    Interceptor.attach(baseAddr.add(0x105E0FC), {
+                        onEnter: function (args) {
+                            log("[🗃️ INVENTORY SCENE] Refresh (0x105E0FC) entered, ensuring DisplayGroupList and lists...");
                             ensureDisplayGroupList();
-                            ensureInventoryLists(sceneThis);
-                            log("[🗃️ INVENTORY SCENE] Safe Refresh (0x105E0FC) no-op completed!");
-                        } catch (eRef) {}
-                    }, "void", ["pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on InventoryScene.Refresh (0x105E0FC)!");
+                            ensureInventoryLists(args[0]);
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on InventoryScene.Refresh (0x105E0FC)!");
                 } catch (eIsr) {
-                    log("[-] Error replacing InventoryScene.Refresh: " + eIsr.message);
+                    log("[-] Error attaching to InventoryScene.Refresh: " + eIsr.message);
                 }
 
                 // Proxy ThemeControl.Data.get_EffectType (0xC89B28)
@@ -7632,12 +7668,15 @@ function initIl2Cpp(module) {
                         cachedCardKlass = cardKlass;
                         cachedCardItemKlass = cardItemKlass;
 
-                        log("[🃏 INVENTORY] Populating " + profile.inventoryCards.length + " LOONA cards into CardMap (" + cardMap + ")...");
+                        var validCards = profile.inventoryCards.filter(function(c) {
+                            return c && c.cardID >= 1001 && c.cardID <= 1021;
+                        });
+                        log("[🃏 INVENTORY] Populating " + validCards.length + " LOONA cards into CardMap (" + cardMap + ")...");
                         var addedCount = 0;
                         loonaCardItems = [];
 
-                        for (var i = 0; i < profile.inventoryCards.length; i++) {
-                            var cData = profile.inventoryCards[i];
+                        for (var i = 0; i < validCards.length; i++) {
+                            var cData = validCards[i];
                             try {
                                 // 1. Create Card managed instance
                                 var cardObj = il2cpp_object_new(cardKlass);
@@ -7984,12 +8023,9 @@ function initIl2Cpp(module) {
                                 try {
                                     var dclPtr = activeInventorySceneInstance.add(0x58).readPointer();
                                     var cnt = 0;
-                                    if (!dclPtr.isNull()) cnt = dclPtr.add(0x18).readS32();
                                     log("[🗃️ INVENTORY SCENE] OnOpen.onLeave: displayCardList count=" + cnt);
-                                    if (cnt === 0) {
-                                        log("[🗃️ INVENTORY SCENE] displayCardList was empty on open/return! Restoring...");
-                                        restoreDefaultDisplayCardList(activeInventorySceneInstance, true);
-                                    }
+                                    log("[🗃️ INVENTORY SCENE] Ensuring displayCardList and calling InvenCardView.SetData...");
+                                    restoreDefaultDisplayCardList(activeInventorySceneInstance, true);
                                 } catch (eOol) {
                                     log("[-] Error in InventoryScene.OnOpen.onLeave: " + eOol.message);
                                 }
