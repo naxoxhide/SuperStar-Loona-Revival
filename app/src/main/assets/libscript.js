@@ -7401,40 +7401,10 @@ function initIl2Cpp(module) {
                     Interceptor.replace(baseAddr.add(0x105E0FC), new NativeCallback(function (sceneThis, methodInfo) {
                         try {
                             if (!sceneThis || sceneThis.isNull()) return;
-                            log("[🗃️ INVENTORY SCENE] Safe Refresh (0x105E0FC) entered!");
                             ensureDisplayGroupList();
                             ensureInventoryLists(sceneThis);
-                            var sceneView = sceneThis.add(0x48).readPointer();
-                            if (sceneView.isNull()) {
-                                log("[🗃️ INVENTORY SCENE] Safe Refresh: sceneView is null, skipping view updates cleanly!");
-                                return;
-                            }
-                            var groupView = sceneView.add(0x70).readPointer();
-                            if (groupView.isNull()) {
-                                log("[🗃️ INVENTORY SCENE] Safe Refresh: groupView is null, skipping view updates cleanly!");
-                                return;
-                            }
-
-                            // Safe groupView refresh
-                            try {
-                                var invenGroupDataSetDataFn = new NativeFunction(baseAddr.add(0xF25140), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
-                                invenGroupDataSetDataFn(groupView, 1, 0, NULL, NULL);
-                            } catch (eGv) {}
-
-                            // Safe update card count and list
-                            try {
-                                var onUpdateCountFn = new NativeFunction(baseAddr.add(0x1054BB4), "void", ["pointer", "pointer"]);
-                                onUpdateCountFn(sceneThis, NULL);
-                            } catch (eCnt) {}
-
-                            try {
-                                var updateCardListFn = new NativeFunction(baseAddr.add(0x10542F4), "void", ["pointer", "bool", "int", "bool", "pointer"]);
-                                updateCardListFn(sceneThis, 1, 0, 1, NULL);
-                            } catch (eUcl) {}
-                            log("[✅ INVENTORY SCENE] Safe Refresh completed!");
-                        } catch (eRef) {
-                            log("[-] Error in safe InventoryScene.Refresh: " + eRef.message);
-                        }
+                            log("[🗃️ INVENTORY SCENE] Safe Refresh (0x105E0FC) no-op completed!");
+                        } catch (eRef) {}
                     }, "void", ["pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on InventoryScene.Refresh (0x105E0FC)!");
                 } catch (eIsr) {
