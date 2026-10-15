@@ -4221,8 +4221,8 @@ function initIl2Cpp(module) {
                                                 try {
                                                     var photoRawImg = cardSmallView.add(0x58).readPointer();
                                                     if (!photoRawImg.isNull()) {
-                                                        var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") ||
-                                                                       loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
+                                                        var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes") ||
+                                                                       loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes");
                                                         if (photoTex && !photoTex.isNull()) {
                                                             var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
                                                             setTextureFn(photoRawImg, photoTex, NULL);
@@ -4230,6 +4230,16 @@ function initIl2Cpp(module) {
                                                             setEnabledFn(photoRawImg, 1, NULL);
                                                             var pGo = getGameObjectFn(photoRawImg, NULL);
                                                             if (!pGo.isNull()) setActiveFn(pGo, 1, NULL);
+
+                                                            // Calibrate photo dimensions to BasicSize (92, 130)
+                                                            try {
+                                                                var getRectTrFn = new NativeFunction(baseAddr.add(0x1614EF0), "pointer", ["pointer", "pointer"]);
+                                                                var setSizeDeltaFn = new NativeFunction(baseAddr.add(0x180DC18), "void", ["pointer", "float", "float", "pointer"]);
+                                                                var photoRectTr = getRectTrFn(photoRawImg, NULL);
+                                                                if (!photoRectTr.isNull()) {
+                                                                    setSizeDeltaFn(photoRectTr, 92.0, 130.0, NULL);
+                                                                }
+                                                            } catch (ePsz) {}
                                                         }
                                                     }
 
@@ -4244,6 +4254,12 @@ function initIl2Cpp(module) {
                                                             setEnabledFn2(tierRawImg, 1, NULL);
                                                             var tGo = getGameObjectFn(tierRawImg, NULL);
                                                             if (!tGo.isNull()) setActiveFn(tGo, 1, NULL);
+
+                                                            // RawImage.SetNativeSize (0x194C1C8) to ensure 116x156 native dimensions
+                                                            try {
+                                                                var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
+                                                                setNativeSizeFn(tierRawImg, NULL);
+                                                            } catch (eSns) {}
                                                         }
                                                     }
                                                 } catch (ePhotoInj) {}
@@ -5133,13 +5149,23 @@ function initIl2Cpp(module) {
                             // 3a. Portrait Photo (item + 0x58)
                             var photoRawImg = item.add(0x58).readPointer();
                             if (!photoRawImg.isNull()) {
-                                var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") ||
-                                               loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
+                                var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes") ||
+                                               loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes");
                                 if (photoTex && !photoTex.isNull()) {
                                     setTextureFn(photoRawImg, photoTex, NULL);
                                     setEnabledFn(photoRawImg, 1, NULL);
                                     var pGo = getGoFnBase(photoRawImg, NULL);
                                     if (!pGo.isNull()) setActFnBase(pGo, 1, NULL);
+
+                                    // Calibrate photo dimensions to BasicSize (92, 130)
+                                    try {
+                                        var getRectTrFn = new NativeFunction(baseAddr.add(0x1614EF0), "pointer", ["pointer", "pointer"]);
+                                        var setSizeDeltaFn = new NativeFunction(baseAddr.add(0x180DC18), "void", ["pointer", "float", "float", "pointer"]);
+                                        var photoRectTr = getRectTrFn(photoRawImg, NULL);
+                                        if (!photoRectTr.isNull()) {
+                                            setSizeDeltaFn(photoRectTr, 92.0, 130.0, NULL);
+                                        }
+                                    } catch (ePsz) {}
                                 }
                             }
 
@@ -5155,6 +5181,12 @@ function initIl2Cpp(module) {
                                     setEnabledFn(tierRawImg, 1, NULL);
                                     var tGo = getGoFnBase(tierRawImg, NULL);
                                     if (!tGo.isNull()) setActFnBase(tGo, 1, NULL);
+
+                                    // Set native size (116x156) for tier frame
+                                    try {
+                                        var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
+                                        setNativeSizeFn(tierRawImg, NULL);
+                                    } catch (eSns) {}
                                 }
                             }
 
@@ -5188,13 +5220,21 @@ function initIl2Cpp(module) {
                                 setEffectVisFn(item, 0, NULL);
                             } catch (eEff) {}
 
-                            // 3e. Ensure transform scale (1, 1, 1)
+                            // 3e. Ensure transform scale matches cell's itemScale
                             try {
                                 var trFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
                                 var itemTr = trFn(item, NULL);
                                 if (!itemTr.isNull()) {
+                                    var sX = cell.add(0x40).readFloat();
+                                    var sY = cell.add(0x44).readFloat();
+                                    var sZ = cell.add(0x48).readFloat();
+                                    log("[📐 SCALE] cell itemScale: (" + sX + ", " + sY + ", " + sZ + ")");
                                     var setScaleFn = new NativeFunction(baseAddr.add(0x181E028), "void", ["pointer", "float", "float", "float", "pointer"]);
-                                    setScaleFn(itemTr, 1.0, 1.0, 1.0, NULL);
+                                    if (sX > 0.001 && sY > 0.001) {
+                                        setScaleFn(itemTr, sX, sY, sZ || 1.0, NULL);
+                                    } else {
+                                        setScaleFn(itemTr, 1.0, 1.0, 1.0, NULL);
+                                    }
                                 }
                             } catch (eSc) {}
 
@@ -6213,13 +6253,23 @@ function initIl2Cpp(module) {
 
                                     var photoRawImg = view.add(0x58).readPointer();
                                     if (!photoRawImg.isNull()) {
-                                        var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") ||
-                                                       loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
+                                        var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes") ||
+                                                       loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes");
                                         if (photoTex && !photoTex.isNull()) {
                                             setTextureFn(photoRawImg, photoTex, NULL);
                                             setEnabledFn(photoRawImg, 1, NULL);
                                             var pGo = getGoFn2(photoRawImg, NULL);
                                             if (!pGo.isNull()) setActFn2(pGo, 1, NULL);
+
+                                            // Calibrate photo dimensions to BasicSize (92, 130)
+                                            try {
+                                                var getRectTrFn = new NativeFunction(baseAddr.add(0x1614EF0), "pointer", ["pointer", "pointer"]);
+                                                var setSizeDeltaFn = new NativeFunction(baseAddr.add(0x180DC18), "void", ["pointer", "float", "float", "pointer"]);
+                                                var photoRectTr = getRectTrFn(photoRawImg, NULL);
+                                                if (!photoRectTr.isNull()) {
+                                                    setSizeDeltaFn(photoRectTr, 92.0, 130.0, NULL);
+                                                }
+                                            } catch (ePsz) {}
                                         }
                                     }
 
@@ -6232,6 +6282,12 @@ function initIl2Cpp(module) {
                                             setEnabledFn(tierRawImg, 1, NULL);
                                             var tGo = getGoFn2(tierRawImg, NULL);
                                             if (!tGo.isNull()) setActFn2(tGo, 1, NULL);
+
+                                            // Set native size (116x156) for tier frame
+                                            try {
+                                                var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
+                                                setNativeSizeFn(tierRawImg, NULL);
+                                            } catch (eSns) {}
                                         }
                                     }
 
@@ -8001,22 +8057,22 @@ function initIl2Cpp(module) {
                                                     if (!bBox.isNull()) {
                                                         var boxGo = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"])(bBox, NULL);
                                                         var boxAct = new NativeFunction(baseAddr.add(0x1DB3D4C), "int", ["pointer"])(bBox);
-                                                        log("[🔍 BTN_BACK BOX] boxGo=" + boxGo + " act=" + boxAct + " col=" + bBox.add(0x20).readFloat() + "," + bBox.add(0x24).readFloat() + "," + bBox.add(0x28).readFloat() + "," + bBox.add(0x2C).readFloat());
+                                                        var boxSprite = bBox.add(0x48).readPointer();
+                                                        log("[🔍 BTN_BACK BOX] boxGo=" + boxGo + " act=" + boxAct + " sprite=" + boxSprite + " col=" + bBox.add(0x20).readFloat() + "," + bBox.add(0x24).readFloat() + "," + bBox.add(0x28).readFloat() + "," + bBox.add(0x2C).readFloat());
                                                     }
-                                                    if (!bGo.isNull()) {
-                                                        var trFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
-                                                        var bTr = trFn(bGo, NULL);
+                                                    var bTr = btnBack.add(0x18).readPointer();
+                                                    if (!bTr.isNull()) {
                                                         var getChildCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
                                                         var getChildFn = new NativeFunction(baseAddr.add(0x181ED28), "pointer", ["pointer", "int", "pointer"]);
                                                         var getNameFn = new NativeFunction(baseAddr.add(0x1DB64F0), "pointer", ["pointer", "pointer"]);
+                                                        var getGoFromComp = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                                                         var cc = getChildCountFn(bTr, NULL);
-                                                        log("[🔍 BTN_BACK TR] name=" + readIl2CppString(getNameFn(bGo, NULL)) + " childCount=" + cc);
+                                                        log("[🔍 BTN_BACK TR] bTr=" + bTr + " childCount=" + cc);
                                                         for (var ci = 0; ci < cc; ci++) {
                                                             var cTr = getChildFn(bTr, ci, NULL);
-                                                            var cGo = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"])(cTr, NULL);
+                                                            var cGo = getGoFromComp(cTr, NULL);
                                                             var cName = readIl2CppString(getNameFn(cGo, NULL));
-                                                            var cAct = new NativeFunction(baseAddr.add(0x1DB3D4C), "int", ["pointer"])(cTr);
-                                                            log("[🔍 BTN_BACK CHILD " + ci + "] name=" + cName + " act=" + cAct);
+                                                            log("[🔍 BTN_BACK CHILD " + ci + "] name=" + cName);
                                                         }
                                                     }
                                                 }

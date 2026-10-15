@@ -96,4 +96,16 @@ Esta skill define los pasos estándar y flujos de trabajo para analizar, desensa
     7. Se refrescan los contadores de cabecera y el carrusel mediante `refreshInventoryHeaderView()` y `refreshInventoryCardList()`.
     8. Se retorna a la vista principal del inventario mediante `InventoryScene.SetStateDefault(sceneThis, 1, 0, NULL)` (RVA `0x1053B88`), restaurando la cuadrícula general de 11 miembros con insignias recalculadas en tiempo real.
 
+### 8. Calibración Dimensional, Aspect Ratio y Pipeline HD de Cartas (`CardSmallView` / `InvenCardCellView`)
+* **Geometría Nativa Dalcomsoft:**
+  * `photoRawImg`: Configurar `sizeDelta` a `Vector2(92.0, 130.0)` (`BasicSize` según RVA `0x13908fc`). No aplicar `SetNativeSize()` sobre la foto para evitar deformación del marco.
+  * `tierRawImg`: Invocar obligatoriamente `RawImage.SetNativeSize()` (RVA `0x194C1C8` / `0x1949574`). La textura nativa de `116 x 156` px escalada por el `CanvasScaler` a 1080p (`1.0517x`) rinde exactamente `122.0` px de ancho en pantalla.
+* **Escala de Celdas (`itemScale`):**
+  * `InvenCardCellView`: El offset `cell + 0x40` define `itemScale = Vector3(0.8f, 0.8f, 1.0f)`. Respetar este valor nativo (`0.8f`) en el `transform` de `cardSmallView` para mantener el espaciado e interleaving canónico del carrusel.
+* **Resolución HD y Downsampling GPU:**
+  * Cargar prioritariamente `files/asiudgasg/asodhsg/wadceg/{cardID}_l.i.bytes` (`226 x 318` px) con `filterMode = 2` (Trilinear) y `anisoLevel = 8` para erradicar la pixelación de miniaturas `_s` (`85 x 120` px).
+* **Botón 'X' (`btnBack`):**
+  * Desactivar el componente `box` (`Image` en `ButtonCache + 0x50`) con `setEnabledFn(bBox, 0, NULL)` y `SetActive(boxGo, 0)` para suprimir el recuadro negro sólido de 82x82 px.
+
+
 

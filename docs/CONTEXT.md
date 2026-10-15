@@ -2030,6 +2030,56 @@ Se verificó la paridad completa mediante captura en vivo del dispositivo contra
 - Captura de Verificación en Vivo: [docs/walkthroughs/media/inventory_restoration_verified.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/inventory_restoration_verified.png)
 - Comparación de Celdas de Zoom: [docs/walkthroughs/media/carousel_zoom_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/carousel_zoom_live.png) contra [docs/walkthroughs/media/carousel_zoom.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/carousel_zoom.png).
 
+---
+
+## 22. Calibración Matemática de Dimensiones de Cartas, RectTransform y Restauración de Resolución HD (Paridad 1:1)
+
+### 22.1. Contexto y Diagnóstico de Regresión de Dimensiones
+Tras la estabilización del inventario, se identificaron desviaciones visuales respecto a la Captura Canónica de Referencia ([docs/walkthroughs/media/inventory_final_check.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/inventory_final_check.png)):
+1. **Pérdida de Nitidez y Resolución (Pixelación):** Se estaban cargando miniaturas de baja resolución (`_s.i.bytes` de `85 x 120` px) en lugar de las texturas HD de retrato (`_l.i.bytes` de `226 x 318` px), produciendo artefactos bilineales borrosos sobre la pantalla renderizada a 1080p.
+2. **Distorsión del Aspect Ratio de Cartas:** Los marcos de grado/rango (`tierRawImg`) mantenían un ancho forzado por el prefab de 132 px en lugar de su relación de aspecto canónica.
+3. **Escala Excesiva en el Carrusel Inferior (`InvenCardCellView`):** Las celdas del scrollview inferior se renderizaban a escala 1.0x, resultando un ~25% más grandes que en la captura de referencia.
+4. **Artefacto en Botón 'X' (`btnBack`):** Un recuadro negro sólido de 82x82 px correspondiente a `bBox` (offset `0x50` de `ButtonCache`) se dibujaba sobre la cruz de cierre.
+
+### 22.2. Ingeniería Inversa de la Geometría Nativa Dalcomsoft
+El desensamblado ARM64 de los métodos de renderizado de cartas reveló la especificación dimensional exacta del motor:
+
+1. **`BasicSize` de `photoRawImg` (`92.0 x 130.0`):**
+   - En `CardSmallView.OnRefresh` (RVA `0x13908fc` - `0x1390904`), el motor carga la constante vectorial `BasicSize`:
+     - Ancho: `92.0f` (`0x42b80000`)
+     - Alto: `130.0f` (`0x43020000`)
+   - Mediante `Graphic.get_rectTransform` (RVA `0x1614EF0`) y `RectTransform.set_sizeDelta` (RVA `0x180DC18`), el tamaño del componente `photoRawImg` debe fijarse estrictamente en `Vector2(92.0, 130.0)`.
+
+2. **Dimensionamiento Nativo del Marco (`tierRawImg.SetNativeSize()`):**
+   - La textura del marco de grado (ej. `0_r_s.i.bytes`) posee dimensiones físicas de `116 x 156` px.
+   - En la lógica original, Dalcomsoft ejecuta `RawImage.SetNativeSize()` (RVA `0x194C1C8` / `0x1949574`) sobre `tierRawImg`.
+   - Con el `CanvasScaler` de Unity ajustado a 1080p con factor de escala `1.0517x`:
+     $$\text{Ancho en Pantalla} = 116 \times 1.0517 \approx 122.0\text{ px}$$
+   - Esto concuerda con exactitud matemática subpíxel con los 122 px medidos directamente en la Captura Canónica.
+
+3. **Escala de Celda Canónica (`itemScale = 0.8`):**
+   - En `InvenCardCellView.ctor` (RVA `0xF21918`), el campo nativo `itemScale` (`cell + 0x40`) se inicializa con `Vector3(0.8f, 0.8f, 1.0f)`.
+   - Al aplicar `cell.add(0x40).readFloat()` (`0.8f`) sobre el `transform` de cada `cardSmallView`, las celdas recuperan su escala nativa, garantizando que el carrusel inferior presente las dimensiones, separación y márgenes exactos de la referencia.
+
+4. **Pipeline HD con Filtrado Trilinear y Anisotropía:**
+   - La carga prioritaria de `files/asiudgasg/asodhsg/wadceg/{cardID}_l.i.bytes` (`226 x 318` px) con:
+     - `Texture.set_filterMode(2)` (Trilinear, RVA `0x181A580`)
+     - `Texture.set_anisoLevel(8)` (RVA `0x181A640`)
+   - Permite que la GPU ejecute un downsampling limpio y anti-aliased dentro del viewport de `92 x 130`, erradicando cualquier pixelación o degradación visual.
+
+5. **Eliminación del Recuadro Negro en 'X' (`btnBack`):**
+   - `ButtonCache` posee en el offset `0x50` la propiedad `box` (`UnityEngine.UI.Image`).
+   - Al desactivar explícitamente el componente (`setEnabledFn(bBox, 0, NULL)`) y su GameObject (`SetActive(boxGo, 0)`), la cruz azul marino (`#535D9C`) se renderiza de forma transparente e impecable.
+
+### 22.3. Certificación Visual y Comparación de Recortes (Pixel-to-Pixel)
+Se certificó la paridad absoluta 1:1 mediante capturas y recortes comparativos:
+- **Captura Completa en Vivo:** [docs/walkthroughs/media/live_check_dimensions_final.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/live_check_dimensions_final.png) vs [docs/walkthroughs/media/inventory_final_check.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/inventory_final_check.png).
+- **Recorte Celda A0 (HeeJin Grado A):** [docs/walkthroughs/media/crop_c0_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/crop_c0_live.png) vs [docs/walkthroughs/media/crop_c0_canon.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/crop_c0_canon.png) — Dimensiones, bordes y nitidez idénticos.
+- **Recorte Celda R2 (HeeJin R50 con Checkmark):** [docs/walkthroughs/media/crop_c2_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/crop_c2_live.png) vs [docs/walkthroughs/media/crop_c2_canon.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/crop_c2_canon.png) — Checkmark, brillo R dorado, estrella e insignia 50 idénticos.
+- **Recorte Panel Superior (Fila 1 Slot 1):** [docs/walkthroughs/media/crop_top0_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/crop_top0_live.png) vs [docs/walkthroughs/media/crop_top0_canon.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/crop_top0_canon.png) — Proporciones y encuadre 100% canónicos.
+- **Recorte Botón 'X' (`btnBack`):** [docs/walkthroughs/media/crop_btn_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/crop_btn_live.png) vs [docs/walkthroughs/media/crop_btn_canon.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/crop_btn_canon.png) — Cruz azul marino nítida sin artefactos de fondo.
+
+
 
 
 
