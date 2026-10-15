@@ -2876,6 +2876,49 @@ function initIl2Cpp(module) {
                 var cachedCardKlass = NULL;
                 var cachedLoonaCbGroupItem = NULL;
 
+                var sortLoonaCardItems = function() {
+                    try {
+                        if (!loonaCardItems || loonaCardItems.length === 0) return;
+                        loonaCardItems.sort(function(itemA, itemB) {
+                            var rawA = itemA.add(0x10).readPointer();
+                            var rawB = itemB.add(0x10).readPointer();
+                            var cIdA = rawA.add(0x20).readS32();
+                            var cIdB = rawB.add(0x20).readS32();
+                            var grA = rawA.add(0x24).readS32();
+                            var grB = rawB.add(0x24).readS32();
+                            var lvlA = rawA.add(0x1C).readS16();
+                            var lvlB = rawB.add(0x1C).readS16();
+                            var isPrismA = (rawA.add(0x2A).readU8() === 1);
+                            var isPrismB = (rawB.add(0x2A).readU8() === 1);
+                            var isEqA = (rawA.add(0x28).readU8() === 1);
+                            var isEqB = (rawB.add(0x28).readU8() === 1);
+
+                            // 1. Equipped cards (with checkmark) ALWAYS FIRST
+                            if (isEqA !== isEqB) {
+                                return isEqA ? -1 : 1;
+                            }
+
+                            // 2. Member order (1001..1011)
+                            var mA = ((cIdA - 1001) % 11);
+                            var mB = ((cIdB - 1001) % 11);
+                            if (mA !== mB) return mA - mB;
+
+                            // 3. Higher grade first
+                            if (grA !== grB) return grB - grA;
+
+                            // 4. Higher level first
+                            if (lvlA !== lvlB) return lvlB - lvlA;
+
+                            // 5. Prism first
+                            if (isPrismA !== isPrismB) return isPrismA ? -1 : 1;
+
+                            return cIdA - cIdB;
+                        });
+                    } catch (eSort) {
+                        log("[-] Error sorting loonaCardItems: " + eSort.message);
+                    }
+                };
+
                 function createFastArray(items, type) {
                     try {
                         var klassTablePtr = NULL;
@@ -5593,6 +5636,8 @@ function initIl2Cpp(module) {
                             return;
                         }
 
+                        sortLoonaCardItems();
+
                         var listItems = ensureListBuffer(dclPtr, Math.max(loonaCardItems.length, 64));
                         if (!listItems || listItems.isNull()) {
                             log("[-] restoreDefaultDisplayCardList: listItems is null and cannot be allocated!");
@@ -7801,37 +7846,8 @@ function initIl2Cpp(module) {
 
                         log("[✅ INVENTORY] Successfully populated " + addedCount + " LOONA cards into CardMap!");
 
-                        // Sort loonaCardItems to match canonical inventory order:
-                        // 1. Unequipped cards with lower grade (A, S) come first (1001 A, 1002 S)
-                        // 2. Equipped Grade R cards in member order (1001..1011)
-                        // 3. Prism cards (1012)
-                        loonaCardItems.sort(function(itemA, itemB) {
-                            var rawA = itemA.add(0x10).readPointer();
-                            var rawB = itemB.add(0x10).readPointer();
-                            var cIdA = rawA.add(0x20).readS32();
-                            var cIdB = rawB.add(0x20).readS32();
-                            var grA = rawA.add(0x24).readS32();
-                            var grB = rawB.add(0x24).readS32();
-                            var isPrismA = (rawA.add(0x2A).readU8() === 1);
-                            var isPrismB = (rawB.add(0x2A).readU8() === 1);
-                            var isEqA = (rawA.add(0x28).readU8() === 1);
-                            var isEqB = (rawB.add(0x28).readU8() === 1);
-
-                            var isLowA = (!isEqA && grA < 4);
-                            var isLowB = (!isEqB && grB < 4);
-                            if (isLowA !== isLowB) return isLowA ? -1 : 1;
-                            if (isLowA && isLowB) {
-                                if (grA !== grB) return grA - grB; // Grade 2 (A) before Grade 3 (S)
-                                return cIdA - cIdB;
-                            }
-
-                            var mA = ((cIdA - 1001) % 11);
-                            var mB = ((cIdB - 1001) % 11);
-                            if (mA !== mB) return mA - mB;
-
-                            if (isPrismA !== isPrismB) return isPrismA ? 1 : -1;
-                            return grB - grA;
-                        });
+                        // Sort loonaCardItems: Equipped cards ALWAYS FIRST, then unequipped
+                        sortLoonaCardItems();
 
                         var loonaEquippedCards = [];
                         var memberFilled = {};
@@ -8280,6 +8296,7 @@ function initIl2Cpp(module) {
                                     }
                                 }
                             }
+                            sortLoonaCardItems();
                         }
 
                         // Rebuild FastArray for group

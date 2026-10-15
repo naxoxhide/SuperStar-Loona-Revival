@@ -2079,6 +2079,70 @@ Se certificó la paridad absoluta 1:1 mediante capturas y recortes comparativos:
 - **Recorte Panel Superior (Fila 1 Slot 1):** [docs/walkthroughs/media/crop_top0_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/crop_top0_live.png) vs [docs/walkthroughs/media/crop_top0_canon.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/crop_top0_canon.png) — Proporciones y encuadre 100% canónicos.
 - **Recorte Botón 'X' (`btnBack`):** [docs/walkthroughs/media/crop_btn_live.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/crop_btn_live.png) vs [docs/walkthroughs/media/crop_btn_canon.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/crop_btn_canon.png) — Cruz azul marino nítida sin artefactos de fondo.
 
+---
+
+## 23. Ordenamiento Canónico de Cartas de Inventario (Equipadas Primero)
+
+### 23.1. Requerimiento y Comportamiento Esperado
+A solicitud del usuario (Ignacio), en la cuadrícula/carrusel inferior de cartas (`InvenCardView` / `displayCardList`):
+- **Las cartas actualmente equipadas (con checkmark azul ✓) deben aparecer SIEMPRE PRIMERO.**
+- Las cartas no equipadas (duplicadas, grados inferiores A/S o variantes temáticas) deben agruparse a continuación de las equipadas.
+- Dentro del bloque de cartas equipadas, el orden debe ser cronológico por integrante de LOONA (`memberIdx` de 0 a 10: HeeJin, HyunJin, HaSeul, YeoJin, ViVi, Kim Lip, JinSoul, Choerry, Yves, Chuu, Go Won).
+
+### 23.2. Implementación del Algoritmo `sortLoonaCardItems`
+Se unificó el ordenamiento en la función auxiliar `sortLoonaCardItems` dentro de [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js):
+```javascript
+var sortLoonaCardItems = function() {
+    if (!loonaCardItems || loonaCardItems.length === 0) return;
+    loonaCardItems.sort(function(itemA, itemB) {
+        var rawA = itemA.add(0x10).readPointer();
+        var rawB = itemB.add(0x10).readPointer();
+        var cIdA = rawA.add(0x20).readS32();
+        var cIdB = rawB.add(0x20).readS32();
+        var grA = rawA.add(0x24).readS32();
+        var grB = rawB.add(0x24).readS32();
+        var lvlA = rawA.add(0x1C).readS16();
+        var lvlB = rawB.add(0x1C).readS16();
+        var isPrismA = (rawA.add(0x2A).readU8() === 1);
+        var isPrismB = (rawB.add(0x2A).readU8() === 1);
+        var isEqA = (rawA.add(0x28).readU8() === 1);
+        var isEqB = (rawB.add(0x28).readU8() === 1);
+
+        // 1. Cartas equipadas (✓) SIEMPRE PRIMERO
+        if (isEqA !== isEqB) return isEqA ? -1 : 1;
+
+        // 2. Orden cronológico de miembros (1001 a 1011)
+        var mA = ((cIdA - 1001) % 11);
+        var mB = ((cIdB - 1001) % 11);
+        if (mA !== mB) return mA - mB;
+
+        // 3. Grado descendente (R > S > A)
+        if (grA !== grB) return grB - grA;
+
+        // 4. Nivel descendente (50 > 1)
+        if (lvlA !== lvlB) return lvlB - lvlA;
+
+        // 5. Variantes Prism
+        if (isPrismA !== isPrismB) return isPrismA ? -1 : 1;
+
+        return cIdA - cIdB;
+    });
+};
+```
+
+Puntos de integración:
+1. `populateOfflineInventoryCards`: Invocado inmediatamente tras instanciar `loonaCardItems` en la apertura de la escena.
+2. `restoreDefaultDisplayCardList`: Invocado antes de poblar el buffer de `displayCardList` (`listItems.add(0x20 + i * 8)`).
+3. `handleCardEquipOffline`: Invocado tras actualizar el flag `isEquip` (`rawCard + 0x28`), reorganizando dinámicamente las cartas en memoria antes de notificar a `InvenCardView.SetData`.
+
+### 23.3. Certificación Visual
+Se validó la reorganización mediante captura en vivo y extracción de la franja del carrusel:
+- **Captura Completa:** [docs/walkthroughs/media/live_check_equipped_first.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/live_check_equipped_first.png)
+- **Franja del Carrusel Inferior:** [docs/walkthroughs/media/carousel_equipped_first_strip.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/carousel_equipped_first_strip.png)
+  - Celdas 0 a 10: Las 11 cartas equipadas de LOONA en orden correlativo (HeeJin a Go Won), todas portando el checkmark azul ✓ en la esquina superior derecha.
+  - Celda 11+: Cartas no equipadas (HeeJin Prism R50, HeeJin A1, HyunJin S1).
+
+
 
 
 
