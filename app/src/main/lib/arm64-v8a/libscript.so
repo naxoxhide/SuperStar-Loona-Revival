@@ -3835,6 +3835,19 @@ function initIl2Cpp(module) {
                     log("[+] Byte patch on GoogleSignInControl.Awake (0xB9B304): ret");
                 } catch (eGsi) {}
 
+                // Direct byte patches to disable Google Mobile Ads / AdMob crashes
+                [
+                    0xD45478, // GoogleMobileAdsScript.AddAdUnit -> ret
+                    0xD45574, // GoogleMobileAdsScript.SetAdUnitId -> ret
+                    0xD45BAC  // GoogleMobileAdsScript.InitADX -> ret
+                ].forEach(function(rva) {
+                    try {
+                        Memory.protect(baseAddr.add(rva), 4, "rwx");
+                        baseAddr.add(rva).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
+                    } catch (eGma) {}
+                });
+                log("[+] Byte patches on GoogleMobileAdsScript (AddAdUnit, SetAdUnitId, InitADX): ret");
+
                 // =========================================================================
                 // INVENTORY STABILIZATION HOOKS & PROXIES
                 // =========================================================================
@@ -9413,9 +9426,12 @@ function initIl2Cpp(module) {
 
                 // 6. Safe offline overrides for KeyVault and global exception logging
                 try {
-                    var dummyKeyVault = Memory.alloc(0x50);
-                    var dummyGameControl = Memory.alloc(0x50);
-                    dummyKeyVault.add(0x28).writePointer(dummyGameControl);
+                    var dummyKeyVault = Memory.alloc(0x100);
+                    var dummySub = Memory.alloc(0x100);
+                    for (var off = 0x18; off <= 0x90; off += 8) {
+                        dummyKeyVault.add(off).writePointer(dummySub);
+                    }
+                    dummyKeyVault.add(0x98).writeU8(1); // isInit = true
 
                     try {
                         Interceptor.replace(baseAddr.add(0x10613AC), new NativeCallback(function() {
@@ -9426,14 +9442,32 @@ function initIl2Cpp(module) {
                         log("[-] Error replacing KeyVault.get_Instance: " + eKvInst.message);
                     }
 
-                    try {
-                        Interceptor.replace(baseAddr.add(0x1061598), new NativeCallback(function() {
-                            return dummyGameControl;
-                        }, "pointer", []));
-                        log("[+] Interceptor.replace installed on KeyVault.get_GameControlDataInfo (0x1061598)!");
-                    } catch (eKvGc) {
-                        log("[-] Error replacing KeyVault.get_GameControlDataInfo: " + eKvGc.message);
-                    }
+                    var kvGetters = [
+                        0x106138C, // GoogleMobileAdsInfo
+                        0x1061578, // WebClientIdDataInfo
+                        0x1061598, // GameControlDataInfo
+                        0x10615B8, // NetworkControlInfo
+                        0x10615D8, // TapjoyDataInfo
+                        0x10615F8, // AdPopcornInfo
+                        0x1061618, // LoginControlInfo
+                        0x1061638, // DalcomAccountAPIInfo
+                        0x1061658, // ETCInfo
+                        0x1061678, // SelectGroupCardPackImageInfo
+                        0x1061698, // ProvidableItemCashDalcomCoinInfo
+                        0x10616B8, // RehearsalDeckSettingInfo
+                        0x10616D8, // InGameTutorialInfo
+                        0x10616F8, // SupportEmailAddressInfo
+                        0x1061718, // DeepLinkInfo
+                        0x1061738  // ServerSettingInfo
+                    ];
+                    kvGetters.forEach(function(rva) {
+                        try {
+                            Interceptor.replace(baseAddr.add(rva), new NativeCallback(function() {
+                                return dummySub;
+                            }, "pointer", []));
+                        } catch (eG) {}
+                    });
+                    log("[+] Interceptor.replace installed on all 16 KeyVault data getters!");
 
                     // Global IL2CPP exception monitor (0x9C4B08)
                     try {
