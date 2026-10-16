@@ -10610,14 +10610,13 @@ function initIl2Cpp(module) {
     function installCSharpHooks() {
         if (hooksInstalled) return true;
         try {
+            csPollCount++;
             var domain = il2cpp_domain_get ? il2cpp_domain_get() : NULL;
+            if (csPollCount <= 3 || csPollCount % 50 === 0) {
+                log("[🔍 CS POLL #" + csPollCount + "] il2cpp_domain_get() = " + domain);
+            }
             if (!domain || domain.isNull()) {
                 return false;
-            }
-
-            csPollCount++;
-            if (csPollCount <= 5 || csPollCount % 30 === 0) {
-                log("[🔍 CS POLL #" + csPollCount + "] domain=" + domain + ", checking Application class...");
             }
 
             var appClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Application");
@@ -11743,6 +11742,8 @@ function initIl2Cpp(module) {
         });
     }
 
+    log("[DEBUG] initIl2Cpp complete, starting installCSharpHooks polling...");
+    installCSharpHooks();
     var pollInterval = setInterval(function () {
         if (hooksInstalled) {
             clearInterval(pollInterval);
