@@ -491,6 +491,16 @@ function initIl2Cpp(module) {
                 log("[🎵 MUSIC] MusicControl.SortAlphabetCache protected bypass");
             }, "void", []));
 
+            // 2.2b AssetControl.<OpenAssetContents>b__108_76 bypass (RVA 0xECA7E8) -> Avoid NRE
+            try {
+                Interceptor.replace(baseAddr.add(0xECA7E8), new NativeCallback(function (thiz) {
+                    log("[📦 ASSET] OpenAssetContents b__108_76 safely bypassed!");
+                    return 1;
+                }, "bool", ["pointer"]));
+            } catch (eB76) {
+                log("[-] Error bypassing b__108_76: " + eB76.message);
+            }
+
             // 2.3 TitleScene.SetSDKInitialize bypass (0xB2341C) -> Skip Firebase/GooglePlay hang and call SetStateLoadingDone (0xB234E0)
             var setStateLoadingDonePtr = baseAddr.add(0xB234E0);
             var setStateLoadingDoneFn = null;
@@ -9279,25 +9289,47 @@ function initIl2Cpp(module) {
                             var subCode = parseInt(subCodeArg, 10);
                             if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) {
                                 try {
-                                    var parentCic = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardIntensifyControl");
-                                    if (parentCic && !parentCic.isNull()) {
-                                        cachedCardIntensifyItemKlass = getNestedClass(parentCic, "Item");
-                                        if (cachedCardIntensifyItemKlass && !cachedCardIntensifyItemKlass.isNull()) {
-                                            log("[+] Resolved CardIntensifyControl.Item class via getNestedClass: " + cachedCardIntensifyItemKlass);
-                                        }
+                                    var slotVal = baseAddr.add(0x30F1E38).readPointer();
+                                    if (!slotVal.isNull() && slotVal.compare(ptr(0x100000000)) > 0) {
+                                        cachedCardIntensifyItemKlass = slotVal;
+                                    } else {
+                                        var classInitFn = new NativeFunction(baseAddr.add(0xA43BE8), 'void', ['pointer']);
+                                        classInitFn(baseAddr.add(0x30F1E38));
+                                        cachedCardIntensifyItemKlass = baseAddr.add(0x30F1E38).readPointer();
                                     }
-                                } catch (eNest) {
-                                    log("[-] getNestedClass error: " + eNest.message);
+                                } catch (eSlot) {}
+                                if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) {
+                                    try {
+                                        var parentCic = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardIntensifyControl");
+                                        if (parentCic && !parentCic.isNull()) {
+                                            cachedCardIntensifyItemKlass = getNestedClass(parentCic, "Item");
+                                        }
+                                    } catch (eNest) {}
+                                }
+                                if (cachedCardIntensifyItemKlass && !cachedCardIntensifyItemKlass.isNull()) {
+                                    log("[+] Resolved CardIntensifyControl.Item class: " + cachedCardIntensifyItemKlass);
                                 }
                             }
-                            if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) {
-                                log("[-] Failed to resolve CardIntensifyControl.Item class!");
-                                return NULL;
-                            }
 
-                            var itemObj = il2cpp_object_new(cachedCardIntensifyItemKlass);
-                            if (!itemObj || itemObj.isNull()) return NULL;
-                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(itemObj, 2);
+                            var itemObj = NULL;
+                            if (cachedCardIntensifyItemKlass && !cachedCardIntensifyItemKlass.isNull() && il2cpp_object_new) {
+                                try {
+                                    itemObj = il2cpp_object_new(cachedCardIntensifyItemKlass);
+                                } catch (eNew) {
+                                    log("[-] il2cpp_object_new failed: " + eNew.message);
+                                }
+                            }
+                            if (!itemObj || itemObj.isNull()) {
+                                itemObj = Memory.alloc(0x30);
+                                if (cachedCardIntensifyItemKlass && !cachedCardIntensifyItemKlass.isNull()) {
+                                    itemObj.writePointer(cachedCardIntensifyItemKlass);
+                                }
+                                log("[+] Fallback allocated Item buffer: " + itemObj);
+                            } else {
+                                if (il2cpp_gchandle_new) {
+                                    try { il2cpp_gchandle_new(itemObj, 2); } catch (eGc) {}
+                                }
+                            }
 
                             var subGrade = 0;
                             var subLvl = 1;
@@ -9333,7 +9365,18 @@ function initIl2Cpp(module) {
                             return itemObj;
                         } catch (eFind) {
                             log("[-] Error in CardIntensifyControl.Find: " + eFind.message);
-                            return NULL;
+                            try {
+                                var fallbackObj = Memory.alloc(0x30);
+                                if (cachedCardIntensifyItemKlass && !cachedCardIntensifyItemKlass.isNull()) {
+                                    fallbackObj.writePointer(cachedCardIntensifyItemKlass);
+                                }
+                                fallbackObj.add(0x10).writeDouble(50.0);
+                                fallbackObj.add(0x18).writeS32(100);
+                                fallbackObj.add(0x1C).writeU8(0);
+                                return fallbackObj;
+                            } catch (eFb) {
+                                return NULL;
+                            }
                         }
                     }, "pointer", ["int16", "int16"]));
 
@@ -9359,6 +9402,54 @@ function initIl2Cpp(module) {
                     log("[+] CardIntensifyControl hooks installed successfully!");
                 } catch (eCicHooks) {
                     log("[-] Error installing CardIntensifyControl hooks: " + eCicHooks.message);
+                }
+
+                // 6. Safe offline overrides for IsMaterialCard, KeyVault and global exception logging
+                try {
+                    // CardItem.get_IsMaterialCard (0xB55F08) -> returns false for normal inventory cards
+                    Interceptor.replace(baseAddr.add(0xB55F08), new NativeCallback(function(thiz) {
+                        return 0;
+                    }, "bool", ["pointer"]));
+
+                    // CardControl.Data.get_IsMaterial (0xE4340C) -> returns false
+                    Interceptor.replace(baseAddr.add(0xE4340C), new NativeCallback(function(thiz) {
+                        return 0;
+                    }, "bool", ["pointer"]));
+
+                    // KeyVault safe fallbacks
+                    var dummyKeyVault = Memory.alloc(0x50);
+                    var dummyGameControl = Memory.alloc(0x50);
+                    dummyKeyVault.add(0x28).writePointer(dummyGameControl);
+                    Interceptor.replace(baseAddr.add(0x10613AC), new NativeCallback(function() {
+                        return dummyKeyVault;
+                    }, "pointer", []));
+                    Interceptor.replace(baseAddr.add(0x1061598), new NativeCallback(function() {
+                        return dummyGameControl;
+                    }, "pointer", []));
+
+                    // Global IL2CPP exception monitor (0x9C4B08)
+                    Interceptor.attach(baseAddr.add(0x9C4B08), {
+                        onEnter: function(args) {
+                            var exc = args[0];
+                            var lr = this.returnAddress;
+                            var off = lr.sub(baseAddr);
+                            var msg = "";
+                            try {
+                                if (!exc.isNull()) {
+                                    var msgStr = exc.add(0x10).readPointer();
+                                    if (!msgStr.isNull()) {
+                                        var len = msgStr.add(0x10).readS32();
+                                        msg = msgStr.add(0x14).readUtf16String(Math.min(len, 200));
+                                    }
+                                }
+                            } catch(e) {}
+                            log("[💥 IL2CPP EXCEPTION 0x9C4B08] Raised from RVA: " + off + " (LR=" + lr + ") msg: " + msg);
+                        }
+                    });
+
+                    log("[+] Safe IsMaterialCard and KeyVault hooks installed successfully!");
+                } catch (eMatSafe) {
+                    log("[-] Error installing safe IsMaterialCard hooks: " + eMatSafe.message);
                 }
 
 
@@ -9391,7 +9482,27 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.attach(baseAddr.add(0x105A97C), {
                         onEnter: function(args) {
-                            log("[⚡ INVENTORY] InventoryScene.OnIntensify called! instance=" + args[0]);
+                            var sceneThis = args[0];
+                            log("[⚡ INVENTORY] InventoryScene.OnIntensify called! instance=" + sceneThis);
+                            try {
+                                var tCard = sceneThis.add(0x88).readPointer();
+                                if (tCard.isNull()) tCard = sceneThis.add(0x98).readPointer();
+                                if (!tCard.isNull()) {
+                                    var tRaw = tCard.add(0x10).readPointer();
+                                    if (!tRaw.isNull()) {
+                                        var tcId = tRaw.add(0x20).readS32();
+                                        var tCcd = getOrCreateCardControlData(tcId);
+                                        tCard.add(0x18).writePointer(tCcd || NULL);
+                                        var tGr = tRaw.add(0x24).readS32();
+                                        var tLvl = tRaw.add(0x1C).readS16();
+                                        var tCode = (tGr < 4) ? (tGr * 5 + Math.min(4, tLvl - 1)) : (20 + Math.min(98, tLvl - 1));
+                                        tCard.add(0x20).writeS16(tCode);
+                                        log("[⚡ INVENTORY OnIntensify] Prepared targetCard: cardID=" + tcId + ", code=" + tCode + ", ccd=" + tCcd);
+                                    }
+                                }
+                            } catch (ePrep) {
+                                log("[-] Error in OnIntensify targetCard prep: " + ePrep.message);
+                            }
                         }
                     });
                 } catch (eOi) {
@@ -9977,9 +10088,23 @@ function initIl2Cpp(module) {
                         } else if (cmdRaw === "intensify") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
                                 log("[⚡ INTENSIFY CMD] Triggering OnIntensify directly!");
-                                var onIntensifyFn = new NativeFunction(baseAddr.add(0x105A97C), "void", ["pointer"]);
-                                onIntensifyFn(curScene);
-                            }
+                                    var tCard = curScene.add(0x88).readPointer();
+                                    if (tCard.isNull()) tCard = curScene.add(0x98).readPointer();
+                                    if (!tCard.isNull()) {
+                                        var tRaw = tCard.add(0x10).readPointer();
+                                        if (!tRaw.isNull()) {
+                                            var tcId = tRaw.add(0x20).readS32();
+                                            var tCcd = getOrCreateCardControlData(tcId);
+                                            tCard.add(0x18).writePointer(tCcd || NULL);
+                                            var tGr = tRaw.add(0x24).readS32();
+                                            var tLvl = tRaw.add(0x1C).readS16();
+                                            var tCode = (tGr < 4) ? (tGr * 5 + Math.min(4, tLvl - 1)) : (20 + Math.min(98, tLvl - 1));
+                                            tCard.add(0x20).writeS16(tCode);
+                                        }
+                                    }
+                                    var onIntensifyFn = new NativeFunction(baseAddr.add(0x105A97C), "void", ["pointer"]);
+                                    onIntensifyFn(curScene);
+                                }
                         } else if (cmdRaw === "recommend") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
                                 log("[⚡ RECOMMEND CMD] Triggering executeRecommend!");
@@ -10048,14 +10173,13 @@ function initIl2Cpp(module) {
                             }
                         } else if (cmdRaw === "reload_script") {
                             try {
-                                var srcF = new File("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/libscript.js", "rb");
-                                var content = srcF.read();
-                                srcF.close();
-                                var dstF = new File("/data/data/com.dalcomsoft.sslo/files/libscript.js", "wb");
-                                dstF.write(content);
-                                dstF.flush();
-                                dstF.close();
-                                log("[🔄 RELOAD] Copied external libscript.js to internal! Frida will hot-reload.");
+                                var content = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/libscript.js");
+                                if (content && content.length > 0) {
+                                    writeTextFile("/data/data/com.dalcomsoft.sslo/files/libscript.js", content);
+                                    log("[🔄 RELOAD] Copied external libscript.js (" + content.length + " bytes) to internal! Frida will hot-reload.");
+                                } else {
+                                    log("[-] reload_script: External file empty or unreadable!");
+                                }
                             } catch (eRel) {
                                 log("[-] Reload error: " + eRel.message);
                             }
