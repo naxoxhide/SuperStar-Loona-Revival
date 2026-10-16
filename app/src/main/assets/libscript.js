@@ -5070,6 +5070,36 @@ function initIl2Cpp(module) {
                             var artistData = loonaArtistDataMap[memberIdx] || NULL;
 
                             var curState = sceneThis.add(0x24).readS32();
+                            if (curState === 8) {
+                                // STATE.Intensify -> Material Card toggle
+                                log("[⚡ ON_CARD_ITEM_INTENSIFY] Material card clicked: " + clickedCardItem);
+                                var isRegistered = false;
+                                var matListPtr = sceneThis.add(0xA0).readPointer();
+                                if (!matListPtr.isNull()) {
+                                    var matCount = matListPtr.add(0x18).readS32();
+                                    var matArr = matListPtr.add(0x10).readPointer();
+                                    for (var mi = 0; mi < matCount; mi++) {
+                                        var mItem = matArr.add(0x20 + mi * 8).readPointer();
+                                        if (mItem.equals(clickedCardItem)) {
+                                            isRegistered = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (isRegistered) {
+                                    log("[⚡ ON_CARD_ITEM_INTENSIFY] Unregistering material card: " + clickedCardItem);
+                                    var unregFn = new NativeFunction(baseAddr.add(0x1058A04), "void", ["pointer", "pointer"]);
+                                    unregFn(sceneThis, clickedCardItem);
+                                } else {
+                                    log("[⚡ ON_CARD_ITEM_INTENSIFY] Registering material card: " + clickedCardItem);
+                                    var regFn = new NativeFunction(baseAddr.add(0x1056B5C), "void", ["pointer", "pointer"]);
+                                    regFn(sceneThis, clickedCardItem);
+                                }
+                                var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "bool", "bool"]);
+                                setStateIntensifyFn(sceneThis, 0, 0);
+                                return;
+                            }
+
                             // Step 2: Store as selectedCardItem in scene (0x88) & preSelectedCardItem (0x98) & selectedArtistData (0x80)
                             sceneThis.add(0x88).writePointer(clickedCardItem);
                             sceneThis.add(0x98).writePointer(clickedCardItem);
@@ -5800,6 +5830,197 @@ function initIl2Cpp(module) {
                         log("[✅ RESTORE] Restored displayCardList to all " + loonaCardItems.length + " cards!");
                     } catch (eR) {
                         log("[-] Error restoring displayCardList: " + eR.message);
+                    }
+                };
+
+                // Populates displayCardList with eligible material cards when in Intensify view (extractType = 2)
+                var populateMaterialDisplayCardList = function(sceneThis) {
+                    try {
+                        if (!sceneThis || sceneThis.isNull() || !loonaCardItems || loonaCardItems.length === 0) return;
+                        var dclPtr = sceneThis.add(0x58).readPointer();
+                        if (dclPtr.isNull()) return;
+
+                        var selCard = sceneThis.add(0x88).readPointer();
+                        if (selCard.isNull()) selCard = sceneThis.add(0x98).readPointer();
+                        var targetObjId = 0;
+                        var targetGrade = 0;
+                        var targetLevel = 1;
+                        var targetArtistCode = 0;
+                        if (!selCard.isNull()) {
+                            var raw = selCard.add(0x10).readPointer();
+                            if (!raw.isNull()) {
+                                targetObjId = raw.add(0x10).readS64();
+                                targetGrade = raw.add(0x24).readS32();
+                                targetLevel = raw.add(0x1C).readS16();
+                                targetArtistCode = raw.add(0x18).readS32();
+                            }
+                        }
+
+                        var isMaxLevel = (targetGrade === 4) ? (targetLevel >= 50) : (targetLevel >= 5);
+                        log("[⚡ MATERIAL LIST] Populating materials for target ObjId=" + targetObjId + ", Grade=" + targetGrade + ", Lvl=" + targetLevel + ", isMaxLevel=" + isMaxLevel);
+
+                        var eligible = [];
+                        for (var i = 0; i < loonaCardItems.length; i++) {
+                            var item = loonaCardItems[i];
+                            if (!item || item.isNull() || item.equals(selCard)) continue;
+                            var raw = item.add(0x10).readPointer();
+                            if (!raw || raw.isNull()) continue;
+
+                            var objId = raw.add(0x10).readS64();
+                            if (objId === targetObjId) continue;
+
+                            var isEquip = (raw.add(0x28).readU8() !== 0);
+                            var isLock = (raw.add(0x29).readU8() !== 0);
+                            if (isEquip || isLock) continue;
+
+                            var grade = raw.add(0x24).readS32();
+                            var level = raw.add(0x1C).readS16();
+                            var artistCode = raw.add(0x18).readS32();
+
+                            // Ensure valid IntensifyCode on cardItem
+                            var fCode = (grade < 4) ? (grade * 5 + Math.min(4, level - 1)) : (20 + Math.min(98, level - 1));
+                            item.add(0x20).writeS16(fCode);
+
+                            if (isMaxLevel) {
+                                var reqMax = (grade === 4) ? 50 : 5;
+                                if (artistCode === targetArtistCode && grade === targetGrade && level >= reqMax) {
+                                    eligible.push(item);
+                                }
+                            } else {
+                                eligible.push(item);
+                            }
+                        }
+
+                        // Sort eligible: Lowest grade first (C=0, B=1, A=2, S=3, R=4), then lowest level
+                        eligible.sort(function(a, b) {
+                            var rawA = a.add(0x10).readPointer();
+                            var rawB = b.add(0x10).readPointer();
+                            var gA = rawA.add(0x24).readS32();
+                            var gB = rawB.add(0x24).readS32();
+                            if (gA !== gB) return gA - gB;
+                            var lA = rawA.add(0x1C).readS16();
+                            var lB = rawB.add(0x1C).readS16();
+                            return lA - lB;
+                        });
+
+                        log("[⚡ MATERIAL LIST] Found " + eligible.length + " eligible material cards (sorted LowGrade first)!");
+
+                        var listItems = ensureListBuffer(dclPtr, Math.max(eligible.length, 64));
+                        for (var j = 0; j < eligible.length; j++) {
+                            listItems.add(0x20 + j * 8).writePointer(eligible[j]);
+                        }
+                        dclPtr.add(0x18).writeS32(eligible.length);
+                        sceneThis.add(0x50).writeS32(2); // EXTRACT_TYPE.Material
+
+                        // Refresh UI CardView
+                        var sceneView = sceneThis.add(0x48).readPointer();
+                        if (!sceneView.isNull()) {
+                            var cardView = sceneView.add(0x78).readPointer();
+                            if (!cardView.isNull()) {
+                                var eventListener = ensureCardViewEventListener(sceneThis, cardView);
+                                var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
+                                setDataFn(cardView, eligible.length, 0, eventListener, NULL);
+                                sanitizeCardScroller(cardView);
+                                var cardCountText = cardView.add(0x38).readPointer();
+                                if (!cardCountText.isNull()) {
+                                    var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                    setTextFn(cardCountText, createIl2CppString(eligible.length + " / 200"), NULL);
+                                }
+                            }
+                        }
+                        log("[✅ MATERIAL LIST] Material display list refreshed in UI with " + eligible.length + " cards!");
+                    } catch (eMatList) {
+                        log("[-] Error in populateMaterialDisplayCardList: " + eMatList.message);
+                    }
+                };
+
+                // Smart recommend material selection: picks up to 5 lowest grade cards and calls RegistMaterialCardItem
+                var executeRecommend = function(sceneThis) {
+                    try {
+                        log("[⚡ RECOMMEND EXEC] Starting smart recommend material selection...");
+                        if (!sceneThis || sceneThis.isNull()) return;
+
+                        // 1. Clear existing materials
+                        var clearFn = new NativeFunction(baseAddr.add(0x1054118), "void", ["pointer"]);
+                        clearFn(sceneThis);
+
+                        // 2. Identify target card
+                        var targetCard = sceneThis.add(0x88).readPointer();
+                        if (targetCard.isNull()) targetCard = sceneThis.add(0x98).readPointer();
+                        var targetObjId = 0;
+                        var targetGrade = 0;
+                        var targetLevel = 1;
+                        var targetArtistCode = 0;
+                        if (!targetCard.isNull()) {
+                            var rawT = targetCard.add(0x10).readPointer();
+                            if (!rawT.isNull()) {
+                                targetObjId = rawT.add(0x10).readS64();
+                                targetGrade = rawT.add(0x24).readS32();
+                                targetLevel = rawT.add(0x1C).readS16();
+                                targetArtistCode = rawT.add(0x18).readS32();
+                            }
+                        }
+                        var isMaxLevel = (targetGrade === 4) ? (targetLevel >= 50) : (targetLevel >= 5);
+
+                        // 3. Find candidates from loonaCardItems
+                        var candidates = [];
+                        for (var i = 0; i < loonaCardItems.length; i++) {
+                            var item = loonaCardItems[i];
+                            if (!item || item.isNull() || item.equals(targetCard)) continue;
+                            var raw = item.add(0x10).readPointer();
+                            if (!raw || raw.isNull()) continue;
+
+                            var objId = raw.add(0x10).readS64();
+                            if (objId === targetObjId) continue;
+                            var isEq = (raw.add(0x28).readU8() !== 0);
+                            var isLk = (raw.add(0x29).readU8() !== 0);
+                            if (isEq || isLk) continue;
+
+                            var gr = raw.add(0x24).readS32();
+                            var lvl = raw.add(0x1C).readS16();
+                            var art = raw.add(0x18).readS32();
+
+                            // Ensure valid IntensifyCode
+                            var fCode = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
+                            item.add(0x20).writeS16(fCode);
+
+                            if (isMaxLevel) {
+                                var reqMax = (gr === 4) ? 50 : 5;
+                                if (art === targetArtistCode && gr === targetGrade && lvl >= reqMax) {
+                                    candidates.push(item);
+                                }
+                            } else {
+                                candidates.push(item);
+                            }
+                        }
+
+                        // 4. Sort lowest grade first (C -> B -> A -> S -> R)
+                        candidates.sort(function(a, b) {
+                            var rA = a.add(0x10).readPointer();
+                            var rB = b.add(0x10).readPointer();
+                            var gA = rA.add(0x24).readS32();
+                            var gB = rB.add(0x24).readS32();
+                            if (gA !== gB) return gA - gB;
+                            var lA = rA.add(0x1C).readS16();
+                            var lB = rB.add(0x1C).readS16();
+                            return lA - lB;
+                        });
+
+                        // 5. Register up to 5 material cards
+                        var pickCount = Math.min(5, candidates.length);
+                        var regFn = new NativeFunction(baseAddr.add(0x1056B5C), "void", ["pointer", "pointer"]);
+                        for (var p = 0; p < pickCount; p++) {
+                            regFn(sceneThis, candidates[p]);
+                            var cRaw = candidates[p].add(0x10).readPointer();
+                            log("[⚡ RECOMMEND] Added material card #" + (p + 1) + ": ObjId=" + cRaw.add(0x10).readS64() + ", Grade=" + cRaw.add(0x24).readS32() + ", Level=" + cRaw.add(0x1C).readS16());
+                        }
+
+                        // 6. Refresh SetStateIntensify(false, false)
+                        var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "bool", "bool"]);
+                        setStateIntensifyFn(sceneThis, 0, 0);
+                        log("[🎉 RECOMMEND COMPLETE] Registered " + pickCount + " material cards and refreshed view!");
+                    } catch (eRecExec) {
+                        log("[-] Error in executeRecommend: " + eRecExec.message);
                     }
                 };
 
@@ -6665,6 +6886,76 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing CardView.get_IsMaterialCard: " + eImcHook.message);
                 }
 
+                // 9e7. Bulletproof CardItem getters against null references
+                try {
+                    // get_IsReflection (0xB55EC0)
+                    Interceptor.replace(baseAddr.add(0xB55EC0), new NativeCallback(function(thisPtr) {
+                        try {
+                            if (!thisPtr || thisPtr.isNull()) return 0;
+                            var raw = thisPtr.add(0x10).readPointer();
+                            if (!raw || raw.isNull()) return 0;
+                            var gr = raw.add(0x24).readS32();
+                            return (gr > 1) ? 1 : 0;
+                        } catch (e) { return 0; }
+                    }, "bool", ["pointer"]));
+
+                    // get_IsPrism (0xB55EA4)
+                    Interceptor.replace(baseAddr.add(0xB55EA4), new NativeCallback(function(thisPtr) {
+                        try {
+                            if (!thisPtr || thisPtr.isNull()) return 0;
+                            var raw = thisPtr.add(0x10).readPointer();
+                            if (!raw || raw.isNull()) return 0;
+                            return raw.add(0x2A).readU8();
+                        } catch (e) { return 0; }
+                    }, "bool", ["pointer"]));
+
+                    // get_IsGlow (0xB55EE4)
+                    Interceptor.replace(baseAddr.add(0xB55EE4), new NativeCallback(function(thisPtr) {
+                        try {
+                            if (!thisPtr || thisPtr.isNull()) return 0;
+                            var raw = thisPtr.add(0x10).readPointer();
+                            if (!raw || raw.isNull()) return 0;
+                            var gr = raw.add(0x24).readS32();
+                            return (gr > 2) ? 1 : 0;
+                        } catch (e) { return 0; }
+                    }, "bool", ["pointer"]));
+
+                    // get_IsMaterialCard (0xB55F08)
+                    Interceptor.replace(baseAddr.add(0xB55F08), new NativeCallback(function(thisPtr) {
+                        try {
+                            if (!thisPtr || thisPtr.isNull()) return 0;
+                            return thisPtr.add(0x2C).readU8();
+                        } catch (e) { return 0; }
+                    }, "bool", ["pointer"]));
+
+                    // get_IsRCard (0xB523E4)
+                    Interceptor.replace(baseAddr.add(0xB523E4), new NativeCallback(function(thisPtr) {
+                        try {
+                            if (!thisPtr || thisPtr.isNull()) return 0;
+                            var raw = thisPtr.add(0x10).readPointer();
+                            if (!raw || raw.isNull()) return 0;
+                            return (raw.add(0x24).readS32() === 4) ? 1 : 0;
+                        } catch (e) { return 0; }
+                    }, "bool", ["pointer"]));
+
+                    // get_IsMaxLevel (0xB52408)
+                    Interceptor.replace(baseAddr.add(0xB52408), new NativeCallback(function(thisPtr) {
+                        try {
+                            if (!thisPtr || thisPtr.isNull()) return 0;
+                            var raw = thisPtr.add(0x10).readPointer();
+                            if (!raw || raw.isNull()) return 0;
+                            var gr = raw.add(0x24).readS32();
+                            var lvl = raw.add(0x1C).readS16();
+                            var maxLvl = (gr === 4) ? 50 : 5;
+                            return (lvl >= maxLvl) ? 1 : 0;
+                        } catch (e) { return 0; }
+                    }, "bool", ["pointer"]));
+
+                    log("[+] Safe CardItem getters installed!");
+                } catch (eSafeCi) {
+                    log("[-] Error installing safe CardItem getters: " + eSafeCi.message);
+                }
+
                 // Exception monitors
                 try {
                     Interceptor.attach(baseAddr.add(0xA43CC0), {
@@ -6697,8 +6988,11 @@ function initIl2Cpp(module) {
                                 var count = (!dclPtr.isNull()) ? dclPtr.add(0x18).readS32() : 0;
                                 var extractType = this.scene.add(0x50).readS32();
                                 log("[🗃️ UPDATE_DISPLAY_CARD_LIST] onLeave: count=" + count + ", extractType=" + extractType);
-                                if (count === 0 && extractType === 0) {
-                                    log("[🗃️ UPDATE_DISPLAY_CARD_LIST] displayCardList was left empty! Restoring all 24 cards...");
+                                if (extractType === 2) {
+                                    log("[⚡ UPDATE_DISPLAY_CARD_LIST] extractType=2 (Material)! Populating material cards...");
+                                    populateMaterialDisplayCardList(this.scene);
+                                } else if (count === 0 && extractType === 0) {
+                                    log("[🗃️ UPDATE_DISPLAY_CARD_LIST] displayCardList was left empty! Restoring all cards...");
                                     restoreDefaultDisplayCardList(this.scene, true, true);
                                 }
                             } catch (eUdclLeave) {
@@ -8010,8 +8304,8 @@ function initIl2Cpp(module) {
                                 }
                                 cardItemObj.add(0x10).writePointer(cardObj); // <Raw>
                                 var ccd = getOrCreateCardControlData(cId);
-                                cardItemObj.add(0x18).writePointer(ccd || NULL); // <Card>
-                                cardItemObj.add(0x20).writeS16(gr * 100 + lvl); // <IntensifyCode>
+                                var formulaCode = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
+                                cardItemObj.add(0x20).writeS16(formulaCode); // <IntensifyCode>
                                 cardItemObj.add(0x24).writeU32(0x3F800000); // 1.0f
                                 cardItemObj.add(0x28).writeS32(100); // <SellPrice>
                                 cardItemObj.add(0x2C).writeU8(0); // isMaterial = false
@@ -9166,12 +9460,14 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing InventoryControl.Intensify: " + eIcInt.message);
                 }
 
+                var activeCardIntensifyPopup = NULL;
                 // 4. Attach monitoring to CardIntensifyPopup
                 try {
                     // CardIntensifyPopup.OnBuild (0x1383D5C)
                     Interceptor.attach(baseAddr.add(0x1383D5C), {
                         onEnter: function(args) {
                             log("[✨ INTENSIFY POPUP] CardIntensifyPopup.OnBuild called! popup=" + args[0]);
+                            activeCardIntensifyPopup = args[0];
                         }
                     });
                     // CardIntensifyPopup.IntensifyResult (0x138467C)
@@ -9574,9 +9870,8 @@ function initIl2Cpp(module) {
                             }
                         } else if (cmdRaw === "recommend") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
-                                log("[⚡ RECOMMEND CMD] Triggering InventoryScene.OnRecommend directly!");
-                                var onRecFn = new NativeFunction(baseAddr.add(0x105B4F4), "void", ["pointer"]);
-                                onRecFn(curScene);
+                                log("[⚡ RECOMMEND CMD] Triggering executeRecommend!");
+                                executeRecommend(curScene);
                             }
                         } else if (cmdRaw === "try") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
@@ -9585,9 +9880,21 @@ function initIl2Cpp(module) {
                                 onTryFn(curScene);
                             }
                         } else if (cmdRaw === "try_popup") {
-                            if (curScene && !curScene.isNull()) {
-                                log("[⚡ TRY POPUP CMD] Triggering CardIntensifyPopup.OnTry directly!");
-                                // Try finding active CardIntensifyPopup if open
+                            if (activeCardIntensifyPopup && !activeCardIntensifyPopup.isNull()) {
+                                log("[⚡ TRY POPUP CMD] Triggering CardIntensifyPopup.OnTry on: " + activeCardIntensifyPopup);
+                                var popupTryFn = new NativeFunction(baseAddr.add(0x13847D0), "void", ["pointer"]);
+                                popupTryFn(activeCardIntensifyPopup);
+                            } else {
+                                log("[-] TRY POPUP CMD: activeCardIntensifyPopup is null!");
+                            }
+                        } else if (cmdRaw === "mat_diag") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                var target = curScene.add(0x88).readPointer();
+                                var matListPtr = curScene.add(0xA0).readPointer();
+                                var dcl = curScene.add(0x58).readPointer();
+                                var matCount = (!matListPtr.isNull()) ? matListPtr.add(0x18).readS32() : 0;
+                                var dclCount = (!dcl.isNull()) ? dcl.add(0x18).readS32() : 0;
+                                log("[🔍 MAT_DIAG] target=" + target + ", matListCount=" + matCount + ", dclCount=" + dclCount + ", extractType=" + curScene.add(0x50).readS32());
                             }
 
                         } else if (cmdRaw === "equip") {
