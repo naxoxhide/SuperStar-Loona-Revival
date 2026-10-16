@@ -9424,77 +9424,29 @@ function initIl2Cpp(module) {
                     log("[-] Error installing CardIntensifyControl hooks: " + eCicHooks.message);
                 }
 
-                // 6. Safe offline overrides for KeyVault and global exception logging
+                // 6. Global IL2CPP exception monitor (0x9C4B08)
                 try {
-                    var dummyKeyVault = Memory.alloc(0x100);
-                    var dummySub = Memory.alloc(0x100);
-                    for (var off = 0x18; off <= 0x90; off += 8) {
-                        dummyKeyVault.add(off).writePointer(dummySub);
-                    }
-                    dummyKeyVault.add(0x98).writeU8(1); // isInit = true
-
-                    try {
-                        Interceptor.replace(baseAddr.add(0x10613AC), new NativeCallback(function() {
-                            return dummyKeyVault;
-                        }, "pointer", []));
-                        log("[+] Interceptor.replace installed on KeyVault.get_Instance (0x10613AC)!");
-                    } catch (eKvInst) {
-                        log("[-] Error replacing KeyVault.get_Instance: " + eKvInst.message);
-                    }
-
-                    var kvGetters = [
-                        0x106138C, // GoogleMobileAdsInfo
-                        0x1061578, // WebClientIdDataInfo
-                        0x1061598, // GameControlDataInfo
-                        0x10615B8, // NetworkControlInfo
-                        0x10615D8, // TapjoyDataInfo
-                        0x10615F8, // AdPopcornInfo
-                        0x1061618, // LoginControlInfo
-                        0x1061638, // DalcomAccountAPIInfo
-                        0x1061658, // ETCInfo
-                        0x1061678, // SelectGroupCardPackImageInfo
-                        0x1061698, // ProvidableItemCashDalcomCoinInfo
-                        0x10616B8, // RehearsalDeckSettingInfo
-                        0x10616D8, // InGameTutorialInfo
-                        0x10616F8, // SupportEmailAddressInfo
-                        0x1061718, // DeepLinkInfo
-                        0x1061738  // ServerSettingInfo
-                    ];
-                    kvGetters.forEach(function(rva) {
-                        try {
-                            Interceptor.replace(baseAddr.add(rva), new NativeCallback(function() {
-                                return dummySub;
-                            }, "pointer", []));
-                        } catch (eG) {}
-                    });
-                    log("[+] Interceptor.replace installed on all 16 KeyVault data getters!");
-
-                    // Global IL2CPP exception monitor (0x9C4B08)
-                    try {
-                        Interceptor.attach(baseAddr.add(0x9C4B08), {
-                            onEnter: function(args) {
-                                var exc = args[0];
-                                var lr = this.returnAddress;
-                                var off = lr.sub(baseAddr);
-                                var msg = "";
-                                try {
-                                    if (!exc.isNull()) {
-                                        var msgStr = exc.add(0x10).readPointer();
-                                        if (!msgStr.isNull()) {
-                                            var len = msgStr.add(0x10).readS32();
-                                            msg = msgStr.add(0x14).readUtf16String(Math.min(len, 200));
-                                        }
+                    Interceptor.attach(baseAddr.add(0x9C4B08), {
+                        onEnter: function(args) {
+                            var exc = args[0];
+                            var lr = this.returnAddress;
+                            var off = lr.sub(baseAddr);
+                            var msg = "";
+                            try {
+                                if (!exc.isNull()) {
+                                    var msgStr = exc.add(0x10).readPointer();
+                                    if (!msgStr.isNull()) {
+                                        var len = msgStr.add(0x10).readS32();
+                                        msg = msgStr.add(0x14).readUtf16String(Math.min(len, 200));
                                     }
-                                } catch(e) {}
-                                log("[💥 IL2CPP EXCEPTION 0x9C4B08] Raised from RVA: " + off + " (LR=" + lr + ") msg: " + msg);
-                            }
-                        });
-                        log("[+] Global IL2CPP exception monitor installed (0x9C4B08)!");
-                    } catch (eExcMon) {
-                        log("[-] Error installing exception monitor: " + eExcMon.message);
-                    }
-                } catch (eMatSafe) {
-                    log("[-] Error installing safe KeyVault/Exception hooks: " + eMatSafe.message);
+                                }
+                            } catch(e) {}
+                            log("[💥 IL2CPP EXCEPTION 0x9C4B08] Raised from RVA: " + off + " (LR=" + lr + ") msg: " + msg);
+                        }
+                    });
+                    log("[+] Global IL2CPP exception monitor installed (0x9C4B08)!");
+                } catch (eExcMon) {
+                    log("[-] Error installing exception monitor: " + eExcMon.message);
                 }
 
 
