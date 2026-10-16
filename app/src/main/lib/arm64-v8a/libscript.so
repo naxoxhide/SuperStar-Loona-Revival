@@ -3828,6 +3828,13 @@ function initIl2Cpp(module) {
                     log("[+] Byte patch on GroupItem.BonusCheck (0xB57C88): ret");
                 } catch (eBc) {}
 
+                // Direct byte patch on GoogleSignInControl.Awake (0xB9B304) -> ret
+                try {
+                    Memory.protect(baseAddr.add(0xB9B304), 4, "rwx");
+                    baseAddr.add(0xB9B304).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
+                    log("[+] Byte patch on GoogleSignInControl.Awake (0xB9B304): ret");
+                } catch (eGsi) {}
+
                 // =========================================================================
                 // INVENTORY STABILIZATION HOOKS & PROXIES
                 // =========================================================================
