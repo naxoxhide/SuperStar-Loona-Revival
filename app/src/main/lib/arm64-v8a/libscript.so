@@ -230,6 +230,26 @@ function initIl2Cpp(module) {
     var il2cppBase = module.base;
     log("[+] libil2cpp.so active at base: " + il2cppBase);
 
+    try {
+        var abortAddr = Module.findExportByName("libc.so", "abort");
+        if (abortAddr) {
+            Interceptor.attach(abortAddr, {
+                onEnter: function() {
+                    log("[🚨 LIBC ABORT TRIGGERED] Backtrace:\n" + Thread.backtrace(this.context, Backtracer.ACCURATE).map(function(addr) {
+                        try {
+                            var mod = Process.findModuleByAddress(addr);
+                            if (mod) return "  " + mod.name + "!" + addr.sub(mod.base);
+                        } catch (e) {}
+                        return "  " + addr;
+                    }).join("\n"));
+                }
+            });
+            log("[+] Interceptor.attach installed on libc.so!abort");
+        }
+    } catch (eAbort) {
+        log("[-] Error hooking libc.so!abort: " + eAbort.message);
+    }
+
     // --- RESOLVE IL2CPP EXPORTED C-APIs ---
     function getExport(name, retType, argTypes) {
         var addr = Module.findExportByName("libil2cpp.so", name);
@@ -257,6 +277,35 @@ function initIl2Cpp(module) {
     var il2cpp_class_get_name = getExport("il2cpp_class_get_name", "pointer", ["pointer"]);
     var il2cpp_gchandle_new = getExport("il2cpp_gchandle_new", "uint32", ["pointer", "bool"]);
     var il2cpp_array_new = getExport("il2cpp_array_new", "pointer", ["pointer", "size_t"]);
+
+    try {
+        var raiseExAddr = Module.findExportByName("libil2cpp.so", "il2cpp_raise_exception");
+        if (raiseExAddr) {
+            Interceptor.attach(raiseExAddr, {
+                onEnter: function(args) {
+                    var ex = args[0];
+                    var exClassName = "Unknown";
+                    try {
+                        var klass = ex.readPointer();
+                        var namePtr = il2cpp_class_get_name(klass);
+                        if (!namePtr.isNull()) exClassName = namePtr.readCString();
+                    } catch (e) {}
+                    var msg = "";
+                    try {
+                        var msgStrPtr = ex.add(0x10).readPointer();
+                        if (!msgStrPtr.isNull()) {
+                            var len = msgStrPtr.add(0x10).readS32();
+                            msg = msgStrPtr.add(0x14).readUtf16String(len);
+                        }
+                    } catch (e2) {}
+                    log("[🔥 IL2CPP EXCEPTION RAISED] Type: " + exClassName + ", Message: '" + msg + "' Caller LR=" + this.returnAddress.sub(il2cppBase));
+                }
+            });
+            log("[+] Interceptor.attach installed on il2cpp_raise_exception!");
+        }
+    } catch (eRaise) {
+        log("[-] Error hooking il2cpp_raise_exception: " + eRaise.message);
+    }
 
     function getNestedClass(parentClass, nestedName) {
         if (!parentClass || parentClass.isNull() || !il2cpp_class_get_nested_types || !il2cpp_class_get_name) return NULL;
@@ -3330,7 +3379,8 @@ function initIl2Cpp(module) {
                             thisPtr.add(0x10).writePointer(accountPtr); // <Raw>k__BackingField
                             var ccd = getOrCreateCardControlData(cardId);
                             thisPtr.add(0x18).writePointer(ccd || NULL); // <Card>k__BackingField
-                            thisPtr.add(0x20).writeS16(grade * 100 + level); // <IntensifyCode>
+                            var fCode = (grade < 4) ? (grade * 5 + Math.min(4, level - 1)) : (20 + Math.min(98, level - 1));
+                            thisPtr.add(0x20).writeS16(fCode); // <IntensifyCode>
                             thisPtr.add(0x24).writeU32(0x3F800000); // <CardGradeBonusValue> = 1.0f
                             thisPtr.add(0x28).writeS32(100); // <SellPrice>
                             thisPtr.add(0x2C).writeU8(0); // isMaterial = false
@@ -5957,7 +6007,9 @@ function initIl2Cpp(module) {
                                 targetObjId = rawT.add(0x10).readS64();
                                 targetGrade = rawT.add(0x24).readS32();
                                 targetLevel = rawT.add(0x1C).readS16();
-                                targetArtistCode = rawT.add(0x18).readS32();
+                                var tCardId = rawT.add(0x20).readS32();
+                                var tMeta = getCardMetadata(tCardId);
+                                targetArtistCode = tMeta ? tMeta.artistID : 0;
                             }
                         }
                         var isMaxLevel = (targetGrade === 4) ? (targetLevel >= 50) : (targetLevel >= 5);
@@ -5978,7 +6030,9 @@ function initIl2Cpp(module) {
 
                             var gr = raw.add(0x24).readS32();
                             var lvl = raw.add(0x1C).readS16();
-                            var art = raw.add(0x18).readS32();
+                            var cId = raw.add(0x20).readS32();
+                            var cMeta = getCardMetadata(cId);
+                            var art = cMeta ? cMeta.artistID : 0;
 
                             // Ensure valid IntensifyCode
                             var fCode = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
@@ -6920,12 +6974,9 @@ function initIl2Cpp(module) {
                         } catch (e) { return 0; }
                     }, "bool", ["pointer"]));
 
-                    // get_IsMaterialCard (0xB55F08)
+                    // get_IsMaterialCard (0xB55F08) -> false for regular idol cards
                     Interceptor.replace(baseAddr.add(0xB55F08), new NativeCallback(function(thisPtr) {
-                        try {
-                            if (!thisPtr || thisPtr.isNull()) return 0;
-                            return thisPtr.add(0x2C).readU8();
-                        } catch (e) { return 0; }
+                        return 0;
                     }, "bool", ["pointer"]));
 
                     // get_IsRCard (0xB523E4)
@@ -8304,6 +8355,7 @@ function initIl2Cpp(module) {
                                 }
                                 cardItemObj.add(0x10).writePointer(cardObj); // <Raw>
                                 var ccd = getOrCreateCardControlData(cId);
+                                cardItemObj.add(0x18).writePointer(ccd || NULL); // <Card>k__BackingField
                                 var formulaCode = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
                                 cardItemObj.add(0x20).writeS16(formulaCode); // <IntensifyCode>
                                 cardItemObj.add(0x24).writeU32(0x3F800000); // 1.0f
@@ -9173,12 +9225,23 @@ function initIl2Cpp(module) {
 
                     // 4. CardIntensifyControl.Find(short code, short subCode) (0x1381780) -> returns Item*
                     var cachedCardIntensifyItemKlass = NULL;
-                    Interceptor.replace(baseAddr.add(0x1381780), new NativeCallback(function(code, subCode) {
+                    Interceptor.replace(baseAddr.add(0x1381780), new NativeCallback(function(codeArg, subCodeArg) {
                         try {
+                            var code = parseInt(codeArg, 10);
+                            var subCode = parseInt(subCodeArg, 10);
                             if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) {
-                                cachedCardIntensifyItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardIntensifyControl/Item");
+                                try {
+                                    var kSlot = baseAddr.add(0x3144308).readPointer();
+                                    if (!kSlot.isNull()) cachedCardIntensifyItemKlass = kSlot;
+                                } catch (eSlot) {}
+                                if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) {
+                                    cachedCardIntensifyItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardIntensifyControl/Item");
+                                }
                             }
-                            if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) return NULL;
+                            if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) {
+                                log("[-] Failed to resolve CardIntensifyControl.Item class!");
+                                return NULL;
+                            }
 
                             var itemObj = il2cpp_object_new(cachedCardIntensifyItemKlass);
                             if (!itemObj || itemObj.isNull()) return NULL;
@@ -9245,6 +9308,49 @@ function initIl2Cpp(module) {
                 } catch (eCicHooks) {
                     log("[-] Error installing CardIntensifyControl hooks: " + eCicHooks.message);
                 }
+
+                // CardControl.Data.get_IsCardUseType (0xE43660) -> always usable
+                try {
+                    Interceptor.replace(baseAddr.add(0xE43660), new NativeCallback(function(thisPtr) {
+                        return 1;
+                    }, "bool", ["pointer"]));
+                    log("[+] Interceptor.replace installed on CardControl.Data.get_IsCardUseType (0xE43660)!");
+                } catch (eUct) {
+                    log("[-] Error hooking get_IsCardUseType: " + eUct.message);
+                }
+
+                // InventoryControl.CheckIntensifyEvent (0xF2C14C) -> safe default rates (1.0, 1.0)
+                try {
+                    Interceptor.replace(baseAddr.add(0xF2C14C), new NativeCallback(function(cardData, probRatePtr, priceRatePtr) {
+                        if (probRatePtr && !probRatePtr.isNull()) probRatePtr.writeDouble(1.0);
+                        if (priceRatePtr && !priceRatePtr.isNull()) priceRatePtr.writeDouble(1.0);
+                    }, "void", ["pointer", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryControl.CheckIntensifyEvent (0xF2C14C)!");
+                } catch (eCie) {
+                    log("[-] Error hooking CheckIntensifyEvent: " + eCie.message);
+                }
+
+                // InventoryScene.OnRecommend (0x105B4F4) -> Smart Recommend material selection
+                try {
+                    Interceptor.replace(baseAddr.add(0x105B4F4), new NativeCallback(function(sceneThis) {
+                        log("[⚡ RECOMMEND UI BUTTON] Native OnRecommend clicked! Triggering executeRecommend...");
+                        executeRecommend(sceneThis);
+                    }, "void", ["pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.OnRecommend (0x105B4F4)!");
+                } catch (eRecUi) {
+                    log("[-] Error hooking InventoryScene.OnRecommend: " + eRecUi.message);
+                }
+
+                // Diagnostic: Monitor il2cpp_codegen_raise_null_reference_exception (0xA43CC0)
+                try {
+                    Interceptor.attach(baseAddr.add(0xA43CC0), {
+                        onEnter: function(args) {
+                            var lr = this.returnAddress;
+                            var offset = lr.sub(baseAddr);
+                            log("[💥 NULL REF EXCEPTION] Called from offset: " + offset + " (LR=" + lr + ")");
+                        }
+                    });
+                } catch (eNre) {}
 
                 // InventoryScene.OnIntensify (0x105A97C)
                 try {
@@ -9865,8 +9971,8 @@ function initIl2Cpp(module) {
                         } else if (cmdRaw === "intensify") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
                                 log("[⚡ INTENSIFY CMD] Triggering OnIntensify directly!");
-                                var onIntensifyFn = new NativeFunction(baseAddr.add(0x105A97C), "void", ["pointer", "pointer"]);
-                                onIntensifyFn(curScene, NULL);
+                                var onIntensifyFn = new NativeFunction(baseAddr.add(0x105A97C), "void", ["pointer"]);
+                                onIntensifyFn(curScene);
                             }
                         } else if (cmdRaw === "recommend") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
