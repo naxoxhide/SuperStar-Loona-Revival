@@ -6034,9 +6034,11 @@ function initIl2Cpp(module) {
                             var cMeta = getCardMetadata(cId);
                             var art = cMeta ? cMeta.artistID : 0;
 
-                            // Ensure valid IntensifyCode
+                            // Ensure valid IntensifyCode and Card backing field
                             var fCode = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
                             item.add(0x20).writeS16(fCode);
+                            var ccd = getOrCreateCardControlData(cId);
+                            item.add(0x18).writePointer(ccd || NULL);
 
                             if (isMaxLevel) {
                                 var reqMax = (gr === 4) ? 50 : 5;
@@ -6060,19 +6062,65 @@ function initIl2Cpp(module) {
                             return lA - lB;
                         });
 
-                        // 5. Register up to 5 material cards
+                        // 5. Ensure targetCard has valid Card backing field, IntensifyCode, and scene.selectedArtistData
+                        if (!targetCard.isNull()) {
+                            var rawT2 = targetCard.add(0x10).readPointer();
+                            if (!rawT2.isNull()) {
+                                var tCardId2 = rawT2.add(0x20).readS32();
+                                var tCcd2 = getOrCreateCardControlData(tCardId2);
+                                targetCard.add(0x18).writePointer(tCcd2 || NULL);
+                                var tCode2 = (targetGrade < 4) ? (targetGrade * 5 + Math.min(4, targetLevel - 1)) : (20 + Math.min(98, targetLevel - 1));
+                                targetCard.add(0x20).writeS16(tCode2);
+                            }
+                        }
+                        var curArt = sceneThis.add(0x80).readPointer();
+                        if (curArt.isNull() && targetArtistCode > 0 && loonaArtistDataMap[targetArtistCode]) {
+                            sceneThis.add(0x80).writePointer(loonaArtistDataMap[targetArtistCode]);
+                            log("[⚡ RECOMMEND] Set scene.selectedArtistData to artist " + targetArtistCode);
+                        }
+
+                        // 6. Register up to 5 material cards
                         var pickCount = Math.min(5, candidates.length);
                         var regFn = new NativeFunction(baseAddr.add(0x1056B5C), "void", ["pointer", "pointer"]);
                         for (var p = 0; p < pickCount; p++) {
-                            regFn(sceneThis, candidates[p]);
-                            var cRaw = candidates[p].add(0x10).readPointer();
+                            var cand = candidates[p];
+                            var cRaw = cand.add(0x10).readPointer();
+                            var candCId = cRaw.add(0x20).readS32();
+                            var candCcd = getOrCreateCardControlData(candCId);
+                            cand.add(0x18).writePointer(candCcd || NULL);
+                            regFn(sceneThis, cand);
                             log("[⚡ RECOMMEND] Added material card #" + (p + 1) + ": ObjId=" + cRaw.add(0x10).readS64() + ", Grade=" + cRaw.add(0x24).readS32() + ", Level=" + cRaw.add(0x1C).readS16());
                         }
 
-                        // 6. Refresh SetStateIntensify(false, false)
+                        // 7. Verify all registered materials in materialCardItemList (scene + 0xA0) have valid Card and IntensifyCode
+                        var matList = sceneThis.add(0xA0).readPointer();
+                        if (!matList.isNull()) {
+                            var mCount = matList.add(0x18).readS32();
+                            var mItems = matList.add(0x10).readPointer();
+                            for (var m = 0; m < mCount; m++) {
+                                var mItem = mItems.add(0x20 + m * 8).readPointer();
+                                if (mItem && !mItem.isNull()) {
+                                    var mRaw = mItem.add(0x10).readPointer();
+                                    if (!mRaw.isNull()) {
+                                        var mcId = mRaw.add(0x20).readS32();
+                                        var mccd = getOrCreateCardControlData(mcId);
+                                        mItem.add(0x18).writePointer(mccd || NULL);
+                                        var mgr = mRaw.add(0x24).readS32();
+                                        var mlvl = mRaw.add(0x1C).readS16();
+                                        var mfCode = (mgr < 4) ? (mgr * 5 + Math.min(4, mlvl - 1)) : (20 + Math.min(98, mlvl - 1));
+                                        mItem.add(0x20).writeS16(mfCode);
+                                    }
+                                }
+                            }
+                        }
+
+                        // 8. Refresh SetStateIntensify(false, false)
+                        var sv = sceneThis.add(0x48).readPointer();
+                        var bbs = (!sv.isNull()) ? sv.add(0xC0).readPointer() : NULL;
+                        log("[🔍 RECOMMEND BEFORE REFRESH] sceneView=" + sv + ", btnBoxSprites=" + bbs);
                         var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "bool", "bool"]);
                         setStateIntensifyFn(sceneThis, 0, 0);
-                        log("[🎉 RECOMMEND COMPLETE] Registered " + pickCount + " material cards and refreshed view!");
+                        log("[🎉 RECOMMEND COMPLETE] Registered " + pickCount + " material cards and refreshed view successfully!");
                     } catch (eRecExec) {
                         log("[-] Error in executeRecommend: " + eRecExec.message);
                     }
@@ -9231,11 +9279,15 @@ function initIl2Cpp(module) {
                             var subCode = parseInt(subCodeArg, 10);
                             if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) {
                                 try {
-                                    var kSlot = baseAddr.add(0x3144308).readPointer();
-                                    if (!kSlot.isNull()) cachedCardIntensifyItemKlass = kSlot;
-                                } catch (eSlot) {}
-                                if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) {
-                                    cachedCardIntensifyItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardIntensifyControl/Item");
+                                    var parentCic = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardIntensifyControl");
+                                    if (parentCic && !parentCic.isNull()) {
+                                        cachedCardIntensifyItemKlass = getNestedClass(parentCic, "Item");
+                                        if (cachedCardIntensifyItemKlass && !cachedCardIntensifyItemKlass.isNull()) {
+                                            log("[+] Resolved CardIntensifyControl.Item class via getNestedClass: " + cachedCardIntensifyItemKlass);
+                                        }
+                                    }
+                                } catch (eNest) {
+                                    log("[-] getNestedClass error: " + eNest.message);
                                 }
                             }
                             if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) {
@@ -9309,25 +9361,31 @@ function initIl2Cpp(module) {
                     log("[-] Error installing CardIntensifyControl hooks: " + eCicHooks.message);
                 }
 
-                // CardControl.Data.get_IsCardUseType (0xE43660) -> always usable
+                // NetworkControl.GetRegionInfo (0xC07628) -> Immediate callback execution offline to advance EntryScene to TitleScene
                 try {
-                    Interceptor.replace(baseAddr.add(0xE43660), new NativeCallback(function(thisPtr) {
-                        return 1;
-                    }, "bool", ["pointer"]));
-                    log("[+] Interceptor.replace installed on CardControl.Data.get_IsCardUseType (0xE43660)!");
-                } catch (eUct) {
-                    log("[-] Error hooking get_IsCardUseType: " + eUct.message);
-                }
-
-                // InventoryControl.CheckIntensifyEvent (0xF2C14C) -> safe default rates (1.0, 1.0)
-                try {
-                    Interceptor.replace(baseAddr.add(0xF2C14C), new NativeCallback(function(cardData, probRatePtr, priceRatePtr) {
-                        if (probRatePtr && !probRatePtr.isNull()) probRatePtr.writeDouble(1.0);
-                        if (priceRatePtr && !priceRatePtr.isNull()) priceRatePtr.writeDouble(1.0);
-                    }, "void", ["pointer", "pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on InventoryControl.CheckIntensifyEvent (0xF2C14C)!");
-                } catch (eCie) {
-                    log("[-] Error hooking CheckIntensifyEvent: " + eCie.message);
+                    Interceptor.replace(baseAddr.add(0xC07628), new NativeCallback(function (callback, methodInfo) {
+                        log("[🌐 NETWORK] NetworkControl.GetRegionInfo (0xC07628) intercepted offline! Invoking callback immediately...");
+                        if (!callback.isNull()) {
+                            try {
+                                var methodPtr = callback.add(0x10).readPointer();
+                                var target = callback.add(0x20).readPointer();
+                                if (!methodPtr.isNull()) {
+                                    var cbFn = new NativeFunction(methodPtr, "void", ["pointer", "pointer"]);
+                                    cbFn(target, NULL);
+                                    log("[✅ NETWORK] GetRegionInfo callback executed directly!");
+                                } else {
+                                    var invokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer"]);
+                                    invokeFn(callback);
+                                    log("[✅ NETWORK] GetRegionInfo callback executed via 0x1DEBE44!");
+                                }
+                            } catch (eInv) {
+                                log("[-] Error invoking GetRegionInfo callback: " + eInv.message);
+                            }
+                        }
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on NetworkControl.GetRegionInfo (0xC07628)!");
+                } catch (eGri) {
+                    log("[-] Error hooking GetRegionInfo: " + eGri.message);
                 }
 
                 // InventoryScene.OnRecommend (0x105B4F4) -> Smart Recommend material selection
@@ -9520,35 +9578,6 @@ function initIl2Cpp(module) {
                     } else {
                         log("[-] Warning: IntensifyCallback pointer is NULL!");
                     }
-                }
-
-                // 1. Bypass card use check: CardControl.Data.get_IsCardUseType (0xE43660) -> return 1
-                try {
-                    Interceptor.replace(baseAddr.add(0xE43660), new NativeCallback(function(thiz) {
-                        return 1;
-                    }, "bool", ["pointer"]));
-                    log("[+] Interceptor.replace installed on CardControl.Data.get_IsCardUseType (0xE43660)!");
-                } catch (eIcut) {
-                    log("[-] Error replacing get_IsCardUseType: " + eIcut.message);
-                }
-
-                // 2. PreloadTexture (0xAD2A48) -> immediately trigger callback offline
-                try {
-                    Interceptor.replace(baseAddr.add(0xAD2A48), new NativeCallback(function(enumerator, callback) {
-                        log("[🖼️ PRELOAD TEXTURE] PreloadTexture intercepted offline! callback: " + callback);
-                        if (!callback.isNull()) {
-                            try {
-                                var actionInvokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer"]);
-                                actionInvokeFn(callback);
-                                log("[🖼️ PRELOAD TEXTURE] Action callback invoked successfully!");
-                            } catch (eAct) {
-                                log("[-] Error invoking PreloadTexture callback: " + eAct.message);
-                            }
-                        }
-                    }, "void", ["pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on PreloadTexture (0xAD2A48)!");
-                } catch (ePt) {
-                    log("[-] Error replacing PreloadTexture: " + ePt.message);
                 }
 
                 // 3. InventoryControl.Intensify (0xF1DCCC) -> offline intensify execution
@@ -9982,6 +10011,40 @@ function initIl2Cpp(module) {
                         } else if (cmdRaw === "try") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
                                 log("[⚡ TRY CMD] Triggering InventoryScene.OnIntensifyTry directly!");
+                                // Verify target card & materials before try
+                                var tCard = curScene.add(0x88).readPointer();
+                                if (!tCard.isNull()) {
+                                    var tRaw = tCard.add(0x10).readPointer();
+                                    if (!tRaw.isNull()) {
+                                        var tcId = tRaw.add(0x20).readS32();
+                                        var tCcd = getOrCreateCardControlData(tcId);
+                                        tCard.add(0x18).writePointer(tCcd || NULL);
+                                        var tGr = tRaw.add(0x24).readS32();
+                                        var tLvl = tRaw.add(0x1C).readS16();
+                                        var tCode = (tGr < 4) ? (tGr * 5 + Math.min(4, tLvl - 1)) : (20 + Math.min(98, tLvl - 1));
+                                        tCard.add(0x20).writeS16(tCode);
+                                    }
+                                }
+                                var matList = curScene.add(0xA0).readPointer();
+                                if (!matList.isNull()) {
+                                    var mCount = matList.add(0x18).readS32();
+                                    var mItems = matList.add(0x10).readPointer();
+                                    for (var m = 0; m < mCount; m++) {
+                                        var mItem = mItems.add(0x20 + m * 8).readPointer();
+                                        if (mItem && !mItem.isNull()) {
+                                            var mRaw = mItem.add(0x10).readPointer();
+                                            if (!mRaw.isNull()) {
+                                                var mcId = mRaw.add(0x20).readS32();
+                                                var mccd = getOrCreateCardControlData(mcId);
+                                                mItem.add(0x18).writePointer(mccd || NULL);
+                                                var mgr = mRaw.add(0x24).readS32();
+                                                var mlvl = mRaw.add(0x1C).readS16();
+                                                var mfCode = (mgr < 4) ? (mgr * 5 + Math.min(4, mlvl - 1)) : (20 + Math.min(98, mlvl - 1));
+                                                mItem.add(0x20).writeS16(mfCode);
+                                            }
+                                        }
+                                    }
+                                }
                                 var onTryFn = new NativeFunction(baseAddr.add(0x105BA9C), "void", ["pointer"]);
                                 onTryFn(curScene);
                             }
@@ -9998,9 +10061,26 @@ function initIl2Cpp(module) {
                                 var target = curScene.add(0x88).readPointer();
                                 var matListPtr = curScene.add(0xA0).readPointer();
                                 var dcl = curScene.add(0x58).readPointer();
+                                var sv = curScene.add(0x48).readPointer();
+                                var bbs = (!sv.isNull()) ? sv.add(0xC0).readPointer() : NULL;
                                 var matCount = (!matListPtr.isNull()) ? matListPtr.add(0x18).readS32() : 0;
                                 var dclCount = (!dcl.isNull()) ? dcl.add(0x18).readS32() : 0;
-                                log("[🔍 MAT_DIAG] target=" + target + ", matListCount=" + matCount + ", dclCount=" + dclCount + ", extractType=" + curScene.add(0x50).readS32());
+                                var tCard = (!target.isNull()) ? target.add(0x18).readPointer() : NULL;
+                                var tCode = (!target.isNull()) ? target.add(0x20).readS16() : -1;
+                                log("[🔍 MAT_DIAG] target=" + target + " (Card=" + tCard + ", Code=" + tCode + "), matListCount=" + matCount + ", sv=" + sv + ", bbs=" + bbs + ", extractType=" + curScene.add(0x50).readS32());
+                            }
+                        } else if (cmdRaw === "reload_script") {
+                            try {
+                                var srcF = new File("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/libscript.js", "rb");
+                                var content = srcF.read();
+                                srcF.close();
+                                var dstF = new File("/data/data/com.dalcomsoft.sslo/files/libscript.js", "wb");
+                                dstF.write(content);
+                                dstF.flush();
+                                dstF.close();
+                                log("[🔄 RELOAD] Copied external libscript.js to internal! Frida will hot-reload.");
+                            } catch (eRel) {
+                                log("[-] Reload error: " + eRel.message);
                             }
 
                         } else if (cmdRaw === "equip") {
