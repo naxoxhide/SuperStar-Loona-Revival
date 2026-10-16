@@ -9388,6 +9388,36 @@ function initIl2Cpp(module) {
                     log("[-] Error hooking GetRegionInfo: " + eGri.message);
                 }
 
+                // EntryScene auto-advance byte patches
+                try {
+                    // 1. EntryScene.get_IsAllCompleted (0xE20628) -> mov w0, #1; ret
+                    Memory.protect(baseAddr.add(0xE20628), 8, "rwx");
+                    baseAddr.add(0xE20628).writeU32(0x52800020); // mov w0, #1
+                    baseAddr.add(0xE2062C).writeU32(0xD65F03C0); // ret
+                    log("[+] Byte patch on EntryScene.get_IsAllCompleted (0xE20628): mov w0, #1; ret");
+
+                    // 2. EntryScene.<SetStateWait>b__11_0 (0xE20A90) -> nop (0x1F2003D5)
+                    // Bypasses the keepNetCtrlState mismatch jump to #0xe20ab0
+                    Memory.protect(baseAddr.add(0xE20A90), 4, "rwx");
+                    baseAddr.add(0xE20A90).writeU32(0x1F2003D5); // nop
+                    log("[+] Byte patch on EntryScene.<SetStateWait>b__11_0 (0xE20A90): nop (bypass net state check)");
+                } catch (eEntryPatch) {
+                    log("[-] Error applying EntryScene patches: " + eEntryPatch.message);
+                }
+
+                // 3. AssetControl.IsAndroidOBBPath (0xAE0D70) -> mov w0, #0; ret
+                // Bypasses non-existent Google Play OBB expansion check in Startup.OnStart
+                try {
+                    Memory.protect(baseAddr.add(0xAE0D70), 8, "rwx");
+                    baseAddr.add(0xAE0D70).writeU32(0x52800000); // mov w0, #0
+                    baseAddr.add(0xAE0D74).writeU32(0xD65F03C0); // ret
+                    log("[+] Byte patch on AssetControl.IsAndroidOBBPath (0xAE0D70): mov w0, #0; ret (bypass OBB extraction)");
+                } catch (eObb) {
+                    log("[-] Error patching IsAndroidOBBPath: " + eObb.message);
+                }
+
+
+
                 // InventoryScene.OnRecommend (0x105B4F4) -> Smart Recommend material selection
                 try {
                     Interceptor.replace(baseAddr.add(0x105B4F4), new NativeCallback(function(sceneThis) {
@@ -10177,6 +10207,12 @@ function initIl2Cpp(module) {
                 Interceptor.attach(baseAddr.add(0xD55EE8), {
                     onEnter: function (args) {
                         sceneUpdateCounter++;
+                        if (pendingSceneCommand) {
+                            var cmd = pendingSceneCommand;
+                            pendingSceneCommand = null;
+                            log("[🚀 SCENE CONTROL DISPATCH] Executing '" + cmd + "' from SceneControl.Update!");
+                            executeSceneCommand(cmd, NULL);
+                        }
                         try {
                             var klassPtr = baseAddr.add(0x3146538).readPointer();
                             if (klassPtr.isNull()) return;
@@ -10533,6 +10569,7 @@ function initIl2Cpp(module) {
         }
     }
     installNativeRvaHooks(il2cppBase);
+    log("[DEBUG] installNativeRvaHooks returned successfully!");
 
     function getClass(assemblyName, namespaceName, className) {
         if (!className) return NULL;
@@ -10599,11 +10636,20 @@ function initIl2Cpp(module) {
     }
 
     var hooksInstalled = false;
+    var csPollCount = 0;
     function installCSharpHooks() {
         if (hooksInstalled) return true;
         var domain = il2cpp_domain_get ? il2cpp_domain_get() : NULL;
         if (!domain || domain.isNull()) {
             return false;
+        }
+        if (il2cpp_thread_attach) {
+            try { il2cpp_thread_attach(domain); } catch (e) {}
+        }
+
+        csPollCount++;
+        if (csPollCount <= 5 || csPollCount % 30 === 0) {
+            log("[🔍 CS POLL #" + csPollCount + "] domain=" + domain + ", checking Application class...");
         }
 
         var appClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Application");
@@ -10611,6 +10657,9 @@ function initIl2Cpp(module) {
             appClass = getClass("UnityEngine", "UnityEngine", "Application");
         }
         if (!appClass || appClass.isNull()) {
+            if (csPollCount <= 5 || csPollCount % 30 === 0) {
+                log("[🔍 CS POLL #" + csPollCount + "] appClass is NULL! Will retry...");
+            }
             return false;
         }
 
@@ -11711,22 +11760,23 @@ function initIl2Cpp(module) {
         hooksInstalled = true;
         log("[✅] All SSLO Dynamic Revival & Logging Hooks Successfully Installed!");
     }
+    log("[DEBUG] Starting C# hook setup section at end of initIl2Cpp!");
 
-    var initPtr = Module.findExportByName("libil2cpp.so", "il2cpp_init");
-    if (initPtr) {
-        Interceptor.attach(initPtr, {
-            onLeave: function (retval) {
-                log("[🎉 IL2CPP RUNTIME INITIALIZED] il2cpp_init returned! Installing C# hooks...");
-                installCSharpHooks();
+    try {
+        log("[DEBUG] Inside try block before installCSharpHooks poll!");
+        try { installCSharpHooks(); } catch (eDirect) { log("[-] Direct install error: " + eDirect.message); }
+        var pollInterval = setInterval(function () {
+            try {
+                if (hooksInstalled) {
+                    clearInterval(pollInterval);
+                } else {
+                    installCSharpHooks();
+                }
+            } catch (ePoll) {
+                log("[-] Error in C# hooks poll: " + ePoll.message);
             }
-        });
+        }, 100);
+    } catch (eTop) {
+        log("[-] Fatal error initializing C# hook dispatch: " + eTop.message);
     }
-
-    var pollInterval = setInterval(function () {
-        if (hooksInstalled) {
-            clearInterval(pollInterval);
-        } else {
-            installCSharpHooks();
-        }
-    }, 100);
 }
