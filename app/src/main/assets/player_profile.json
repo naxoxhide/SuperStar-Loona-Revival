@@ -169,6 +169,83 @@
             "isEquip": false,
             "isLock": false,
             "isPrism": false
+        },
+        {
+            "objectID": 100015,
+            "cardID": 1003,
+            "grade": 0,
+            "level": 1,
+            "energy": 10,
+            "score": 10,
+            "isEquip": false,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100016,
+            "cardID": 1004,
+            "grade": 0,
+            "level": 1,
+            "energy": 10,
+            "score": 10,
+            "isEquip": false,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100017,
+            "cardID": 1005,
+            "grade": 1,
+            "level": 1,
+            "energy": 25,
+            "score": 25,
+            "isEquip": false,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100018,
+            "cardID": 1006,
+            "grade": 1,
+            "level": 1,
+            "energy": 25,
+            "score": 25,
+            "isEquip": false,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100019,
+            "cardID": 1007,
+            "grade": 2,
+            "level": 1,
+            "energy": 40,
+            "score": 40,
+            "isEquip": false,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100020,
+            "cardID": 1008,
+            "grade": 3,
+            "level": 1,
+            "energy": 71,
+            "score": 65,
+            "isEquip": false,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100021,
+            "cardID": 1009,
+            "grade": 4,
+            "level": 1,
+            "energy": 100,
+            "score": 101,
+            "isEquip": false,
+            "isLock": false,
+            "isPrism": false
         }
     ],
     "equipedCards": {

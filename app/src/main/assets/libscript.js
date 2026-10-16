@@ -5535,8 +5535,45 @@ function initIl2Cpp(module) {
                                         var cCell = acvData.add(0x20 + cIdx * 8).readPointer();
                                         if (cCell.isNull()) continue;
                                         var dIdx = cCell.add(0x24).readS32();
-                                        if (dIdx >= 0 && dIdx < filteredItems.length) {
+                                        var cGo = getGoFnBase(cCell, NULL);
+                                        if (dIdx >= 0 && dIdx < filteredItems.length && cIdx < filteredItems.length) {
+                                            if (!cGo.isNull()) setActFnBase(cGo, 1, NULL);
                                             updateSingleCell(cCell, filteredItems[dIdx], dIdx, (dIdx === 0));
+                                        } else {
+                                            if (!cGo.isNull()) setActFnBase(cGo, 0, NULL);
+                                        }
+                                    }
+
+                                    // Deactivate any duplicate or stray children in container (e.g. ghost cells at pos=3)
+                                    var container = scroller.add(0xC8).readPointer();
+                                    if (!container.isNull()) {
+                                        var dGetChild = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                                        var dChildCount = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
+                                        var padF = scroller.add(0xF0).readPointer();
+                                        var padL = scroller.add(0xF8).readPointer();
+                                        var trFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                        var padFT = (!padF.isNull()) ? trFn(padF, NULL) : NULL;
+                                        var padLT = (!padL.isNull()) ? trFn(padL, NULL) : NULL;
+
+                                        var wantedTrs = [];
+                                        for (var w = 0; w < filteredItems.length && w < acvCount; w++) {
+                                            var wCell = acvData.add(0x20 + w * 8).readPointer();
+                                            if (!wCell.isNull()) {
+                                                var wTr = trFn(wCell, NULL);
+                                                if (!wTr.isNull()) wantedTrs.push(wTr.toString());
+                                            }
+                                        }
+
+                                        var nChild = dChildCount(container, NULL);
+                                        for (var ch = 0; ch < nChild; ch++) {
+                                            var chT = dGetChild(container, ch, NULL);
+                                            if (chT.isNull()) continue;
+                                            if ((!padFT.isNull() && chT.equals(padFT)) || (!padLT.isNull() && chT.equals(padLT))) continue;
+                                            var chGo = getGoFnBase(chT, NULL);
+                                            if (chGo.isNull()) continue;
+                                            if (wantedTrs.indexOf(chT.toString()) === -1) {
+                                                setActFnBase(chGo, 0, NULL);
+                                            }
                                         }
                                     }
                                 }
@@ -5877,6 +5914,80 @@ function initIl2Cpp(module) {
                         }
                     } catch (eDiag) {
                         log("[-] Error in diagCarousel: " + eDiag.message);
+                    }
+                };
+
+                var diagMaterialView = function(sceneThis) {
+                    try {
+                        var dGo = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var dTr = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                        var dActSelf = new NativeFunction(baseAddr.add(0x1DBAE44), "bool", ["pointer", "pointer"]);
+                        var dEnabled = new NativeFunction(baseAddr.add(0x1DB3CBC), "bool", ["pointer", "pointer"]);
+                        var dRect = new NativeFunction(baseAddr.add(0x180D6E0), ["float", "float", "float", "float"], ["pointer", "pointer"]);
+                        var dPos = new NativeFunction(baseAddr.add(0x180DE48), ["float", "float", "float"], ["pointer", "pointer"]);
+                        var dSize = new NativeFunction(baseAddr.add(0x180DB70), ["float", "float"], ["pointer", "pointer"]);
+                        var dScale = new NativeFunction(baseAddr.add(0x181DF78), ["float", "float", "float"], ["pointer", "pointer"]);
+                        var dChildCount = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
+                        var dGetChild = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                        var dName = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                        var f2 = function(a) { return a.map(function(v) { return v.toFixed(1); }).join(","); };
+
+                        var sceneView = sceneThis.add(0x48).readPointer();
+                        if (sceneView.isNull()) return;
+                        var intensifyView = sceneView.add(0x68).readPointer();
+                        log("[🧪 DIAG MAT] intensifyView=" + intensifyView);
+                        if (intensifyView.isNull()) return;
+
+                        var ivGo = dGo(intensifyView, NULL);
+                        var ivTr = dTr(intensifyView, NULL);
+                        log("[🧪 DIAG MAT] intensifyView: GOact=" + (!ivGo.isNull() ? dActSelf(ivGo, NULL) : false) + " RT pos=[" + f2(dPos(ivTr, NULL)) + "] size=[" + f2(dSize(ivTr, NULL)) + "]");
+
+                        var matList = intensifyView.add(0x40).readPointer();
+                        log("[🧪 DIAG MAT] materialList=" + matList);
+                        if (matList.isNull()) return;
+
+                        var count = matList.add(0x18).readS32();
+                        var items = matList.add(0x10).readPointer();
+                        log("[🧪 DIAG MAT] Material slot count=" + count);
+
+                        var dumpTree = function(trNode, depth) {
+                            if (trNode.isNull()) return;
+                            var indent = "  ";
+                            for (var d = 0; d < depth; d++) indent += "  ";
+                            var numChildren = dChildCount(trNode, NULL);
+                            for (var k = 0; k < numChildren; k++) {
+                                var chTr = dGetChild(trNode, k, NULL);
+                                var chNm = readIl2CppString(dName(chTr, NULL));
+                                var chG = dGo(chTr, NULL);
+                                var chAct = (!chG.isNull()) ? dActSelf(chG, NULL) : false;
+                                log("[🧪 DIAG MAT]" + indent + "child[" + k + "] '" + chNm + "' act=" + chAct + " pos=[" + f2(dPos(chTr, NULL)) + "] size=[" + f2(dSize(chTr, NULL)) + "]");
+                                if (depth < 3) dumpTree(chTr, depth + 1);
+                            }
+                        };
+
+                        for (var i = 0; i < count; i++) {
+                            var matView = items.add(0x20 + i * 8).readPointer();
+                            if (matView.isNull()) continue;
+                            var emptyImg = matView.add(0x38).readPointer();
+                            var effectGo = matView.add(0x40).readPointer();
+                            var enabledGo = matView.add(0x48).readPointer();
+                            var flowName = matView.add(0x50).readPointer();
+                            var cardSmall = matView.add(0x58).readPointer();
+                            var mountGo = matView.add(0x60).readPointer();
+
+                            var tr = dTr(matView, NULL);
+                            log("[🧪 DIAG MAT] Slot[" + i + "]: matView=" + matView + " RT pos=[" + f2(dPos(tr, NULL)) + "] size=[" + f2(dSize(tr, NULL)) + "]");
+                            if (!emptyImg.isNull()) {
+                                var eGo = dGo(emptyImg, NULL);
+                                var eTr = dTr(emptyImg, NULL);
+                                var eSpr = emptyImg.add(0xD8).readPointer();
+                                log("[🧪 DIAG MAT]   emptyImg: en=" + dEnabled(emptyImg, NULL) + " GOact=" + (!eGo.isNull() ? dActSelf(eGo, NULL) : false) +
+                                    " sprite=" + eSpr + " size=[" + f2(dSize(eTr, NULL)) + "] pos=[" + f2(dPos(eTr, NULL)) + "]");
+                            }
+                            dumpTree(tr, 1);
+                        }
+                    } catch (eDm) {
+                        log("[-] Error in diagMaterialView: " + eDm.message);
                     }
                 };
 
@@ -6477,7 +6588,16 @@ function initIl2Cpp(module) {
                             var curState = (scene && !scene.isNull()) ? scene.add(0x24).readS32() : 5;
                             var isInspected = (curState === 6 && dataIdx === 0);
                             if (cardItem && !cardItem.isNull()) {
+                                var getGoFnBase = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                var setActFnBase = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                var cGo = getGoFnBase(cell, NULL);
+                                if (!cGo.isNull()) setActFnBase(cGo, 1, NULL);
                                 updateSingleCell(cell, cardItem, dataIdx, isInspected);
+                            } else {
+                                var getGoFnBase = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                var setActFnBase = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                var cGo = getGoFnBase(cell, NULL);
+                                if (!cGo.isNull()) setActFnBase(cGo, 0, NULL);
                             }
                         } catch (eRcv) {
                             log("[-] Error in RefreshCellView replacement: " + eRcv.message);
@@ -8072,7 +8192,15 @@ function initIl2Cpp(module) {
                         0x2FE097C: "Prism",
                         0x2FE097B: "Group",
                         0x2FE097A: "Material Card",
-                        0x2FE097E: "Lock"
+                        0x2FE097E: "Lock",
+                        0x3029D59: "Material Card",
+                        0x302A141: "RECOMMEND",
+                        0x302A142: "TRY",
+                        0x3029D5A: "Probability of Power Up: ",
+                        0x3029D5B: "Low",
+                        0x3029D5C: "Normal",
+                        0x3029D5D: "High",
+                        0x3029D5E: "Very High"
                     };
 
                     Interceptor.attach(baseAddr.add(0xCF1064), {
@@ -8086,8 +8214,32 @@ function initIl2Cpp(module) {
                         }
                     });
                     log("[+] Hooked LanguageControl.GetString (0xCF1064) with offline fallbacks!");
+
+                    // InvenMaterialView.Refresh (0xF22504) -> style empty slot box container
+                    Interceptor.attach(baseAddr.add(0xF22504), {
+                        onEnter: function (args) {
+                            this.matView = args[0];
+                            this.paramsPtr = args[1];
+                        },
+                        onLeave: function (retval) {
+                            try {
+                                if (!this.matView || this.matView.isNull()) return;
+                                var emptyImg = this.matView.add(0x38).readPointer();
+                                if (!emptyImg.isNull()) {
+                                    // Set subtle card slot container tint: rgba(0.2, 0.25, 0.45, 0.15)
+                                    emptyImg.add(0x20).writeFloat(0.25); // r
+                                    emptyImg.add(0x24).writeFloat(0.30); // g
+                                    emptyImg.add(0x28).writeFloat(0.50); // b
+                                    emptyImg.add(0x2C).writeFloat(0.18); // a
+                                    emptyImg.add(0x60).writeU8(1); // m_VertsDirty
+                                    emptyImg.add(0x61).writeU8(1); // m_MaterialDirty
+                                }
+                            } catch (eMvr) {}
+                        }
+                    });
+                    log("[+] Hooked InvenMaterialView.Refresh (0xF22504) for empty slot box styling!");
                 } catch (eLg) {
-                    log("[-] Error hooking LanguageControl.GetString: " + eLg.message);
+                    log("[-] Error hooking LanguageControl.GetString / InvenMaterialView: " + eLg.message);
                 }
 
                 // --- Protect UserData.get_CardInvenMaxCount (0xAB1C1C) & InventoryControl.get_CardMapCount (0xF275E8) ---
@@ -9183,6 +9335,8 @@ function initIl2Cpp(module) {
                             }
                         } else if (cmdRaw === "diag") {
                             if (curScene && !curScene.isNull() && sceneId === 4) diagCarousel(curScene);
+                        } else if (cmdRaw === "diag_mat") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) diagMaterialView(curScene);
                         } else if (cmdRaw === "change") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
                                 log("[🗃️ CHANGE CMD] Triggering OnChange directly!");

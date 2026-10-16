@@ -2220,6 +2220,56 @@ En el motor Dalcomsoft, los atributos, bonificaciones, precios y probabilidades 
    - Comprobación visual en emulador: cartas A1 renderizan Score 40 / Energy 40; cartas R50 renderizan Score 199 / Energy 100 con total fidelidad.
    - Apertura verificada de `InvenCardIntensifyView` (con 5 ranuras de material, etiqueta de probabilidad, botón RECOMMEND y botón TRY con costo de RP).
 
+### 24.5. Depuración Visual, Ranuras de Material Cards y Soporte Multirango (C, B, A, S, R)
+
+1. **Resolución de la Celda Fantasma en el Carrusel Inferior:**
+   - **Diagnóstico:** En la vista de inspección/intensify, el carrusel horizontal inferior (`InventoryScene.cardCarousel` y celdas `InvenCardCellView`) reutilizaba objetos de celda reciclados (`FastArray` de celdas). Cuando el número de cartas filtradas era menor que la capacidad del buffer de reciclaje, o cuando una celda quedaba con `cardItem == NULL`, el sprite base de la carta permanecía visible detrás de la primera celda activa, mostrando una carta vacía/sin diseño.
+   - **Solución Implementada en `libscript.js`:**
+     - En `safeUpdateLowerCarousel`: Al actualizar los índices visibles, cualquier celda cuyo índice virtual exceda `filteredItems.length` se desactiva explícitamente (`cellObj.SetActive(0)`).
+     - Hook en `InvenCardCellView.RefreshCellView` (RVA `0xF2136C`): Se intercepta la ejecución para verificar si el puntero `cardItem` (offset `+0x40`) es nulo o inválido; de ser así, se oculta inmediatamente la celda con `cellView.get_gameObject().SetActive(0)`.
+   - **Resultado Visual:** El inventario inferior queda 100% limpio sin artefactos ni cartas fantasma detrás de la primera carta seleccionada.
+
+2. **Investigación y Diseño de Ranuras Vacías en `Material Card` (`InvenMaterialView`):**
+   - **Estructura Interna de `InvenMaterialView` (TypeDefIndex: 13988):**
+     - `+0x38`: `Image empty` (Componente `UnityEngine.UI.Image` de dimensiones `98.0 x 136.0` en coordenadas locales `[0, 36]`).
+     - `+0x40`: `Transform parent` (Contenedor base).
+     - `+0x48`: `GameObject enabled` (Elemento hijo que contiene la barra horizontal y la estrella sombreada).
+     - `+0x50`: `GameObject disabled` (Estado deshabilitado).
+     - `+0x58`: `CardSmallView card` (Instancia de la carta miniatura montada en el slot).
+     - `+0x60`: `GameObject mountObj` (Contenedor que aloja a `CardSmallView`).
+   - **Causa de las Ranuras Vacías sin Marco:** En el APK de Dalcomsoft, `emptyImg` (`+0x38`) no tenía un sprite asignado por defecto (`m_Sprite = NULL`), por lo que únicamente se dibujaba el subcomponente flotante de barra y estrella.
+   - **Estilización y Marco Oficial:**
+     - Se enganchó `InvenMaterialView.Refresh` (RVA `0xF22504`).
+     - Cuando la ranura está vacía (`cardItem == NULL`), se asigna a `emptyImg` la textura translúcida oficial con la marca de agua "SUPERSTAR LOONA" y marco de ranura (`rgba(0.25, 0.30, 0.50, 0.18)`), proporcionando un recuadro sobrio y coherente con el estilo de la interfaz Dalcomsoft.
+     - Cuando la ranura tiene una carta asignada, `emptyImg` y el subcomponente `enabled` se ocultan automáticamente (`SetActive(0)`), activándose `mountObj` para renderizar la carta completa.
+
+3. **Restauración de Textos y Botones de Localización:**
+   - Se completaron las claves de localización en `offlineLocaleStrings` dentro de `libscript.js`:
+     - `0x3029D59`: `"Material Card"` (título de sección).
+     - `0x302A141`: `"RECOMMEND"` (botón de recomendación automática).
+     - `0x302A142`: `"TRY"` (botón de ejecución de subida de nivel).
+     - `0x3029D5A`: `"Probability of Power Up: "` (etiqueta de tasa de éxito).
+     - `0x3029D5B..0x3029D5E`: Niveles de probabilidad (`"Low"`, `"Normal"`, `"High"`, `"Very High"`).
+
+4. **Inyección de Cartas de Prueba Multirango (C, B, A, S, R) en `player_profile.json`:**
+   - Se agregaron 7 cartas no equipadas (`isEquip: false`, `isLock: false`) abarcando todo el espectro de rangos para validar el comportamiento del motor:
+     - `100015`: HaSeul (C1, Score: 10, Energy: 10).
+     - `100016`: YeoJin (C1, Score: 10, Energy: 10).
+     - `100017`: ViVi (B1, Score: 25, Energy: 25).
+     - `100018`: Kim Lip (B1, Score: 25, Energy: 25).
+     - `100019`: JinSoul (A1, Score: 40, Energy: 40).
+     - `100020`: Choerry (S1, Score: 65, Energy: 71).
+     - `100021`: Yves (R1, Score: 101, Energy: 100).
+   - El inventario ahora cuenta con 21 cartas sincronizadas tanto en assets como en `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/player_profile.json`.
+
+5. **Validación Visual de Cartas Material Asignadas:**
+   - Al pulsar el botón `RECOMMEND` (`InventoryScene.OnRecommend` @ RVA `0x105B4F4`):
+     - El algoritmo original selecciona de inmediato las 5 cartas de menor rango disponibles: Ranuras 0 y 1 con Grado C (HaSeul, YeoJin; marco plata metálico con insignia 'C'), Ranuras 2 y 3 con Grado B (ViVi, Kim Lip; marco bronce/rojo con insignia 'B'), y Ranura 4 con Grado A (JinSoul; marco morado con insignia 'A').
+     - Se calcula dinámicamente el precio total en Rhythm Points: `(R) 1.404` basado en la matriz de `cid.bin`.
+     - Las cartas pequeñas en cada una de las 5 ranuras renderizan perfectamente sus marcos vectoriales oficiales, estrellas, insignias de rango y retratos sin solapamientos ni desalineaciones.
+   - Evidencias gráficas registradas en [screen_material_card_empty_styled.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_material_card_empty_styled.png), [screen_material_cards_mounted.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_material_cards_mounted.png) y [crop_material_slots_verified.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/crop_material_slots_verified.png).
+
+
 
 
 
