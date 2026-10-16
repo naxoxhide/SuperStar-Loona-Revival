@@ -9401,11 +9401,23 @@ function initIl2Cpp(module) {
                     Memory.protect(baseAddr.add(0xE20A90), 4, "rwx");
                     baseAddr.add(0xE20A90).writeU32(0x1F2003D5); // nop
                     log("[+] Byte patch on EntryScene.<SetStateWait>b__11_0 (0xE20A90): nop (bypass net state check)");
+
+                    // 3. EntryScene.<SetStateReady>b__8_0 (0xE2084C) -> b #0xe2055c (SetStateComplete)
+                    // Bypasses 0.3s wait, 4.0s video logo animation and server select checks, leaping straight to SetStateComplete
+                    Memory.protect(baseAddr.add(0xE2084C), 4, "rwx");
+                    baseAddr.add(0xE2084C).writeU32(0x17FFFF44); // b #0xe2055c
+                    log("[+] Byte patch on EntryScene.<SetStateReady>b__8_0 (0xE2084C): b #0xe2055c (fast advance to SetStateComplete)");
+
+                    // 4. ServerSelectControl.get_IsSelectableServer (0xAB9BD4) -> mov w0, #0; ret
+                    Memory.protect(baseAddr.add(0xAB9BD4), 8, "rwx");
+                    baseAddr.add(0xAB9BD4).writeU32(0x52800000); // mov w0, #0
+                    baseAddr.add(0xAB9BD8).writeU32(0xD65F03C0); // ret
+                    log("[+] Byte patch on ServerSelectControl.get_IsSelectableServer (0xAB9BD4): mov w0, #0; ret");
                 } catch (eEntryPatch) {
                     log("[-] Error applying EntryScene patches: " + eEntryPatch.message);
                 }
 
-                // 3. AssetControl.IsAndroidOBBPath (0xAE0D70) -> mov w0, #0; ret
+                // 5. AssetControl.IsAndroidOBBPath (0xAE0D70) -> mov w0, #0; ret
                 // Bypasses non-existent Google Play OBB expansion check in Startup.OnStart
                 try {
                     Memory.protect(baseAddr.add(0xAE0D70), 8, "rwx");
@@ -10202,6 +10214,47 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.attach installed on Scene.Update (0xD5330C) for main-thread command dispatch!");
                 } catch (eScUp) {
                     log("[-] Error attaching to Scene.Update: " + eScUp.message);
+                }
+
+                try {
+                    var unityMod = Process.findModuleByName("libunity.so");
+                    var nativeRenderPtr = unityMod ? unityMod.base.add(0x3AA730) : null;
+                    if (nativeRenderPtr) {
+                        Interceptor.attach(nativeRenderPtr, {
+                            onEnter: function (args) {
+                                if (pendingSceneCommand) {
+                                    var cmd = pendingSceneCommand;
+                                    pendingSceneCommand = null;
+                                    log("[🚀 UNITY MAIN DISPATCH] Executing '" + cmd + "' from nativeRender (0x3AA730)!");
+                                    executeSceneCommand(cmd, NULL);
+                                }
+                            }
+                        });
+                        log("[+] Interceptor.attach installed on libunity.so nativeRender (0x3AA730) for global main-thread command dispatch!");
+                    }
+                } catch (eNr) {
+                    log("[-] Error attaching to nativeRender: " + eNr.message);
+                }
+
+                // Startup & EntryScene boot lifecycle tracking hooks
+                try {
+                    Interceptor.attach(baseAddr.add(0xD202E4), {
+                        onEnter: function (args) { log("[🎬 BOOT] Startup.Awake called! this: " + args[0]); }
+                    });
+                    Interceptor.attach(baseAddr.add(0xD20468), {
+                        onEnter: function (args) { log("[🎬 BOOT] Startup.Start called! this: " + args[0]); }
+                    });
+                    Interceptor.attach(baseAddr.add(0xE20034), {
+                        onEnter: function (args) { log("[🎬 BOOT] EntryScene.OnOpen called! this: " + args[0]); }
+                    });
+                    Interceptor.attach(baseAddr.add(0xE2055C), {
+                        onEnter: function (args) { log("[🎬 BOOT] EntryScene.SetStateComplete called! this: " + args[0]); }
+                    });
+                    Interceptor.attach(baseAddr.add(0xE20C78), {
+                        onEnter: function (args) { log("[🎬 BOOT] EntryScene.<SetStateComplete>b__12_0 called! Transitioning to TitleScene..."); }
+                    });
+                } catch (eBootDiag) {
+                    log("[-] Error attaching boot diagnostics: " + eBootDiag.message);
                 }
 
                 Interceptor.attach(baseAddr.add(0xD55EE8), {
@@ -11760,23 +11813,21 @@ function initIl2Cpp(module) {
         hooksInstalled = true;
         log("[✅] All SSLO Dynamic Revival & Logging Hooks Successfully Installed!");
     }
-    log("[DEBUG] Starting C# hook setup section at end of initIl2Cpp!");
-
-    try {
-        log("[DEBUG] Inside try block before installCSharpHooks poll!");
-        try { installCSharpHooks(); } catch (eDirect) { log("[-] Direct install error: " + eDirect.message); }
-        var pollInterval = setInterval(function () {
-            try {
-                if (hooksInstalled) {
-                    clearInterval(pollInterval);
-                } else {
-                    installCSharpHooks();
-                }
-            } catch (ePoll) {
-                log("[-] Error in C# hooks poll: " + ePoll.message);
+    var initPtr = Module.findExportByName("libil2cpp.so", "il2cpp_init");
+    if (initPtr) {
+        Interceptor.attach(initPtr, {
+            onLeave: function (retval) {
+                log("[🎉 IL2CPP RUNTIME INITIALIZED] il2cpp_init returned! Installing C# hooks...");
+                installCSharpHooks();
             }
-        }, 100);
-    } catch (eTop) {
-        log("[-] Fatal error initializing C# hook dispatch: " + eTop.message);
+        });
     }
+
+    var pollInterval = setInterval(function () {
+        if (hooksInstalled) {
+            clearInterval(pollInterval);
+        } else {
+            installCSharpHooks();
+        }
+    }, 100);
 }
