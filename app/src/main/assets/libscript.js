@@ -9361,72 +9361,7 @@ function initIl2Cpp(module) {
                     log("[-] Error installing CardIntensifyControl hooks: " + eCicHooks.message);
                 }
 
-                // NetworkControl.GetRegionInfo (0xC07628) -> Immediate callback execution offline to advance EntryScene to TitleScene
-                try {
-                    Interceptor.replace(baseAddr.add(0xC07628), new NativeCallback(function (callback, methodInfo) {
-                        log("[🌐 NETWORK] NetworkControl.GetRegionInfo (0xC07628) intercepted offline! Invoking callback immediately...");
-                        if (!callback.isNull()) {
-                            try {
-                                var methodPtr = callback.add(0x10).readPointer();
-                                var target = callback.add(0x20).readPointer();
-                                if (!methodPtr.isNull()) {
-                                    var cbFn = new NativeFunction(methodPtr, "void", ["pointer", "pointer"]);
-                                    cbFn(target, NULL);
-                                    log("[✅ NETWORK] GetRegionInfo callback executed directly!");
-                                } else {
-                                    var invokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer"]);
-                                    invokeFn(callback);
-                                    log("[✅ NETWORK] GetRegionInfo callback executed via 0x1DEBE44!");
-                                }
-                            } catch (eInv) {
-                                log("[-] Error invoking GetRegionInfo callback: " + eInv.message);
-                            }
-                        }
-                    }, "void", ["pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on NetworkControl.GetRegionInfo (0xC07628)!");
-                } catch (eGri) {
-                    log("[-] Error hooking GetRegionInfo: " + eGri.message);
-                }
 
-                // EntryScene auto-advance byte patches
-                try {
-                    // 1. EntryScene.get_IsAllCompleted (0xE20628) -> mov w0, #1; ret
-                    Memory.protect(baseAddr.add(0xE20628), 8, "rwx");
-                    baseAddr.add(0xE20628).writeU32(0x52800020); // mov w0, #1
-                    baseAddr.add(0xE2062C).writeU32(0xD65F03C0); // ret
-                    log("[+] Byte patch on EntryScene.get_IsAllCompleted (0xE20628): mov w0, #1; ret");
-
-                    // 2. EntryScene.<SetStateWait>b__11_0 (0xE20A90) -> nop (0x1F2003D5)
-                    // Bypasses the keepNetCtrlState mismatch jump to #0xe20ab0
-                    Memory.protect(baseAddr.add(0xE20A90), 4, "rwx");
-                    baseAddr.add(0xE20A90).writeU32(0x1F2003D5); // nop
-                    log("[+] Byte patch on EntryScene.<SetStateWait>b__11_0 (0xE20A90): nop (bypass net state check)");
-
-                    // 3. EntryScene.<SetStateReady>b__8_0 (0xE2084C) -> b #0xe2055c (SetStateComplete)
-                    // Bypasses 0.3s wait, 4.0s video logo animation and server select checks, leaping straight to SetStateComplete
-                    Memory.protect(baseAddr.add(0xE2084C), 4, "rwx");
-                    baseAddr.add(0xE2084C).writeU32(0x17FFFF44); // b #0xe2055c
-                    log("[+] Byte patch on EntryScene.<SetStateReady>b__8_0 (0xE2084C): b #0xe2055c (fast advance to SetStateComplete)");
-
-                    // 4. ServerSelectControl.get_IsSelectableServer (0xAB9BD4) -> mov w0, #0; ret
-                    Memory.protect(baseAddr.add(0xAB9BD4), 8, "rwx");
-                    baseAddr.add(0xAB9BD4).writeU32(0x52800000); // mov w0, #0
-                    baseAddr.add(0xAB9BD8).writeU32(0xD65F03C0); // ret
-                    log("[+] Byte patch on ServerSelectControl.get_IsSelectableServer (0xAB9BD4): mov w0, #0; ret");
-                } catch (eEntryPatch) {
-                    log("[-] Error applying EntryScene patches: " + eEntryPatch.message);
-                }
-
-                // 5. AssetControl.IsAndroidOBBPath (0xAE0D70) -> mov w0, #0; ret
-                // Bypasses non-existent Google Play OBB expansion check in Startup.OnStart
-                try {
-                    Memory.protect(baseAddr.add(0xAE0D70), 8, "rwx");
-                    baseAddr.add(0xAE0D70).writeU32(0x52800000); // mov w0, #0
-                    baseAddr.add(0xAE0D74).writeU32(0xD65F03C0); // ret
-                    log("[+] Byte patch on AssetControl.IsAndroidOBBPath (0xAE0D70): mov w0, #0; ret (bypass OBB extraction)");
-                } catch (eObb) {
-                    log("[-] Error patching IsAndroidOBBPath: " + eObb.message);
-                }
 
 
 
@@ -10216,25 +10151,7 @@ function initIl2Cpp(module) {
                     log("[-] Error attaching to Scene.Update: " + eScUp.message);
                 }
 
-                try {
-                    var unityMod = Process.findModuleByName("libunity.so");
-                    var nativeRenderPtr = unityMod ? unityMod.base.add(0x3AA730) : null;
-                    if (nativeRenderPtr) {
-                        Interceptor.attach(nativeRenderPtr, {
-                            onEnter: function (args) {
-                                if (pendingSceneCommand) {
-                                    var cmd = pendingSceneCommand;
-                                    pendingSceneCommand = null;
-                                    log("[🚀 UNITY MAIN DISPATCH] Executing '" + cmd + "' from nativeRender (0x3AA730)!");
-                                    executeSceneCommand(cmd, NULL);
-                                }
-                            }
-                        });
-                        log("[+] Interceptor.attach installed on libunity.so nativeRender (0x3AA730) for global main-thread command dispatch!");
-                    }
-                } catch (eNr) {
-                    log("[-] Error attaching to nativeRender: " + eNr.message);
-                }
+
 
                 // Startup & EntryScene boot lifecycle tracking hooks
                 try {
@@ -10692,29 +10609,27 @@ function initIl2Cpp(module) {
     var csPollCount = 0;
     function installCSharpHooks() {
         if (hooksInstalled) return true;
-        var domain = il2cpp_domain_get ? il2cpp_domain_get() : NULL;
-        if (!domain || domain.isNull()) {
-            return false;
-        }
-        if (il2cpp_thread_attach) {
-            try { il2cpp_thread_attach(domain); } catch (e) {}
-        }
-
-        csPollCount++;
-        if (csPollCount <= 5 || csPollCount % 30 === 0) {
-            log("[🔍 CS POLL #" + csPollCount + "] domain=" + domain + ", checking Application class...");
-        }
-
-        var appClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Application");
-        if (!appClass || appClass.isNull()) {
-            appClass = getClass("UnityEngine", "UnityEngine", "Application");
-        }
-        if (!appClass || appClass.isNull()) {
-            if (csPollCount <= 5 || csPollCount % 30 === 0) {
-                log("[🔍 CS POLL #" + csPollCount + "] appClass is NULL! Will retry...");
+        try {
+            var domain = il2cpp_domain_get ? il2cpp_domain_get() : NULL;
+            if (!domain || domain.isNull()) {
+                return false;
             }
-            return false;
-        }
+
+            csPollCount++;
+            if (csPollCount <= 5 || csPollCount % 30 === 0) {
+                log("[🔍 CS POLL #" + csPollCount + "] domain=" + domain + ", checking Application class...");
+            }
+
+            var appClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Application");
+            if (!appClass || appClass.isNull()) {
+                appClass = getClass("UnityEngine", "UnityEngine", "Application");
+            }
+            if (!appClass || appClass.isNull()) {
+                if (csPollCount <= 5 || csPollCount % 30 === 0) {
+                    log("[🔍 CS POLL #" + csPollCount + "] appClass is NULL! Will retry...");
+                }
+                return false;
+            }
 
         hooksInstalled = true;
         log("[🎉 INSTALLING C# IL2CPP HOOKS - DOMAIN FULLY READY] Domain: " + domain);
@@ -11812,7 +11727,12 @@ function initIl2Cpp(module) {
 
         hooksInstalled = true;
         log("[✅] All SSLO Dynamic Revival & Logging Hooks Successfully Installed!");
+        return true;
+    } catch (eCs) {
+        log("[-] installCSharpHooks error: " + eCs.message);
+        return false;
     }
+}
     var initPtr = Module.findExportByName("libil2cpp.so", "il2cpp_init");
     if (initPtr) {
         Interceptor.attach(initPtr, {
