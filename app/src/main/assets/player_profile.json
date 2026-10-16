@@ -1,0 +1,189 @@
+{
+    "userId": 10001,
+    "nickname": "Orbit",
+    "profileCode": 1001,
+    "diamond": 10000,
+    "rhythmPoint": 100000,
+    "headphone": 50,
+    "dalcomCoin": 5000,
+    "cardInvenMax": 200,
+    "equipedLobbyBgList": [
+        100001
+    ],
+    "leaderCard": {
+        "cardID": 1001,
+        "grade": 4,
+        "level": 50
+    },
+    "inventoryCards": [
+        {
+            "objectID": 100001,
+            "cardID": 1001,
+            "grade": 4,
+            "level": 50,
+            "energy": 100,
+            "score": 100,
+            "isEquip": true,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100002,
+            "cardID": 1002,
+            "grade": 4,
+            "level": 50,
+            "energy": 100,
+            "score": 100,
+            "isEquip": true,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100003,
+            "cardID": 1003,
+            "grade": 4,
+            "level": 50,
+            "energy": 100,
+            "score": 100,
+            "isEquip": true,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100004,
+            "cardID": 1004,
+            "grade": 4,
+            "level": 50,
+            "energy": 100,
+            "score": 100,
+            "isEquip": true,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100005,
+            "cardID": 1005,
+            "grade": 4,
+            "level": 50,
+            "energy": 100,
+            "score": 100,
+            "isEquip": true,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100006,
+            "cardID": 1006,
+            "grade": 4,
+            "level": 50,
+            "energy": 100,
+            "score": 100,
+            "isEquip": true,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100007,
+            "cardID": 1007,
+            "grade": 4,
+            "level": 50,
+            "energy": 100,
+            "score": 100,
+            "isEquip": true,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100008,
+            "cardID": 1008,
+            "grade": 4,
+            "level": 50,
+            "energy": 100,
+            "score": 100,
+            "isEquip": true,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100009,
+            "cardID": 1009,
+            "grade": 4,
+            "level": 50,
+            "energy": 100,
+            "score": 100,
+            "isEquip": true,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100010,
+            "cardID": 1010,
+            "grade": 4,
+            "level": 50,
+            "energy": 100,
+            "score": 100,
+            "isEquip": true,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100011,
+            "cardID": 1011,
+            "grade": 4,
+            "level": 50,
+            "energy": 100,
+            "score": 100,
+            "isEquip": true,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100012,
+            "cardID": 1012,
+            "grade": 4,
+            "level": 50,
+            "energy": 100,
+            "score": 100,
+            "isEquip": false,
+            "isLock": false,
+            "isPrism": true
+        },
+        {
+            "objectID": 100013,
+            "cardID": 1001,
+            "grade": 2,
+            "level": 1,
+            "energy": 50,
+            "score": 50,
+            "isEquip": false,
+            "isLock": false,
+            "isPrism": false
+        },
+        {
+            "objectID": 100014,
+            "cardID": 1002,
+            "grade": 3,
+            "level": 1,
+            "energy": 70,
+            "score": 70,
+            "isEquip": false,
+            "isLock": false,
+            "isPrism": false
+        }
+    ],
+    "equipedCards": {
+        "1001": [
+            100001,
+            100002,
+            100003,
+            100004,
+            100005,
+            100006,
+            100007,
+            100008,
+            100009,
+            100010,
+            100011
+        ]
+    }
+}
