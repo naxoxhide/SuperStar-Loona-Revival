@@ -6027,6 +6027,10 @@ function initIl2Cpp(module) {
                         // 2. Identify target card
                         var targetCard = sceneThis.add(0x88).readPointer();
                         if (targetCard.isNull()) targetCard = sceneThis.add(0x98).readPointer();
+                        if (!targetCard.isNull()) {
+                            sceneThis.add(0x88).writePointer(targetCard);
+                            sceneThis.add(0x98).writePointer(targetCard);
+                        }
                         var targetObjId = 0;
                         var targetGrade = 0;
                         var targetLevel = 1;
@@ -6094,6 +6098,8 @@ function initIl2Cpp(module) {
 
                         // 5. Ensure targetCard has valid Card backing field, IntensifyCode, and scene.selectedArtistData
                         if (!targetCard.isNull()) {
+                            sceneThis.add(0x88).writePointer(targetCard);
+                            sceneThis.add(0x98).writePointer(targetCard);
                             var rawT2 = targetCard.add(0x10).readPointer();
                             if (!rawT2.isNull()) {
                                 var tCardId2 = rawT2.add(0x20).readS32();
@@ -6145,6 +6151,16 @@ function initIl2Cpp(module) {
                         }
 
                         // 8. Refresh SetStateIntensify(false, false)
+                        if (!targetCard.isNull()) {
+                            sceneThis.add(0x88).writePointer(targetCard);
+                            sceneThis.add(0x98).writePointer(targetCard);
+                        }
+                        if (sceneThis.add(0xA8).readDouble() === 0.0) {
+                            sceneThis.add(0xA8).writeDouble(1.0);
+                        }
+                        if (sceneThis.add(0xB0).readDouble() === 0.0) {
+                            sceneThis.add(0xB0).writeDouble(1.0);
+                        }
                         var sv = sceneThis.add(0x48).readPointer();
                         var bbs = (!sv.isNull()) ? sv.add(0xC0).readPointer() : NULL;
                         log("[🔍 RECOMMEND BEFORE REFRESH] sceneView=" + sv + ", btnBoxSprites=" + bbs);
@@ -9485,6 +9501,8 @@ function initIl2Cpp(module) {
                                 var tCard = sceneThis.add(0x88).readPointer();
                                 if (tCard.isNull()) tCard = sceneThis.add(0x98).readPointer();
                                 if (!tCard.isNull()) {
+                                    sceneThis.add(0x88).writePointer(tCard);
+                                    sceneThis.add(0x98).writePointer(tCard);
                                     var tRaw = tCard.add(0x10).readPointer();
                                     if (!tRaw.isNull()) {
                                         var tcId = tRaw.add(0x20).readS32();
@@ -9510,7 +9528,34 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.attach(baseAddr.add(0x1056BCC), {
                         onEnter: function(args) {
+                            var sceneThis = args[0];
                             log("[⚡ INVENTORY] InventoryScene.SetStateIntensify called! isReload=" + args[1] + ", isUpdate=" + args[2]);
+                            try {
+                                var tCard = sceneThis.add(0x88).readPointer();
+                                if (tCard.isNull()) tCard = sceneThis.add(0x98).readPointer();
+                                if (!tCard.isNull()) {
+                                    sceneThis.add(0x88).writePointer(tCard);
+                                    sceneThis.add(0x98).writePointer(tCard);
+                                    var tRaw = tCard.add(0x10).readPointer();
+                                    if (!tRaw.isNull()) {
+                                        var tcId = tRaw.add(0x20).readS32();
+                                        var tCcd = getOrCreateCardControlData(tcId);
+                                        tCard.add(0x18).writePointer(tCcd || NULL);
+                                        var tGr = tRaw.add(0x24).readS32();
+                                        var tLvl = tRaw.add(0x1C).readS16();
+                                        var tCode = (tGr < 4) ? (tGr * 5 + Math.min(4, tLvl - 1)) : (20 + Math.min(98, tLvl - 1));
+                                        tCard.add(0x20).writeS16(tCode);
+                                    }
+                                }
+                                if (sceneThis.add(0xA8).readDouble() === 0.0) {
+                                    sceneThis.add(0xA8).writeDouble(1.0);
+                                }
+                                if (sceneThis.add(0xB0).readDouble() === 0.0) {
+                                    sceneThis.add(0xB0).writeDouble(1.0);
+                                }
+                            } catch (eSsi) {
+                                log("[-] Error in SetStateIntensify onEnter: " + eSsi.message);
+                            }
                         }
                     });
                 } catch (eSsi) {
