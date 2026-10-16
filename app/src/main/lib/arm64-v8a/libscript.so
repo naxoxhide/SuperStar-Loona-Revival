@@ -9404,52 +9404,56 @@ function initIl2Cpp(module) {
                     log("[-] Error installing CardIntensifyControl hooks: " + eCicHooks.message);
                 }
 
-                // 6. Safe offline overrides for IsMaterialCard, KeyVault and global exception logging
+                // 6. Safe offline overrides for KeyVault and global exception logging
                 try {
-                    // CardItem.get_IsMaterialCard (0xB55F08) -> returns false for normal inventory cards
-                    Interceptor.replace(baseAddr.add(0xB55F08), new NativeCallback(function(thiz) {
-                        return 0;
-                    }, "bool", ["pointer"]));
-
-                    // CardControl.Data.get_IsMaterial (0xE4340C) -> returns false
-                    Interceptor.replace(baseAddr.add(0xE4340C), new NativeCallback(function(thiz) {
-                        return 0;
-                    }, "bool", ["pointer"]));
-
-                    // KeyVault safe fallbacks
                     var dummyKeyVault = Memory.alloc(0x50);
                     var dummyGameControl = Memory.alloc(0x50);
                     dummyKeyVault.add(0x28).writePointer(dummyGameControl);
-                    Interceptor.replace(baseAddr.add(0x10613AC), new NativeCallback(function() {
-                        return dummyKeyVault;
-                    }, "pointer", []));
-                    Interceptor.replace(baseAddr.add(0x1061598), new NativeCallback(function() {
-                        return dummyGameControl;
-                    }, "pointer", []));
+
+                    try {
+                        Interceptor.replace(baseAddr.add(0x10613AC), new NativeCallback(function() {
+                            return dummyKeyVault;
+                        }, "pointer", []));
+                        log("[+] Interceptor.replace installed on KeyVault.get_Instance (0x10613AC)!");
+                    } catch (eKvInst) {
+                        log("[-] Error replacing KeyVault.get_Instance: " + eKvInst.message);
+                    }
+
+                    try {
+                        Interceptor.replace(baseAddr.add(0x1061598), new NativeCallback(function() {
+                            return dummyGameControl;
+                        }, "pointer", []));
+                        log("[+] Interceptor.replace installed on KeyVault.get_GameControlDataInfo (0x1061598)!");
+                    } catch (eKvGc) {
+                        log("[-] Error replacing KeyVault.get_GameControlDataInfo: " + eKvGc.message);
+                    }
 
                     // Global IL2CPP exception monitor (0x9C4B08)
-                    Interceptor.attach(baseAddr.add(0x9C4B08), {
-                        onEnter: function(args) {
-                            var exc = args[0];
-                            var lr = this.returnAddress;
-                            var off = lr.sub(baseAddr);
-                            var msg = "";
-                            try {
-                                if (!exc.isNull()) {
-                                    var msgStr = exc.add(0x10).readPointer();
-                                    if (!msgStr.isNull()) {
-                                        var len = msgStr.add(0x10).readS32();
-                                        msg = msgStr.add(0x14).readUtf16String(Math.min(len, 200));
+                    try {
+                        Interceptor.attach(baseAddr.add(0x9C4B08), {
+                            onEnter: function(args) {
+                                var exc = args[0];
+                                var lr = this.returnAddress;
+                                var off = lr.sub(baseAddr);
+                                var msg = "";
+                                try {
+                                    if (!exc.isNull()) {
+                                        var msgStr = exc.add(0x10).readPointer();
+                                        if (!msgStr.isNull()) {
+                                            var len = msgStr.add(0x10).readS32();
+                                            msg = msgStr.add(0x14).readUtf16String(Math.min(len, 200));
+                                        }
                                     }
-                                }
-                            } catch(e) {}
-                            log("[💥 IL2CPP EXCEPTION 0x9C4B08] Raised from RVA: " + off + " (LR=" + lr + ") msg: " + msg);
-                        }
-                    });
-
-                    log("[+] Safe IsMaterialCard and KeyVault hooks installed successfully!");
+                                } catch(e) {}
+                                log("[💥 IL2CPP EXCEPTION 0x9C4B08] Raised from RVA: " + off + " (LR=" + lr + ") msg: " + msg);
+                            }
+                        });
+                        log("[+] Global IL2CPP exception monitor installed (0x9C4B08)!");
+                    } catch (eExcMon) {
+                        log("[-] Error installing exception monitor: " + eExcMon.message);
+                    }
                 } catch (eMatSafe) {
-                    log("[-] Error installing safe IsMaterialCard hooks: " + eMatSafe.message);
+                    log("[-] Error installing safe KeyVault/Exception hooks: " + eMatSafe.message);
                 }
 
 
