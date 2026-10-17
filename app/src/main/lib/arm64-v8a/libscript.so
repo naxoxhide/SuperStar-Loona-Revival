@@ -492,39 +492,7 @@ function initIl2Cpp(module) {
             log("[-] Error hooking libc abort: " + e3.message);
         }
 
-        // Diagnostic trace for SetStateIntensify steps
-        try {
-            var stepPoints = [
-                { off: 0x1056BCC, name: "SetStateIntensify ENTRY" },
-                { off: 0x1056CE4, name: "bl SetState<STATE>(8)" },
-                { off: 0x1056E30, name: "bl CardIntensifyControl.Find (0x1381780)" },
-                { off: 0x1056E44, name: "bl List.Add" },
-                { off: 0x10570D8, name: "bl InventoryView.SetStateIntensify (0x1057B6C)" },
-                { off: 0x10570F4, name: "bl InvenCardSelectView.Params ctor (0x10572AC)" },
-                { off: 0x1057108, name: "bl InvenCardSelectView.Refresh (0xF22C34)" },
-                { off: 0x1057144, name: "bl InvenCardIntensifyView.Params ctor (0x1057C10)" },
-                { off: 0x1057168, name: "bl InvenCardIntensifyView.Refresh (0xF22024)" },
-                { off: 0x10571B4, name: "bl InvenCardView.Refresh (0xF233B8)" },
-                { off: 0x10571E8, name: "SetStateIntensify NULL CHECK FAILED (0x10571E8)" },
-                { off: 0x1057E30, name: "bl InvenMaterialView.Params ctor (0x105E33C)" },
-                { off: 0x105E430, name: "InvenMaterialView.Params NULL CHECK FAILED (0x105E430)" },
-                { off: 0x1057FEC, name: "InvenCardIntensifyView.Params NULL CHECK FAILED (0x1057FEC)" }
-            ];
-            stepPoints.forEach(function(sp) {
-                try {
-                    Interceptor.attach(baseAddr.add(sp.off), {
-                        onEnter: function() {
-                            log("[📍 STEP TRACE] " + sp.name + " reached! (RVA: 0x" + sp.off.toString(16) + ")");
-                        }
-                    });
-                } catch(eSp) {
-                    log("[-] Could not hook step " + sp.name + ": " + eSp.message);
-                }
-            });
-            log("[+] SetStateIntensify step tracer installed!");
-        } catch(eSt) {
-            log("[-] Error installing step tracer: " + eSt.message);
-        }
+        // SetStateIntensify step tracer removed to prevent mid-function ARM64 instruction clobbering
 
         try {
             // 1. Platform.<getRegion>b__0 (0xEF87D0) - Evitar ArgumentNullException de Newtonsoft
@@ -5369,7 +5337,7 @@ function initIl2Cpp(module) {
                                     regFn(sceneThis, clickedCardItem);
                                 }
                                 var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "bool", "bool"]);
-                                setStateIntensifyFn(sceneThis, 0, 0);
+                                setStateIntensifyFn(sceneThis, 0, 1);
                                 return;
                             }
 
@@ -6358,7 +6326,7 @@ function initIl2Cpp(module) {
                         var bbs = (!sv.isNull()) ? sv.add(0xC0).readPointer() : NULL;
                         log("[🔍 RECOMMEND BEFORE REFRESH] sceneView=" + sv + ", btnBoxSprites=" + bbs);
                         var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "bool", "bool"]);
-                        setStateIntensifyFn(sceneThis, 0, 0);
+                        setStateIntensifyFn(sceneThis, 0, 1);
                         log("[🎉 RECOMMEND COMPLETE] Registered " + pickCount + " material cards and refreshed view successfully!");
                     } catch (eRecExec) {
                         log("[-] Error in executeRecommend: " + eRecExec.message);
@@ -9518,13 +9486,13 @@ function initIl2Cpp(module) {
                             var subCode = parseInt(subCodeArg, 10);
                             if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) {
                                 try {
-                                    var slotVal = baseAddr.add(0x30F1E38).readPointer();
+                                    var slotVal = baseAddr.add(0x3144308).readPointer();
                                     if (!slotVal.isNull() && slotVal.compare(ptr(0x100000000)) > 0) {
                                         cachedCardIntensifyItemKlass = slotVal;
                                     } else {
                                         var classInitFn = new NativeFunction(baseAddr.add(0xA43BE8), 'void', ['pointer']);
-                                        classInitFn(baseAddr.add(0x30F1E38));
-                                        cachedCardIntensifyItemKlass = baseAddr.add(0x30F1E38).readPointer();
+                                        classInitFn(baseAddr.add(0x3144308));
+                                        cachedCardIntensifyItemKlass = baseAddr.add(0x3144308).readPointer();
                                     }
                                 } catch (eSlot) {}
                                 if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) {
