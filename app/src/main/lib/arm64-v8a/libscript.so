@@ -450,9 +450,32 @@ function initIl2Cpp(module) {
                     } catch (eBt) {}
                 }
             });
-            log("[+] Internal __cxa_throw monitor attached to 0xA8A284!");
         } catch(e2) {
             log("[-] Error hooking 0xA8A284: " + e2.message);
+        }
+
+        try {
+            var cxaPtr = Module.findExportByName(null, "__cxa_throw");
+            if (cxaPtr && !cxaPtr.isNull()) {
+                Interceptor.attach(cxaPtr, {
+                    onEnter: function(args) {
+                        var lr = this.returnAddress;
+                        var rvaStr = "";
+                        try { rvaStr = " (RVA " + lr.sub(baseAddr) + ")"; } catch(e) {}
+                        log("[💥 LIBC++ __cxa_throw] Called from: " + lr + rvaStr);
+                        try {
+                            var bt = Thread.backtrace(this.context, Backtracer.ACCURATE).map(function(addr) {
+                                try { return "  " + addr + " (RVA " + addr.sub(baseAddr) + ")"; }
+                                catch(e) { return "  " + addr; }
+                            }).join("\n");
+                            log("[💥 LIBC++ __cxa_throw] Backtrace:\n" + bt);
+                        } catch(eBt) {}
+                    }
+                });
+                log("[+] Hooked libc++ __cxa_throw successfully!");
+            }
+        } catch(eCxa) {
+            log("[-] Error hooking libc++ __cxa_throw: " + eCxa.message);
         }
 
         try {
@@ -6324,7 +6347,12 @@ function initIl2Cpp(module) {
                         }
                         var sv = sceneThis.add(0x48).readPointer();
                         var bbs = (!sv.isNull()) ? sv.add(0xC0).readPointer() : NULL;
-                        log("[🔍 RECOMMEND BEFORE REFRESH] sceneView=" + sv + ", btnBoxSprites=" + bbs);
+                        var selView = (!sv.isNull()) ? sv.add(0x48).readPointer() : NULL;
+                        var intView = (!sv.isNull()) ? sv.add(0x68).readPointer() : NULL;
+                        var cardView = (!sv.isNull()) ? sv.add(0x78).readPointer() : NULL;
+                        var sortView = (!sv.isNull()) ? sv.add(0x80).readPointer() : NULL;
+                        var btnBack = (!sv.isNull()) ? sv.add(0x88).readPointer() : NULL;
+                        log("[🔍 RECOMMEND BEFORE REFRESH] sv=" + sv + ", selView=" + selView + ", intView=" + intView + ", cardView=" + cardView + ", sortView=" + sortView + ", btnBack=" + btnBack);
                         var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "bool", "bool"]);
                         setStateIntensifyFn(sceneThis, 0, 1);
                         log("[🎉 RECOMMEND COMPLETE] Registered " + pickCount + " material cards and refreshed view successfully!");
@@ -7229,10 +7257,29 @@ function initIl2Cpp(module) {
                         } catch (e) { return 0; }
                     }, "bool", ["pointer"]));
 
+                    // get_IsMaterial (0xE4340C) -> false for regular idol cards
+                    Interceptor.replace(baseAddr.add(0xE4340C), new NativeCallback(function(thisPtr) {
+                        return 0;
+                    }, "bool", ["pointer"]));
+
                     // get_IsMaterialCard (0xB55F08) -> false for regular idol cards
                     Interceptor.replace(baseAddr.add(0xB55F08), new NativeCallback(function(thisPtr) {
                         return 0;
                     }, "bool", ["pointer"]));
+
+                    // KeyVault offline safe stubs:
+                    var dummyGameControlData = Memory.alloc(64);
+                    dummyGameControlData.add(0x10).writeS16(0);    // musicAutoSync = 0
+                    dummyGameControlData.add(0x14).writeS32(-1);   // materialCardGroup = -1
+                    Interceptor.replace(baseAddr.add(0x1061598), new NativeCallback(function() {
+                        return dummyGameControlData;
+                    }, "pointer", []));
+
+                    var dummyKeyVaultInstance = Memory.alloc(128);
+                    dummyKeyVaultInstance.add(0x28).writePointer(dummyGameControlData);
+                    Interceptor.replace(baseAddr.add(0x10613AC), new NativeCallback(function() {
+                        return dummyKeyVaultInstance;
+                    }, "pointer", []));
 
                     // get_IsRCard (0xB523E4)
                     Interceptor.replace(baseAddr.add(0xB523E4), new NativeCallback(function(thisPtr) {
@@ -7244,7 +7291,7 @@ function initIl2Cpp(module) {
                         } catch (e) { return 0; }
                     }, "bool", ["pointer"]));
 
-                    // get_IsMaxLevel (0xB52408)
+                    // get_IsMaxLevel (0xB52408) - R cards maxLevel is 99 in Dalcomsoft engine
                     Interceptor.replace(baseAddr.add(0xB52408), new NativeCallback(function(thisPtr) {
                         try {
                             if (!thisPtr || thisPtr.isNull()) return 0;
@@ -7252,12 +7299,12 @@ function initIl2Cpp(module) {
                             if (!raw || raw.isNull()) return 0;
                             var gr = raw.add(0x24).readS32();
                             var lvl = raw.add(0x1C).readS16();
-                            var maxLvl = (gr === 4) ? 50 : 5;
+                            var maxLvl = (gr === 4) ? 99 : 5;
                             return (lvl >= maxLvl) ? 1 : 0;
                         } catch (e) { return 0; }
                     }, "bool", ["pointer"]));
 
-                    log("[+] Safe CardItem getters installed!");
+                    log("[+] Safe CardItem and KeyVault getters installed!");
                 } catch (eSafeCi) {
                     log("[-] Error installing safe CardItem getters: " + eSafeCi.message);
                 }
