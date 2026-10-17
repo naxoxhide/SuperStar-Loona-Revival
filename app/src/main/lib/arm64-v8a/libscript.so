@@ -3876,13 +3876,16 @@ function initIl2Cpp(module) {
                     log("[+] Byte patch on GoogleSignInControl.Awake (0xB9B304): ret");
                 } catch (eGsi) {}
 
-                // Direct byte patches to disable Google Mobile Ads, Tapjoy, Stan's Assets, NotifyControl, Facebook, and AdMob crashes
+                // Direct byte patches to disable Google Mobile Ads, Tapjoy, Stan's Assets, NotifyControl, Facebook, DeepLink, and AdMob crashes
                 [
                     0xB17894, // TapjoyUnityInit.Awake -> ret
                     0xC108B0, // NotifyControl.Start -> ret
+                    0x1250674, // DeepLinkControl.Start -> ret
+                    0xD45408, // GoogleMobileAdsScript.Start -> ret
                     0xD45478, // GoogleMobileAdsScript.AddAdUnit -> ret
                     0xD45574, // GoogleMobileAdsScript.SetAdUnitId -> ret
                     0xD45BAC, // GoogleMobileAdsScript.InitADX -> ret
+                    0x25ADC04, // MobileAdsEventExecutor.Awake -> ret
                     0x12FE444, // SA.Android.Utilities.AN_Logger.Init -> ret
                     0x12FE4B0, // SA.Android.Utilities.AN_Logger.InitNativeLogger -> ret
                     0x1303434, // SA.Android.App.AN_PermissionsUtility.Init -> ret
@@ -3896,7 +3899,7 @@ function initIl2Cpp(module) {
                         baseAddr.add(rva).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
                     } catch (eGma) {}
                 });
-                log("[+] Byte patches on Tapjoy, NotifyControl, AdMob, Stan's Assets & Facebook applied: ret");
+                log("[+] Byte patches on Tapjoy, NotifyControl, DeepLink, AdMob, Stan's Assets & Facebook applied: ret");
 
                 // =========================================================================
                 // INVENTORY STABILIZATION HOOKS & PROXIES
