@@ -7257,56 +7257,86 @@ function initIl2Cpp(module) {
                         } catch (e) { return 0; }
                     }, "bool", ["pointer"]));
 
-                    // get_IsMaterial (0xE4340C) -> false for regular idol cards
-                    Interceptor.replace(baseAddr.add(0xE4340C), new NativeCallback(function(thisPtr) {
-                        return 0;
-                    }, "bool", ["pointer"]));
-
                     // get_IsMaterialCard (0xB55F08) -> false for regular idol cards
-                    Interceptor.replace(baseAddr.add(0xB55F08), new NativeCallback(function(thisPtr) {
-                        return 0;
-                    }, "bool", ["pointer"]));
+                    try {
+                        Interceptor.replace(baseAddr.add(0xB55F08), new NativeCallback(function(thisPtr) {
+                            return 0;
+                        }, "bool", ["pointer"]));
+                        log("[+] Interceptor.replace installed on CardItem.get_IsMaterialCard (0xB55F08)!");
+                    } catch (eImc) {
+                        log("[-] Error replacing get_IsMaterialCard: " + eImc.message);
+                    }
 
                     // KeyVault offline safe stubs:
-                    var dummyGameControlData = Memory.alloc(64);
-                    dummyGameControlData.add(0x10).writeS16(0);    // musicAutoSync = 0
-                    dummyGameControlData.add(0x14).writeS32(-1);   // materialCardGroup = -1
-                    Interceptor.replace(baseAddr.add(0x1061598), new NativeCallback(function() {
-                        return dummyGameControlData;
-                    }, "pointer", []));
+                    try {
+                        var dummyStr = createIl2CppString("offline");
+                        var dummySubObj = Memory.alloc(256);
+                        for (var off = 0; off < 256; off += 8) {
+                            dummySubObj.add(off).writePointer(dummyStr);
+                        }
 
-                    var dummyKeyVaultInstance = Memory.alloc(128);
-                    dummyKeyVaultInstance.add(0x28).writePointer(dummyGameControlData);
-                    Interceptor.replace(baseAddr.add(0x10613AC), new NativeCallback(function() {
-                        return dummyKeyVaultInstance;
-                    }, "pointer", []));
+                        var dummyGameControlData = Memory.alloc(64);
+                        dummyGameControlData.add(0x10).writeS16(0);    // musicAutoSync = 0
+                        dummyGameControlData.add(0x14).writeS32(-1);   // materialCardGroup = -1
+
+                        var dummyKeyVaultInstance = Memory.alloc(512);
+                        for (var kOff = 0; kOff < 512; kOff += 8) {
+                            dummyKeyVaultInstance.add(kOff).writePointer(dummySubObj);
+                        }
+                        dummyKeyVaultInstance.add(0x28).writePointer(dummyGameControlData);
+
+                        Interceptor.replace(baseAddr.add(0x1061598), new NativeCallback(function() {
+                            return dummyGameControlData;
+                        }, "pointer", []));
+                        log("[+] Interceptor.replace installed on KeyVault.get_GameControlDataInfo (0x1061598)!");
+
+                        Interceptor.replace(baseAddr.add(0x10613AC), new NativeCallback(function() {
+                            return dummyKeyVaultInstance;
+                        }, "pointer", []));
+                        log("[+] Interceptor.replace installed on KeyVault.get_Instance (0x10613AC)!");
+
+                        // TrackingControl stubs (Tapjoy offline bypass)
+                        Interceptor.replace(baseAddr.add(0x14E32A4), new NativeCallback(function() {}, "void", []));
+                        Interceptor.replace(baseAddr.add(0x14E36C4), new NativeCallback(function() {}, "void", []));
+                        log("[+] Interceptor.replace installed on TrackingControl.Open & OnConnectSuccess!");
+                    } catch (eKv) {
+                        log("[-] Error replacing KeyVault / TrackingControl: " + eKv.message);
+                    }
 
                     // get_IsRCard (0xB523E4)
-                    Interceptor.replace(baseAddr.add(0xB523E4), new NativeCallback(function(thisPtr) {
-                        try {
-                            if (!thisPtr || thisPtr.isNull()) return 0;
-                            var raw = thisPtr.add(0x10).readPointer();
-                            if (!raw || raw.isNull()) return 0;
-                            return (raw.add(0x24).readS32() === 4) ? 1 : 0;
-                        } catch (e) { return 0; }
-                    }, "bool", ["pointer"]));
+                    try {
+                        Interceptor.replace(baseAddr.add(0xB523E4), new NativeCallback(function(thisPtr) {
+                            try {
+                                if (!thisPtr || thisPtr.isNull()) return 0;
+                                var raw = thisPtr.add(0x10).readPointer();
+                                if (!raw || raw.isNull()) return 0;
+                                return (raw.add(0x24).readS32() === 4) ? 1 : 0;
+                            } catch (e) { return 0; }
+                        }, "bool", ["pointer"]));
+                        log("[+] Interceptor.replace installed on CardItem.get_IsRCard (0xB523E4)!");
+                    } catch (eIrc) {
+                        log("[-] Error replacing get_IsRCard: " + eIrc.message);
+                    }
 
                     // get_IsMaxLevel (0xB52408) - R cards maxLevel is 99 in Dalcomsoft engine
-                    Interceptor.replace(baseAddr.add(0xB52408), new NativeCallback(function(thisPtr) {
-                        try {
-                            if (!thisPtr || thisPtr.isNull()) return 0;
-                            var raw = thisPtr.add(0x10).readPointer();
-                            if (!raw || raw.isNull()) return 0;
-                            var gr = raw.add(0x24).readS32();
-                            var lvl = raw.add(0x1C).readS16();
-                            var maxLvl = (gr === 4) ? 99 : 5;
-                            return (lvl >= maxLvl) ? 1 : 0;
-                        } catch (e) { return 0; }
-                    }, "bool", ["pointer"]));
-
-                    log("[+] Safe CardItem and KeyVault getters installed!");
+                    try {
+                        Interceptor.replace(baseAddr.add(0xB52408), new NativeCallback(function(thisPtr) {
+                            try {
+                                if (!thisPtr || thisPtr.isNull()) return 0;
+                                var raw = thisPtr.add(0x10).readPointer();
+                                if (!raw || raw.isNull()) return 0;
+                                var gr = raw.add(0x24).readS32();
+                                var lvl = raw.add(0x1C).readS16();
+                                var maxLvl = (gr === 4) ? 99 : 5;
+                                return (lvl >= maxLvl) ? 1 : 0;
+                            } catch (e) { return 0; }
+                        }, "bool", ["pointer"]));
+                        log("[+] Interceptor.replace installed on CardItem.get_IsMaxLevel (0xB52408)!");
+                    } catch (eIml) {
+                        log("[-] Error replacing get_IsMaxLevel: " + eIml.message);
+                    }
                 } catch (eSafeCi) {
-                    log("[-] Error installing safe CardItem getters: " + eSafeCi.message);
+                    log("[-] Error in CardItem getters block: " + eSafeCi.message);
                 }
 
                 // Exception monitors
@@ -9698,6 +9728,40 @@ function initIl2Cpp(module) {
                         }
                     });
                 } catch (eNre) {}
+
+                // Milestone tracers for SetStateIntensify
+                try {
+                    Interceptor.attach(baseAddr.add(0x1056BCC), {
+                        onEnter: function(args) {
+                            log("[🎯 1. SetStateIntensify] ENTER: scene=" + args[0] + ", isReload=" + args[1] + ", isUpdate=" + args[2]);
+                        },
+                        onLeave: function(retval) {
+                            log("[🎯 1. SetStateIntensify] LEAVE");
+                        }
+                    });
+
+                    Interceptor.attach(baseAddr.add(0x1057B6C), {
+                        onEnter: function(args) {
+                            log("[🎯 2. ViewSetup 0x1057B6C] ENTER: sceneView=" + args[0]);
+                        },
+                        onLeave: function(retval) {
+                            log("[🎯 2. ViewSetup 0x1057B6C] LEAVE");
+                        }
+                    });
+
+                    Interceptor.attach(baseAddr.add(0xF22024), {
+                        onEnter: function(args) {
+                            log("[🎯 3. IntensifyView.Refresh 0xF22024] ENTER: intView=" + args[0]);
+                        },
+                        onLeave: function(retval) {
+                            log("[🎯 3. IntensifyView.Refresh 0xF22024] LEAVE");
+                        }
+                    });
+
+                    log("[+] Milestone tracers for SetStateIntensify installed successfully!");
+                } catch (eMils) {
+                    log("[-] Error installing milestone tracers: " + eMils.message);
+                }
 
                 // InventoryScene.OnIntensify (0x105A97C)
                 try {
