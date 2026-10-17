@@ -10574,24 +10574,33 @@ function initIl2Cpp(module) {
                             }
                         } else if (cmdRaw === "intensify") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
-                                log("[⚡ INTENSIFY CMD] Triggering OnIntensify directly!");
-                                    var tCard = curScene.add(0x88).readPointer();
-                                    if (tCard.isNull()) tCard = curScene.add(0x98).readPointer();
-                                    if (!tCard.isNull()) {
-                                        var tRaw = tCard.add(0x10).readPointer();
-                                        if (!tRaw.isNull()) {
-                                            var tcId = tRaw.add(0x20).readS32();
-                                            var tCcd = getOrCreateCardControlData(tcId);
-                                            tCard.add(0x18).writePointer(tCcd || NULL);
-                                            var tGr = tRaw.add(0x24).readS32();
-                                            var tLvl = tRaw.add(0x1C).readS16();
-                                            var tCode = (tGr < 4) ? (tGr * 5 + Math.min(4, tLvl - 1)) : (20 + Math.min(98, tLvl - 1));
-                                            tCard.add(0x20).writeS16(tCode);
-                                        }
+                                log("[⚡ INTENSIFY CMD] Entering Intensify state cleanly!");
+                                var tCard = curScene.add(0x88).readPointer();
+                                if (tCard.isNull()) tCard = curScene.add(0x98).readPointer();
+                                if (!tCard.isNull()) {
+                                    curScene.add(0x88).writePointer(tCard);
+                                    curScene.add(0x98).writePointer(tCard);
+                                    var tRaw = tCard.add(0x10).readPointer();
+                                    if (!tRaw.isNull()) {
+                                        var tcId = tRaw.add(0x20).readS32();
+                                        var tCcd = getOrCreateCardControlData(tcId);
+                                        tCard.add(0x18).writePointer(tCcd || NULL);
+                                        var tGr = tRaw.add(0x24).readS32();
+                                        var tLvl = tRaw.add(0x1C).readS16();
+                                        var tCode = (tGr < 4) ? (tGr * 5 + Math.min(4, tLvl - 1)) : (20 + Math.min(98, tLvl - 1));
+                                        tCard.add(0x20).writeS16(tCode);
                                     }
-                                    var onIntensifyFn = new NativeFunction(baseAddr.add(0x105A97C), "void", ["pointer"]);
-                                    onIntensifyFn(curScene);
                                 }
+                                var clearFn = new NativeFunction(baseAddr.add(0x1054118), "void", ["pointer"]);
+                                clearFn(curScene);
+                                var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "int", "int", "pointer"]);
+                                try {
+                                    setStateIntensifyFn(curScene, 1, 1, NULL);
+                                    log("[⚡ INTENSIFY CMD] SetStateIntensify(1, 1) completed successfully!");
+                                } catch (eIntensifyState) {
+                                    log("[-] Error calling SetStateIntensify(1, 1): " + eIntensifyState.message);
+                                }
+                            }
                         } else if (cmdRaw === "recommend") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
                                 log("[⚡ RECOMMEND CMD] Triggering executeRecommend!");
