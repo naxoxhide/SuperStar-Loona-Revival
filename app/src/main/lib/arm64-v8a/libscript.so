@@ -5372,8 +5372,8 @@ function initIl2Cpp(module) {
                                     var regFn = new NativeFunction(baseAddr.add(0x1056B5C), "void", ["pointer", "pointer"]);
                                     regFn(sceneThis, clickedCardItem);
                                 }
-                                var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "bool", "bool"]);
-                                setStateIntensifyFn(sceneThis, 0, 1);
+                                var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "int", "int", "pointer"]);
+                                setStateIntensifyFn(sceneThis, 0, 1, NULL);
                                 return;
                             }
 
@@ -6366,8 +6366,8 @@ function initIl2Cpp(module) {
                         var sortView = (!sv.isNull()) ? sv.add(0x80).readPointer() : NULL;
                         var btnBack = (!sv.isNull()) ? sv.add(0x88).readPointer() : NULL;
                         log("[🔍 RECOMMEND BEFORE REFRESH] sv=" + sv + ", selView=" + selView + ", intView=" + intView + ", cardView=" + cardView + ", sortView=" + sortView + ", btnBack=" + btnBack);
-                        var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "bool", "bool"]);
-                        setStateIntensifyFn(sceneThis, 0, 1);
+                        var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "int", "int", "pointer"]);
+                        setStateIntensifyFn(sceneThis, 0, 1, NULL);
                         log("[🎉 RECOMMEND COMPLETE] Registered " + pickCount + " material cards and refreshed view successfully!");
                     } catch (eRecExec) {
                         log("[-] Error in executeRecommend: " + eRecExec.message);
@@ -9848,23 +9848,32 @@ function initIl2Cpp(module) {
                     });
                 } catch (eNre) {}
 
-                // Milestone tracers for SetStateIntensify
+                // Non-duplicate Milestone tracers for SetStateIntensify & Intensify sub-views
                 try {
-                    Interceptor.attach(baseAddr.add(0x1056BCC), {
-                        onEnter: function(args) {
-                            log("[🎯 1. SetStateIntensify] ENTER: scene=" + args[0] + ", isReload=" + args[1] + ", isUpdate=" + args[2]);
-                        },
-                        onLeave: function(retval) {
-                            log("[🎯 1. SetStateIntensify] LEAVE");
-                        }
-                    });
-
                     Interceptor.attach(baseAddr.add(0x1057B6C), {
                         onEnter: function(args) {
                             log("[🎯 2. ViewSetup 0x1057B6C] ENTER: sceneView=" + args[0]);
                         },
                         onLeave: function(retval) {
                             log("[🎯 2. ViewSetup 0x1057B6C] LEAVE");
+                        }
+                    });
+
+                    Interceptor.attach(baseAddr.add(0x1057C10), {
+                        onEnter: function(args) {
+                            log("[🎯 GetIntensifyViewData 0x1057C10] ENTER: card=" + args[1] + ", matItems=" + args[2]);
+                        },
+                        onLeave: function(retval) {
+                            log("[🎯 GetIntensifyViewData 0x1057C10] LEAVE");
+                        }
+                    });
+
+                    Interceptor.attach(baseAddr.add(0x105E33C), {
+                        onEnter: function(args) {
+                            log("[🎯 GetMaterialViewData 0x105E33C] ENTER: card=" + args[1] + ", mat=" + args[2] + ", idx=" + args[3]);
+                        },
+                        onLeave: function(retval) {
+                            log("[🎯 GetMaterialViewData 0x105E33C] LEAVE");
                         }
                     });
 
@@ -9877,7 +9886,16 @@ function initIl2Cpp(module) {
                         }
                     });
 
-                    log("[+] Milestone tracers for SetStateIntensify installed successfully!");
+                    Interceptor.attach(baseAddr.add(0xF22504), {
+                        onEnter: function(args) {
+                            log("[🎯 InvenMaterialView.Refresh 0xF22504] ENTER: matView=" + args[0]);
+                        },
+                        onLeave: function(retval) {
+                            log("[🎯 InvenMaterialView.Refresh 0xF22504] LEAVE");
+                        }
+                    });
+
+                    log("[+] Milestone tracers for Intensify installed successfully!");
                 } catch (eMils) {
                     log("[-] Error installing milestone tracers: " + eMils.message);
                 }
@@ -9947,6 +9965,9 @@ function initIl2Cpp(module) {
                             } catch (eSsi) {
                                 log("[-] Error in SetStateIntensify onEnter: " + eSsi.message);
                             }
+                        },
+                        onLeave: function(retval) {
+                            log("[🎯 SetStateIntensify] LEAVE successfully!");
                         }
                     });
                 } catch (eSsi) {
