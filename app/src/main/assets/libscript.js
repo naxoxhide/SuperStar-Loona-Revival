@@ -6367,8 +6367,12 @@ function initIl2Cpp(module) {
                         var btnBack = (!sv.isNull()) ? sv.add(0x88).readPointer() : NULL;
                         log("[🔍 RECOMMEND BEFORE REFRESH] sv=" + sv + ", selView=" + selView + ", intView=" + intView + ", cardView=" + cardView + ", sortView=" + sortView + ", btnBack=" + btnBack);
                         var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "int", "int", "pointer"]);
-                        setStateIntensifyFn(sceneThis, 0, 1, NULL);
-                        log("[🎉 RECOMMEND COMPLETE] Registered " + pickCount + " material cards and refreshed view successfully!");
+                        try {
+                            setStateIntensifyFn(sceneThis, 0, 0, NULL);
+                            log("[🎉 RECOMMEND COMPLETE] Registered " + pickCount + " material cards and refreshed view successfully!");
+                        } catch (eSetState) {
+                            log("[-] Error calling SetStateIntensify(0, 0): " + eSetState.message);
+                        }
                     } catch (eRecExec) {
                         log("[-] Error in executeRecommend: " + eRecExec.message);
                     }
@@ -9676,11 +9680,11 @@ function initIl2Cpp(module) {
 
                     // 4. CardIntensifyControl.Find(short code, short subCode) (0x1381780) -> returns Item*
                     var cachedCardIntensifyItemKlass = NULL;
-                    Interceptor.replace(baseAddr.add(0x1381780), new NativeCallback(function(codeArg, subCodeArg) {
+                    Interceptor.replace(baseAddr.add(0x1381780), new NativeCallback(function(codeArg, subCodeArg, methodArg) {
                         try {
                             var code = parseInt(codeArg, 10);
                             var subCode = parseInt(subCodeArg, 10);
-                            if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) {
+                            if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull() || cachedCardIntensifyItemKlass.compare(ptr(0x100000)) <= 0) {
                                 try {
                                     var slotVal = baseAddr.add(0x3144308).readPointer();
                                     if (!slotVal.isNull() && slotVal.compare(ptr(0x100000000)) > 0) {
@@ -9691,7 +9695,7 @@ function initIl2Cpp(module) {
                                         cachedCardIntensifyItemKlass = baseAddr.add(0x3144308).readPointer();
                                     }
                                 } catch (eSlot) {}
-                                if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull()) {
+                                if (!cachedCardIntensifyItemKlass || cachedCardIntensifyItemKlass.isNull() || cachedCardIntensifyItemKlass.compare(ptr(0x100000)) <= 0) {
                                     try {
                                         var parentCic = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardIntensifyControl");
                                         if (parentCic && !parentCic.isNull()) {
@@ -9750,11 +9754,16 @@ function initIl2Cpp(module) {
                                 rate = (subGrade >= 4) ? 50.0 : 70.0;
                             }
 
-                            itemObj.add(0x10).writeDouble(rate);
-                            itemObj.add(0x18).writeS32(price);
+                            try {
+                                var itemCtorFn = new NativeFunction(baseAddr.add(0xE45308), "void", ["pointer", "double", "int", "pointer"]);
+                                itemCtorFn(itemObj, rate, price, NULL);
+                            } catch (eCtor) {
+                                itemObj.add(0x10).writeDouble(rate);
+                                itemObj.add(0x18).writeS32(price);
+                            }
                             itemObj.add(0x1C).writeU8(0); // isMaterial = false
 
-                            log("[⚡ INTENSIFY FIND] code=" + code + ", subCode=" + subCode + " (" + matKey + ") -> Rate=" + rate.toFixed(1) + "%, Price=" + price + " RP");
+                            log("[⚡ INTENSIFY FIND] code=" + code + ", subCode=" + subCode + " (" + matKey + ") -> Rate=" + rate.toFixed(1) + "%, Price=" + price + " RP (Item=" + itemObj + ")");
                             return itemObj;
                         } catch (eFind) {
                             log("[-] Error in CardIntensifyControl.Find: " + eFind.message);
@@ -9771,10 +9780,10 @@ function initIl2Cpp(module) {
                                 return NULL;
                             }
                         }
-                    }, "pointer", ["int16", "int16"]));
+                    }, "pointer", ["int16", "int16", "pointer"]));
 
                     // 5. CardIntensifyControl.Find(CardGrade, short, CardGrade, short) (0x1383BDC) -> returns Item*
-                    Interceptor.replace(baseAddr.add(0x1383BDC), new NativeCallback(function(grade, level, subGrade, subLevel) {
+                    Interceptor.replace(baseAddr.add(0x1383BDC), new NativeCallback(function(grade, level, subGrade, subLevel, methodArg) {
                         try {
                             var gr = parseInt(grade, 10) || 0;
                             var lvl = Math.max(1, parseInt(level, 10) || 1);
@@ -9784,13 +9793,13 @@ function initIl2Cpp(module) {
                             var code = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
                             var subCode = (sGr < 4) ? (sGr * 5 + Math.min(4, sLvl - 1)) : (20 + Math.min(98, sLvl - 1));
 
-                            var findFn = new NativeFunction(baseAddr.add(0x1381780), "pointer", ["int16", "int16"]);
-                            return findFn(code, subCode);
+                            var findFn = new NativeFunction(baseAddr.add(0x1381780), "pointer", ["int16", "int16", "pointer"]);
+                            return findFn(code, subCode, NULL);
                         } catch (eFind4) {
                             log("[-] Error in CardIntensifyControl.Find(4 args): " + eFind4.message);
                             return NULL;
                         }
-                    }, "pointer", ["int", "int16", "int", "int16"]));
+                    }, "pointer", ["int", "int16", "int", "int16", "pointer"]));
 
                     log("[+] CardIntensifyControl hooks installed successfully!");
                 } catch (eCicHooks) {
@@ -9990,10 +9999,10 @@ function initIl2Cpp(module) {
                     }
 
                     var targetObjId = rawObj.add(0x10).readS64();
-                    var cardId = rawObj.add(0x18).readS32();
+                    var energy = rawObj.add(0x18).readS16();
                     var score = rawObj.add(0x1A).readS16();
                     var level = rawObj.add(0x1C).readS16();
-                    var energy = rawObj.add(0x1E).readS16();
+                    var cardId = rawObj.add(0x20).readS32();
                     var grade = rawObj.add(0x24).readS32();
                     var isPrism = (rawObj.add(0x2A).readU8() !== 0);
                     var maxLevel = (grade === 4) ? 50 : 5;
@@ -10046,9 +10055,9 @@ function initIl2Cpp(module) {
                     log("[⚡ STATS] Result level: " + currentLvl + " (Successes: " + successes + "/" + materials.length + ") | Score=" + newStats.score + ", Energy=" + newStats.energy + " | Total Cost: " + totalCost + " RP");
 
                     // Update target card in memory
-                    rawObj.add(0x1C).writeS16(currentLvl);
+                    rawObj.add(0x18).writeS16(newStats.energy);
                     rawObj.add(0x1A).writeS16(newStats.score);
-                    rawObj.add(0x1E).writeS16(newStats.energy);
+                    rawObj.add(0x1C).writeS16(currentLvl);
 
                     // Update player_profile.json
                     try {
