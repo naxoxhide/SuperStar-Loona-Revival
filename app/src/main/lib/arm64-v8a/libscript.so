@@ -347,6 +347,7 @@ function initIl2Cpp(module) {
         log("[🚀 RVA HOOKS] Installing direct RVA hooks at libil2cpp base: " + baseAddr);
 
         // 0. Comprehensive exception tracers: capture root thrower (0x9F1AC8), null refs (0xA43CC0), __cxa_throw (0xA8A284 / 0x81EF40)
+        // 0. Comprehensive exception tracers: capture root thrower (0x9F1AC8), null refs (0xA43CC0), __cxa_throw (0xA8A284), abort
         try {
             // A. ROOT IL2CPP Exception Thrower (0x9F1AC8)
             Interceptor.attach(baseAddr.add(0x9F1AC8), {
@@ -387,7 +388,11 @@ function initIl2Cpp(module) {
                 }
             });
             log("[+] Root IL2CPP exception monitor attached to 0x9F1AC8!");
+        } catch(e0) {
+            log("[-] Error hooking 0x9F1AC8: " + e0.message);
+        }
 
+        try {
             // B. Direct hook on il2cpp_codegen_raise_null_reference_exception (0xA43CC0)
             Interceptor.attach(baseAddr.add(0xA43CC0), {
                 onEnter: function(args) {
@@ -407,26 +412,84 @@ function initIl2Cpp(module) {
                 }
             });
             log("[+] Null reference monitor attached to 0xA43CC0!");
+        } catch(e1) {
+            log("[-] Error hooking 0xA43CC0: " + e1.message);
+        }
 
-            // C. libil2cpp PLT __cxa_throw (0x81EF40)
-            Interceptor.attach(baseAddr.add(0x81EF40), {
-                onEnter: function(args) {
-                    var lr = this.returnAddress;
-                    var rva = lr.sub(baseAddr);
-                    log("[💥 PLT __cxa_throw] Called from RVA: " + rva + " (LR=" + lr + ")");
-                }
-            });
-
-            // D. libil2cpp internal __cxa_throw (0xA8A284)
+        try {
+            // C. libil2cpp internal __cxa_throw (0xA8A284)
             Interceptor.attach(baseAddr.add(0xA8A284), {
                 onEnter: function(args) {
                     var lr = this.returnAddress;
                     var rva = lr.sub(baseAddr);
                     log("[💥 INTERNAL __cxa_throw] Called from RVA: " + rva + " (LR=" + lr + ")");
+                    try {
+                        var thrownObj = args[0];
+                        if (!thrownObj.isNull()) {
+                            var innerPtr = thrownObj.readPointer();
+                            if (!innerPtr.isNull()) {
+                                var klass = innerPtr.readPointer();
+                                if (!klass.isNull()) {
+                                    var kNamePtr = klass.add(0x10).readPointer();
+                                    if (!kNamePtr.isNull()) {
+                                        log("[💥 INTERNAL __cxa_throw] Exception Type: " + kNamePtr.readCString());
+                                    }
+                                }
+                            }
+                        }
+                    } catch(eEx) {}
+                    try {
+                        var bt = Thread.backtrace(this.context, Backtracer.ACCURATE).map(function(addr) {
+                            try {
+                                return "  " + addr + " (RVA " + addr.sub(baseAddr) + ")";
+                            } catch(e) {
+                                return "  " + addr;
+                            }
+                        }).join("\n");
+                        log("[💥 INTERNAL __cxa_throw] Backtrace:\n" + bt);
+                    } catch (eBt) {}
                 }
             });
-        } catch(eCxa) {
-            log("[-] Error hooking exception handlers: " + eCxa.message);
+            log("[+] Internal __cxa_throw monitor attached to 0xA8A284!");
+        } catch(e2) {
+            log("[-] Error hooking 0xA8A284: " + e2.message);
+        }
+
+        try {
+            // D. libc.so android_set_abort_message & abort
+            var setAbortMsgPtr = Module.findExportByName("libc.so", "android_set_abort_message");
+            if (setAbortMsgPtr) {
+                Interceptor.attach(setAbortMsgPtr, {
+                    onEnter: function(args) {
+                        try {
+                            var msg = args[0].readCString();
+                            log("[🚨 LIBC ABORT MESSAGE] " + msg);
+                        } catch(e) {}
+                    }
+                });
+                log("[+] android_set_abort_message monitor attached!");
+            }
+            var abortPtr = Module.findExportByName("libc.so", "abort");
+            if (abortPtr) {
+                Interceptor.attach(abortPtr, {
+                    onEnter: function(args) {
+                        log("[🚨 LIBC abort()] Called! ReturnAddress: " + this.returnAddress);
+                        try {
+                            var bt = Thread.backtrace(this.context, Backtracer.ACCURATE).map(function(addr) {
+                                try {
+                                    return "  " + addr + " (RVA " + addr.sub(baseAddr) + ")";
+                                } catch(e) {
+                                    return "  " + addr;
+                                }
+                            }).join("\n");
+                            log("[🚨 LIBC abort()] Backtrace:\n" + bt);
+                        } catch (eBt) {}
+                    }
+                });
+                log("[+] abort() monitor attached!");
+            }
+        } catch(e3) {
+            log("[-] Error hooking libc abort: " + e3.message);
         }
 
         try {
