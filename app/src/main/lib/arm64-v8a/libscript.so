@@ -6207,7 +6207,7 @@ function initIl2Cpp(module) {
                                 targetArtistCode = tMeta ? tMeta.artistID : 0;
                             }
                         }
-                        var isMaxLevel = (targetGrade === 4) ? (targetLevel >= 50) : (targetLevel >= 5);
+                        var isMaxLevel = (targetGrade === 4) ? (targetLevel >= 99) : (targetLevel >= 5);
 
                         // 3. Find candidates from loonaCardItems
                         var candidates = [];
@@ -6236,7 +6236,7 @@ function initIl2Cpp(module) {
                             item.add(0x18).writePointer(ccd || NULL);
 
                             if (isMaxLevel) {
-                                var reqMax = (gr === 4) ? 50 : 5;
+                                var reqMax = (gr === 4) ? 99 : 5;
                                 if (art === targetArtistCode && gr === targetGrade && lvl >= reqMax) {
                                     candidates.push(item);
                                 }
