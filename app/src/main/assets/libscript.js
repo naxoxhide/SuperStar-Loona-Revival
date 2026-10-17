@@ -7283,7 +7283,9 @@ function initIl2Cpp(module) {
                         for (var kOff = 0; kOff < 512; kOff += 8) {
                             dummyKeyVaultInstance.add(kOff).writePointer(dummySubObj);
                         }
+                        var dummyServerSetting = Memory.alloc(64);
                         dummyKeyVaultInstance.add(0x28).writePointer(dummyGameControlData);
+                        dummyKeyVaultInstance.add(0x90).writePointer(dummyServerSetting);
 
                         Interceptor.replace(baseAddr.add(0x1061598), new NativeCallback(function() {
                             return dummyGameControlData;
@@ -7295,12 +7297,116 @@ function initIl2Cpp(module) {
                         }, "pointer", []));
                         log("[+] Interceptor.replace installed on KeyVault.get_Instance (0x10613AC)!");
 
+                        // KeyVault.ServerSetting stubs (universal offline fallback):
+                        // Init (0xB5BED8) -> no-op
+                        Interceptor.replace(baseAddr.add(0xB5BED8), new NativeCallback(function(thisPtr) {}, "void", ["pointer"]));
+                        // Find (0xB5C378) -> returns null
+                        Interceptor.replace(baseAddr.add(0xB5C378), new NativeCallback(function(thisPtr, code) {
+                            return ptr(0);
+                        }, "pointer", ["pointer", "int"]));
+                        // IsRealServer (0xB5B968) -> returns false (0)
+                        Interceptor.replace(baseAddr.add(0xB5B968), new NativeCallback(function(thisPtr, code) {
+                            return 0;
+                        }, "bool", ["pointer", "int"]));
+                        // GetName (0xB5C468) -> returns "offline"
+                        Interceptor.replace(baseAddr.add(0xB5C468), new NativeCallback(function(thisPtr, code) {
+                            return dummyStr;
+                        }, "pointer", ["pointer", "int"]));
+                        // GetServerCode (0xB5C564) -> returns "offline"
+                        Interceptor.replace(baseAddr.add(0xB5C564), new NativeCallback(function(thisPtr, code) {
+                            return dummyStr;
+                        }, "pointer", ["pointer", "int"]));
+                        // get_ServerList (0xB5C660) -> returns null
+                        Interceptor.replace(baseAddr.add(0xB5C660), new NativeCallback(function(thisPtr) {
+                            return ptr(0);
+                        }, "pointer", ["pointer"]));
+                        // GetRealServerCode (0xB5C668) -> returns 0
+                        Interceptor.replace(baseAddr.add(0xB5C668), new NativeCallback(function(thisPtr) {
+                            return 0;
+                        }, "int", ["pointer"]));
+                        log("[+] Interceptor.replace installed on all KeyVault.ServerSetting methods!");
+
                         // TrackingControl stubs (Tapjoy offline bypass)
                         Interceptor.replace(baseAddr.add(0x14E32A4), new NativeCallback(function() {}, "void", []));
                         Interceptor.replace(baseAddr.add(0x14E36C4), new NativeCallback(function() {}, "void", []));
                         log("[+] Interceptor.replace installed on TrackingControl.Open & OnConnectSuccess!");
                     } catch (eKv) {
                         log("[-] Error replacing KeyVault / TrackingControl: " + eKv.message);
+                    }
+
+                    // NetworkControl offline stubs (immediate native resolution)
+                    try {
+                        // NetworkControl.<OnOpen>d__86.MoveNext (0xEEE170) -> returns false (coroutine completed)
+                        Interceptor.replace(baseAddr.add(0xEEE170), new NativeCallback(function(thisPtr) {
+                            return 0;
+                        }, "bool", ["pointer"]));
+
+                        // NetworkControl.get_IsOpened (0xC06354) -> true
+                        Interceptor.replace(baseAddr.add(0xC06354), new NativeCallback(function() {
+                            return 1;
+                        }, "bool", []));
+
+                        // NetworkControl.get_IsMaintenanceChecked (0xC06424) -> true
+                        Interceptor.replace(baseAddr.add(0xC06424), new NativeCallback(function() {
+                            return 1;
+                        }, "bool", []));
+
+                        // NetworkControl.get_IsDone (0xC0668C) -> true
+                        Interceptor.replace(baseAddr.add(0xC0668C), new NativeCallback(function() {
+                            return 1;
+                        }, "bool", []));
+
+                        // NetworkControl.get_IsValid (0xC066F0) -> true
+                        Interceptor.replace(baseAddr.add(0xC066F0), new NativeCallback(function() {
+                            return 1;
+                        }, "bool", []));
+
+                        // NetworkControl.get_ServerState (0xC067FC) -> 0 (Normal)
+                        Interceptor.replace(baseAddr.add(0xC067FC), new NativeCallback(function() {
+                            return 0;
+                        }, "int", []));
+
+                        // NetworkControl.CheckServerUrl (0xC080B8) -> no-op
+                        Interceptor.replace(baseAddr.add(0xC080B8), new NativeCallback(function() {}, "void", []));
+
+                        // NetworkControl.CheckServerUrl_Step2 (0xC08384) -> no-op
+                        Interceptor.replace(baseAddr.add(0xC08384), new NativeCallback(function() {}, "void", []));
+
+                        // NetworkControl.SetManifest (0xC083E0) -> no-op
+                        Interceptor.replace(baseAddr.add(0xC083E0), new NativeCallback(function(str) {}, "void", ["pointer"]));
+
+                        // EntryScene.get_IsAllCompleted (0xE20628) -> returns true (1)
+                        Interceptor.replace(baseAddr.add(0xE20628), new NativeCallback(function(thisPtr) {
+                            return 1;
+                        }, "bool", ["pointer"]));
+
+                        log("[+] Interceptor.replace installed on NetworkControl & EntryScene offline stubs!");
+                    } catch (eNet) {
+                        log("[-] Error replacing NetworkControl / EntryScene: " + eNet.message);
+                    }
+
+                    // AdPopcorn & GoogleMobileAds offline stubs
+                    try {
+                        // AdPopcornControl.Initialize (0x12225EC) -> no-op
+                        Interceptor.replace(baseAddr.add(0x12225EC), new NativeCallback(function() {}, "void", []));
+                        // AdPopcornControl.SetUserID (0x12233F0) -> no-op
+                        Interceptor.replace(baseAddr.add(0x12233F0), new NativeCallback(function(uid) {}, "void", ["pointer"]));
+                        // AdPopcornControl.get_IsOnAdPopcorn (0x122DA10) -> false (0)
+                        Interceptor.replace(baseAddr.add(0x122DA10), new NativeCallback(function() {
+                            return 0;
+                        }, "bool", []));
+                        // AdPopcornOfferwallUnityPluginAOS.getInstance (0x122DA78) -> null
+                        Interceptor.replace(baseAddr.add(0x122DA78), new NativeCallback(function() {
+                            return ptr(0);
+                        }, "pointer", []));
+
+                        // GoogleMobileAdsScript.InitADX (0xD45BAC) -> no-op
+                        Interceptor.replace(baseAddr.add(0xD45BAC), new NativeCallback(function(cb) {}, "void", ["pointer"]));
+                        // GoogleMobileAdsScript.Start (0xD45408) -> no-op
+                        Interceptor.replace(baseAddr.add(0xD45408), new NativeCallback(function(thiz) {}, "void", ["pointer"]));
+                        log("[+] Interceptor.replace installed on AdPopcorn & AdMob offline stubs!");
+                    } catch (eAds) {
+                        log("[-] Error replacing AdPopcorn / AdMob: " + eAds.message);
                     }
 
                     // get_IsRCard (0xB523E4)
