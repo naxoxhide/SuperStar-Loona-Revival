@@ -346,29 +346,14 @@ function initIl2Cpp(module) {
     function installNativeRvaHooks(baseAddr) {
         log("[🚀 RVA HOOKS] Installing direct RVA hooks at libil2cpp base: " + baseAddr);
 
-        // 0. Exception tracer: capture __cxa_throw (0xA8A284) to pinpoint exact crash RVA and backtrace
+        // 0. Comprehensive exception tracers: capture null reference exceptions (0xA43CC0), __cxa_throw (0x81EF40 / libc++)
         try {
-            var cxaThrowPtr = baseAddr.add(0xA8A284);
-            Interceptor.attach(cxaThrowPtr, {
+            // A. Direct hook on il2cpp_codegen_raise_null_reference_exception (0xA43CC0)
+            Interceptor.attach(baseAddr.add(0xA43CC0), {
                 onEnter: function(args) {
                     var lr = this.returnAddress;
                     var rva = lr.sub(baseAddr);
-                    log("[💥 __cxa_throw] Exception thrown from RVA: " + rva + " (LR=" + lr + ")");
-                    try {
-                        var thrownObj = args[0];
-                        if (!thrownObj.isNull()) {
-                            var innerPtr = thrownObj.readPointer();
-                            if (!innerPtr.isNull()) {
-                                var klass = innerPtr.readPointer();
-                                if (!klass.isNull()) {
-                                    var kNamePtr = klass.add(0x10).readPointer();
-                                    if (!kNamePtr.isNull()) {
-                                        log("[💥 __cxa_throw] Exception Type: " + kNamePtr.readCString());
-                                    }
-                                }
-                            }
-                        }
-                    } catch(eEx) {}
+                    log("[💥 NULL_PTR_EXCEPTION] NullReferenceException triggered from RVA: " + rva + " (LR=" + lr + ")");
                     try {
                         var bt = Thread.backtrace(this.context, Backtracer.ACCURATE).map(function(addr) {
                             try {
@@ -377,13 +362,51 @@ function initIl2Cpp(module) {
                                 return "  " + addr;
                             }
                         }).join("\n");
-                        log("[💥 __cxa_throw] Backtrace:\n" + bt);
+                        log("[💥 NULL_PTR_EXCEPTION] Backtrace:\n" + bt);
                     } catch (eBt) {}
                 }
             });
-            log("[+] Exception monitor attached to __cxa_throw (0xA8A284)");
+            log("[+] Null reference monitor attached to 0xA43CC0!");
+
+            // B. Global __cxa_throw hook across all loaded modules
+            var globalCxa = Module.findExportByName(null, "__cxa_throw");
+            if (globalCxa) {
+                Interceptor.attach(globalCxa, {
+                    onEnter: function(args) {
+                        var lr = this.returnAddress;
+                        var rva = lr.sub(baseAddr);
+                        log("[💥 GLOBAL __cxa_throw] Exception thrown from: " + lr + " (RVA " + rva + ")");
+                        try {
+                            var thrownObj = args[0];
+                            if (!thrownObj.isNull()) {
+                                var innerPtr = thrownObj.readPointer();
+                                if (!innerPtr.isNull()) {
+                                    var klass = innerPtr.readPointer();
+                                    if (!klass.isNull()) {
+                                        var kNamePtr = klass.add(0x10).readPointer();
+                                        if (!kNamePtr.isNull()) {
+                                            log("[💥 GLOBAL __cxa_throw] Exception Type: " + kNamePtr.readCString());
+                                        }
+                                    }
+                                }
+                            }
+                        } catch(eEx) {}
+                        try {
+                            var bt = Thread.backtrace(this.context, Backtracer.ACCURATE).map(function(addr) {
+                                try {
+                                    return "  " + addr + " (RVA " + addr.sub(baseAddr) + ")";
+                                } catch(e) {
+                                    return "  " + addr;
+                                }
+                            }).join("\n");
+                            log("[💥 GLOBAL __cxa_throw] Backtrace:\n" + bt);
+                        } catch (eBt) {}
+                    }
+                });
+                log("[+] Global __cxa_throw monitor attached at: " + globalCxa);
+            }
         } catch(eCxa) {
-            log("[-] Error hooking __cxa_throw: " + eCxa.message);
+            log("[-] Error hooking exception handlers: " + eCxa.message);
         }
 
         try {
