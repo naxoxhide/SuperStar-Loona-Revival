@@ -9857,16 +9857,109 @@ function initIl2Cpp(module) {
                     });
                 } catch (eNre) {}
 
-                // Non-duplicate Milestone tracers for SetStateIntensify & Intensify sub-views
+                // InventorySceneView.HideAll (0x10608B4) - Safe replacement to prevent NullReferenceException on uninstantiated subviews
                 try {
-                    Interceptor.attach(baseAddr.add(0x1057B6C), {
-                        onEnter: function(args) {
-                            log("[🎯 2. ViewSetup 0x1057B6C] ENTER: sceneView=" + args[0]);
-                        },
-                        onLeave: function(retval) {
-                            log("[🎯 2. ViewSetup 0x1057B6C] LEAVE");
+                    Interceptor.replace(baseAddr.add(0x10608B4), new NativeCallback(function(sceneViewPtr) {
+                        if (!sceneViewPtr || sceneViewPtr.isNull()) return;
+                        var subViewOffsets = [
+                            { name: "selectView", offset: 0x48 },
+                            { name: "noneView", offset: 0x50 },
+                            { name: "mainView", offset: 0x58 },
+                            { name: "equipView", offset: 0x60 },
+                            { name: "intensifyView", offset: 0x68 },
+                            { name: "groupView", offset: 0x70 },
+                            { name: "cardView", offset: 0x78 },
+                            { name: "sortView", offset: 0x80 }
+                        ];
+                        for (var i = 0; i < subViewOffsets.length; i++) {
+                            var item = subViewOffsets[i];
+                            var subView = sceneViewPtr.add(item.offset).readPointer();
+                            if (!subView.isNull()) {
+                                var vtable = subView.readPointer();
+                                if (!vtable.isNull()) {
+                                    var hideFunc = vtable.add(0x188).readPointer();
+                                    var methodInfo = vtable.add(0x190).readPointer();
+                                    if (!hideFunc.isNull()) {
+                                        try {
+                                            var fn = new NativeFunction(hideFunc, "void", ["pointer", "pointer"]);
+                                            fn(subView, methodInfo);
+                                        } catch (eH) {
+                                            log("[-] Error hiding " + item.name + ": " + eH.message);
+                                        }
+                                    }
+                                }
+                            }
                         }
-                    });
+                    }, "void", ["pointer"]));
+                    log("[+] Interceptor.replace installed on InventorySceneView.HideAll (0x10608B4)!");
+                } catch (eHa) {
+                    log("[-] Error replacing InventorySceneView.HideAll: " + eHa.message);
+                }
+
+                // InventorySceneView.ShowIntensifyLayout (0x1057B6C) - Safe replacement
+                try {
+                    Interceptor.replace(baseAddr.add(0x1057B6C), new NativeCallback(function(sceneViewPtr) {
+                        if (!sceneViewPtr || sceneViewPtr.isNull()) return;
+                        log("[🎯 ShowIntensifyLayout] Safe entry for sceneView=" + sceneViewPtr);
+                        // 1. HideAll
+                        var hideAllFn = new NativeFunction(baseAddr.add(0x10608B4), "void", ["pointer"]);
+                        hideAllFn(sceneViewPtr);
+
+                        // 2. Show required views safely
+                        var showOffsets = [
+                            { name: "selectView", offset: 0x48 },
+                            { name: "intensifyView", offset: 0x68 },
+                            { name: "cardView", offset: 0x78 },
+                            { name: "sortView", offset: 0x80 }
+                        ];
+                        for (var i = 0; i < showOffsets.length; i++) {
+                            var item = showOffsets[i];
+                            var subView = sceneViewPtr.add(item.offset).readPointer();
+                            if (!subView.isNull()) {
+                                var vtable = subView.readPointer();
+                                if (!vtable.isNull()) {
+                                    var showFunc = vtable.add(0x178).readPointer();
+                                    var methodInfo = vtable.add(0x180).readPointer();
+                                    if (!showFunc.isNull()) {
+                                        try {
+                                            var fn = new NativeFunction(showFunc, "void", ["pointer", "pointer"]);
+                                            fn(subView, methodInfo);
+                                            log("[🎯 ShowIntensifyLayout] Subview " + item.name + " Show() called successfully.");
+                                        } catch (eS) {
+                                            log("[-] Error showing " + item.name + ": " + eS.message);
+                                        }
+                                    }
+                                }
+                            } else {
+                                log("[⚠️ ShowIntensifyLayout] Subview " + item.name + " is NULL!");
+                            }
+                        }
+
+                        // 3. btnBack setActive(true)
+                        var btnBack = sceneViewPtr.add(0x88).readPointer();
+                        if (!btnBack.isNull()) {
+                            var go = btnBack.add(0x10).readPointer();
+                            if (!go.isNull()) {
+                                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                setActiveFn(go, 1, NULL);
+                            }
+                        }
+
+                        // 4. SetSideButtonActive(false)
+                        var setSideBtnFn = new NativeFunction(baseAddr.add(0x10606E0), "void", ["pointer", "bool"]);
+                        setSideBtnFn(sceneViewPtr, 0);
+
+                        // 5. currentState = 5 (INTENSIFY)
+                        sceneViewPtr.add(0xC8).writeS32(5);
+                        log("[⚡ ShowIntensifyLayout] Completed layout setup and set currentState = 5 (INTENSIFY)!");
+                    }, "void", ["pointer"]));
+                    log("[+] Interceptor.replace installed on InventorySceneView.ShowIntensifyLayout (0x1057B6C)!");
+                } catch (eSil) {
+                    log("[-] Error replacing ShowIntensifyLayout: " + eSil.message);
+                }
+
+                // Milestone tracers for SetStateIntensify & Intensify sub-views
+                try {
 
                     Interceptor.attach(baseAddr.add(0x1057C10), {
                         onEnter: function(args) {
@@ -9970,6 +10063,41 @@ function initIl2Cpp(module) {
                                 }
                                 if (sceneThis.add(0xB0).readDouble() === 0.0) {
                                     sceneThis.add(0xB0).writeDouble(1.0);
+                                }
+                                // Ensure selectedArtistData (0x80) is populated
+                                var curArt = sceneThis.add(0x80).readPointer();
+                                if (curArt.isNull() && !tCard.isNull()) {
+                                    var tRawArt = tCard.add(0x10).readPointer();
+                                    if (!tRawArt.isNull()) {
+                                        var artCId = tRawArt.add(0x20).readS32();
+                                        var artMeta = getCardMetadata(artCId);
+                                        var artId = artMeta ? artMeta.artistID : 0;
+                                        if (artId > 0 && loonaArtistDataMap[artId]) {
+                                            sceneThis.add(0x80).writePointer(loonaArtistDataMap[artId]);
+                                            log("[⚡ SetStateIntensify] Injected selectedArtistData for artist " + artId);
+                                        }
+                                    }
+                                }
+                                // Ensure all items in materialCardItemList (0xA0) have Card backing & IntensifyCode
+                                var matList = sceneThis.add(0xA0).readPointer();
+                                if (!matList.isNull()) {
+                                    var mCount = matList.add(0x18).readS32();
+                                    var mItems = matList.add(0x10).readPointer();
+                                    for (var m = 0; m < mCount; m++) {
+                                        var mItem = mItems.add(0x20 + m * 8).readPointer();
+                                        if (mItem && !mItem.isNull()) {
+                                            var mRaw = mItem.add(0x10).readPointer();
+                                            if (!mRaw.isNull()) {
+                                                var mcId = mRaw.add(0x20).readS32();
+                                                var mccd = getOrCreateCardControlData(mcId);
+                                                mItem.add(0x18).writePointer(mccd || NULL);
+                                                var mgr = mRaw.add(0x24).readS32();
+                                                var mlvl = mRaw.add(0x1C).readS16();
+                                                var mfCode = (mgr < 4) ? (mgr * 5 + Math.min(4, mlvl - 1)) : (20 + Math.min(98, mlvl - 1));
+                                                mItem.add(0x20).writeS16(mfCode);
+                                            }
+                                        }
+                                    }
                                 }
                             } catch (eSsi) {
                                 log("[-] Error in SetStateIntensify onEnter: " + eSsi.message);
