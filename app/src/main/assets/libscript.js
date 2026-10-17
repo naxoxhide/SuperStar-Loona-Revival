@@ -3876,8 +3876,9 @@ function initIl2Cpp(module) {
                     log("[+] Byte patch on GoogleSignInControl.Awake (0xB9B304): ret");
                 } catch (eGsi) {}
 
-                // Direct byte patches to disable Google Mobile Ads / AdMob crashes
+                // Direct byte patches to disable Google Mobile Ads, Tapjoy, and AdMob crashes
                 [
+                    0xB17894, // TapjoyUnityInit.Awake -> ret
                     0xD45478, // GoogleMobileAdsScript.AddAdUnit -> ret
                     0xD45574, // GoogleMobileAdsScript.SetAdUnitId -> ret
                     0xD45BAC  // GoogleMobileAdsScript.InitADX -> ret
@@ -3887,7 +3888,7 @@ function initIl2Cpp(module) {
                         baseAddr.add(rva).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
                     } catch (eGma) {}
                 });
-                log("[+] Byte patches on GoogleMobileAdsScript (AddAdUnit, SetAdUnitId, InitADX): ret");
+                log("[+] Byte patches on Tapjoy & GoogleMobileAdsScript (0xB17894, 0xD45478, 0xD45574, 0xD45BAC): ret");
 
                 // =========================================================================
                 // INVENTORY STABILIZATION HOOKS & PROXIES
