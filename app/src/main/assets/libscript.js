@@ -581,6 +581,19 @@ function initIl2Cpp(module) {
             }, "void", ["pointer", "pointer"]));
             log("[+] Hooked Platform.<checkAssetBundle>b__0 at: " + checkAssetBundleCallbackHandlerPtr);
 
+            // 1d. ApiExceptControl.Except (0x10EF934 & 0x10F0798) - Suppress network exception popups in offline mode
+            try {
+                Interceptor.replace(baseAddr.add(0x10EF934), new NativeCallback(function (handle) {
+                    log("[🛡️ API EXCEPT] Suppressed ApiExceptControl.Except(NetworkHandler) in offline mode");
+                }, "void", ["pointer"]));
+                Interceptor.replace(baseAddr.add(0x10F0798), new NativeCallback(function (code, cb) {
+                    log("[🛡️ API EXCEPT] Suppressed ApiExceptControl.Except(code=" + code + ") in offline mode");
+                }, "void", ["int", "pointer"]));
+                log("[🛡️ API EXCEPT] ApiExceptControl hooks installed successfully!");
+            } catch (eApiEx) {
+                log("[-] Error hooking ApiExceptControl: " + eApiEx.message);
+            }
+
             // 2. AssetControl bypass (forzar IsResourceDownloadComplete=true, State=Done=8 y Progress=1.0)
             var assetControlReqTryDownloadPtr = baseAddr.add(0xAD792C);
             var assetControlResCompletePtr = baseAddr.add(0xAD7CC8);
@@ -10455,7 +10468,15 @@ function initIl2Cpp(module) {
                             }
                         }
 
-                        if (cmdRaw.indexOf("card:") === 0) {
+                        // Automatically dismiss any modal error popups (like -30002)
+                        try {
+                            var closeAllPopupsFn = new NativeFunction(baseAddr.add(0x114C680), "void", ["bool"]);
+                            closeAllPopupsFn(0);
+                        } catch (eCls) {}
+
+                        if (cmdRaw === "dismiss" || cmdRaw === "close_popups" || cmdRaw === "dismiss_popups") {
+                            log("[🛡️ POPUP CMD] Popups dismissed cleanly via Popup.CloseAll(0)!");
+                        } else if (cmdRaw.indexOf("card:") === 0) {
                             var cardArg = cmdRaw.substring(5).trim();
                             log("[🃏 CARD CMD] Triggering card select for arg: '" + cardArg + "' on scene: " + curScene);
                             if (curScene && !curScene.isNull() && sceneId === 4) {
@@ -10466,10 +10487,26 @@ function initIl2Cpp(module) {
                                     if (!dclPtr.isNull()) {
                                         var listItems = dclPtr.add(0x10).readPointer();
                                         var listSize = dclPtr.add(0x18).readS32();
-                                        if (isNaN(cardIdx) || cardIdx < 0 || cardIdx >= listSize) cardIdx = 0;
-                                        if (!listItems.isNull() && listSize > 0) {
-                                            targetCardItem = listItems.add(0x20 + cardIdx * 8).readPointer();
-                                            log("[🃏 CARD CMD] Selected CardItem[" + cardIdx + "] = " + targetCardItem + " (out of " + listSize + ")");
+                                        var argLower = cardArg.toLowerCase();
+                                        if (argLower === "jinsoul" || cardArg === "1007" || cardArg === "r50") {
+                                            for (var sc = 0; sc < listSize; sc++) {
+                                                var itmPtr = listItems.add(0x20 + sc * 8).readPointer();
+                                                if (!itmPtr.isNull()) {
+                                                    var rPtr = itmPtr.add(0x10).readPointer();
+                                                    if (!rPtr.isNull() && rPtr.add(0x20).readS32() === 1007) {
+                                                        targetCardItem = itmPtr;
+                                                        cardIdx = sc;
+                                                        log("[🃏 CARD CMD] Found JinSoul card at index: " + sc);
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            if (isNaN(cardIdx) || cardIdx < 0 || cardIdx >= listSize) cardIdx = 0;
+                                            if (!listItems.isNull() && listSize > 0) {
+                                                targetCardItem = listItems.add(0x20 + cardIdx * 8).readPointer();
+                                                log("[🃏 CARD CMD] Selected CardItem[" + cardIdx + "] = " + targetCardItem + " (out of " + listSize + ")");
+                                            }
                                         }
                                     }
                                 } catch (eDclCmd) {
