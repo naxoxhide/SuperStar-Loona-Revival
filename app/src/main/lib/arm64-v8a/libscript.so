@@ -1994,32 +1994,7 @@ function initIl2Cpp(module) {
             // Safe replacement for AssetControl.OnOpenContents (0xAD948C) to prevent crashes on missing online asset configs
             try {
                 Interceptor.replace(baseAddr.add(0xAD948C), new NativeCallback(function (methodInfo) {
-                    try {
-                        log("[📦 ASSET] Safe AssetControl.OnOpenContents running...");
-                        var openContentsFn = new NativeFunction(baseAddr.add(0xADAA74), "pointer", ["pointer"]);
-                        var list = openContentsFn(NULL);
-                        if (!list.isNull()) {
-                            var items = list.add(0x10).readPointer();
-                            var count = list.add(0x18).readS32();
-                            log("[📦 ASSET] Found " + count + " OpenAssetContents callbacks to execute safely");
-                            var invokeFn = new NativeFunction(baseAddr.add(0xB86944), "bool", ["pointer", "pointer"]);
-                            for (var i = 0; i < count; i++) {
-                                try {
-                                    var cb = items.add(0x20 + i * 8).readPointer();
-                                    if (!cb.isNull()) {
-                                        log("[📦 ASSET] Callback " + i + "/" + count + " starting (ptr: " + cb + ")...");
-                                        invokeFn(cb, NULL);
-                                        log("[📦 ASSET] Callback " + i + "/" + count + " finished.");
-                                    }
-                                } catch (eCb) {
-                                    log("[-] Safe bypass of asset callback[" + i + "]: " + eCb.message);
-                                }
-                            }
-                        }
-                        log("[📦 ASSET] Safe AssetControl.OnOpenContents completed cleanly!");
-                    } catch (eOoc) {
-                        log("[-] Error in safe OnOpenContents: " + eOoc.message);
-                    }
+                    log("[📦 ASSET] Safe AssetControl.OnOpenContents: bypassed cleanly for offline mode!");
                 }, "void", ["pointer"]));
                 log("[+] Safe replacement installed for AssetControl.OnOpenContents (0xAD948C)!");
             } catch (eOocH) {
@@ -2030,13 +2005,7 @@ function initIl2Cpp(module) {
             function ensureDownloadDone() {
                 if (downloadDoneCalled) return;
                 downloadDoneCalled = true;
-                log("[📦 ASSET] ensureDownloadDone invoked -> calling AssetControl.DownloadDone (0xADA150)");
-                try {
-                    var downloadDoneFn = new NativeFunction(baseAddr.add(0xADA150), 'void', ['pointer']);
-                    downloadDoneFn(NULL);
-                } catch (e) {
-                    log("[-] Error calling DownloadDone: " + e.message);
-                }
+                log("[📦 ASSET] ensureDownloadDone: bypassed cleanly for offline mode!");
             }
 
             try {
