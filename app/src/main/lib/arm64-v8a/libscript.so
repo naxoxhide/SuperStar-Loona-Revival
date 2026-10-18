@@ -1198,20 +1198,31 @@ function initIl2Cpp(module) {
                 log("[🛡️ LOGIN ASSIST] TitleLoginAssist.Close null guard installed!");
             } catch (eTla) {}
 
-            Interceptor.attach(requestSequentialLoginPtr, {
-                onEnter: function (args) {
-                    log("[🔐 LOGIN] TitleScene.RequestSequentialLogin called");
-                    var cb = args[1];
+            try {
+                var cachedServerName = null;
+                Interceptor.replace(baseAddr.add(0xB5C468), new NativeCallback(function (thiz, code, methodInfo) {
+                    if (!cachedServerName) cachedServerName = createIl2CppString("SSLO_LOCAL");
+                    return cachedServerName;
+                }, "pointer", ["pointer", "int", "pointer"]));
+                log("[+] Interceptor.replace installed on KeyVault.ServerSetting.GetName (0xB5C468)!");
+            } catch (eGsn) {}
+
+            try {
+                Interceptor.replace(requestSequentialLoginPtr, new NativeCallback(function (thiz, cb, methodInfo) {
+                    log("[🔐 LOGIN] TitleScene.RequestSequentialLogin replaced cleanly offline!");
                     if (!cb.isNull() && actionInvokeFn) {
                         try {
                             actionInvokeFn(cb, ptr(0));
-                            log("[🔐 LOGIN] RequestSequentialLogin callback invoked!");
+                            log("[🔐 LOGIN] RequestSequentialLogin callback invoked cleanly!");
                         } catch (e) {
                             log("[-] Error invoking sequential callback: " + e.message);
                         }
                     }
-                }
-            });
+                }, "void", ["pointer", "pointer", "pointer"]));
+                log("[+] Interceptor.replace installed on TitleScene.RequestSequentialLogin (0xB23630)!");
+            } catch (eRsl) {
+                log("[-] Error replacing RequestSequentialLogin: " + eRsl.message);
+            }
 
             function dismissFade() {
                 try {
