@@ -6213,6 +6213,8 @@ function initIl2Cpp(module) {
                     try {
                         log("[⚡ ON_INTENSIFY] Starting safe offline intensify mode transition...");
                         if (!sceneThis || sceneThis.isNull()) return;
+                        ensureInventoryLists(sceneThis);
+
                         var tCard = sceneThis.add(0x88).readPointer();
                         if (tCard.isNull()) tCard = sceneThis.add(0x98).readPointer();
                         if (tCard.isNull()) {
@@ -6244,9 +6246,19 @@ function initIl2Cpp(module) {
                         sceneThis.add(0xA8).writeDouble(1.0);
                         sceneThis.add(0xB0).writeDouble(1.0);
 
-                        // Clear material list
-                        var clearFn = new NativeFunction(baseAddr.add(0x1054118), "void", ["pointer"]);
-                        clearFn(sceneThis);
+                        // Clear material list safely
+                        var matList = sceneThis.add(0xA0).readPointer();
+                        if (!matList.isNull()) {
+                            var count = matList.add(0x18).readS32();
+                            var items = matList.add(0x10).readPointer();
+                            if (!items.isNull()) {
+                                for (var m = 0; m < count; m++) {
+                                    var it = items.add(0x20 + m * 8).readPointer();
+                                    if (!it.isNull()) it.add(0x2C).writeU8(0);
+                                }
+                            }
+                            matList.add(0x18).writeS32(0);
+                        }
 
                         // Transition state: SetStateIntensify(1, 1)
                         var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "int", "int", "pointer"]);
@@ -9866,6 +9878,34 @@ function initIl2Cpp(module) {
 
 
 
+
+                // InventoryScene.ClearMaterialCardItem (0x1054118) -> Safe null-guard replacement
+                try {
+                    Interceptor.replace(baseAddr.add(0x1054118), new NativeCallback(function(sceneThis) {
+                        try {
+                            if (!sceneThis || sceneThis.isNull()) return;
+                            ensureInventoryLists(sceneThis);
+                            var matList = sceneThis.add(0xA0).readPointer();
+                            if (!matList.isNull()) {
+                                var count = matList.add(0x18).readS32();
+                                var items = matList.add(0x10).readPointer();
+                                if (!items.isNull()) {
+                                    for (var m = 0; m < count; m++) {
+                                        var it = items.add(0x20 + m * 8).readPointer();
+                                        if (!it.isNull()) it.add(0x2C).writeU8(0);
+                                    }
+                                }
+                                matList.add(0x18).writeS32(0);
+                            }
+                            log("[🧹 CLEAR_MAT] ClearMaterialCardItem executed safely!");
+                        } catch (eCmEx) {
+                            log("[-] Error in ClearMaterialCardItem: " + eCmEx.message);
+                        }
+                    }, "void", ["pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.ClearMaterialCardItem (0x1054118)!");
+                } catch (eCm) {
+                    log("[-] Error hooking InventoryScene.ClearMaterialCardItem: " + eCm.message);
+                }
 
                 // InventoryScene.OnIntensify (0x105A97C) -> Safe offline entry into intensify mode
                 try {
