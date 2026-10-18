@@ -562,6 +562,32 @@ function initIl2Cpp(module) {
             }, "void", ["pointer", "pointer"]));
             log("[+] Hooked Platform.<getRegion>b__0 at: " + getRegionCallbackHandlerPtr);
 
+            // 1a2. PlatformControl.GetRegionInfo (0xC07628) - Direct TitleScene transition for seamless EntryScene completion
+            try {
+                var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), "void", ["pointer", "int", "pointer", "pointer", "pointer"]);
+                Interceptor.replace(baseAddr.add(0xC07628), new NativeCallback(function (cb) {
+                    log("[🌍 PLATFORM] PlatformControl.GetRegionInfo intercepted! cb: " + cb);
+                    try {
+                        if (!cb.isNull()) {
+                            var methodPtr = cb.add(0x10).readPointer();
+                            var entrySceneThis = cb.add(0x20).readPointer();
+                            log("[🌍 PLATFORM] methodPtr: " + methodPtr + " entrySceneThis: " + entrySceneThis);
+                            if (!entrySceneThis.isNull()) {
+                                log("[🌍 PLATFORM] Triggering SetStateOpenScene(2) on EntryScene...");
+                                setStateOpenSceneFn(entrySceneThis, 2, NULL, NULL, NULL);
+                                log("[🌟 SUCCESS] Scene.SetStateOpenScene(2) cleanly triggered!");
+                                return;
+                            }
+                        }
+                    } catch (eCb) {
+                        log("[-] Error invoking GetRegionInfo callback: " + eCb.message);
+                    }
+                }, "void", ["pointer"]));
+                log("[+] Hooked PlatformControl.GetRegionInfo at: " + baseAddr.add(0xC07628));
+            } catch (eGri) {
+                log("[-] Error hooking PlatformControl.GetRegionInfo: " + eGri.message);
+            }
+
             // 1b. Platform.<getTimestamp>b__0 (0xEF8130) - Evitar InvalidCastException de JObject a Int64
             var getTimestampCallbackHandlerPtr = baseAddr.add(0xEF8130);
             Interceptor.replace(getTimestampCallbackHandlerPtr, new NativeCallback(function (thiz, handle) {
@@ -5061,6 +5087,98 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing GetSelectViewData: " + eRepGsv.message);
                 }
 
+                // Shared helper for CardLargeView visual rendering (photo + grade/tier frame)
+                function applyCardLargeVisuals(card, cId, gr, isPrism) {
+                    try {
+                        if (!card || card.isNull()) return;
+                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var getTrFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                        var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                        var setPhotoVisFn = new NativeFunction(baseAddr.add(0x138F3A0), "void", ["pointer", "int", "pointer"]);
+                        var setTierVisFn = new NativeFunction(baseAddr.add(0x1393AAC), "void", ["pointer", "int", "pointer"]);
+                        var setAsLastSiblingFn = new NativeFunction(baseAddr.add(0x181ED70), "void", ["pointer", "pointer"]);
+                        var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
+
+                        // Photo (card + 0x58)
+                        var photo = card.add(0x58).readPointer();
+                        if (!photo.isNull()) {
+                            var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes") ||
+                                           loadLocalTexture2D("asiudgasg/asodhsg/weoihxd/" + cId + "_l.i.bytes");
+                            if (photoTex && !photoTex.isNull()) {
+                                setTextureFn(photo, photoTex, NULL);
+                                card.add(0x50).writePointer(photoTex);
+                                try { setNativeSizeFn(photo, NULL); } catch (eSns) {}
+                                var photoGo = getGoFn(photo, NULL);
+                                if (!photoGo.isNull()) setActiveFn(photoGo, 1, NULL);
+                            }
+                            setPhotoVisFn(card, 1, NULL);
+                        }
+
+                        // Tier Frame (card + 0x68)
+                        var tier = card.add(0x68).readPointer();
+                        if (!tier.isNull()) {
+                            var gLetter = (gr === 4) ? "r" : (gr === 3) ? "s" : (gr === 2) ? "a" : (gr === 1) ? "b" : "c";
+                            var tierRelPath = (gr === 1) ? "0b_l.i.bytes" : ("0_" + gLetter + "_l.i.bytes");
+                            var tierTex = loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/" + tierRelPath) ||
+                                          loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gLetter + "_l.i.bytes");
+                            if (tierTex && !tierTex.isNull()) {
+                                setTextureFn(tier, tierTex, NULL);
+                                card.add(0x60).writePointer(tierTex);
+                                try { setNativeSizeFn(tier, NULL); } catch (eSnsT) {}
+                                // Ensure opaque white color (1, 1, 1, 1)
+                                try {
+                                    tier.add(0x20).writeFloat(1.0);
+                                    tier.add(0x24).writeFloat(1.0);
+                                    tier.add(0x28).writeFloat(1.0);
+                                    tier.add(0x2C).writeFloat(1.0);
+                                } catch (eCol) {}
+                                var tierGo = getGoFn(tier, NULL);
+                                if (!tierGo.isNull()) setActiveFn(tierGo, 1, NULL);
+                                setTierVisFn(card, 1, NULL);
+
+                                // Bring tier to front of photo so it renders over photo
+                                try {
+                                    var tierTr = getTrFn(tier, NULL);
+                                    if (!tierTr.isNull()) {
+                                        setAsLastSiblingFn(tierTr, NULL);
+                                    }
+                                } catch (eSib) {}
+
+                                log("[🖼️ CARD TIER] Successfully loaded and raised large tier frame " + tierRelPath + " for grade=" + gr + " on card " + card);
+                            } else {
+                                log("[⚠️ CARD TIER] Could not load large tier frame " + tierRelPath);
+                            }
+                        }
+
+                        // Ensure numberLevel (badge 55) stays in front of tier frame
+                        try {
+                            var numLevel = card.add(0x80).readPointer();
+                            if (!numLevel.isNull()) {
+                                var nlGo = getGoFn(numLevel, NULL);
+                                if (!nlGo.isNull()) {
+                                    var nlTr = getTrFn(nlGo, NULL);
+                                    if (!nlTr.isNull()) setAsLastSiblingFn(nlTr, NULL);
+                                }
+                            }
+                        } catch (eNl) {}
+
+                        // Ensure starLevel stays in front if applicable
+                        try {
+                            var starLevel = card.add(0x78).readPointer();
+                            if (!starLevel.isNull()) {
+                                var slGo = getGoFn(starLevel, NULL);
+                                if (!slGo.isNull()) {
+                                    var slTr = getTrFn(slGo, NULL);
+                                    if (!slTr.isNull()) setAsLastSiblingFn(slTr, NULL);
+                                }
+                            }
+                        } catch (eSl) {}
+                    } catch (eVis) {
+                        log("[-] Error in applyCardLargeVisuals: " + eVis.message);
+                    }
+                }
+
                 // 9c2. InvenCardSelectView.Refresh (0xF22C34) -> Bulletproof replacement to prevent any NullReferenceException
                 function safeRefreshInvenCardSelectView(viewThis, p) {
                     try {
@@ -5082,6 +5200,25 @@ function initIl2Cpp(module) {
                         var gr = 4;
                         var lvl = 50;
                         var isPrism = false;
+                        var card = viewThis.add(0x38).readPointer();
+                        if (cardParams.isNull() && !card.isNull()) {
+                            var pBuf = card.add(0x48).readPointer();
+                            if (!pBuf.isNull()) cardParams = pBuf;
+                        }
+                        if (cardParams.isNull() && activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                            var tCard = activeInventorySceneInstance.add(0x88).readPointer();
+                            if (tCard.isNull()) tCard = activeInventorySceneInstance.add(0x98).readPointer();
+                            if (!tCard.isNull()) {
+                                var raw = tCard.add(0x10).readPointer();
+                                if (!raw.isNull()) {
+                                    cId = raw.add(0x20).readS32();
+                                    gr = raw.add(0x24).readS32();
+                                    lvl = raw.add(0x1C).readS16();
+                                    isPrism = (raw.add(0x2A).readU8() === 1);
+                                    cardParams = createMockLargeCardParams(cId, gr, lvl, isPrism);
+                                }
+                            }
+                        }
                         if (!cardParams.isNull()) {
                             try {
                                 var photoDp = cardParams.add(0x10).readPointer();
@@ -5112,7 +5249,6 @@ function initIl2Cpp(module) {
                         var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
 
                         // 1. card (0x38) -> CardLargeView
-                        var card = viewThis.add(0x38).readPointer();
                         if (!card.isNull()) {
                             if (!cardParams.isNull()) {
                                 try {
@@ -5120,22 +5256,14 @@ function initIl2Cpp(module) {
                                     cardRefreshFn(card, cardParams, NULL);
                                 } catch (eC) {}
                             }
-                            // Direct texture loading on photo (0x58) and tier (0x68) to guarantee immediate high-res portrait
+                            applyCardLargeVisuals(card, cId, gr, isPrism);
                             try {
-                                var photo = card.add(0x58).readPointer();
-                                if (!photo.isNull()) {
-                                    var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
-                                    if (photoTex && !photoTex.isNull()) {
-                                        setTextureFn(photo, photoTex, NULL);
-                                        try {
-                                            var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
-                                            setNativeSizeFn(photo, NULL);
-                                        } catch (eSns) {}
-                                        var photoGo = getGoFn(photo, NULL);
-                                        if (!photoGo.isNull()) setActiveFn(photoGo, 1, NULL);
-                                    }
+                                var numLevel = card.add(0x80).readPointer();
+                                if (!numLevel.isNull()) {
+                                    var setValFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "uint32", "pointer"]);
+                                    setValFn(numLevel, lvl, NULL);
                                 }
-                            } catch (ePh) {}
+                            } catch (eNumL) {}
                         }
 
                         // 2. groupName (0x40)
@@ -6418,6 +6546,17 @@ function initIl2Cpp(module) {
                         sceneThis.add(0xB0).writeDouble(1.0); // priceRate = 1.0
                         sceneThis.add(0xB8).writeS32(totalPrice);
 
+                        // Ensure InvenCardSelectView (target card view on the left) has complete visuals (frame, photo, badge)
+                        try {
+                            var svPtr = sceneThis.add(0x48).readPointer();
+                            if (!svPtr.isNull()) {
+                                var selV = svPtr.add(0x48).readPointer();
+                                if (!selV.isNull()) {
+                                    safeRefreshInvenCardSelectView(selV, NULL);
+                                }
+                            }
+                        } catch (eSelR) {}
+
                         log("[🎉 INTENSIFY VIEW REFRESHED] RegCount=" + regCards.length + ", Prob=" + totalProbRate.toFixed(1) + "% (" + probLabel + "), TotalPrice=" + totalPrice + " RP");
                     } catch (eSriv) {
                         log("[-] Error in safeRefreshIntensifyView: " + eSriv.message);
@@ -6904,6 +7043,17 @@ function initIl2Cpp(module) {
                                     var showMainLayoutFn = new NativeFunction(baseAddr.add(0x10571EC), "void", ["pointer", "int", "pointer"]);
                                     showMainLayoutFn(sceneView, 1, NULL);
                                     log("[✅ SET_STATE_MAIN] ShowMainLayout(true) called!");
+
+                                    // Deactivate btnBack (0x88) to eliminate black box artifact in card detail view
+                                    var btnBack = sceneView.add(0x88).readPointer();
+                                    if (!btnBack.isNull()) {
+                                        var go = btnBack.add(0x10).readPointer();
+                                        if (!go.isNull()) {
+                                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                            setActiveFn(go, 0, NULL);
+                                            log("[🚫 BLACK_SQUARE] Deactivated InventoryView.btnBack in safeSetStateMain");
+                                        }
+                                    }
                                 } catch (eSml) { log("[-] Error calling ShowMainLayout: " + eSml.message); }
 
                                 // 2. Correct InventoryView field offsets (from dump.cs):
@@ -6923,13 +7073,32 @@ function initIl2Cpp(module) {
                                     } catch (eMvr) { log("[-] Error refreshing mainView: " + eMvr.message); }
                                 }
 
-                                // 4. Refresh InvenCardSelectView (our replaced function handles it safely)
+                                // 4a. Refresh InvenCardSelectView (our replaced function handles it safely)
                                 if (!selectView.isNull()) {
                                     try {
                                         var selectParams = safeGetSelectViewData(sceneThis, selectedCardItem, NULL, (equippedCardItem && !equippedCardItem.isNull()) ? equippedCardItem : NULL, 0);
                                         safeRefreshInvenCardSelectView(selectView, selectParams);
                                         log("[✅ SET_STATE_MAIN] InvenCardSelectView refreshed!");
                                     } catch (eSvr) { log("[-] Error refreshing selectView: " + eSvr.message); }
+                                }
+
+                                // 4b. Refresh InvenCardEquipView & its CardLargeView (frame, photo, level)
+                                var equipView = sceneView.add(0x60).readPointer();
+                                if (!equipView.isNull()) {
+                                    try {
+                                        var eqCard = equipView.add(0x38).readPointer();
+                                        if (!eqCard.isNull()) {
+                                            applyCardLargeVisuals(eqCard, cId, gr, isPrism);
+                                            try {
+                                                var numLevel = eqCard.add(0x80).readPointer();
+                                                if (!numLevel.isNull()) {
+                                                    var setValFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "uint32", "pointer"]);
+                                                    setValFn(numLevel, lvl, NULL);
+                                                }
+                                            } catch (eNumL) {}
+                                            log("[🖼️ EQUIP VIEW TARGET] Applied large card visuals to equipView.card for cId=" + cId + " gr=" + gr + " lvl=" + lvl);
+                                        }
+                                    } catch (eEqV) { log("[-] Error updating equipView card: " + eEqV.message); }
                                 }
 
                                 // 5. Update lower card carousel (InvenCardView @ sceneView + 0x78) with member + theme filtered cards
@@ -8050,6 +8219,24 @@ function initIl2Cpp(module) {
                                     var cardRefreshFn = new NativeFunction(baseAddr.add(0x137F570), "void", ["pointer", "pointer", "pointer"]);
                                     cardRefreshFn(card, cardParams, NULL);
                                 } catch (eC) {}
+                                var eqCid = 1007;
+                                try {
+                                    var photoDp = cardParams.add(0x10).readPointer();
+                                    if (!photoDp.isNull()) {
+                                        var fpPtr = photoDp.add(0x18).readPointer();
+                                        if (!fpPtr.isNull()) {
+                                            var pLen = fpPtr.add(0x10).readS32();
+                                            if (pLen > 0) {
+                                                var pStr = fpPtr.add(0x14).readUtf16String(pLen);
+                                                var m = pStr.match(/(\d+)_l\.i\.bytes/);
+                                                if (m) eqCid = parseInt(m[1], 10);
+                                            }
+                                        }
+                                    }
+                                } catch (eEqCid) {}
+                                var eqGr = cardParams.add(0x3C).readS32();
+                                var eqPrism = (cardParams.add(0x20).readU8() === 1);
+                                applyCardLargeVisuals(card, eqCid, eqGr, eqPrism);
                             }
 
                             // 2. groupName (0x40)
@@ -8117,7 +8304,7 @@ function initIl2Cpp(module) {
                             var btnIntensify = viewThis.add(0xB0).readPointer();
                             var setBtnTextFn = new NativeFunction(baseAddr.add(0xE9B7B0), "void", ["pointer", "pointer", "pointer"]);
                             if (!btnEquip.isNull()) setBtnTextFn(btnEquip, createIl2CppString("Equip"), NULL);
-                            if (!btnCancel.isNull()) setBtnTextFn(btnCancel, createIl2CppString("Cancel"), NULL);
+                            // Note: btnCancel is an icon button ('X'), do not call set_Text on it to avoid black box graphic corruption
                             if (!btnIntensify.isNull()) setBtnTextFn(btnIntensify, createIl2CppString("Level Up"), NULL);
 
                             var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
@@ -9479,8 +9666,8 @@ function initIl2Cpp(module) {
                                     var dclPtr = activeInventorySceneInstance.add(0x58).readPointer();
                                     var cnt = 0;
                                     log("[🗃️ INVENTORY SCENE] OnOpen.onLeave: displayCardList count=" + cnt);
-                                    log("[🗃️ INVENTORY SCENE] Ensuring displayCardList and calling InvenCardView.SetData...");
-                                    restoreDefaultDisplayCardList(activeInventorySceneInstance, true);
+                                    log("[🗃️ INVENTORY SCENE] Ensuring displayCardList without premature SetData...");
+                                    restoreDefaultDisplayCardList(activeInventorySceneInstance, true, true);
                                 } catch (eOol) {
                                     log("[-] Error in InventoryScene.OnOpen.onLeave: " + eOol.message);
                                 }
@@ -10217,13 +10404,13 @@ function initIl2Cpp(module) {
                             }
                         }
 
-                        // 3. btnBack setActive(true)
+                        // 3. btnBack setActive(false) to completely eliminate floating black square/box artifact
                         var btnBack = sceneViewPtr.add(0x88).readPointer();
                         if (!btnBack.isNull()) {
                             var go = btnBack.add(0x10).readPointer();
                             if (!go.isNull()) {
                                 var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                                setActiveFn(go, 1, NULL);
+                                setActiveFn(go, 0, NULL);
                             }
                         }
 
@@ -10330,6 +10517,23 @@ function initIl2Cpp(module) {
                             if (!sceneView.isNull()) {
                                 var showIntensifyFn = new NativeFunction(baseAddr.add(0x1057B6C), "void", ["pointer"]);
                                 showIntensifyFn(sceneView);
+
+                                // Apply large card visuals & golden frame to selectView.card (left target card)
+                                var selectView = sceneView.add(0x48).readPointer();
+                                if (!selectView.isNull()) {
+                                    var sCard = selectView.add(0x38).readPointer();
+                                    if (!sCard.isNull()) {
+                                        applyCardLargeVisuals(sCard, tcId, tGr, false);
+                                        try {
+                                            var numLevel = sCard.add(0x80).readPointer();
+                                            if (!numLevel.isNull()) {
+                                                var setValFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "uint32", "pointer"]);
+                                                setValFn(numLevel, tLvl, NULL);
+                                            }
+                                        } catch (eNum) {}
+                                        log("[🖼️ INTENSIFY TARGET] Applied large card visuals to selectView.card for cId=" + tcId + " gr=" + tGr + " lvl=" + tLvl);
+                                    }
+                                }
                             }
 
                             // Refresh Intensify View (5 pedestals, probability, RP price, button states)
@@ -11139,6 +11343,114 @@ function initIl2Cpp(module) {
                                 var tCard = (!target.isNull()) ? target.add(0x18).readPointer() : NULL;
                                 var tCode = (!target.isNull()) ? target.add(0x20).readS16() : -1;
                                 log("[🔍 MAT_DIAG] target=" + target + " (Card=" + tCard + ", Code=" + tCode + "), matListCount=" + matCount + ", sv=" + sv + ", bbs=" + bbs + ", extractType=" + curScene.add(0x50).readS32());
+                            }
+                        } else if (cmdRaw === "diag_ui") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                log("[🔍 DIAG_UI] Starting InventoryView hierarchy scan...");
+                                var sceneView = curScene.add(0x48).readPointer();
+                                if (!sceneView.isNull()) {
+                                    var dGo = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                    var dTr = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                    var dActSelf = new NativeFunction(baseAddr.add(0x1DBAE44), "bool", ["pointer", "pointer"]);
+                                    var dActHier = new NativeFunction(baseAddr.add(0x1DBAE84), "bool", ["pointer", "pointer"]);
+                                    var dChildCount = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
+                                    var dGetChild = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                                    var dName = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                                    var dPos = new NativeFunction(baseAddr.add(0x180DE48), ["float", "float", "float"], ["pointer", "pointer"]);
+                                    var dSize = new NativeFunction(baseAddr.add(0x180DB70), ["float", "float"], ["pointer", "pointer"]);
+
+                                    var readName = function(obj) {
+                                        try {
+                                            var sPtr = dName(obj, NULL);
+                                            return readIl2CppString(sPtr) || "unknown";
+                                        } catch (eN) { return "err"; }
+                                    };
+
+                                    // btnBack check
+                                    var btnBack = sceneView.add(0x88).readPointer();
+                                    if (!btnBack.isNull()) {
+                                        var bbGo = btnBack.add(0x10).readPointer();
+                                        var bbTr = btnBack.add(0x18).readPointer();
+                                        var bbBox = btnBack.add(0x50).readPointer();
+                                        var bbPos = dPos(bbTr, NULL);
+                                        var bbSize = dSize(bbTr, NULL);
+                                        log("[🔍 DIAG_UI] btnBack: go=" + bbGo + " name=" + readName(bbGo) + " actSelf=" + dActSelf(bbGo, NULL) + " actHier=" + dActHier(bbGo, NULL) + " pos=[" + bbPos.map(function(v){return v.toFixed(0);}).join(",") + "] size=[" + bbSize.map(function(v){return v.toFixed(0);}).join(",") + "] box=" + bbBox);
+                                    }
+
+                                    // Scan direct children of sceneView
+                                    var svTr = dTr(sceneView, NULL);
+                                    var cCount = dChildCount(svTr, NULL);
+                                    log("[🔍 DIAG_UI] sceneView transform=" + svTr + " childCount=" + cCount);
+                                    for (var ci = 0; ci < cCount; ci++) {
+                                        var ch = dGetChild(svTr, ci, NULL);
+                                        if (ch.isNull()) continue;
+                                        var cGo = dGo(ch, NULL);
+                                        var cName = readName(cGo);
+                                        var cH = dActHier(cGo, NULL);
+                                        var cS = dActSelf(cGo, NULL);
+                                        var cP = dPos(ch, NULL);
+                                        var cSz = dSize(ch, NULL);
+                                        log("[🔍 DIAG_UI] [" + ci + "] " + cName + " hier=" + cH + " self=" + cS + " pos=[" + cP.map(function(v){return v.toFixed(0);}).join(",") + "] size=[" + cSz.map(function(v){return v.toFixed(0);}).join(",") + "]");
+                                        // Scan 1 sub-level
+                                        var subCount = dChildCount(ch, NULL);
+                                        for (var si = 0; si < subCount; si++) {
+                                            var sch = dGetChild(ch, si, NULL);
+                                            if (sch.isNull()) continue;
+                                            var sGo = dGo(sch, NULL);
+                                            var sH = dActHier(sGo, NULL);
+                                            if (sH) {
+                                                var sName = readName(sGo);
+                                                var sP = dPos(sch, NULL);
+                                                var sSz = dSize(sch, NULL);
+                                                log("[🔍 DIAG_UI]   sub[" + si + "] " + sName + " pos=[" + sP.map(function(v){return v.toFixed(0);}).join(",") + "] size=[" + sSz.map(function(v){return v.toFixed(0);}).join(",") + "]");
+                                            }
+                                        }
+                                    }
+
+                                    // Direct CardLargeView inspection in selectView
+                                    var selView = sceneView.add(0x48).readPointer();
+                                    if (!selView.isNull()) {
+                                        var card = selView.add(0x38).readPointer();
+                                        if (!card.isNull()) {
+                                            var photo = card.add(0x58).readPointer();
+                                            var tier = card.add(0x68).readPointer();
+                                            var cardTr = dTr(card, NULL);
+                                            var cardCount = dChildCount(cardTr, NULL);
+                                            log("[🔍 DIAG_CARD] card=" + card + " children=" + cardCount + " photo=" + photo + " tier=" + tier);
+                                            for (var ki = 0; ki < cardCount; ki++) {
+                                                var kch = dGetChild(cardTr, ki, NULL);
+                                                if (kch.isNull()) continue;
+                                                var kGo = dGo(kch, NULL);
+                                                var kName = readName(kGo);
+                                                var kH = dActHier(kGo, NULL);
+                                                var kS = dActSelf(kGo, NULL);
+                                                var kP = dPos(kch, NULL);
+                                                var kSz = dSize(kch, NULL);
+                                                log("[🔍 DIAG_CARD] [" + ki + "] " + kName + " hier=" + kH + " self=" + kS + " pos=[" + kP.map(function(v){return v.toFixed(0);}).join(",") + "] size=[" + kSz.map(function(v){return v.toFixed(0);}).join(",") + "]");
+                                            }
+                                            if (!tier.isNull()) {
+                                                var tierGo = dGo(dTr(tier, NULL), NULL);
+                                                var tierTr = dTr(tier, NULL);
+                                                log("[🔍 DIAG_TIER] tier: go=" + tierGo + " name=" + readName(tierGo) + " actSelf=" + dActSelf(tierGo, NULL) + " actHier=" + dActHier(tierGo, NULL) + " pos=[" + dPos(tierTr, NULL).map(function(v){return v.toFixed(0);}).join(",") + "] size=[" + dSize(tierTr, NULL).map(function(v){return v.toFixed(0);}).join(",") + "]");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else if (cmdRaw === "hide_back") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                var sceneView = curScene.add(0x48).readPointer();
+                                if (!sceneView.isNull()) {
+                                    var btnBack = sceneView.add(0x88).readPointer();
+                                    if (!btnBack.isNull()) {
+                                        var bbGo = btnBack.add(0x10).readPointer();
+                                        if (!bbGo.isNull()) {
+                                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                            setActiveFn(bbGo, 0, NULL);
+                                            log("[🚫 HIDE_BACK] btnBack.gameObject set to Active(0)!");
+                                        }
+                                    }
+                                }
                             }
                         } else if (cmdRaw === "reload_script") {
                             try {
