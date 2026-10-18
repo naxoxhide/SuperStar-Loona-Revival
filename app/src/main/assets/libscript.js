@@ -10369,7 +10369,7 @@ function initIl2Cpp(module) {
                     var cardId = rawObj.add(0x20).readS32();
                     var grade = rawObj.add(0x24).readS32();
                     var isPrism = (rawObj.add(0x2A).readU8() !== 0);
-                    var maxLevel = (grade === 4) ? 50 : 5;
+                    var maxLevel = (grade === 4) ? 99 : 5;
 
                     log("[⚡ INTENSIFY] Target Card: ID=" + cardId + " (ObjectID=" + targetObjId + "), Grade=" + grade + ", Level=" + level + "/" + maxLevel + ", Score=" + score + ", Energy=" + energy);
 
@@ -10423,7 +10423,15 @@ function initIl2Cpp(module) {
                     rawObj.add(0x1A).writeS16(newStats.score);
                     rawObj.add(0x1C).writeS16(currentLvl);
 
+                    var newTargetCode = (grade < 4) ? (grade * 5 + Math.min(4, currentLvl - 1)) : (20 + Math.min(98, currentLvl - 1));
+                    cardItem.add(0x20).writeS16(newTargetCode);
+
                     // Update player_profile.json
+                    var consumedIds = {};
+                    for (var k = 0; k < materials.length; k++) {
+                        consumedIds[materials[k].objId] = true;
+                    }
+
                     try {
                         var profile = loadPlayerProfile();
                         if (profile) {
@@ -10440,10 +10448,6 @@ function initIl2Cpp(module) {
                                         cardEntry.energy = newStats.energy;
                                     }
                                 }
-                                var consumedIds = {};
-                                for (var k = 0; k < materials.length; k++) {
-                                    consumedIds[materials[k].objId] = true;
-                                }
                                 profile.inventoryCards = profile.inventoryCards.filter(function(cardItemJson) {
                                     return !consumedIds[cardItemJson.objectID];
                                 });
@@ -10454,6 +10458,17 @@ function initIl2Cpp(module) {
                         }
                     } catch (eProf) {
                         log("[-] Error updating player_profile.json: " + eProf.message);
+                    }
+
+                    // Remove consumed cards from global loonaCardItems
+                    if (loonaCardItems && loonaCardItems.length > 0) {
+                        loonaCardItems = loonaCardItems.filter(function(ci) {
+                            if (!ci || ci.isNull()) return false;
+                            var r = ci.add(0x10).readPointer();
+                            if (!r || r.isNull()) return false;
+                            return !consumedIds[r.add(0x10).readS64()];
+                        });
+                        log("[🃏 CARDS] Filtered loonaCardItems, new count: " + loonaCardItems.length);
                     }
 
                     // Remove consumed materials from in-memory CardMap
@@ -10491,7 +10506,107 @@ function initIl2Cpp(module) {
                         invokeFn(callback, 1000, resArr, NULL);
                         log("[🎉 CALLBACK COMPLETE] Intensify result dispatched successfully!");
                     } else {
-                        log("[-] Warning: IntensifyCallback pointer is NULL!");
+                        log("[-] Info: IntensifyCallback pointer is NULL (offline direct mode)");
+                    }
+                }
+
+                // Clean standalone executor for offline intensify
+                function executeOfflineTry(sceneThis) {
+                    try {
+                        log("[⚡ OFFLINE TRY] Initiating offline intensify try...");
+                        if (!sceneThis || sceneThis.isNull()) {
+                            if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                sceneThis = activeInventorySceneInstance;
+                            } else {
+                                log("[-] OFFLINE TRY: sceneThis and activeInventorySceneInstance are null!");
+                                return;
+                            }
+                        }
+
+                        var targetCard = sceneThis.add(0x88).readPointer();
+                        if (targetCard.isNull()) targetCard = sceneThis.add(0x98).readPointer();
+                        if (!targetCard || targetCard.isNull()) {
+                            log("[-] OFFLINE TRY: targetCard is null!");
+                            return;
+                        }
+
+                        var matList = sceneThis.add(0xA0).readPointer();
+                        if (!matList || matList.isNull()) {
+                            log("[-] OFFLINE TRY: matList is null!");
+                            return;
+                        }
+                        var matCount = matList.add(0x18).readS32();
+                        if (matCount <= 0) {
+                            log("[-] OFFLINE TRY: No material cards registered (count=" + matCount + ")");
+                            return;
+                        }
+
+                        var probRate = sceneThis.add(0xA8).readDouble();
+                        var priceRate = sceneThis.add(0xB0).readDouble();
+
+                        // 1. Play button touch sound
+                        try {
+                            var playSoundFn = new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"]);
+                            var sName = createIl2CppString("btn_touch");
+                            playSoundFn(sName, NULL);
+                        } catch (eSnd) {}
+
+                        // 2. Execute offline intensify calculation, RNG rolls, and data saving
+                        handleOfflineIntensify(targetCard, matList, NULL, probRate, priceRate, NULL);
+
+                        // 3. Clear registered material cards from scene
+                        try {
+                            var clearFn = new NativeFunction(baseAddr.add(0x1054118), "void", ["pointer"]);
+                            clearFn(sceneThis);
+                            log("[🧹 OFFLINE TRY] Cleared registered material list on scene!");
+                        } catch (eClr) {
+                            log("[-] Error clearing material list: " + eClr.message);
+                        }
+
+                        // 4. Update the target card's visual numberLevel and stats on the left panel
+                        try {
+                            var rawObj = targetCard.add(0x10).readPointer();
+                            var updatedLvl = (!rawObj.isNull()) ? rawObj.add(0x1C).readS16() : 50;
+                            var updatedScore = (!rawObj.isNull()) ? rawObj.add(0x1A).readS16() : 199;
+                            var updatedEnergy = (!rawObj.isNull()) ? rawObj.add(0x18).readS16() : 100;
+
+                            var sceneView = sceneThis.add(0x48).readPointer();
+                            if (!sceneView.isNull()) {
+                                var equipView = sceneView.add(0x60).readPointer();
+                                if (!equipView.isNull()) {
+                                    var cardLarge = equipView.add(0x38).readPointer();
+                                    if (!cardLarge.isNull()) {
+                                        var numLevel = cardLarge.add(0x80).readPointer();
+                                        if (!numLevel.isNull()) {
+                                            var setValFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "uint32", "pointer"]);
+                                            setValFn(numLevel, updatedLvl, NULL);
+                                            log("[✨ OFFLINE TRY] Updated cardLarge numberLevel to: " + updatedLvl);
+                                        }
+                                    }
+                                    var statView = equipView.add(0x50).readPointer();
+                                    if (!statView.isNull()) {
+                                        var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                        var scoreText = statView.add(0x48).readPointer();
+                                        if (!scoreText.isNull()) setTextFn(scoreText, createIl2CppString("" + updatedScore), NULL);
+                                        var energyText = statView.add(0x68).readPointer();
+                                        if (!energyText.isNull()) setTextFn(energyText, createIl2CppString("" + updatedEnergy), NULL);
+                                        log("[✨ OFFLINE TRY] Updated statView: Score=" + updatedScore + ", Energy=" + updatedEnergy);
+                                    }
+                                }
+                            }
+                        } catch (eVisual) {
+                            log("[-] Error updating left card visuals: " + eVisual.message);
+                        }
+
+                        // 5. Refresh Intensify View (resets 5 pedestals to idle, probability to 0%, disables TRY button)
+                        safeRefreshIntensifyView(sceneThis);
+
+                        // 6. Refresh bottom material list (carousel)
+                        populateMaterialDisplayCardList(sceneThis);
+
+                        log("[🎉 OFFLINE TRY COMPLETE] Offline intensify completed and UI refreshed smoothly!");
+                    } catch (eTry) {
+                        log("[-] Error in executeOfflineTry: " + eTry.message + " stack: " + eTry.stack);
                     }
                 }
 
@@ -10508,6 +10623,28 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on InventoryControl.Intensify (0xF1DCCC)!");
                 } catch (eIcInt) {
                     log("[-] Error replacing InventoryControl.Intensify: " + eIcInt.message);
+                }
+
+                // Hook native InventoryScene.OnIntensifyTry (0x105BA9C) to execute offline try safely
+                try {
+                    Interceptor.replace(baseAddr.add(0x105BA9C), new NativeCallback(function(sceneThis) {
+                        log("[⚡ NATIVE OnIntensifyTry] Intercepted on scene: " + sceneThis);
+                        executeOfflineTry(sceneThis);
+                    }, "void", ["pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.OnIntensifyTry (0x105BA9C)!");
+                } catch (eOit) {
+                    log("[-] Error replacing InventoryScene.OnIntensifyTry: " + eOit.message);
+                }
+
+                // Hook UI button click InvenCardIntensifyView.OnTry (0xF22758)
+                try {
+                    Interceptor.replace(baseAddr.add(0xF22758), new NativeCallback(function(thiz) {
+                        log("[⚡ UI BUTTON TRY] InvenCardIntensifyView.OnTry clicked!");
+                        executeOfflineTry(activeInventorySceneInstance);
+                    }, "void", ["pointer"]));
+                    log("[+] Interceptor.replace installed on InvenCardIntensifyView.OnTry (0xF22758)!");
+                } catch (eOtv) {
+                    log("[-] Error replacing InvenCardIntensifyView.OnTry: " + eOtv.message);
                 }
 
                 var activeCardIntensifyPopup = NULL;
@@ -10958,43 +11095,8 @@ function initIl2Cpp(module) {
                             }
                         } else if (cmdRaw === "try") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
-                                log("[⚡ TRY CMD] Triggering InventoryScene.OnIntensifyTry directly!");
-                                // Verify target card & materials before try
-                                var tCard = curScene.add(0x88).readPointer();
-                                if (!tCard.isNull()) {
-                                    var tRaw = tCard.add(0x10).readPointer();
-                                    if (!tRaw.isNull()) {
-                                        var tcId = tRaw.add(0x20).readS32();
-                                        var tCcd = getOrCreateCardControlData(tcId);
-                                        tCard.add(0x18).writePointer(tCcd || NULL);
-                                        var tGr = tRaw.add(0x24).readS32();
-                                        var tLvl = tRaw.add(0x1C).readS16();
-                                        var tCode = (tGr < 4) ? (tGr * 5 + Math.min(4, tLvl - 1)) : (20 + Math.min(98, tLvl - 1));
-                                        tCard.add(0x20).writeS16(tCode);
-                                    }
-                                }
-                                var matList = curScene.add(0xA0).readPointer();
-                                if (!matList.isNull()) {
-                                    var mCount = matList.add(0x18).readS32();
-                                    var mItems = matList.add(0x10).readPointer();
-                                    for (var m = 0; m < mCount; m++) {
-                                        var mItem = mItems.add(0x20 + m * 8).readPointer();
-                                        if (mItem && !mItem.isNull()) {
-                                            var mRaw = mItem.add(0x10).readPointer();
-                                            if (!mRaw.isNull()) {
-                                                var mcId = mRaw.add(0x20).readS32();
-                                                var mccd = getOrCreateCardControlData(mcId);
-                                                mItem.add(0x18).writePointer(mccd || NULL);
-                                                var mgr = mRaw.add(0x24).readS32();
-                                                var mlvl = mRaw.add(0x1C).readS16();
-                                                var mfCode = (mgr < 4) ? (mgr * 5 + Math.min(4, mlvl - 1)) : (20 + Math.min(98, mlvl - 1));
-                                                mItem.add(0x20).writeS16(mfCode);
-                                            }
-                                        }
-                                    }
-                                }
-                                var onTryFn = new NativeFunction(baseAddr.add(0x105BA9C), "void", ["pointer"]);
-                                onTryFn(curScene);
+                                log("[⚡ TRY CMD] Executing offline intensify try!");
+                                executeOfflineTry(curScene);
                             }
                         } else if (cmdRaw === "try_popup") {
                             if (activeCardIntensifyPopup && !activeCardIntensifyPopup.isNull()) {
