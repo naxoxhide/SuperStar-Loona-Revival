@@ -5390,6 +5390,22 @@ function initIl2Cpp(module) {
                                     var unregFn = new NativeFunction(baseAddr.add(0x1058A04), "void", ["pointer", "pointer"]);
                                     unregFn(sceneThis, clickedCardItem);
                                 } else {
+                                    var matList = sceneThis.add(0xA0).readPointer();
+                                    var curCount = (!matList.isNull()) ? matList.add(0x18).readS32() : 0;
+                                    if (curCount >= 5) {
+                                        log("[⚠️ ON_CARD_ITEM_INTENSIFY] Material slots full (5/5)!");
+                                        return;
+                                    }
+                                    var clickedRaw = clickedCardItem.add(0x10).readPointer();
+                                    if (!clickedRaw.isNull()) {
+                                        var cId = clickedRaw.add(0x20).readS32();
+                                        var ccd = getOrCreateCardControlData(cId);
+                                        clickedCardItem.add(0x18).writePointer(ccd || NULL);
+                                        var gr = clickedRaw.add(0x24).readS32();
+                                        var lvl = clickedRaw.add(0x1C).readS16();
+                                        var fCode = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
+                                        clickedCardItem.add(0x20).writeS16(fCode);
+                                    }
                                     log("[⚡ ON_CARD_ITEM_INTENSIFY] Registering material card: " + clickedCardItem);
                                     var regFn = new NativeFunction(baseAddr.add(0x1056B5C), "void", ["pointer", "pointer"]);
                                     regFn(sceneThis, clickedCardItem);
@@ -10255,80 +10271,66 @@ function initIl2Cpp(module) {
                 }
 
 
-                // InventoryScene.SetStateIntensify (0x1056BCC)
+                // InventoryScene.SetStateIntensify (0x1056BCC) -> Full safe offline replace
                 try {
-                    Interceptor.attach(baseAddr.add(0x1056BCC), {
-                        onEnter: function(args) {
-                            var sceneThis = args[0];
-                            log("[⚡ INVENTORY] InventoryScene.SetStateIntensify called! isReload=" + args[1] + ", isUpdate=" + args[2]);
-                            try {
-                                var tCard = sceneThis.add(0x88).readPointer();
-                                if (tCard.isNull()) tCard = sceneThis.add(0x98).readPointer();
-                                if (!tCard.isNull()) {
-                                    sceneThis.add(0x88).writePointer(tCard);
-                                    sceneThis.add(0x98).writePointer(tCard);
-                                    var tRaw = tCard.add(0x10).readPointer();
-                                    if (!tRaw.isNull()) {
-                                        var tcId = tRaw.add(0x20).readS32();
-                                        var tCcd = getOrCreateCardControlData(tcId);
-                                        tCard.add(0x18).writePointer(tCcd || NULL);
-                                        var tGr = tRaw.add(0x24).readS32();
-                                        var tLvl = tRaw.add(0x1C).readS16();
-                                        var tCode = (tGr < 4) ? (tGr * 5 + Math.min(4, tLvl - 1)) : (20 + Math.min(98, tLvl - 1));
-                                        tCard.add(0x20).writeS16(tCode);
+                    Interceptor.replace(baseAddr.add(0x1056BCC), new NativeCallback(function(sceneThis, isReload, isUpdate, method) {
+                        log("[⚡ SetStateIntensify REPLACE] isReload=" + isReload + ", isUpdate=" + isUpdate + ", scene=" + sceneThis);
+                        try {
+                            if (!sceneThis || sceneThis.isNull()) return;
+                            ensureInventoryLists(sceneThis);
+                            sceneThis.add(0x24).writeS32(8); // STATE.Intensify
+
+                            // Ensure target card and artist
+                            var tCard = sceneThis.add(0x88).readPointer();
+                            if (tCard.isNull()) tCard = sceneThis.add(0x98).readPointer();
+                            if (!tCard.isNull()) {
+                                sceneThis.add(0x88).writePointer(tCard);
+                                sceneThis.add(0x98).writePointer(tCard);
+                                var tRaw = tCard.add(0x10).readPointer();
+                                if (!tRaw.isNull()) {
+                                    var tcId = tRaw.add(0x20).readS32();
+                                    var tCcd = getOrCreateCardControlData(tcId);
+                                    tCard.add(0x18).writePointer(tCcd || NULL);
+                                    var tGr = tRaw.add(0x24).readS32();
+                                    var tLvl = tRaw.add(0x1C).readS16();
+                                    var tCode = (tGr < 4) ? (tGr * 5 + Math.min(4, tLvl - 1)) : (20 + Math.min(98, tLvl - 1));
+                                    tCard.add(0x20).writeS16(tCode);
+
+                                    var artMeta = getCardMetadata(tcId);
+                                    var artId = artMeta ? artMeta.artistID : 0;
+                                    if (artId > 0 && loonaArtistDataMap[artId]) {
+                                        sceneThis.add(0x80).writePointer(loonaArtistDataMap[artId]);
                                     }
                                 }
-                                if (sceneThis.add(0xA8).readDouble() === 0.0) {
-                                    sceneThis.add(0xA8).writeDouble(1.0);
-                                }
-                                if (sceneThis.add(0xB0).readDouble() === 0.0) {
-                                    sceneThis.add(0xB0).writeDouble(1.0);
-                                }
-                                // Ensure selectedArtistData (0x80) is populated
-                                var curArt = sceneThis.add(0x80).readPointer();
-                                if (curArt.isNull() && !tCard.isNull()) {
-                                    var tRawArt = tCard.add(0x10).readPointer();
-                                    if (!tRawArt.isNull()) {
-                                        var artCId = tRawArt.add(0x20).readS32();
-                                        var artMeta = getCardMetadata(artCId);
-                                        var artId = artMeta ? artMeta.artistID : 0;
-                                        if (artId > 0 && loonaArtistDataMap[artId]) {
-                                            sceneThis.add(0x80).writePointer(loonaArtistDataMap[artId]);
-                                            log("[⚡ SetStateIntensify] Injected selectedArtistData for artist " + artId);
-                                        }
-                                    }
-                                }
-                                // Ensure all items in materialCardItemList (0xA0) have Card backing & IntensifyCode
-                                var matList = sceneThis.add(0xA0).readPointer();
-                                if (!matList.isNull()) {
-                                    var mCount = matList.add(0x18).readS32();
-                                    var mItems = matList.add(0x10).readPointer();
-                                    for (var m = 0; m < mCount; m++) {
-                                        var mItem = mItems.add(0x20 + m * 8).readPointer();
-                                        if (mItem && !mItem.isNull()) {
-                                            var mRaw = mItem.add(0x10).readPointer();
-                                            if (!mRaw.isNull()) {
-                                                var mcId = mRaw.add(0x20).readS32();
-                                                var mccd = getOrCreateCardControlData(mcId);
-                                                mItem.add(0x18).writePointer(mccd || NULL);
-                                                var mgr = mRaw.add(0x24).readS32();
-                                                var mlvl = mRaw.add(0x1C).readS16();
-                                                var mfCode = (mgr < 4) ? (mgr * 5 + Math.min(4, mlvl - 1)) : (20 + Math.min(98, mlvl - 1));
-                                                mItem.add(0x20).writeS16(mfCode);
-                                            }
-                                        }
-                                    }
-                                }
-                            } catch (eSsi) {
-                                log("[-] Error in SetStateIntensify onEnter: " + eSsi.message);
                             }
-                        },
-                        onLeave: function(retval) {
-                            log("[🎯 SetStateIntensify] LEAVE successfully!");
+
+                            if (sceneThis.add(0xA8).readDouble() === 0.0) {
+                                sceneThis.add(0xA8).writeDouble(1.0);
+                            }
+                            if (sceneThis.add(0xB0).readDouble() === 0.0) {
+                                sceneThis.add(0xB0).writeDouble(1.0);
+                            }
+
+                            // Show Intensify Layout
+                            var sceneView = sceneThis.add(0x48).readPointer();
+                            if (!sceneView.isNull()) {
+                                var showIntensifyFn = new NativeFunction(baseAddr.add(0x1057B6C), "void", ["pointer"]);
+                                showIntensifyFn(sceneView);
+                            }
+
+                            // Refresh Intensify View (5 pedestals, probability, RP price, button states)
+                            safeRefreshIntensifyView(sceneThis);
+
+                            // Populate bottom material card list
+                            populateMaterialDisplayCardList(sceneThis);
+                            log("[🎉 SetStateIntensify REPLACE] Successfully updated intensify view & material list!");
+                        } catch (eSsi) {
+                            log("[-] Error in replaced SetStateIntensify: " + eSsi.message);
                         }
-                    });
+                    }, "void", ["pointer", "int", "int", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.SetStateIntensify (0x1056BCC)!");
                 } catch (eSsi) {
-                    log("[-] Error hooking InventoryScene.SetStateIntensify: " + eSsi.message);
+                    log("[-] Error replacing InventoryScene.SetStateIntensify: " + eSsi.message);
                 }
 
                 // =========================================================================
