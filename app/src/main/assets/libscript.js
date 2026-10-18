@@ -11015,7 +11015,7 @@ function initIl2Cpp(module) {
                                 } catch (e) {}
                             }
 
-                            // FastMutex Watchdog & Deadlock Breaker during scene load
+                            // FastMutex Watchdog & Deadlock Breaker during scene load (safe wake only)
                             if (isChanging === 1 || !asyncOp.isNull() || sceneId === 3) {
                                 try {
                                     var pFutex = baseAddr.add(0x3392580);
@@ -11025,33 +11025,25 @@ function initIl2Cpp(module) {
 
                                     if (futexVal !== 0 && progressVal < 0.99) {
                                         deadlockFrames = (deadlockFrames || 0) + 1;
-                                        if (deadlockFrames >= 15) { // ~250ms stuck
-                                            var owner = pOwner.readPointer();
+                                        if (deadlockFrames >= 300) { // > 5 seconds
                                             var recurCount = pRecur.readU32();
-
-                                            log("🚨 [DEADLOCK WATCHDOG] Breaking stuck lock at prog=" + progressVal.toFixed(4) + "! futex=" + futexVal + " owner=" + owner + " recur=" + recurCount);
-
-                                            // Reset lock state
-                                            pOwner.writePointer(NULL);
-                                            pRecur.writeU32(0);
-                                            pFutex.writeU32(0);
-
-                                            // Wake futex waiters
+                                            if (recurCount >= 2) {
+                                                log("🚨 [DEADLOCK WATCHDOG] Breaking stuck recursive lock at prog=" + progressVal.toFixed(4) + "! recur=" + recurCount);
+                                                pOwner.writePointer(NULL);
+                                                pRecur.writeU32(0);
+                                                pFutex.writeU32(0);
+                                            }
                                             var syscallPtr = Module.findExportByName("libc.so", "syscall");
                                             if (syscallPtr) {
                                                 var syscallFn = new NativeFunction(syscallPtr, "int", ["int", "pointer", "int", "int"]);
-                                                var w1 = syscallFn(98, pFutex, 129, 2147483647);
-                                                var w2 = syscallFn(98, pFutex, 1, 2147483647);
-                                                log("[🔓 DEADLOCK RESOLVED] Woke futex waiters: priv=" + w1 + ", shared=" + w2);
+                                                syscallFn(98, pFutex, 129, 2147483647);
                                             }
                                             deadlockFrames = 0;
                                         }
                                     } else {
                                         deadlockFrames = 0;
                                     }
-                                } catch (de) {
-                                    log("[-] Error in watchdog: " + de.message);
-                                }
+                                } catch (de) {}
                             }
 
                             if (sceneUpdateCounter % 60 === 0) {
