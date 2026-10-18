@@ -6293,8 +6293,9 @@ function initIl2Cpp(module) {
                         var getGameObjectFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                         var cardRefreshFn = new NativeFunction(baseAddr.add(0x137F570), "void", ["pointer", "pointer", "pointer"]);
                         var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
-                        var setTextureFn = new NativeFunction(baseAddr.add(0x180FEF0), "void", ["pointer", "pointer", "pointer"]);
-                        var setEnabledFn = new NativeFunction(baseAddr.add(0x180E740), "void", ["pointer", "bool", "pointer"]);
+                        var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                        var setPhotoVisFn = new NativeFunction(baseAddr.add(0x138F3A0), "void", ["pointer", "int", "pointer"]);
+                        var setTierVisFn = new NativeFunction(baseAddr.add(0x1393AAC), "void", ["pointer", "int", "pointer"]);
 
                         var totalPrice = 0;
                         var failureProbProduct = 1.0;
@@ -6330,26 +6331,30 @@ function initIl2Cpp(module) {
                                     log("[-] Error refreshing cardSmall: " + eCrf.message);
                                 }
 
-                                // Direct texture injection
-                                var photoRawImg = cardSmall.add(0x58).readPointer();
-                                if (!photoRawImg.isNull()) {
-                                    var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") ||
-                                                   loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
-                                    if (photoTex && !photoTex.isNull()) {
-                                        setTextureFn(photoRawImg, photoTex, NULL);
-                                        setEnabledFn(photoRawImg, 1, NULL);
+                                // Direct texture injection & visibility
+                                try {
+                                    var photoRawImg = cardSmall.add(0x58).readPointer();
+                                    if (!photoRawImg.isNull()) {
+                                        var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes") ||
+                                                       loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes");
+                                        if (photoTex && !photoTex.isNull()) {
+                                            setTextureFn(photoRawImg, photoTex, NULL);
+                                        }
                                     }
-                                }
-                                var tierRawImg = cardSmall.add(0x68).readPointer();
-                                if (!tierRawImg.isNull()) {
-                                    var gLetter = (gr === 4) ? "r" : (gr === 3) ? "s" : (gr === 2) ? "a" : (gr === 1) ? "b" : "c";
-                                    var tierRelPath = (gr === 1) ? "0b_s.i.bytes" : ("0_" + gLetter + "_s.i.bytes");
-                                    var tierTex = loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/" + tierRelPath) ||
-                                                  loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gLetter + "_s.i.bytes");
-                                    if (tierTex && !tierTex.isNull()) {
-                                        setTextureFn(tierRawImg, tierTex, NULL);
-                                        setEnabledFn(tierRawImg, 1, NULL);
+                                    var tierRawImg = cardSmall.add(0x68).readPointer();
+                                    if (!tierRawImg.isNull()) {
+                                        var gLetter = (gr === 4) ? "r" : (gr === 3) ? "s" : (gr === 2) ? "a" : (gr === 1) ? "b" : "c";
+                                        var tierRelPath = (gr === 1) ? "0b_s.i.bytes" : ("0_" + gLetter + "_s.i.bytes");
+                                        var tierTex = loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/" + tierRelPath) ||
+                                                      loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gLetter + "_s.i.bytes");
+                                        if (tierTex && !tierTex.isNull()) {
+                                            setTextureFn(tierRawImg, tierTex, NULL);
+                                        }
                                     }
+                                    setPhotoVisFn(cardSmall, 1, NULL);
+                                    setTierVisFn(cardSmall, 1, NULL);
+                                } catch (eTex) {
+                                    log("[-] Error injecting textures: " + eTex.message);
                                 }
 
                                 if (!mountGo.isNull()) setActiveFn(mountGo, 1, NULL);
