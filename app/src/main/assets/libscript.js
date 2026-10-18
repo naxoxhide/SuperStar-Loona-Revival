@@ -1200,11 +1200,22 @@ function initIl2Cpp(module) {
 
             try {
                 var cachedServerName = null;
+                var cachedServerCode = null;
                 Interceptor.replace(baseAddr.add(0xB5C468), new NativeCallback(function (thiz, code, methodInfo) {
                     if (!cachedServerName) cachedServerName = createIl2CppString("SSLO_LOCAL");
                     return cachedServerName;
                 }, "pointer", ["pointer", "int", "pointer"]));
-                log("[+] Interceptor.replace installed on KeyVault.ServerSetting.GetName (0xB5C468)!");
+                Interceptor.replace(baseAddr.add(0xB5C564), new NativeCallback(function (thiz, code, methodInfo) {
+                    if (!cachedServerCode) cachedServerCode = createIl2CppString("LOCAL");
+                    return cachedServerCode;
+                }, "pointer", ["pointer", "int", "pointer"]));
+                Interceptor.replace(baseAddr.add(0xB5C668), new NativeCallback(function (thiz, methodInfo) {
+                    return 1;
+                }, "int", ["pointer", "pointer"]));
+                Interceptor.replace(baseAddr.add(0xB5B968), new NativeCallback(function (thiz, code, methodInfo) {
+                    return 1;
+                }, "int", ["pointer", "int", "pointer"]));
+                log("[+] Interceptor.replace installed on KeyVault.ServerSetting methods (GetName, GetServerCode, GetRealServerCode, IsRealServer)!");
             } catch (eGsn) {}
 
             try {
