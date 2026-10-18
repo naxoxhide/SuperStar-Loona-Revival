@@ -6413,6 +6413,11 @@ function initIl2Cpp(module) {
                             if (!disGo.isNull()) setActiveFn(disGo, (regCards.length === 0) ? 1 : 0, NULL);
                         }
 
+                        // Write to InventoryScene fields for native OnIntensifyTry / IntensifyAssist
+                        sceneThis.add(0xA8).writeDouble(totalProbRate);
+                        sceneThis.add(0xB0).writeDouble(1.0); // priceRate = 1.0
+                        sceneThis.add(0xB8).writeS32(totalPrice);
+
                         log("[🎉 INTENSIFY VIEW REFRESHED] RegCount=" + regCards.length + ", Prob=" + totalProbRate.toFixed(1) + "% (" + probLabel + "), TotalPrice=" + totalPrice + " RP");
                     } catch (eSriv) {
                         log("[-] Error in safeRefreshIntensifyView: " + eSriv.message);
@@ -10535,6 +10540,16 @@ function initIl2Cpp(module) {
                     });
                 } catch (ePopMon) {
                     log("[-] Error attaching CardIntensifyPopup monitoring: " + ePopMon.message);
+                }
+
+                // 5. CardControl.Data.get_IsCardUseType (0xE43660) -> Always true for offline cards
+                try {
+                    Interceptor.replace(baseAddr.add(0xE43660), new NativeCallback(function(thiz, methodInfo) {
+                        return 1;
+                    }, "bool", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on CardControl.Data.get_IsCardUseType (0xE43660)!");
+                } catch (eIcut) {
+                    log("[-] Error replacing get_IsCardUseType: " + eIcut.message);
                 }
 
 
