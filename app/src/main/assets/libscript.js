@@ -6387,20 +6387,20 @@ function initIl2Cpp(module) {
                         }
 
                         var btnTry = intensifyView.add(0x60).readPointer();
-                        var tryTextObj = intensifyView.add(0x70).readPointer();
                         var btnDisable = intensifyView.add(0x78).readPointer();
+                        var setPriceFn = new NativeFunction(baseAddr.add(0xE9B914), "void", ["pointer", "pointer", "pointer"]);
 
-                        if (!tryTextObj.isNull()) {
-                            var formattedPrice = (totalPrice > 0) ? totalPrice.toLocaleString("en-US") : "0";
-                            setTextFn(tryTextObj, createIl2CppString(formattedPrice), NULL);
-                        }
+                        var formattedPrice = (totalPrice > 0) ? totalPrice.toLocaleString("en-US") : "0";
+                        var il2cppPriceStr = createIl2CppString(formattedPrice);
 
                         if (!btnTry.isNull()) {
-                            var tryGo = getGameObjectFn(btnTry, NULL);
+                            try { setPriceFn(btnTry, il2cppPriceStr, NULL); } catch (ePt) {}
+                            var tryGo = btnTry.add(0x10).readPointer();
                             if (!tryGo.isNull()) setActiveFn(tryGo, (regCards.length > 0) ? 1 : 0, NULL);
                         }
                         if (!btnDisable.isNull()) {
-                            var disGo = getGameObjectFn(btnDisable, NULL);
+                            try { setPriceFn(btnDisable, il2cppPriceStr, NULL); } catch (ePd) {}
+                            var disGo = btnDisable.add(0x10).readPointer();
                             if (!disGo.isNull()) setActiveFn(disGo, (regCards.length === 0) ? 1 : 0, NULL);
                         }
 
