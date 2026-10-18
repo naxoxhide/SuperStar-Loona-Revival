@@ -1985,7 +1985,9 @@ function initIl2Cpp(module) {
                                 try {
                                     var cb = items.add(0x20 + i * 8).readPointer();
                                     if (!cb.isNull()) {
+                                        log("[📦 ASSET] Callback " + i + "/" + count + " starting (ptr: " + cb + ")...");
                                         invokeFn(cb, NULL);
+                                        log("[📦 ASSET] Callback " + i + "/" + count + " finished.");
                                     }
                                 } catch (eCb) {
                                     log("[-] Safe bypass of asset callback[" + i + "]: " + eCb.message);
@@ -11141,20 +11143,28 @@ function initIl2Cpp(module) {
 
                         if (futexVal !== 0) {
                             fastMutexHoldCount++;
-                            if (fastMutexHoldCount >= 3) { // stuck for > 300ms
+                            // Only intervene if stuck for > 5 seconds (50 ticks) AND actual recursive deadlock (recurCount >= 2)
+                            if (fastMutexHoldCount >= 50) {
                                 var owner = pOwner.readPointer();
                                 var recurCount = pRecur.readU32();
 
-                                log("🚨 [INDEPENDENT WATCHDOG] Breaking stuck lock! futex=" + futexVal + " owner=" + owner + " recur=" + recurCount);
+                                if (recurCount >= 2) {
+                                    log("🚨 [INDEPENDENT WATCHDOG] Breaking stuck recursive lock! futex=" + futexVal + " owner=" + owner + " recur=" + recurCount);
 
-                                pOwner.writePointer(NULL);
-                                pRecur.writeU32(0);
-                                pFutex.writeU32(0);
+                                    pOwner.writePointer(NULL);
+                                    pRecur.writeU32(0);
+                                    pFutex.writeU32(0);
 
-                                if (globalSyscallFn) {
-                                    var w1 = globalSyscallFn(98, pFutex, 129, 2147483647);
-                                    var w2 = globalSyscallFn(98, pFutex, 1, 2147483647);
-                                    log("[🔓 INDEPENDENT WATCHDOG] Woke futex waiters: priv=" + w1 + ", shared=" + w2);
+                                    if (globalSyscallFn) {
+                                        var w1 = globalSyscallFn(98, pFutex, 129, 2147483647);
+                                        var w2 = globalSyscallFn(98, pFutex, 1, 2147483647);
+                                        log("[🔓 INDEPENDENT WATCHDOG] Woke futex waiters: priv=" + w1 + ", shared=" + w2);
+                                    }
+                                } else {
+                                    // Just wake waiters without corrupting lock ownership
+                                    if (globalSyscallFn) {
+                                        globalSyscallFn(98, pFutex, 129, 2147483647);
+                                    }
                                 }
                                 fastMutexHoldCount = 0;
                             }
