@@ -250,6 +250,31 @@ function initIl2Cpp(module) {
         log("[-] Error hooking libc.so!abort: " + eAbort.message);
     }
 
+    try {
+        var cxaThrowAddr = Module.findExportByName("libc++abi.so", "__cxa_throw") || Module.findExportByName(null, "__cxa_throw");
+        if (cxaThrowAddr) {
+            Interceptor.attach(cxaThrowAddr, {
+                onEnter: function(args) {
+                    var lr = this.returnAddress;
+                    var mod = Process.findModuleByAddress(lr);
+                    var modName = mod ? mod.name : "unknown";
+                    var offset = mod ? lr.sub(mod.base) : lr;
+                    log("[💥 __cxa_throw] Exception thrown from: " + modName + "!" + offset + " (LR=" + lr + ")");
+                    log("[💥 __cxa_throw Backtrace]:\n" + Thread.backtrace(this.context, Backtracer.ACCURATE).map(function(addr) {
+                        try {
+                            var m = Process.findModuleByAddress(addr);
+                            if (m) return "  " + m.name + "!" + addr.sub(m.base);
+                        } catch (e) {}
+                        return "  " + addr;
+                    }).join("\n"));
+                }
+            });
+            log("[+] Interceptor.attach installed on __cxa_throw");
+        }
+    } catch (eCxa) {
+        log("[-] Error hooking __cxa_throw: " + eCxa.message);
+    }
+
     // --- RESOLVE IL2CPP EXPORTED C-APIs ---
     function getExport(name, retType, argTypes) {
         var addr = Module.findExportByName("libil2cpp.so", name);
