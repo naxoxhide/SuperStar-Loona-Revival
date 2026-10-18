@@ -6291,7 +6291,7 @@ function initIl2Cpp(module) {
 
                         var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
                         var getGameObjectFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                        var cardRefreshFn = new NativeFunction(baseAddr.add(0x1388BDC), "void", ["pointer", "pointer", "pointer"]);
+                        var cardRefreshFn = new NativeFunction(baseAddr.add(0x137F570), "void", ["pointer", "pointer", "pointer"]);
                         var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
                         var setTextureFn = new NativeFunction(baseAddr.add(0x180FEF0), "void", ["pointer", "pointer", "pointer"]);
                         var setEnabledFn = new NativeFunction(baseAddr.add(0x180E740), "void", ["pointer", "bool", "pointer"]);
@@ -6321,9 +6321,13 @@ function initIl2Cpp(module) {
                                 failureProbProduct *= (1.0 - singleRate);
 
                                 // Refresh CardSmallView via createMockSmallCardParams
-                                var cardParam = createMockSmallCardParams(cId, gr, lvl, false);
-                                if (cardParam && !cardParam.isNull()) {
-                                    cardRefreshFn(cardSmall, cardParam, NULL);
+                                try {
+                                    var cardParam = createMockSmallCardParams(cId, gr, lvl, false);
+                                    if (cardParam && !cardParam.isNull()) {
+                                        cardRefreshFn(cardSmall, cardParam, NULL);
+                                    }
+                                } catch (eCrf) {
+                                    log("[-] Error refreshing cardSmall: " + eCrf.message);
                                 }
 
                                 // Direct texture injection
