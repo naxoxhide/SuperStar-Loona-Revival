@@ -4283,7 +4283,7 @@ function initIl2Cpp(module) {
                         p.add(0x3C).writeS32(grade);
                         p.add(0x40).writeU8(grade === 4 ? 1 : 0);
                         p.add(0x41).writeU8(0);
-                        p.add(0x44).writeS32(grade === 4 ? 50 : 5);
+                        p.add(0x44).writeS32(grade === 4 ? 99 : 5);
                         p.add(0x48).writeS32(level);
                         p.add(0x4C).writeU8(0);
                         p.add(0x4E).writeS16(0);
@@ -6867,8 +6867,8 @@ function initIl2Cpp(module) {
                         if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cId - 1001) % 11) + 1;
                         var artistData = loonaArtistDataMap[memberIdx] || NULL;
 
-                        // Ensure selectedArtistData (0x80) is populated
-                        if (sceneThis.add(0x80).readPointer().isNull() && artistData && !artistData.isNull()) {
+                        // Always update selectedArtistData (0x80) with the selected card's member
+                        if (artistData && !artistData.isNull()) {
                             sceneThis.add(0x80).writePointer(artistData);
                         }
 
@@ -10576,6 +10576,15 @@ function initIl2Cpp(module) {
                                 if (!equipView.isNull()) {
                                     var cardLarge = equipView.add(0x38).readPointer();
                                     if (!cardLarge.isNull()) {
+                                        var pBuf = cardLarge.add(0x48).readPointer();
+                                        if (!pBuf.isNull()) {
+                                            pBuf.add(0x48).writeS32(updatedLvl);
+                                            if (pBuf.add(0x44).readS32() < 99) pBuf.add(0x44).writeS32(99);
+                                            try {
+                                                var setLevelFn = new NativeFunction(baseAddr.add(0x1394858), "void", ["pointer", "pointer", "pointer"]);
+                                                setLevelFn(cardLarge, pBuf, NULL);
+                                            } catch (eSl) {}
+                                        }
                                         var numLevel = cardLarge.add(0x80).readPointer();
                                         if (!numLevel.isNull()) {
                                             var setValFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "uint32", "pointer"]);
@@ -11024,25 +11033,37 @@ function initIl2Cpp(module) {
                                 var targetCardItem = NULL;
                                 try {
                                     var cardIdx = parseInt(cardArg, 10);
-                                    var dclPtr = curScene.add(0x58).readPointer();
-                                    if (!dclPtr.isNull()) {
-                                        var listItems = dclPtr.add(0x10).readPointer();
-                                        var listSize = dclPtr.add(0x18).readS32();
-                                        var argLower = cardArg.toLowerCase();
-                                        if (argLower === "jinsoul" || cardArg === "1007" || cardArg === "r50") {
-                                            for (var sc = 0; sc < listSize; sc++) {
-                                                var itmPtr = listItems.add(0x20 + sc * 8).readPointer();
-                                                if (!itmPtr.isNull()) {
-                                                    var rPtr = itmPtr.add(0x10).readPointer();
-                                                    if (!rPtr.isNull() && rPtr.add(0x20).readS32() === 1007) {
-                                                        targetCardItem = itmPtr;
-                                                        cardIdx = sc;
-                                                        log("[🃏 CARD CMD] Found JinSoul card at index: " + sc);
-                                                        break;
-                                                    }
-                                                }
+                                    var argLower = cardArg.toLowerCase();
+
+                                    // 1. Search directly in global loonaCardItems (covers JinSoul R55 and all equipped LOONA members)
+                                    if (loonaCardItems && loonaCardItems.length > 0) {
+                                        for (var lk = 0; lk < loonaCardItems.length; lk++) {
+                                            var itm = loonaCardItems[lk];
+                                            if (!itm || itm.isNull()) continue;
+                                            var r = itm.add(0x10).readPointer();
+                                            if (!r || r.isNull()) continue;
+                                            var cid = r.add(0x20).readS32();
+                                            var m = getCardMetadata(cid);
+                                            var aName = (m && m.artistID && artistNamesMap[m.artistID]) ? artistNamesMap[m.artistID].toLowerCase() : "";
+                                            if ((argLower === "jinsoul" || cardArg === "1007" || argLower === "r55" || argLower === "r50") && (cid === 1007 || aName === "jinsoul")) {
+                                                targetCardItem = itm;
+                                                log("[🃏 CARD CMD] Found JinSoul card in loonaCardItems at index " + lk + " (cardID=" + cid + ")");
+                                                break;
                                             }
-                                        } else {
+                                            if (aName === argLower || cid.toString() === cardArg) {
+                                                targetCardItem = itm;
+                                                log("[🃏 CARD CMD] Found card in loonaCardItems at index " + lk + " (cardID=" + cid + ", artist=" + aName + ")");
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    // 2. Fallback to displayCardList
+                                    if (!targetCardItem || targetCardItem.isNull()) {
+                                        var dclPtr = curScene.add(0x58).readPointer();
+                                        if (!dclPtr.isNull()) {
+                                            var listItems = dclPtr.add(0x10).readPointer();
+                                            var listSize = dclPtr.add(0x18).readS32();
                                             if (isNaN(cardIdx) || cardIdx < 0 || cardIdx >= listSize) cardIdx = 0;
                                             if (!listItems.isNull() && listSize > 0) {
                                                 targetCardItem = listItems.add(0x20 + cardIdx * 8).readPointer();
@@ -11051,7 +11072,7 @@ function initIl2Cpp(module) {
                                         }
                                     }
                                 } catch (eDclCmd) {
-                                    log("[-] Error reading displayCardList in CARD CMD: " + eDclCmd.message);
+                                    log("[-] Error resolving card in CARD CMD: " + eDclCmd.message);
                                 }
                                 if ((!targetCardItem || targetCardItem.isNull()) && loonaCardItems && loonaCardItems.length > 0) {
                                     targetCardItem = loonaCardItems[0];

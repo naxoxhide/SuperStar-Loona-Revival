@@ -2269,6 +2269,61 @@ En el motor Dalcomsoft, los atributos, bonificaciones, precios y probabilidades 
      - Las cartas pequeñas en cada una de las 5 ranuras renderizan perfectamente sus marcos vectoriales oficiales, estrellas, insignias de rango y retratos sin solapamientos ni desalineaciones.
    - Evidencias gráficas registradas en [screen_material_card_empty_styled.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_material_card_empty_styled.png), [screen_material_cards_mounted.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_material_cards_mounted.png) y [crop_material_slots_verified.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/crop_material_slots_verified.png).
 
+### 24.6. Implementación, Ejecución Offline y Validación de la Fase 2 (Power Up / Intensify & Consumo de Cartas)
+
+1. **Causa Raíz y Eliminación de Fallos Nativos (`Il2CppExceptionWrapper`):**
+   - **Diagnóstico:** En la implementación original de Dalcomsoft, pulsar el botón "TRY" invoca `InventoryScene.OnIntensifyTry` (RVA `0x105BA9C`), el cual intenta cargar el prefab de recursos `"RatingUpCardIntensifyPopup"` mediante `Popup.Load` (RVA `0x114A70C`). Dicho método consulta `Popup.recycles` (`0x114AC78`) esperando un pool de objetos y una respuesta del servidor remoto. Al operar en modo offline sin backend ni prefab descargado, se disparaba `il2cpp_codegen_raise_null_reference_exception` (`0xA43CC0`) con `abort was called`, abortando el proceso.
+   - **Solución Implementada (`executeOfflineTry`):**
+     - Se interceptaron y reemplazaron vía `Interceptor.replace` los métodos de entrada:
+       - `InventoryScene.OnIntensifyTry` (RVA `0x105BA9C`) -> redirigido a `executeOfflineTry`.
+       - `InvenCardIntensifyView.OnTry` (RVA `0xF22758`) -> redirigido a `executeOfflineTry`.
+       - `InventoryControl.Intensify` (RVA `0xF1DCCC`) -> despacho seguro y desacoplado que invoca `IntensifyCallback` (RVA `0xB54C74`) con código `1000` (SUCCESS) y un array IL2CPP de resultados (`System.Int32[]`).
+
+2. **Lógica Matemática de Tiradas RNG y Balance Oficial:**
+   - **Capping de Rango R:** Se corrigió el límite de nivel máximo de cartas grado R de 50 a **99** (`maxLevel = 99`), permitiendo la progresión completa del end-game oficial.
+   - **Tiradas RNG Reales:** Por cada carta material registrada en la lista (`matList` @ `0xA0` de `InventoryScene`), se realiza una tirada probabilística independiente basada en la tasa porcentual obtenida de `cid.bin`:
+     - Tasa de éxito: `Math.random() * 100 <= rate`.
+     - Si la tirada tiene éxito: `currentLvl = Math.min(maxLevel, currentLvl + 1)`.
+     - Se actualiza `code` en la estructura de memoria `targetRaw` (`+0x20`): `(gr < 4) ? (gr * 5 + lvl - 1) : (20 + lvl - 1)`.
+     - Se recalculan Score y Energy según las fórmulas de `cbd.bin`.
+
+3. **Deducción de Recursos y Descarte Atómico de Materiales:**
+   - **Rhythm Points (RP):** Se descuenta el coste acumulado en `player_profile.json` (`profile.rhythmPoint -= totalCost`). En caso de saldo insuficiente, se previene el roll.
+   - **Descarte de Cartas Material:**
+     - En `player_profile.json`: se filtran las cartas consumidas (`profile.inventoryCards.filter(...)`).
+     - En memoria runtime: se remueven de `loonaCardItems` para que ninguna carta consumida pueda volver a usarse ni renderizarse.
+     - En `CardMap` nativo de Dalcomsoft (RVA `0xF2751C`): se purgan los punteros para sincronizar la estructura interna del motor.
+   - **Persistencia en Almacenamiento Externo Android:** Se escribe atómicamente a `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/player_profile.json`. Se corrigieron permisos (`chmod 777`) para evitar bloqueos de I/O por propiedad de usuario shell.
+
+4. **Sincronización de UI y Visualización de Insignias de Nivel:**
+   - **`NumberBox.SetValue` (RVA `0xC104C4`) & `CardView.SetLevel` (RVA `0x1394858`):**
+     - Al completar la tirada, se actualiza `paramBuffer.level` (`+0x48`) en `CardLargeView` y se invoca `CardView.SetLevel`, refrescando los dígitos de `NumberBox` (offset `+0x80`).
+     - En `createMockLargeCardParams`, se actualizó `maxLevel` para grado R a 99 (`p.add(0x44).writeS32(99)`).
+   - **Selector de Cartas `card:<arg>`:**
+     - Se actualizó `executeSceneCommand` para buscar directamente en `loonaCardItems` la carta coincidente (`cid === 1007` o artista `"jinsoul"`), resolviendo la restricción del filtro de `displayCardList` cuando la vista activa pertenecía a otro miembro.
+     - Se asegura la asignación dinámica de `selectedArtistData` (`+0x80` de `InventoryScene`) para que coincida siempre con el miembro inspeccionado.
+
+5. **Resultados de Validación Experimental en Emulador:**
+   - **Tirada 1 (5 cartas material C y B):**
+     - Consumo: HaSeul C, YeoJin C, ViVi B, Kim Lip B, HeeJin A.
+     - Deducción: 94,258 RP (100,000 -> 5,742 RP). Inventario reducido de 21 a 16 cartas.
+   - **Tirada 2 (5 cartas material A, S y R):**
+     - Materiales: JinSoul A, HyunJin S, Choerry S, Yves R1, HeeJin R50 (75.1% de probabilidad acumulada).
+     - Resultado: ¡5 éxitos RNG consecutivos! JinSoul sube de nivel: **R50 -> R51 -> R52 -> R53 -> R54 -> R55**.
+     - Inventario: Reducido a exactamente 11 cartas (las 11 cartas equipadas de cada miembro de LOONA).
+   - **Comprobación Visual Integral:**
+     - **Cuadrícula de Inventario:** JinSoul muestra el badge violeta `★ 55` con marco dorado R; las 10 miembros restantes se mantienen en `★ 50`.
+     - **Carrusel Inferior:** Celda de JinSoul muestra `★ 55`; contador total indica exactamente `11 / 200`.
+     - **Detalle de Carta (`InvenCardSelectView`):** Retrato en alta definición con badge amarillo **55**, Score 199, Energy 100.
+     - **Vista de Intensificación (`InvenCardIntensifyView`):** Panel izquierdo con JinSoul R55; 5 pedestales limpios en reposo y 0 RP requeridos.
+   - **Evidencias Gráficas Registradas:**
+     - [screen_jinsoul_r55_grid_carousel.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_jinsoul_r55_grid_carousel.png)
+     - [screen_jinsoul_r55_detail_badge.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_jinsoul_r55_detail_badge.png)
+     - [screen_jinsoul_r55_intensify_view.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_jinsoul_r55_intensify_view.png)
+     - [screen_intensify_5pedestals_materials.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_intensify_5pedestals_materials.png)
+     - [screen_intensify_after_try.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_intensify_after_try.png)
+
+
 
 
 
