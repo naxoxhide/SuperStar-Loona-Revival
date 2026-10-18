@@ -6236,8 +6236,9 @@ function initIl2Cpp(module) {
                 // Safe offline entry into intensify mode
                 var triggerSafeOnIntensify = function(sceneThis) {
                     try {
-                        log("[⚡ ON_INTENSIFY] Starting safe offline intensify mode transition...");
+                        log("[⚡ ON_INTENSIFY 1] Starting safe offline intensify mode transition on scene: " + sceneThis);
                         if (!sceneThis || sceneThis.isNull()) return;
+                        log("[⚡ ON_INTENSIFY 2] Calling ensureInventoryLists...");
                         ensureInventoryLists(sceneThis);
 
                         var tCard = sceneThis.add(0x88).readPointer();
@@ -6248,10 +6249,12 @@ function initIl2Cpp(module) {
                         }
                         sceneThis.add(0x88).writePointer(tCard);
                         sceneThis.add(0x98).writePointer(tCard);
+                        log("[⚡ ON_INTENSIFY 3] targetCard = " + tCard);
 
                         var raw = tCard.add(0x10).readPointer();
                         if (!raw.isNull()) {
                             var cId = raw.add(0x20).readS32();
+                            log("[⚡ ON_INTENSIFY 4] target cardID = " + cId);
                             var ccd = getOrCreateCardControlData(cId);
                             tCard.add(0x18).writePointer(ccd || NULL);
                             var gr = raw.add(0x24).readS32();
@@ -6265,14 +6268,17 @@ function initIl2Cpp(module) {
                             if (artistData && !artistData.isNull()) {
                                 sceneThis.add(0x80).writePointer(artistData);
                             }
+                            log("[⚡ ON_INTENSIFY 5] metadata & artistData set!");
                         }
 
                         // Event rates default to 1.0
                         sceneThis.add(0xA8).writeDouble(1.0);
                         sceneThis.add(0xB0).writeDouble(1.0);
+                        log("[⚡ ON_INTENSIFY 6] probRate & priceRate written!");
 
                         // Clear material list safely
                         var matList = sceneThis.add(0xA0).readPointer();
+                        log("[⚡ ON_INTENSIFY 7] matList = " + matList);
                         if (!matList.isNull()) {
                             var count = matList.add(0x18).readS32();
                             var items = matList.add(0x10).readPointer();
@@ -6283,15 +6289,18 @@ function initIl2Cpp(module) {
                                 }
                             }
                             matList.add(0x18).writeS32(0);
+                            log("[⚡ ON_INTENSIFY 8] matList cleared (prev count=" + count + ")!");
                         }
 
                         // Transition state: SetStateIntensify(1, 1)
+                        log("[⚡ ON_INTENSIFY 9] Calling SetStateIntensify(1, 1)...");
                         var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "int", "int", "pointer"]);
                         setStateIntensifyFn(sceneThis, 1, 1, NULL);
+                        log("[⚡ ON_INTENSIFY 10] SetStateIntensify returned cleanly!");
 
                         // Populate bottom material card list
                         populateMaterialDisplayCardList(sceneThis);
-                        log("[🎉 ON_INTENSIFY] SetStateIntensify(1, 1) completed safely!");
+                        log("[🎉 ON_INTENSIFY 11] SetStateIntensify(1, 1) completed safely!");
                     } catch (eOnInt) {
                         log("[-] Error in safe OnIntensify: " + eOnInt.message);
                     }
