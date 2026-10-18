@@ -4036,6 +4036,10 @@ function initIl2Cpp(module) {
                 // Direct byte patches to disable Google Mobile Ads, Tapjoy, Stan's Assets, NotifyControl, Facebook, DeepLink, and AdMob crashes
                 [
                     0xB17894, // TapjoyUnityInit.Awake -> ret
+                    0x14E32A4, // TapjoyControl.Open -> ret
+                    0x14E38A0, // TapjoyControl.SetUserID -> ret
+                    0x14E36C4, // TapjoyControl.OnConnectSuccess -> ret
+                    0x14E37B0, // TapjoyControl.OnConnectFailure -> ret
                     0xC108B0, // NotifyControl.Start -> ret
                     0x1250674, // DeepLinkControl.Start -> ret
                     0xD45408, // GoogleMobileAdsScript.Start -> ret
