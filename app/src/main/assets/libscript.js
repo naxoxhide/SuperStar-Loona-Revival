@@ -6208,6 +6208,58 @@ function initIl2Cpp(module) {
                     }
                 };
 
+                // Safe offline entry into intensify mode
+                var triggerSafeOnIntensify = function(sceneThis) {
+                    try {
+                        log("[⚡ ON_INTENSIFY] Starting safe offline intensify mode transition...");
+                        if (!sceneThis || sceneThis.isNull()) return;
+                        var tCard = sceneThis.add(0x88).readPointer();
+                        if (tCard.isNull()) tCard = sceneThis.add(0x98).readPointer();
+                        if (tCard.isNull()) {
+                            log("[-] OnIntensify: targetCard is null!");
+                            return;
+                        }
+                        sceneThis.add(0x88).writePointer(tCard);
+                        sceneThis.add(0x98).writePointer(tCard);
+
+                        var raw = tCard.add(0x10).readPointer();
+                        if (!raw.isNull()) {
+                            var cId = raw.add(0x20).readS32();
+                            var ccd = getOrCreateCardControlData(cId);
+                            tCard.add(0x18).writePointer(ccd || NULL);
+                            var gr = raw.add(0x24).readS32();
+                            var lvl = raw.add(0x1C).readS16();
+                            var code = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
+                            tCard.add(0x20).writeS16(code);
+                            var meta = getCardMetadata(cId);
+                            var memberIdx = (meta && meta.artistID >= 1000) ? (meta.artistID - 1000) : (meta ? meta.artistID : 0);
+                            if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cId - 1001) % 11) + 1;
+                            var artistData = loonaArtistDataMap[memberIdx] || NULL;
+                            if (artistData && !artistData.isNull()) {
+                                sceneThis.add(0x80).writePointer(artistData);
+                            }
+                        }
+
+                        // Event rates default to 1.0
+                        sceneThis.add(0xA8).writeDouble(1.0);
+                        sceneThis.add(0xB0).writeDouble(1.0);
+
+                        // Clear material list
+                        var clearFn = new NativeFunction(baseAddr.add(0x1054118), "void", ["pointer"]);
+                        clearFn(sceneThis);
+
+                        // Transition state: SetStateIntensify(1, 1)
+                        var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "int", "int", "pointer"]);
+                        setStateIntensifyFn(sceneThis, 1, 1, NULL);
+
+                        // Populate bottom material card list
+                        populateMaterialDisplayCardList(sceneThis);
+                        log("[🎉 ON_INTENSIFY] SetStateIntensify(1, 1) completed safely!");
+                    } catch (eOnInt) {
+                        log("[-] Error in safe OnIntensify: " + eOnInt.message);
+                    }
+                };
+
                 // Smart recommend material selection: picks up to 5 lowest grade cards and calls RegistMaterialCardItem
                 var executeRecommend = function(sceneThis) {
                     try {
@@ -9819,50 +9871,7 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.replace(baseAddr.add(0x105A97C), new NativeCallback(function(sceneThis) {
                         log("[⚡ ON_INTENSIFY] Native OnIntensify intercepted cleanly!");
-                        try {
-                            if (!sceneThis || sceneThis.isNull()) return;
-                            var tCard = sceneThis.add(0x88).readPointer();
-                            if (tCard.isNull()) tCard = sceneThis.add(0x98).readPointer();
-                            if (tCard.isNull()) {
-                                log("[-] OnIntensify: targetCard is null!");
-                                return;
-                            }
-                            sceneThis.add(0x88).writePointer(tCard);
-                            sceneThis.add(0x98).writePointer(tCard);
-
-                            var raw = tCard.add(0x10).readPointer();
-                            if (!raw.isNull()) {
-                                var cId = raw.add(0x20).readS32();
-                                var ccd = getOrCreateCardControlData(cId);
-                                tCard.add(0x18).writePointer(ccd || NULL);
-                                var gr = raw.add(0x24).readS32();
-                                var lvl = raw.add(0x1C).readS16();
-                                var code = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
-                                tCard.add(0x20).writeS16(code);
-                                var meta = getCardMetadata(cId);
-                                var memberIdx = (meta && meta.artistID >= 1000) ? (meta.artistID - 1000) : (meta ? meta.artistID : 0);
-                                if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cId - 1001) % 11) + 1;
-                                var artistData = loonaArtistDataMap[memberIdx] || NULL;
-                                if (artistData && !artistData.isNull()) {
-                                    sceneThis.add(0x80).writePointer(artistData);
-                                }
-                            }
-
-                            // Event rates default to 1.0
-                            sceneThis.add(0xA8).writeDouble(1.0);
-                            sceneThis.add(0xB0).writeDouble(1.0);
-
-                            // Clear material list
-                            var clearFn = new NativeFunction(baseAddr.add(0x1054118), "void", ["pointer"]);
-                            clearFn(sceneThis);
-
-                            // Transition state: SetStateIntensify(1, 1)
-                            var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "int", "int", "pointer"]);
-                            setStateIntensifyFn(sceneThis, 1, 1, NULL);
-                            log("[🎉 ON_INTENSIFY] SetStateIntensify(1, 1) completed safely!");
-                        } catch (eOnInt) {
-                            log("[-] Error in safe OnIntensify: " + eOnInt.message);
-                        }
+                        triggerSafeOnIntensify(sceneThis);
                     }, "void", ["pointer"]));
                     log("[+] Interceptor.replace installed on InventoryScene.OnIntensify (0x105A97C)!");
                 } catch (eOi) {
@@ -10704,38 +10713,8 @@ function initIl2Cpp(module) {
                             }
                         } else if (cmdRaw === "intensify") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
-                                log("[⚡ INTENSIFY CMD] Preparing and dispatching native InventoryScene.OnIntensify!");
-                                var tCard = curScene.add(0x88).readPointer();
-                                if (tCard.isNull()) tCard = curScene.add(0x98).readPointer();
-                                if (!tCard.isNull()) {
-                                    curScene.add(0x88).writePointer(tCard);
-                                    curScene.add(0x98).writePointer(tCard);
-                                    var tRaw = tCard.add(0x10).readPointer();
-                                    if (!tRaw.isNull()) {
-                                        var tcId = tRaw.add(0x20).readS32();
-                                        var tCcd = getOrCreateCardControlData(tcId);
-                                        tCard.add(0x18).writePointer(tCcd || NULL);
-                                        var tGr = tRaw.add(0x24).readS32();
-                                        var tLvl = tRaw.add(0x1C).readS16();
-                                        var tCode = (tGr < 4) ? (tGr * 5 + Math.min(4, tLvl - 1)) : (20 + Math.min(98, tLvl - 1));
-                                        tCard.add(0x20).writeS16(tCode);
-                                        var tMeta = getCardMetadata(tcId);
-                                        var memberIdx = (tMeta && tMeta.artistID >= 1000) ? (tMeta.artistID - 1000) : (tMeta ? tMeta.artistID : 0);
-                                        if (memberIdx < 1 || memberIdx > 11) memberIdx = ((tcId - 1001) % 11) + 1;
-                                        var artistData = loonaArtistDataMap[memberIdx] || NULL;
-                                        if (artistData && !artistData.isNull()) {
-                                            curScene.add(0x80).writePointer(artistData);
-                                        }
-                                        log("[⚡ INTENSIFY CMD] Target card ready: ID=" + tcId + ", code=" + tCode + ", artist=" + memberIdx);
-                                    }
-                                }
-                                var onIntensifyFn = new NativeFunction(baseAddr.add(0x105A97C), "void", ["pointer"]);
-                                try {
-                                    onIntensifyFn(curScene);
-                                    log("[⚡ INTENSIFY CMD] Native OnIntensify dispatched successfully!");
-                                } catch (eOnIntensify) {
-                                    log("[-] Error calling OnIntensify: " + eOnIntensify.message);
-                                }
+                                log("[⚡ INTENSIFY CMD] Dispatching triggerSafeOnIntensify cleanly!");
+                                triggerSafeOnIntensify(curScene);
                             }
                         } else if (cmdRaw === "recommend") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
