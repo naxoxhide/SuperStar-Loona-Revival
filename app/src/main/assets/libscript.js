@@ -5087,20 +5087,66 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing GetSelectViewData: " + eRepGsv.message);
                 }
 
-                // Shared helper for CardLargeView visual rendering (photo + grade/tier frame)
+                // Helper to eliminate floating black box artifact by deactivating InventoryView.btnBack
+                function disableInventoryBlackSquare(sceneView) {
+                    try {
+                        if (!sceneView || sceneView.isNull()) return;
+                        var btnBack = sceneView.add(0x88).readPointer();
+                        if (!btnBack.isNull()) {
+                            var go = btnBack.add(0x10).readPointer();
+                            if (!go.isNull()) {
+                                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                setActiveFn(go, 0, NULL);
+                                log("[🚫 BLACK_SQUARE] Deactivated InventoryView.btnBack");
+                            }
+                        }
+                    } catch (eBs) {}
+                }
+
+                // Shared helper for CardLargeView visual rendering (photo + grade/tier frame + level badge)
                 function applyCardLargeVisuals(card, cId, gr, isPrism) {
                     try {
                         if (!card || card.isNull()) return;
                         var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                         var getTrFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
                         var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                        var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
                         var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
                         var setPhotoVisFn = new NativeFunction(baseAddr.add(0x138F3A0), "void", ["pointer", "int", "pointer"]);
                         var setTierVisFn = new NativeFunction(baseAddr.add(0x1393AAC), "void", ["pointer", "int", "pointer"]);
+                        var setStarVisFn = new NativeFunction(baseAddr.add(0x1388C58), "void", ["pointer", "int", "pointer"]);
+                        var setAsFirstSiblingFn = new NativeFunction(baseAddr.add(0x181ED30), "void", ["pointer", "pointer"]);
                         var setAsLastSiblingFn = new NativeFunction(baseAddr.add(0x181ED70), "void", ["pointer", "pointer"]);
                         var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
 
-                        // Photo (card + 0x58)
+                        // 1. Deactivate background (0xF8 in CardLargeView) to prevent solid card back from obscuring photo
+                        try {
+                            var bg = card.add(0xF8).readPointer();
+                            if (!bg.isNull()) {
+                                var bgGo = getGoFn(bg, NULL);
+                                if (!bgGo.isNull()) setActiveFn(bgGo, 0, NULL);
+                            }
+                        } catch (eBg) {}
+
+                        // 2. Deactivate prism / limited effects if not prism
+                        try {
+                            var objPrism = card.add(0x40).readPointer();
+                            if (!objPrism.isNull()) setActiveFn(objPrism, isPrism ? 1 : 0, NULL);
+                            var prismEffect = card.add(0xB0).readPointer();
+                            if (!prismEffect.isNull()) setActiveFn(prismEffect, isPrism ? 1 : 0, NULL);
+                        } catch (ePrism) {}
+
+                        // 3. Configure starLevel (0x78) - for Grade R (4), stars are hidden (badge replaces them)
+                        try {
+                            var starLevel = card.add(0x78).readPointer();
+                            if (!starLevel.isNull()) {
+                                var slGo = getGoFn(starLevel, NULL);
+                                if (!slGo.isNull()) setActiveFn(slGo, (gr === 4) ? 0 : 1, NULL);
+                            }
+                            setStarVisFn(card, (gr === 4) ? 0 : 1, NULL);
+                        } catch (eStar) {}
+
+                        // 4. Photo (card + 0x58) -> load high-res member portrait
                         var photo = card.add(0x58).readPointer();
                         if (!photo.isNull()) {
                             var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes") ||
@@ -5108,14 +5154,27 @@ function initIl2Cpp(module) {
                             if (photoTex && !photoTex.isNull()) {
                                 setTextureFn(photo, photoTex, NULL);
                                 card.add(0x50).writePointer(photoTex);
+                                setEnabledFn(photo, 1, NULL);
+                                // Ensure opaque white color (1, 1, 1, 1)
+                                try {
+                                    photo.add(0x20).writeFloat(1.0);
+                                    photo.add(0x24).writeFloat(1.0);
+                                    photo.add(0x28).writeFloat(1.0);
+                                    photo.add(0x2C).writeFloat(1.0);
+                                } catch (ePCol) {}
                                 try { setNativeSizeFn(photo, NULL); } catch (eSns) {}
                                 var photoGo = getGoFn(photo, NULL);
                                 if (!photoGo.isNull()) setActiveFn(photoGo, 1, NULL);
+                                var photoTr = getTrFn(photo, NULL);
+                                if (!photoTr.isNull()) setAsFirstSiblingFn(photoTr, NULL);
+                                log("[🖼️ CARD PHOTO] Set photo texture for cId=" + cId + " on card=" + card);
+                            } else {
+                                log("[-] Could not load photo texture for cId=" + cId);
                             }
                             setPhotoVisFn(card, 1, NULL);
                         }
 
-                        // Tier Frame (card + 0x68)
+                        // 5. Tier Frame (card + 0x68) -> load golden R frame
                         var tier = card.add(0x68).readPointer();
                         if (!tier.isNull()) {
                             var gLetter = (gr === 4) ? "r" : (gr === 3) ? "s" : (gr === 2) ? "a" : (gr === 1) ? "b" : "c";
@@ -5125,7 +5184,7 @@ function initIl2Cpp(module) {
                             if (tierTex && !tierTex.isNull()) {
                                 setTextureFn(tier, tierTex, NULL);
                                 card.add(0x60).writePointer(tierTex);
-                                try { setNativeSizeFn(tier, NULL); } catch (eSnsT) {}
+                                setEnabledFn(tier, 1, NULL);
                                 // Ensure opaque white color (1, 1, 1, 1)
                                 try {
                                     tier.add(0x20).writeFloat(1.0);
@@ -5133,16 +5192,15 @@ function initIl2Cpp(module) {
                                     tier.add(0x28).writeFloat(1.0);
                                     tier.add(0x2C).writeFloat(1.0);
                                 } catch (eCol) {}
+                                try { setNativeSizeFn(tier, NULL); } catch (eSnsT) {}
                                 var tierGo = getGoFn(tier, NULL);
                                 if (!tierGo.isNull()) setActiveFn(tierGo, 1, NULL);
                                 setTierVisFn(card, 1, NULL);
 
-                                // Bring tier to front of photo so it renders over photo
+                                // Bring tier to front of photo
                                 try {
                                     var tierTr = getTrFn(tier, NULL);
-                                    if (!tierTr.isNull()) {
-                                        setAsLastSiblingFn(tierTr, NULL);
-                                    }
+                                    if (!tierTr.isNull()) setAsLastSiblingFn(tierTr, NULL);
                                 } catch (eSib) {}
 
                                 log("[🖼️ CARD TIER] Successfully loaded and raised large tier frame " + tierRelPath + " for grade=" + gr + " on card " + card);
@@ -5151,29 +5209,18 @@ function initIl2Cpp(module) {
                             }
                         }
 
-                        // Ensure numberLevel (badge 55) stays in front of tier frame
+                        // 6. Ensure numberLevel (badge 55) stays in front of tier frame
                         try {
                             var numLevel = card.add(0x80).readPointer();
                             if (!numLevel.isNull()) {
                                 var nlGo = getGoFn(numLevel, NULL);
                                 if (!nlGo.isNull()) {
+                                    setActiveFn(nlGo, 1, NULL);
                                     var nlTr = getTrFn(nlGo, NULL);
                                     if (!nlTr.isNull()) setAsLastSiblingFn(nlTr, NULL);
                                 }
                             }
                         } catch (eNl) {}
-
-                        // Ensure starLevel stays in front if applicable
-                        try {
-                            var starLevel = card.add(0x78).readPointer();
-                            if (!starLevel.isNull()) {
-                                var slGo = getGoFn(starLevel, NULL);
-                                if (!slGo.isNull()) {
-                                    var slTr = getTrFn(slGo, NULL);
-                                    if (!slTr.isNull()) setAsLastSiblingFn(slTr, NULL);
-                                }
-                            }
-                        } catch (eSl) {}
                     } catch (eVis) {
                         log("[-] Error in applyCardLargeVisuals: " + eVis.message);
                     }
@@ -5196,16 +5243,14 @@ function initIl2Cpp(module) {
                         var isLeader = (p && !p.isNull()) ? (p.add(0x52).readU8() === 1) : false;
                         var isLk = (p && !p.isNull()) ? (p.add(0x53).readU8() === 1) : false;
 
-                        var cId = 1001;
+                        var cId = 1007; // default to JinSoul
                         var gr = 4;
-                        var lvl = 50;
+                        var lvl = 55;
                         var isPrism = false;
                         var card = viewThis.add(0x38).readPointer();
-                        if (cardParams.isNull() && !card.isNull()) {
-                            var pBuf = card.add(0x48).readPointer();
-                            if (!pBuf.isNull()) cardParams = pBuf;
-                        }
-                        if (cardParams.isNull() && activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+
+                        // Unconditionally inspect selected card directly from InventoryScene for 100% accurate metadata
+                        if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
                             var tCard = activeInventorySceneInstance.add(0x88).readPointer();
                             if (tCard.isNull()) tCard = activeInventorySceneInstance.add(0x98).readPointer();
                             if (!tCard.isNull()) {
@@ -5215,10 +5260,10 @@ function initIl2Cpp(module) {
                                     gr = raw.add(0x24).readS32();
                                     lvl = raw.add(0x1C).readS16();
                                     isPrism = (raw.add(0x2A).readU8() === 1);
-                                    cardParams = createMockLargeCardParams(cId, gr, lvl, isPrism);
                                 }
                             }
                         }
+
                         if (!cardParams.isNull()) {
                             try {
                                 var photoDp = cardParams.add(0x10).readPointer();
@@ -5248,12 +5293,11 @@ function initIl2Cpp(module) {
                         var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
                         var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
 
-                        // 1. card (0x38) -> CardLargeView
+                        // 1. card (0x38) -> CardLargeView (Photo, Golden Tier Frame, Level Badge)
                         if (!card.isNull()) {
                             if (!cardParams.isNull()) {
                                 try {
-                                    var cardRefreshFn = new NativeFunction(baseAddr.add(0x137F570), "void", ["pointer", "pointer", "pointer"]);
-                                    cardRefreshFn(card, cardParams, NULL);
+                                    card.add(0x48).writePointer(cardParams);
                                 } catch (eC) {}
                             }
                             applyCardLargeVisuals(card, cId, gr, isPrism);
@@ -5264,6 +5308,12 @@ function initIl2Cpp(module) {
                                     setValFn(numLevel, lvl, NULL);
                                 }
                             } catch (eNumL) {}
+                        }
+
+                        // Eliminate black square in selectView
+                        if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                            var sView = activeInventorySceneInstance.add(0x48).readPointer();
+                            disableInventoryBlackSquare(sView);
                         }
 
                         // 2. groupName (0x40)
@@ -7045,15 +7095,7 @@ function initIl2Cpp(module) {
                                     log("[✅ SET_STATE_MAIN] ShowMainLayout(true) called!");
 
                                     // Deactivate btnBack (0x88) to eliminate black box artifact in card detail view
-                                    var btnBack = sceneView.add(0x88).readPointer();
-                                    if (!btnBack.isNull()) {
-                                        var go = btnBack.add(0x10).readPointer();
-                                        if (!go.isNull()) {
-                                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                                            setActiveFn(go, 0, NULL);
-                                            log("[🚫 BLACK_SQUARE] Deactivated InventoryView.btnBack in safeSetStateMain");
-                                        }
-                                    }
+                                    disableInventoryBlackSquare(sceneView);
                                 } catch (eSml) { log("[-] Error calling ShowMainLayout: " + eSml.message); }
 
                                 // 2. Correct InventoryView field offsets (from dump.cs):
@@ -7145,12 +7187,41 @@ function initIl2Cpp(module) {
                     log("[-] Error attaching to SetStateDefault: " + eSsdHook.message);
                 }
 
+                // Hook InventoryView.ShowMainLayout (0x10571EC) and ShowDefaultLayout (0x1055ED0) to automatically eliminate black square
+                try {
+                    Interceptor.attach(baseAddr.add(0x10571EC), {
+                        onLeave: function (retval) {
+                            if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                var sView = activeInventorySceneInstance.add(0x48).readPointer();
+                                disableInventoryBlackSquare(sView);
+                            }
+                        }
+                    });
+                    Interceptor.attach(baseAddr.add(0x1055ED0), {
+                        onLeave: function (retval) {
+                            if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                var sView = activeInventorySceneInstance.add(0x48).readPointer();
+                                disableInventoryBlackSquare(sView);
+                            }
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on ShowMainLayout & ShowDefaultLayout for black square elimination!");
+                } catch (eLayAtt) {
+                    log("[-] Error attaching to layout methods: " + eLayAtt.message);
+                }
+
                 // Centralized and bulletproof handleInventoryBack
                 var handleInventoryBack = function (sceneThis) {
                     try {
                         if (!sceneThis || sceneThis.isNull()) return;
                         var curState = sceneThis.add(0x24).readS32();
                         log("[🔙 ON_BACK] handleInventoryBack entered! state=" + curState);
+
+                        if (curState === 8) { // STATE.Intensify (8)
+                            log("[🔙 ON_BACK] Returning from Intensify view (8) to STATE.Main (6)...");
+                            safeSetStateMain(sceneThis, false);
+                            return;
+                        }
 
                         if (curState === 6 || curState === 7) { // STATE.Main (6) or STATE.Equip (7)
                             log("[🔙 ON_BACK] Returning from detail/equip view to Default state, restoring 24 cards...");
@@ -7169,6 +7240,7 @@ function initIl2Cpp(module) {
                                 try {
                                     var showDefFn = new NativeFunction(baseAddr.add(0x1055ED0), "void", ["pointer", "pointer"]);
                                     showDefFn(sceneView, NULL);
+                                    disableInventoryBlackSquare(sceneView);
                                     log("[✅ ON_BACK] ShowDefaultLayout executed!");
                                 } catch (eSdl) {
                                     log("[-] Error in ShowDefaultLayout: " + eSdl.message);
@@ -10405,14 +10477,7 @@ function initIl2Cpp(module) {
                         }
 
                         // 3. btnBack setActive(false) to completely eliminate floating black square/box artifact
-                        var btnBack = sceneViewPtr.add(0x88).readPointer();
-                        if (!btnBack.isNull()) {
-                            var go = btnBack.add(0x10).readPointer();
-                            if (!go.isNull()) {
-                                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                                setActiveFn(go, 0, NULL);
-                            }
-                        }
+                        disableInventoryBlackSquare(sceneViewPtr);
 
                         // 4. SetSideButtonActive(false)
                         var setSideBtnFn = new NativeFunction(baseAddr.add(0x10606E0), "void", ["pointer", "bool"]);
@@ -10517,6 +10582,7 @@ function initIl2Cpp(module) {
                             if (!sceneView.isNull()) {
                                 var showIntensifyFn = new NativeFunction(baseAddr.add(0x1057B6C), "void", ["pointer"]);
                                 showIntensifyFn(sceneView);
+                                disableInventoryBlackSquare(sceneView);
 
                                 // Apply large card visuals & golden frame to selectView.card (left target card)
                                 var selectView = sceneView.add(0x48).readPointer();

@@ -2323,6 +2323,48 @@ En el motor Dalcomsoft, los atributos, bonificaciones, precios y probabilidades 
      - [screen_intensify_5pedestals_materials.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_intensify_5pedestals_materials.png)
      - [screen_intensify_after_try.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_intensify_after_try.png)
 
+### 24.7. Refinamiento Visual UI: Eliminación de Cuadrado Negro y Restauración del Marco Dorado (Tier R) en JinSoul R55
+
+1. **Diagnóstico del Cuadrado Negro Flotante (Esquina Superior Derecha):**
+   * **Causa Raíz:** En `InventoryView` (`dump.cs` TypeDefIndex: 12200), el campo `btnBack` (offset `+0x88`, clase `ButtonCache`) se encuentra ubicado en la posición de coordenadas de Canvas `(x=510, y=196)` (equivalente a `x ≈ 1840, y ≈ 100` en resolución de pantalla 1920x1080).
+   * Al acceder offline o tras invocaciones dinámicas de `InvenCardIntensifyView` y `InvenCardSelectView`, el componente `ButtonCache.box` (`Image`) intentaba renderizarse sin una textura válida asignada por el pipeline de BestHTTP, produciendo un quad negro opaco flotando en la esquina superior derecha.
+   * **Solución Implementada:** Se diseñó la función `disableInventoryBlackSquare(sceneView)`:
+     ```javascript
+     function disableInventoryBlackSquare(sceneView) {
+         try {
+             if (!sceneView || sceneView.isNull()) return;
+             var btnBack = sceneView.add(0x88).readPointer();
+             if (!btnBack.isNull()) {
+                 var go = btnBack.add(0x10).readPointer();
+                 if (!go.isNull()) {
+                     var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                     setActiveFn(go, 0, NULL);
+                 }
+             }
+         } catch (eBs) {}
+     }
+     ```
+   * Esta función se ejecuta de forma preventiva y determinista en cada ciclo de actualización de `InvenCardSelectView`, `InvenCardIntensifyView` y `InvenCardEquipView`, eliminando el artefacto al 100%.
+
+2. **Diagnóstico y Corrección del Marco Dorado (Tier/Frame) Ausente en JinSoul:**
+   * **Causa Raíz:** La clase `CardLargeView` (`dump.cs` TypeDefIndex: 12267) delega la carga asíncrona de la textura del marco dorado a callbacks remotos (`<OnRefresh>b__37_1`), los cuales nunca se disparan en modo offline. Como resultado, el componente `RawImage tier` (offset `+0x68`) permanecía sin textura o deshabilitado, mostrando la foto de JinSoul "flotando" sin el marco dorado característico de grado R.
+   * **Análisis de la Textura `0_r_l.i.bytes`:**
+     - Mediante análisis con Python/PIL de [0_r_l.i.bytes.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/aoeiwhslc/uhex/0_r_l.i.bytes.png) (`226x318` RGBA), se descubrió que el centro de la imagen (de `y=75` a `y=225`) cuenta con un canal alfa de apenas `11` a `44` (96% de transparencia).
+     - La textura fue concebida por Dalcomsoft como una máscara superpuesta (*overlay frame*): el marco dorado exterior, el logo "R" tridimensional superior izquierdo y la barra inferior púrpura son opacos (alfa `255`), mientras que el centro permite ver el retrato de la artista ubicado en la capa inferior.
+   * **Solución y Composición de Capas:**
+     - Se implementó la rutina centralizada `applyCardLargeVisuals(card, cId, gr, isPrism)`:
+       1. Carga directa de la foto de la artista en `photo` (`card + 0x58`) con `loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes")`.
+       2. Carga y asignación de la textura del marco R (`0_r_l.i.bytes`) en `tier` (`card + 0x68`) con `setTextureFn(tier, tierTex, NULL)`.
+       3. Ajuste de jerarquía UGUI mediante `Transform.SetAsLastSibling` para que el marco `tier` se renderice inmediatamente sobre la foto, y la insignia numérica `numberLevel` (badge 55, offset `0x80`) se posicione al frente sobre la barra púrpura.
+     - Esta rutina se integró tanto en la vista de detalle (`InvenCardSelectView.Refresh`) como en la vista de intensificación (`triggerSafeOnIntensify` y `safeRefreshIntensifyView`).
+
+3. **Validación Visual Definitiva:**
+   * **`InvenCardSelectView`:** [screen_jinsoul_r55_select_view.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_jinsoul_r55_select_view.png)
+     - Retrato completo de JinSoul con marco dorado metálico R, logo superior, estrella dorada y badge amarillo 55. Cero artefactos negros en la esquina.
+   * **`InvenCardIntensifyView`:** [screen_jinsoul_r55_intensify_view.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_jinsoul_r55_intensify_view.png)
+     - Carta grande en panel izquierdo con marco dorado R completo e idéntica fidelidad gráfica.
+     - Esquina superior derecha libre del bloque negro, mostrando el fondo limpio de Canvas junto a "Material Card".
+
 
 
 
