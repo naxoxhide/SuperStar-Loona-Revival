@@ -10067,38 +10067,6 @@ function initIl2Cpp(module) {
                     log("[-] Error installing milestone tracers: " + eMils.message);
                 }
 
-                // InventoryScene.OnIntensify (0x105A97C)
-                try {
-                    Interceptor.attach(baseAddr.add(0x105A97C), {
-                        onEnter: function(args) {
-                            var sceneThis = args[0];
-                            log("[⚡ INVENTORY] InventoryScene.OnIntensify called! instance=" + sceneThis);
-                            try {
-                                var tCard = sceneThis.add(0x88).readPointer();
-                                if (tCard.isNull()) tCard = sceneThis.add(0x98).readPointer();
-                                if (!tCard.isNull()) {
-                                    sceneThis.add(0x88).writePointer(tCard);
-                                    sceneThis.add(0x98).writePointer(tCard);
-                                    var tRaw = tCard.add(0x10).readPointer();
-                                    if (!tRaw.isNull()) {
-                                        var tcId = tRaw.add(0x20).readS32();
-                                        var tCcd = getOrCreateCardControlData(tcId);
-                                        tCard.add(0x18).writePointer(tCcd || NULL);
-                                        var tGr = tRaw.add(0x24).readS32();
-                                        var tLvl = tRaw.add(0x1C).readS16();
-                                        var tCode = (tGr < 4) ? (tGr * 5 + Math.min(4, tLvl - 1)) : (20 + Math.min(98, tLvl - 1));
-                                        tCard.add(0x20).writeS16(tCode);
-                                        log("[⚡ INVENTORY OnIntensify] Prepared targetCard: cardID=" + tcId + ", code=" + tCode + ", ccd=" + tCcd);
-                                    }
-                                }
-                            } catch (ePrep) {
-                                log("[-] Error in OnIntensify targetCard prep: " + ePrep.message);
-                            }
-                        }
-                    });
-                } catch (eOi) {
-                    log("[-] Error hooking InventoryScene.OnIntensify: " + eOi.message);
-                }
 
                 // InventoryScene.SetStateIntensify (0x1056BCC)
                 try {
