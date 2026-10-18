@@ -6349,8 +6349,12 @@ function initIl2Cpp(module) {
                             var candCId = cRaw.add(0x20).readS32();
                             var candCcd = getOrCreateCardControlData(candCId);
                             cand.add(0x18).writePointer(candCcd || NULL);
+                            var cGr = cRaw.add(0x24).readS32();
+                            var cLvl = cRaw.add(0x1C).readS16();
+                            var cCode = (cGr < 4) ? (cGr * 5 + Math.min(4, cLvl - 1)) : (20 + Math.min(98, cLvl - 1));
+                            cand.add(0x20).writeS16(cCode);
                             regFn(sceneThis, cand);
-                            log("[⚡ RECOMMEND] Added material card #" + (p + 1) + ": ObjId=" + cRaw.add(0x10).readS64() + ", Grade=" + cRaw.add(0x24).readS32() + ", Level=" + cRaw.add(0x1C).readS16());
+                            log("[⚡ RECOMMEND] Added material card #" + (p + 1) + ": ObjId=" + cRaw.add(0x10).readS64() + ", Grade=" + cGr + ", Level=" + cLvl + ", Code=" + cCode);
                         }
 
                         // 7. Verify all registered materials in materialCardItemList (scene + 0xA0) have valid Card and IntensifyCode
@@ -6375,7 +6379,7 @@ function initIl2Cpp(module) {
                             }
                         }
 
-                        // 8. Refresh SetStateIntensify(false, false)
+                        // 8. Refresh SetStateIntensify(false, true)
                         if (!targetCard.isNull()) {
                             sceneThis.add(0x88).writePointer(targetCard);
                             sceneThis.add(0x98).writePointer(targetCard);
@@ -6385,6 +6389,10 @@ function initIl2Cpp(module) {
                         }
                         if (sceneThis.add(0xB0).readDouble() === 0.0) {
                             sceneThis.add(0xB0).writeDouble(1.0);
+                        }
+                        var curArtRec = sceneThis.add(0x80).readPointer();
+                        if (curArtRec.isNull() && targetArtistCode > 0 && loonaArtistDataMap[targetArtistCode]) {
+                            sceneThis.add(0x80).writePointer(loonaArtistDataMap[targetArtistCode]);
                         }
                         var sv = sceneThis.add(0x48).readPointer();
                         var bbs = (!sv.isNull()) ? sv.add(0xC0).readPointer() : NULL;
@@ -6396,10 +6404,10 @@ function initIl2Cpp(module) {
                         log("[🔍 RECOMMEND BEFORE REFRESH] sv=" + sv + ", selView=" + selView + ", intView=" + intView + ", cardView=" + cardView + ", sortView=" + sortView + ", btnBack=" + btnBack);
                         var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "int", "int", "pointer"]);
                         try {
-                            setStateIntensifyFn(sceneThis, 0, 0, NULL);
+                            setStateIntensifyFn(sceneThis, 0, 1, NULL);
                             log("[🎉 RECOMMEND COMPLETE] Registered " + pickCount + " material cards and refreshed view successfully!");
                         } catch (eSetState) {
-                            log("[-] Error calling SetStateIntensify(0, 0): " + eSetState.message);
+                            log("[-] Error calling SetStateIntensify(0, 1): " + eSetState.message);
                         }
                     } catch (eRecExec) {
                         log("[-] Error in executeRecommend: " + eRecExec.message);
@@ -10730,7 +10738,7 @@ function initIl2Cpp(module) {
                             }
                         } else if (cmdRaw === "intensify") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
-                                log("[⚡ INTENSIFY CMD] Entering Intensify state cleanly!");
+                                log("[⚡ INTENSIFY CMD] Preparing and dispatching native InventoryScene.OnIntensify!");
                                 var tCard = curScene.add(0x88).readPointer();
                                 if (tCard.isNull()) tCard = curScene.add(0x98).readPointer();
                                 if (!tCard.isNull()) {
@@ -10745,16 +10753,22 @@ function initIl2Cpp(module) {
                                         var tLvl = tRaw.add(0x1C).readS16();
                                         var tCode = (tGr < 4) ? (tGr * 5 + Math.min(4, tLvl - 1)) : (20 + Math.min(98, tLvl - 1));
                                         tCard.add(0x20).writeS16(tCode);
+                                        var tMeta = getCardMetadata(tcId);
+                                        var memberIdx = (tMeta && tMeta.artistID >= 1000) ? (tMeta.artistID - 1000) : (tMeta ? tMeta.artistID : 0);
+                                        if (memberIdx < 1 || memberIdx > 11) memberIdx = ((tcId - 1001) % 11) + 1;
+                                        var artistData = loonaArtistDataMap[memberIdx] || NULL;
+                                        if (artistData && !artistData.isNull()) {
+                                            curScene.add(0x80).writePointer(artistData);
+                                        }
+                                        log("[⚡ INTENSIFY CMD] Target card ready: ID=" + tcId + ", code=" + tCode + ", artist=" + memberIdx);
                                     }
                                 }
-                                var clearFn = new NativeFunction(baseAddr.add(0x1054118), "void", ["pointer"]);
-                                clearFn(curScene);
-                                var setStateIntensifyFn = new NativeFunction(baseAddr.add(0x1056BCC), "void", ["pointer", "int", "int", "pointer"]);
+                                var onIntensifyFn = new NativeFunction(baseAddr.add(0x105A97C), "void", ["pointer"]);
                                 try {
-                                    setStateIntensifyFn(curScene, 1, 1, NULL);
-                                    log("[⚡ INTENSIFY CMD] SetStateIntensify(1, 1) completed successfully!");
-                                } catch (eIntensifyState) {
-                                    log("[-] Error calling SetStateIntensify(1, 1): " + eIntensifyState.message);
+                                    onIntensifyFn(curScene);
+                                    log("[⚡ INTENSIFY CMD] Native OnIntensify dispatched successfully!");
+                                } catch (eOnIntensify) {
+                                    log("[-] Error calling OnIntensify: " + eOnIntensify.message);
                                 }
                             }
                         } else if (cmdRaw === "recommend") {
