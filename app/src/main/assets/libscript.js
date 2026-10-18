@@ -7637,10 +7637,75 @@ function initIl2Cpp(module) {
                     Interceptor.replace(checkIntensifyEventAddr, new NativeCallback(function (cardData, probRatePtr, priceRatePtr, methodInfo) {
                         if (!probRatePtr.isNull()) probRatePtr.writeDouble(1.0);
                         if (!priceRatePtr.isNull()) priceRatePtr.writeDouble(1.0);
+                        log("[⚡ INTENSIFY EVENT] CheckIntensifyEvent bypassed offline! rates=1.0");
                     }, "void", ["pointer", "pointer", "pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on InventoryControl.CheckIntensifyEvent (0xF2C14C)!");
                 } catch (eCie) {
                     log("[-] Error replacing CheckIntensifyEvent: " + eCie.message);
+                }
+
+                // 9f2. CardIntensifyControl.Find (0x1381780) -> Safe offline provider for intensify material rates and prices
+                try {
+                    var findAddr = baseAddr.add(0x1381780);
+                    var il2cppObjectNewFn = new NativeFunction(baseAddr.add(0xA43CB8), "pointer", ["pointer"]);
+                    var cachedItemKlass = NULL;
+                    var itemObjCache = {};
+
+                    function getItemKlass() {
+                        if (!cachedItemKlass.isNull()) return cachedItemKlass;
+                        try {
+                            var box = baseAddr.add(0x3144308).readPointer();
+                            if (box.isNull() || box.toUInt32() === 0x130000) {
+                                var initMeta = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
+                                initMeta(ptr("0x130000"));
+                                box = baseAddr.add(0x3144308).readPointer();
+                            }
+                            if (!box.isNull()) {
+                                cachedItemKlass = box.readPointer();
+                            }
+                        } catch (eKlass) {
+                            log("[-] Error resolving CardIntensifyControl.Item klass: " + eKlass.message);
+                        }
+                        return cachedItemKlass;
+                    }
+
+                    Interceptor.replace(findAddr, new NativeCallback(function(code, subCode, methodInfo) {
+                        var key = code + "_" + subCode;
+                        if (itemObjCache[key] && !itemObjCache[key].isNull()) {
+                            return itemObjCache[key];
+                        }
+
+                        var klass = getItemKlass();
+                        if (klass.isNull()) {
+                            log("[-] CardIntensifyControl.Item klass is NULL!");
+                            return NULL;
+                        }
+
+                        var itemObj = il2cppObjectNewFn(klass);
+                        if (itemObj.isNull()) {
+                            log("[-] il2cpp_object_new failed for CardIntensifyControl.Item!");
+                            return NULL;
+                        }
+
+                        function codeToGL(c) {
+                            if (c < 20) return { grade: Math.floor(c / 5), level: (c % 5) + 1 };
+                            return { grade: 4, level: (c - 20) + 1 };
+                        }
+                        var tGL = codeToGL(code);
+                        var mGL = codeToGL(subCode);
+                        var info = getIntensifyPriceAndRate(tGL.grade, tGL.level, mGL.grade, mGL.level);
+
+                        itemObj.add(0x10).writeDouble(info.rate);
+                        itemObj.add(0x18).writeS32(info.price);
+                        itemObj.add(0x1C).writeU8(0);
+
+                        itemObjCache[key] = itemObj;
+                        log("[⚡ INTENSIFY FIND] code=" + code + " (Gr" + tGL.grade + " L" + tGL.level + ") vs subCode=" + subCode + " (Gr" + mGL.grade + " L" + mGL.level + ") -> Rate=" + info.rate.toFixed(1) + "%, Price=" + info.price + " RP");
+                        return itemObj;
+                    }, "pointer", ["int32", "int32", "pointer"]));
+                    log("[+] Interceptor.replace installed on CardIntensifyControl.Find (0x1381780)!");
+                } catch (eCicFind) {
+                    log("[-] Error replacing CardIntensifyControl.Find: " + eCicFind.message);
                 }
 
                 // 9g. CardThemeInfoView.Refresh (0x1393510) -> Patch null check at 0x1393598 to return safely
