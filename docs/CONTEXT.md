@@ -2365,14 +2365,28 @@ En el motor Dalcomsoft, los atributos, bonificaciones, precios y probabilidades 
      - Carta grande en panel izquierdo con marco dorado R completo e idéntica fidelidad gráfica.
      - Esquina superior derecha libre del bloque negro, mostrando el fondo limpio de Canvas junto a "Material Card".
 
+### 24.8. Auditoría de Estado de las Fases y Hoja de Ruta del Inventario de Cartas (`CARD_STATS_INTENSIFY_REVERSING.md`)
 
+1. **Fase 1 — Desencriptación de Tablas Maestras, Motor de Balance y Apertura de `InvenCardIntensifyView` (✅ COMPLETADA 100%):**
+   - Desencriptación y despliegue de `cbd.json` (119 niveles), `cid.json` (matriz de costos y tasas), `cgd.json` (bonos por grado), `csd.json` (precios de venta) y `cdd.json` (1,467 cartas).
+   - Funciones offline en `libscript.js`: `loadOfflineCardDataTables`, `getCardBaseStats`, `getIntensifyPriceAndRate`, `getCardSellPrice`.
+   - Hooks en `CardIntensifyControl` (`get_IsOpened` @ `0x137F644`, `Open` @ `0x137F7E0`, `GetCode` @ `0x13819A4`, `Find` @ `0x1381780` y `0x1383BDC`).
+   - Renderizado limpio de los 5 pedestales (`InvenMaterialView`), selección manual/automática (`OnRecommend` @ `0x105B4F4`) y cálculo dinámico del costo en RP.
 
+2. **Fase 2 — Ejecución Offline de Power Up / Rating Up (`TRY`), Tiradas RNG y Persistencia (✅ COMPLETADA 100%):**
+   - Interceptación de `InventoryScene.OnIntensifyTry` (`0x105BA9C`), `InvenCardIntensifyView.OnTry` (`0xF22758`) e `InventoryControl.Intensify` (`0xF1DCCC`) mediante `executeOfflineTry` y `handleOfflineIntensify`.
+   - Tiradas RNG reales contra las tasas de `cid.json`, deducción de Rhythm Points (`rhythmPoint`), purga de cartas material en `player_profile.json`, `loonaCardItems` y `CardMap` (`0xF2751C`), y soporte de nivel hasta R99 (validado con JinSoul R55 y restauración del marco dorado R `0_r_l.i.bytes`).
 
+3. **Fase 3 — Refinamiento Visual de Subvistas (`btnBack` 'X'), Popups Nativos de Resultado (`CardIntensifyPopup`) y Evolución de Rango (`Upgrade` / `Grade Up`) (🟡 EN PROGRESO / SIGUIENTE FASE INMEDIATA):**
+   - **Restauración del Botón 'X' (`btnBack` @ `InventoryView + 0x88`):** Reemplazar la desactivación total de `btnBack` en `disableInventoryBlackSquare` por la desactivación selectiva de los subcomponentes `box` (`+0x50`) y `disabled` (`+0x58`), manteniendo visible y funcional la cruz azul marino `'X'` en `InvenCardSelectView`, `InvenCardIntensifyView` e `InvenCardEquipView` (diagnóstico preparado en `diag_back`, commit `60ebb904`).
+   - **Evolución de Grado (`Upgrade` / `Grade Up`: C5 $\to$ B1, B5 $\to$ A1, A5 $\to$ S1, S5 $\to$ R1):** Soporte en `InvenCardMainView`, `InvenCardIntensifyView` y `executeOfflineTry` cuando la carta objetivo en grado C, B, A o S alcanza el nivel 5 máximo (`isMaxLevel` en grado $< 4$), permitiendo fusionar otra carta del mismo miembro en nivel 5 para ascender a grado superior nivel 1 (`grade + 1`, `level = 1`) y recalcular `Group Grade` / `CardBook`.
+   - **Feedback Visual de Resultado (`CardIntensifyPopup` @ `0x1383D5C` / `GradeUpPopup` @ `0xB9CD58`):** Animación/indicador visual de `SUCCESS` / `FAILED` por cada carta material consumida.
 
+4. **Fase 4 — Gestión Integral de Colección en Inventario: Venta de Cartas (`Sell` / `Sell All`), Bloqueo (`Lock`) y Carta Líder (`LeaderCard`) (⏳ PENDIENTE):**
+   - **Venta Individual y Masiva (`OnSellCard` @ `0x10590D8`, `OnSellCardBundle` @ `0x10593D4`, `InventoryControl.Sell` @ `0xF2D6F8`, `SellBundle` @ `0xF2D7F0`):** Liquidación de cartas no equipadas ni bloqueadas sumando RP según `csd.json` (C=200, B=400, A=600, S=800, R=1,200 RP) con actualización de `TopView` y `player_profile.json`.
+   - **Bloqueo / Desbloqueo (`OnLock` @ `0x10598CC`, `OnEquipCardLock` @ `0x1059A80`, `InventoryControl.LockCard` @ `0xF2DC30`):** Persistencia del flag `isLock` (`rawCard + 0x29`) para proteger cartas frente a `RECOMMEND` y `Sell All`.
+   - **Carta Representativa (`OnLeaderCard` @ `0x1059F08`, `OnEquipLeaderCard` @ `0x105A428`):** Asignación del icono de corona y persistencia en `profile.leaderCard`.
 
-
-
-
-
-
-
+5. **Fase 5 — Filtros / Ordenamiento Dinámico (`InvenSortView`) e Integración de Estadísticas con Gameplay Musical (`GameScene`) (⏳ PENDIENTE):**
+   - **Menú de Ordenamiento y Filtros (`OnSortSelect` @ `0x105D830`, `OnSortGroup` @ `0x105D960`, `OnSortMaterial` @ `0x105DA78`, `OnSortLock` @ `0x105DB5C`, `OnSortPrism` @ `0x105DC40`):** Operatividad completa del selector `High` / `Low` / `New` / `Prism` / `Lock` sobre el carrusel inferior.
+   - **Impacto Real en Partida (`GameScene`):** Conectar el mazo equipado (`equipedCards`) y las tablas `cbd.json` / `cgd.json` al motor de puntuación de canciones (`Start Grade Bonus` de hasta +500,000 pts, multiplicador `ULTRA RAVE Lv 3` y `score`/`energy` por nota).
