@@ -11537,6 +11537,62 @@ function initIl2Cpp(module) {
                                 var onEquipFn = new NativeFunction(baseAddr.add(0x105AFC8), "void", ["pointer", "pointer"]);
                                 onEquipFn(curScene, NULL);
                             }
+                        } else if (cmdRaw === "diag_back") {
+                            try {
+                                log("[🔍 DIAG_BACK] Inspecting btnBack in curScene=" + curScene);
+                                if (curScene && !curScene.isNull() && sceneId === 4) {
+                                    var sView = curScene.add(0x48).readPointer();
+                                    if (!sView.isNull()) {
+                                        var bBack = sView.add(0x88).readPointer();
+                                        log("[🔍 DIAG_BACK] sView=" + sView + " btnBack=" + bBack);
+                                        if (!bBack.isNull()) {
+                                            var bGo = bBack.add(0x10).readPointer();
+                                            var bTr = bBack.add(0x18).readPointer();
+                                            var bBtn = bBack.add(0x48).readPointer();
+                                            var bBox = bBack.add(0x50).readPointer();
+                                            var bDis = bBack.add(0x58).readPointer();
+
+                                            var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                                            var getGoFromComp = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                            var getChildCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
+                                            var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                                            var getActiveSelfFn = new NativeFunction(baseAddr.add(0x1DBAE44), "int", ["pointer", "pointer"]);
+                                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+
+                                            var goName = (!bGo.isNull()) ? readIl2CppString(getNameFn(bGo, NULL)) : "null";
+                                            var goAct = (!bGo.isNull()) ? getActiveSelfFn(bGo, NULL) : -1;
+                                            log("[🔍 DIAG_BACK GO] name=" + goName + " act=" + goAct + " btn=" + bBtn + " box=" + bBox + " dis=" + bDis);
+
+                                            if (!bBox.isNull()) {
+                                                var boxGo = getGoFromComp(bBox, NULL);
+                                                var boxAct = (!boxGo.isNull()) ? getActiveSelfFn(boxGo, NULL) : -1;
+                                                var boxSprite = bBox.add(0x48).readPointer();
+                                                var boxMat = bBox.add(0x38).readPointer();
+                                                log("[🔍 DIAG_BACK BOX] boxGo=" + boxGo + " act=" + boxAct + " sprite=" + boxSprite + " mat=" + boxMat);
+                                                if (!boxSprite.isNull()) {
+                                                    var spName = readIl2CppString(getNameFn(boxSprite, NULL));
+                                                    var spTex = boxSprite.add(0x10).readPointer();
+                                                    log("[🔍 DIAG_BACK SPRITE] name=" + spName + " tex=" + spTex);
+                                                }
+                                            }
+
+                                            if (!bTr.isNull()) {
+                                                var cc = getChildCountFn(bTr, NULL);
+                                                log("[🔍 DIAG_BACK TR] childCount=" + cc);
+                                                for (var ci = 0; ci < cc; ci++) {
+                                                    var cTr = getChildFn(bTr, ci, NULL);
+                                                    var cGo = getGoFromComp(cTr, NULL);
+                                                    var cName = (!cGo.isNull()) ? readIl2CppString(getNameFn(cGo, NULL)) : "null";
+                                                    var cAct = (!cGo.isNull()) ? getActiveSelfFn(cGo, NULL) : -1;
+                                                    log("[🔍 DIAG_BACK CHILD " + ci + "] name=" + cName + " act=" + cAct + " go=" + cGo + " tr=" + cTr);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (eDgb) {
+                                log("[-] Error in diag_back: " + eDgb.message);
+                            }
                         } else if (cmdRaw === "back" || cmdRaw === "close") {
                             if (curScene && !curScene.isNull()) {
                                 if (sceneId === 4) {
