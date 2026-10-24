@@ -2647,4 +2647,38 @@ En el motor Dalcomsoft, los atributos, bonificaciones, precios y probabilidades 
      - [docs/walkthroughs/media/screen_c_rank_view.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_c_rank_view.png): Vista Grado C (Marco metálico bronce oficial `0c_l.i.bytes`, 1 estrella `★`, nivel numérico oculto, partículas desactivadas).
      - [docs/walkthroughs/media/screen_s_rank_view.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_s_rank_view.png): Vista Grado S (Marco metálico oro oficial `0_s_l.i.bytes`, 1 estrella dorada `★`, nivel numérico oculto, partículas desactivadas).
 
+### 24.14 Corrección Integral de UI en Escena Power Up: Eliminación de Texto Duplicado 'TrY' y Marca de Agua Universal en Pedestales
+
+En respuesta a la revisión visual del usuario (Ignacio), se identificaron y solventaron dos anomalías críticas de interfaz gráfica dentro de `InventoryScene` al entrar a la vista de Power Up / Level Up (`InvenCardIntensifyView`):
+
+1. **Eliminación del Texto Duplicado / Fantasma en el Botón de Acción (`TrY` -> `TRY`):**
+   * **Causa Raíz:** En `InvenCardIntensifyView`, existen tres controles de botón para la acción de intensificar: `btnTry` (offset `0x60`, `ButtonCache`), `btnTryEvent` (offset `0x68`, `ButtonEvent`), y `btnDisable` (offset `0x78`, `ButtonCache`).
+     - `btnTryEvent` hereda de `View : ManagedComponent` (`MonoBehaviour`). En Unity IL2CPP, el offset `0x10` en un `MonoBehaviour` corresponde a `m_CachedPtr` (puntero C++ interno nativo), y **no** al `GameObject`.
+     - El código previo ejecutaba `btnTryEvent.add(0x10).readPointer()`, obteniendo un puntero nativo inválido para `SetActive`, lo que provocaba que la llamada a desactivación fallara silenciosamente sin alterar el estado del componente.
+     - Como resultado, el `GameObject` de `btnTryEvent` permanecía activo en pantalla renderizando la palabra `"TRY"`, superponiéndose de forma desalineada con el texto `"Try"` de `btnDisable` / `btnTry`, generando el artefacto visual `"TrY"`.
+   * **Corrección de Ingeniería:**
+     - Se implementó la resolución legítima del `GameObject` mediante `getGameObjectFn(btnTryEvent, NULL)` (RVA `0x1DB6AD4`).
+     - Se aplicó `SetActive(0)` (RVA `0x1DBADF4`) tanto al `GameObject` raíz de `btnTryEvent` como a su sub-botón (`btnTryEvent + 0x38`).
+     - Se estandarizó la tipografía de acción en mayúsculas oficiales consistentes Dalcomsoft (`"TRY"` y `"UPGRADE"`), eliminando cualquier duplicidad.
+
+2. **Garantía Universal de Marca de Agua Translúcida en los 5 Pedestales (`pedestal_watermark.png`):**
+   * **Causa Raíz:** En `InvenMaterialView`, el contenedor de ranura vacía `empty` (offset `0x38`) es un componente `UnityEngine.UI.Image`.
+     - Cuando no hay cartas de material registradas, los pedestales 1 a 4 mantenían `m_Sprite` en `0x0` (nulo) con un color asignado de blanco opaco `(1.0, 1.0, 1.0, 1.0)`.
+     - En el pipeline de renderizado de UGUI, cualquier `Image` sin sprite asignado recurre a `Graphic.s_WhiteTexture` (textura interna blanca 4x4). Al multiplicarse por el color blanco opaco, se dibujaba como un bloque rectangular blanco 100% opaco, ocultando el fondo del pedestal.
+   * **Corrección de Ingeniería:**
+     - Se diseñó la función global `getWatermarkSprite()`, la cual carga `pedestal_watermark.png`, genera un `Sprite` mediante `Texture2DExtensions.CreateSprite` (RVA `0x23E1268`), lo fija permanentemente con `il2cpp_gchandle_new(sp, 2)` (Pinned Handle) y le asigna `DontDestroyOnLoad` (RVA `0x1DC7FB4`).
+     - En `safeRefreshIntensifyView`, se inyecta dicho sprite a `emptyImg` mediante `Image.set_sprite` (RVA `0x1ECB61C`) con color neutro `(1.0, 1.0, 1.0, 1.0)`. En caso de ausencia del archivo, se fuerza el canal alfa a `0.0` como fallback defensivo, impidiendo la aparición de rectángulos opacos.
+     - Se fuerza la re-subida de malla y geometría al `CanvasRenderer` mediante `Graphic.SetVerticesDirty` (RVA `0x1614F4C`) y `Graphic.SetMaterialDirty` (RVA `0x1614FE4`).
+
+3. **Sincronización en la Ruta de Entrada Nativa UI (`InventoryScene.OnIntensify` RVA `0x105A97C`):**
+   * Al pulsar el botón nativo "Power Up" / "Level Up" desde la vista de detalle de la carta, `triggerSafeOnIntensify` ahora sincroniza visualmente la carta seleccionada en `selectView.card` con `applyCardLargeVisuals`, configura los 5 pedestales limpios con la marca de agua y puebla la lista inferior de materiales, asegurando una experiencia homogénea tanto por UI interactiva como por comandos remotos.
+
+4. **Matriz de Pruebas Visuales Automatizadas y Verificación Multi-Rango (`emulator-5554`):**
+   * **Caso 1 (HeeJin R1 / R50):** Pedestales limpios con 0.00% de píxeles blancos anómalos (`mean BGR=[220..227, 182..190, 175..184]`), botón de acción desactivado con un único texto nítido `"TRY"` y precio `"0"` RP.
+   * **Caso 2 (HyunJin Grado S):** Verificación de entrada limpia a Power Up, los 5 pedestales desplegando la marca de agua oficial con el icono `+`, botón `"TRY"` aislado sin texto superpuesto.
+   * **Caso 3 (HeeJin Grado A):** Transición nativa verificada, 5 pedestales limpios sin bloques blancos.
+   * **Caso 4 (Grado C):** Verificación de carta base grado C nivel 1, estética UI 100% idéntica y limpia.
+   * **Caso 5 (Recomendación & Deselección Dinámica):** Registro automático de 5 cartas de material mediante `recommend` (`totalPrice = 83,220 RP`, probabilidad `4.9% (Low)`), botón `"TRY"` transicionado a estado activo con tipografía limpia y recuadro de precio formateado.
+
+
 

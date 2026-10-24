@@ -6816,6 +6816,40 @@ function initIl2Cpp(module) {
                     }
                 };
 
+                // Global cached pedestal watermark sprite (translucent official SUPER STAR LOONA watermark)
+                var globalWatermarkSprite = null;
+                var getWatermarkSprite = function() {
+                    if (globalWatermarkSprite && !globalWatermarkSprite.isNull()) {
+                        try {
+                            var testPtr = globalWatermarkSprite.add(0x10).readPointer();
+                            if (!testPtr.isNull()) return globalWatermarkSprite;
+                        } catch (eTest) {}
+                        globalWatermarkSprite = null;
+                    }
+                    try {
+                        var wmTex = loadLocalTexture2D("asiudgasg/pedestal_watermark.png");
+                        if (wmTex && !wmTex.isNull()) {
+                            var createSpriteFn = new NativeFunction(baseAddr.add(0x23E1268), "pointer", ["pointer", "pointer"]);
+                            var sp = createSpriteFn(wmTex, NULL);
+                            if (sp && !sp.isNull()) {
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(sp, 2); // Pinned GC handle
+                                var dontDestroyFn = new NativeFunction(baseAddr.add(0x1DC7FB4), "void", ["pointer", "pointer"]);
+                                dontDestroyFn(sp, NULL);
+                                globalWatermarkSprite = sp;
+                                log("[🏛️ WATERMARK] Created & pinned global watermark sprite: " + sp);
+                                return sp;
+                            } else {
+                                log("[-] CreateSprite returned null for pedestal_watermark.png");
+                            }
+                        } else {
+                            log("[-] loadLocalTexture2D returned null for pedestal_watermark.png");
+                        }
+                    } catch (eWsp) {
+                        log("[-] Error in getWatermarkSprite: " + eWsp.message);
+                    }
+                    return NULL;
+                };
+
                 // Visual & state refresh for InvenCardIntensifyView (5 pedestals + probability + RP price)
                 var safeRefreshIntensifyView = function(sceneThis) {
                     try {
@@ -7028,38 +7062,29 @@ function initIl2Cpp(module) {
                                     setEnabledFn(emptyImg, 1, NULL);
                                     // Official SUPER STAR LOONA watermark texture styling
                                     try {
-                                        var createSpriteFn = new NativeFunction(baseAddr.add(0x23E1268), "pointer", ["pointer", "pointer"]);
                                         var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
-                                        var wmTex = loadLocalTexture2D("asiudgasg/pedestal_watermark.png");
-                                        if (wmTex && !wmTex.isNull()) {
-                                            var wmSprite = createSpriteFn(wmTex, NULL);
-                                            if (wmSprite && !wmSprite.isNull()) {
-                                                setSpriteFn(emptyImg, wmSprite, NULL);
-                                            }
+                                        var wmSprite = getWatermarkSprite();
+                                        if (wmSprite && !wmSprite.isNull()) {
+                                            setSpriteFn(emptyImg, wmSprite, NULL);
+                                            emptyImg.add(0x20).writeFloat(1.0);
+                                            emptyImg.add(0x24).writeFloat(1.0);
+                                            emptyImg.add(0x28).writeFloat(1.0);
+                                            emptyImg.add(0x2C).writeFloat(1.0);
+                                        } else {
+                                            // Transparent fallback to prevent opaque white box if sprite is unavailable
+                                            emptyImg.add(0x2C).writeFloat(0.0);
                                         }
-                                        emptyImg.add(0x20).writeFloat(1.0);
-                                        emptyImg.add(0x24).writeFloat(1.0);
-                                        emptyImg.add(0x28).writeFloat(1.0);
-                                        emptyImg.add(0x2C).writeFloat(1.0);
-                                    } catch (eEmpCol) {}
+                                        // Force CanvasRenderer to re-upload mesh and material
+                                        var setVertsDirtyFn = new NativeFunction(baseAddr.add(0x1614F4C), "void", ["pointer", "pointer"]);
+                                        setVertsDirtyFn(emptyImg, NULL);
+                                        var setMatDirtyFn = new NativeFunction(baseAddr.add(0x1614FE4), "void", ["pointer", "pointer"]);
+                                        setMatDirtyFn(emptyImg, NULL);
+                                    } catch (eEmpCol) {
+                                        log("[-] Error setting pedestal watermark: " + eEmpCol.message);
+                                    }
                                 }
                                 if (!enabledGo.isNull()) {
                                     setActiveFn(enabledGo, isSlotAvail ? 1 : 0, NULL);
-                                    // Ensure white '+' Plus icon is visible inside Enabled
-                                    try {
-                                        var getTrFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
-                                        var enTr = getTrFn(enabledGo, NULL);
-                                        if (!enTr.isNull()) {
-                                            var chCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
-                                            var getChFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
-                                            var nCh = chCountFn(enTr, NULL);
-                                            for (var k = 0; k < nCh; k++) {
-                                                var ch = getChFn(enTr, k, NULL);
-                                                var chG = getGameObjectFn(ch, NULL);
-                                                if (!chG.isNull()) setActiveFn(chG, 1, NULL);
-                                            }
-                                        }
-                                    } catch (ePlus) {}
                                 }
                                 if (!cardSmall.isNull()) {
                                     var csGo = getGameObjectFn(cardSmall, NULL);
@@ -7102,12 +7127,20 @@ function initIl2Cpp(module) {
                             try { setBtnTextFn(btnRecommend, createIl2CppString("Recommended\nMaterial"), NULL); } catch (eBr) {}
                         }
 
+                        // Ensure btnTryEvent (0x68) is deactivated via legitimate GameObject to prevent ghost 'TrY' text overlay
                         var btnTryEvent = intensifyView.add(0x68).readPointer();
                         if (!btnTryEvent.isNull()) {
                             try {
-                                var tryEvGo = btnTryEvent.add(0x10).readPointer();
+                                var tryEvGo = getGameObjectFn(btnTryEvent, NULL);
                                 if (!tryEvGo.isNull()) setActiveFn(tryEvGo, 0, NULL);
-                            } catch (eBte) {}
+                                var tryEvSubBtn = btnTryEvent.add(0x38).readPointer();
+                                if (!tryEvSubBtn.isNull()) {
+                                    var subGo = tryEvSubBtn.add(0x10).readPointer();
+                                    if (!subGo.isNull()) setActiveFn(subGo, 0, NULL);
+                                }
+                            } catch (eBte) {
+                                log("[-] Error deactivating btnTryEvent: " + eBte.message);
+                            }
                         }
 
                         var btnTry = intensifyView.add(0x60).readPointer();
@@ -7116,7 +7149,7 @@ function initIl2Cpp(module) {
 
                         var formattedPrice = (totalPrice > 0) ? totalPrice.toLocaleString("en-US") : "0";
                         var il2cppPriceStr = createIl2CppString(formattedPrice);
-                        var tryActionLabel = (isMaxLevel && tGrade < 4) ? "Upgrade" : "Try";
+                        var tryActionLabel = (isMaxLevel && tGrade < 4) ? "UPGRADE" : "TRY";
                         var il2cppTryLabel = createIl2CppString(tryActionLabel);
 
                         if (!btnTry.isNull()) {
@@ -7214,6 +7247,25 @@ function initIl2Cpp(module) {
                         var sceneView = sceneThis.add(0x48).readPointer();
                         if (!sceneView.isNull()) {
                             safeShowIntensifyLayout(sceneView);
+
+                            // Apply large card visuals & golden frame to selectView.card (left target card)
+                            var selectView = sceneView.add(0x48).readPointer();
+                            if (!selectView.isNull()) {
+                                var sCard = selectView.add(0x38).readPointer();
+                                if (!sCard.isNull()) {
+                                    applyCardLargeVisuals(sCard, cId, gr, false, lvl);
+                                    if (gr === 4) {
+                                        try {
+                                            var numLevel = sCard.add(0x80).readPointer();
+                                            if (!numLevel.isNull()) {
+                                                var setValFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "uint32", "pointer"]);
+                                                setValFn(numLevel, lvl, NULL);
+                                            }
+                                        } catch (eNum) {}
+                                    }
+                                    log("[🖼️ INTENSIFY TARGET] Applied large card visuals to selectView.card for cId=" + cId + " gr=" + gr + " lvl=" + lvl);
+                                }
+                            }
                         }
 
                         // Refresh Intensify View (empty pedestals, TRY disabled, RP 0)
@@ -7553,9 +7605,14 @@ function initIl2Cpp(module) {
                             if (!emptyImg.isNull()) {
                                 var eGo = dGo(emptyImg, NULL);
                                 var eTr = dTr(emptyImg, NULL);
-                                var eSpr = emptyImg.add(0xD8).readPointer();
+                                var eSpr = emptyImg.add(0xD0).readPointer();
+                                var eOvr = emptyImg.add(0xD8).readPointer();
+                                var cR = emptyImg.add(0x20).readFloat();
+                                var cG = emptyImg.add(0x24).readFloat();
+                                var cB = emptyImg.add(0x28).readFloat();
+                                var cA = emptyImg.add(0x2C).readFloat();
                                 log("[🧪 DIAG MAT]   emptyImg: en=" + dEnabled(emptyImg, NULL) + " GOact=" + (!eGo.isNull() ? dActSelf(eGo, NULL) : false) +
-                                    " sprite=" + eSpr + " size=[" + f2(dSize(eTr, NULL)) + "] pos=[" + f2(dPos(eTr, NULL)) + "]");
+                                    " sprite=" + eSpr + " ovr=" + eOvr + " col=(" + cR.toFixed(2) + "," + cG.toFixed(2) + "," + cB.toFixed(2) + "," + cA.toFixed(2) + ") size=[" + f2(dSize(eTr, NULL)) + "] pos=[" + f2(dPos(eTr, NULL)) + "]");
                             }
                             dumpTree(tr, 1);
                         }
@@ -10099,21 +10156,21 @@ function initIl2Cpp(module) {
                                 var emptyImg = this.matView.add(0x38).readPointer();
                                 if (!emptyImg.isNull()) {
                                     try {
-                                        var createSpriteFn = new NativeFunction(baseAddr.add(0x23E1268), "pointer", ["pointer", "pointer"]);
                                         var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
-                                        var wmTex = loadLocalTexture2D("asiudgasg/pedestal_watermark.png");
-                                        if (wmTex && !wmTex.isNull()) {
-                                            var wmSprite = createSpriteFn(wmTex, NULL);
-                                            if (wmSprite && !wmSprite.isNull()) {
-                                                setSpriteFn(emptyImg, wmSprite, NULL);
-                                            }
+                                        var wmSprite = getWatermarkSprite();
+                                        if (wmSprite && !wmSprite.isNull()) {
+                                            setSpriteFn(emptyImg, wmSprite, NULL);
+                                            emptyImg.add(0x20).writeFloat(1.0);
+                                            emptyImg.add(0x24).writeFloat(1.0);
+                                            emptyImg.add(0x28).writeFloat(1.0);
+                                            emptyImg.add(0x2C).writeFloat(1.0);
+                                        } else {
+                                            emptyImg.add(0x2C).writeFloat(0.0);
                                         }
-                                        emptyImg.add(0x20).writeFloat(1.0);
-                                        emptyImg.add(0x24).writeFloat(1.0);
-                                        emptyImg.add(0x28).writeFloat(1.0);
-                                        emptyImg.add(0x2C).writeFloat(1.0);
-                                        emptyImg.add(0x60).writeU8(1); // m_VertsDirty
-                                        emptyImg.add(0x61).writeU8(1); // m_MaterialDirty
+                                        var setVertsDirtyFn = new NativeFunction(baseAddr.add(0x1614F4C), "void", ["pointer", "pointer"]);
+                                        setVertsDirtyFn(emptyImg, NULL);
+                                        var setMatDirtyFn = new NativeFunction(baseAddr.add(0x1614FE4), "void", ["pointer", "pointer"]);
+                                        setMatDirtyFn(emptyImg, NULL);
                                     } catch (eMvrSp) {}
                                 }
                             } catch (eMvr) {}
