@@ -8545,14 +8545,11 @@ function initIl2Cpp(module) {
                                 var setStateWaitDoneFn = new NativeFunction(baseAddr.add(0x1055E14), "void", ["pointer", "pointer"]);
                                 setStateWaitDoneFn(sceneThis, NULL);
                                 log("[✅ INVENTORY] SetStateWaitDone invoked successfully!");
-                                // Restore all 24 cards after transition to Default state
-                                restoreDefaultDisplayCardList(sceneThis, true);
                             } catch (eSwd) {
                                 log("[-] Error invoking SetStateWaitDone: " + eSwd.message);
                                 // Fallback: direct SetStateDefault
                                 var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool", "pointer"]);
                                 setStateDefaultFn(sceneThis, 1, 1, NULL);
-                                restoreDefaultDisplayCardList(sceneThis, true);
                             }
                         } catch (eWait) {
                             log("[-] Error in SetStateWait replacement: " + eWait.message);
