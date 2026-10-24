@@ -11436,15 +11436,51 @@ function initIl2Cpp(module) {
                             log("[-] triggerNativeIntensifyTry: No material cards registered (count=" + matCount + ")");
                             return;
                         }
+                        // Patch 0x105BBD4 to NOP (neutralize tbz w0, #0, #0x105bd54) to guarantee Path 1 to IntensifyAssist.Open
+                        try {
+                            Memory.protect(baseAddr.add(0x105BBD4), 4, "rwx");
+                            baseAddr.add(0x105BBD4).writeByteArray([0x1f, 0x20, 0x03, 0xd5]); // NOP
+                            log("[🛡️ TRY GUARD] Patched 0x105BBD4 to NOP (error branch neutralized)!");
+                        } catch (ePatchNop) {
+                            log("[-] Error patching 0x105BBD4: " + ePatchNop.message);
+                        }
+
                         log("[⚡ TRIGGER NATIVE TRY] Calling native InventoryScene.OnIntensifyTry (0x105BA9C) on: " + sceneThis + " with " + matCount + " materials");
                         var onTryFn = new NativeFunction(baseAddr.add(0x105BA9C), "void", ["pointer", "pointer"]);
                         onTryFn(sceneThis, NULL);
+                        log("[⚡ TRIGGER NATIVE TRY] OnIntensifyTry returned cleanly!");
                     } catch (eTrigTry) {
                         log("[-] Error in triggerNativeIntensifyTry: " + eTrigTry.message + " stack: " + eTrigTry.stack);
                         // Fallback to executeOfflineTry if native call throws
                         executeOfflineTry(sceneThis);
                     }
                 };
+
+                // Offline IntensifyAssist.Start (0xF1CD34) -> Instantly dispatch <Start>b__10_1 without CDN/network delays
+                try {
+                    Interceptor.replace(baseAddr.add(0xF1CD34), new NativeCallback(function (assistInstance, methodInfo) {
+                        log("[⚡ IntensifyAssist.Start] Intercepted offline! assistInstance=" + assistInstance);
+                        try {
+                            // Clear loading indicator
+                            try {
+                                var loadingCompleteFn = new NativeFunction(baseAddr.add(0xB3E230), "void", ["pointer"]);
+                                loadingCompleteFn(NULL);
+                                log("[🛡️ IntensifyAssist.Start] LoadingIndicator.Complete() dispatched!");
+                            } catch (eLd) {}
+
+                            // Directly invoke <Start>b__10_1 (0xF1E158) to open CardIntensifyPopup!
+                            var openPopupCallbackFn = new NativeFunction(baseAddr.add(0xF1E158), "void", ["pointer", "pointer"]);
+                            log("[⚡ IntensifyAssist.Start] Dispatching <Start>b__10_1 (0xF1E158)...");
+                            openPopupCallbackFn(assistInstance, NULL);
+                            log("[✅ IntensifyAssist.Start] <Start>b__10_1 returned successfully!");
+                        } catch (eSt) {
+                            log("[-] Error in IntensifyAssist.Start: " + eSt.message + " stack: " + eSt.stack);
+                        }
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on IntensifyAssist.Start (0xF1CD34)!");
+                } catch (eIasReplace) {
+                    log("[-] Error replacing IntensifyAssist.Start: " + eIasReplace.message);
+                }
 
                 // Attach monitor to native InventoryScene.OnIntensifyTry (0x105BA9C) (NO REPLACE, allowing native popup instantiation)
                 try {
@@ -11456,11 +11492,6 @@ function initIl2Cpp(module) {
                     Interceptor.attach(baseAddr.add(0xF1CBEC), {
                         onEnter: function(args) {
                             log("[⚡ IntensifyAssist.Open ENTER] params=" + args[0] + ", callback=" + args[1]);
-                        }
-                    });
-                    Interceptor.attach(baseAddr.add(0xF1CD34), {
-                        onEnter: function(args) {
-                            log("[⚡ IntensifyAssist.Start ENTER] assist=" + args[0]);
                         }
                     });
                     Interceptor.attach(baseAddr.add(0xAAA0D0), {
@@ -12253,6 +12284,16 @@ function initIl2Cpp(module) {
                     });
                 } catch (ePopMon) {
                     log("[-] Error attaching CardIntensifyPopup monitoring: " + ePopMon.message);
+                }
+
+                // 5. CardControl.Data.get_IsCardUseType (0xE43660) -> Always true for offline cards
+                try {
+                    Interceptor.replace(baseAddr.add(0xE43660), new NativeCallback(function(thiz, methodInfo) {
+                        return 1;
+                    }, "int", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on CardControl.Data.get_IsCardUseType (0xE43660)!");
+                } catch (eIcut) {
+                    log("[-] Error replacing get_IsCardUseType: " + eIcut.message);
                 }
 
 
