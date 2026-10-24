@@ -2583,4 +2583,28 @@ En el motor Dalcomsoft, los atributos, bonificaciones, precios y probabilidades 
    * **Vista Completa de Pedestales con Materiales:** [screen_powerup_pedestals_clean.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_powerup_pedestals_clean.png) (YeoJin R50, 5 pedestales con cartas `C/B/A`, badges `+`, marquesina de artistas, probabilidad "Low" en color coral y botón "Try" con RP `94258`).
    * **Modal de Resultado Oficial Renderizado:** [screen_powerup_popup_result.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_powerup_popup_result.png) (Modal nativo `CardIntensifyPopup` mostrando YeoJin R51 con el shader de líneas diagonales rayadas, texto "FAILED", Score 199, Energy 100, fondo modal difuminado y destello de iluminación oficial).
 
+### 24.12. Perfeccionamiento Visual y Control de Flujo Completo del Modal de Power Up (`CardIntensifyPopup`)
+
+1. **Inyección de Título y Claves de Localización:**
+   * **Título Superior Oficial:** Se forzó `Popup.set_TitleString(pop, "Power Up")` (RVA `0x1148F6C`) y la activación de `titleBase` (`pop + 0x90`) y `titleText` (`pop + 0x98`) en `OpenResultLayout` (RVA `0x13841D4`).
+   * **Diccionario de Localización Offline:** Se inyectaron en `offlineLocaleStrings` las claves `0x72A2311`, `0x72A2312`, `0x72A2313`, `0x72A2315`, `0x72A1F29` como `"Power Up"`, y los textos para botones: `0x72A2AE1` (`"OK"`), `0x72A2AE3` (`"Next"`), `0x72A2AE4` (`"Power Up"`), `0x72A2AE5` (`"Upgrade"`).
+
+2. **Lógica de Flujo Oficial de Intentos Multi-Material (Next vs OK):**
+   * **Caso FAILED:** Al fallar un intento de material, si restan materiales pendientes (`index < count`), `isNext` se mantiene en `true`, configurando el botón hexagonal con el texto `"Next"` (RVA `0x1149BB4`). Al presionar `"Next"`, `OnClickOverride` (RVA `0x138407C`) despacha el siguiente material (`materialCardParams.Invoke(index)`) y re-ejecuta `OpenResultLayout`.
+   * **Caso SUCCEED:** Si el intento tiene éxito, el flujo de power-up se completa inmediatamente: `isNext` se fuerza a `false` en memoria (`pop + 0x168 = 0`) y el botón hexagonal se configura con el texto `"OK"`. Al presionar `"OK"`, `OnClickOverride` invoca directamente `Popup.Close()` (RVA `0x114B6C8`).
+   * **Desbloqueo de Toques Físicos (`touchLocked`):** Dalcomsoft activa `touchLocked` (`pop + 0x70`, `UICache`) durante las transiciones para ignorar toques. Al desactivarlo explícitamente en `OpenResultLayout`, los toques físicos y clics en el botón responden instantáneamente.
+
+3. **Efectos Visuales Fidelizados al Juego Original:**
+   * **Efectos en Caso FAILED:** Shader nativo de líneas diagonales rayadas sobre la carta (`ANIM_FAILED = 3`), etiqueta roja `"FAILED"`, y ocultación de deltas en las barras de estadísticas.
+   * **Efectos en Caso SUCCEED:** Destello esférico y rayos de luz radiales blancos en el fondo del modal (`ANIM_SUCCEED = 2`), aura resplandeciente en el borde de la carta, estrellas actualizadas (`★★` para cartas regulares o nivel incrementado para cartas R), y deltas numéricos violeta (`+2` en Score y `+3` en Energy, color `r=0.72, g=0.39, b=0.83, a=1.0`).
+
+4. **Estabilización del Cierre y Retorno Limpio al Inventario:**
+   * **Causa Raíz del Bloqueo/Crash al presionar OK:** Al cerrar `CardIntensifyPopup`, el delegado `<Start>b__10_3` (RVA `0xF1E710`) llama a `CommonPopupControl.OpenCardBookGradeupPopup` (RVA `0xACB070`). Al no haber datos de CardBook en memoria offline (`CardBookControl.SharedInfo == NULL`), la instrucción en `0xACB254` saltaba a `0xACB4C4` (`bl #0xa43cc0`, excepción de desreferenciación nula) provocando un `abort()` del proceso en UnityMain.
+   * **Safe Stub Interceptor:** Se implementó `Interceptor.replace` en `0xACB070` invocando directamente el delegado de finalización `callback.Invoke()` (`<Start>b__5`, RVA `0xB522FC`), el cual llama a `IntensifyAssist.Complete(1)` (RVA `0xF1D048`), desencadena `InventoryScene.<OnIntensifyTry>b__1` (RVA `0xB5B3E8`), limpia los pedestales de materiales y restaura el estado de inventario limpiamente sin errores ni caídas.
+
+5. **Evidencias Visuales Verificadas en Vivo (`emulator-5554`):**
+   * **Paso 1 (FAILED con botón 'Next'):** [screen_step1_failed.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_step1_failed.png) (Título `"Power Up"` centrado en barra superior, carta con shader diagonal rayado, etiqueta roja `"FAILED"`, botón hexagonal centrado `"Next"`).
+   * **Paso 2 (SUCCEED con botón 'OK'):** [screen_step2_succeed.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_step2_succeed.png) (Título `"Power Up"` centrado, carta con destellos y aura de luz radiales, etiqueta violeta `"SUCCEED"`, deltas `+2` Score y `+3` Energy en violeta, botón hexagonal centrado `"OK"`).
+   * **Paso 3 (Retorno Limpio a Inventario tras presionar 'OK'):** [screen_step_done_inven.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_step_done_inven.png) (Modal cerrado, pedestales limpios y vacíos, carta YeoJin R59 actualizada, interfaz receptiva).
+
 

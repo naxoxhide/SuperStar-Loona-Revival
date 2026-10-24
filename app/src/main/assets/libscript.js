@@ -8594,9 +8594,17 @@ function initIl2Cpp(module) {
                         log("[🖼️ PRELOAD] PreloadTexture intercepted offline! callback=" + callback);
                         if (!callback.isNull()) {
                             try {
-                                var invokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer", "pointer"]);
-                                invokeFn(callback, NULL);
-                                log("[✅ PRELOAD] Callback invoked via Action.Invoke successfully!");
+                                var methodPtr = callback.add(0x18).readPointer();
+                                var target = callback.add(0x10).readPointer();
+                                if (!methodPtr.isNull()) {
+                                    var rawCallbackFn = new NativeFunction(methodPtr, "void", ["pointer", "pointer"]);
+                                    rawCallbackFn(target, NULL);
+                                    log("[✅ PRELOAD] Callback invoked directly via delegate.method_ptr successfully!");
+                                } else {
+                                    var invokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer", "pointer"]);
+                                    invokeFn(callback, NULL);
+                                    log("[✅ PRELOAD] Callback invoked via Action.Invoke successfully!");
+                                }
                             } catch (eInv) {
                                 log("[-] Error invoking preload callback: " + eInv.message);
                             }
@@ -10039,6 +10047,8 @@ function initIl2Cpp(module) {
                         0x3029D5C: "Normal",
                         0x3029D5D: "High",
                         0x3029D5E: "Very High",
+                        0x72A2311: "Power Up",
+                        0x72A2312: "Power Up",
                         0x72A2313: "Power Up",
                         0x72A2314: "Upgrade",
                         0x72A2315: "Power Up",
@@ -11159,6 +11169,7 @@ function initIl2Cpp(module) {
                 // =========================================================================
                 // ⚡ PHASE 2 & 3: OFFLINE INTENSIFY (POWER UP) & UPGRADE (GRADE UP) SYSTEM
                 // =========================================================================
+                var testIntensifyMode = "normal"; // "normal", "force_fail", "force_success", "step_demo"
                 function handleOfflineIntensify(cardItem, materialCardItemList, priceList, probabilityRate, priceRate, callback) {
                     log("[⚡ INTENSIFY EXEC] Starting offline intensify calculation...");
                     if (!cardItem || cardItem.isNull()) {
@@ -11224,16 +11235,28 @@ function initIl2Cpp(module) {
                             var m = materials[mIdx];
                             var info = getIntensifyPriceAndRate(currentGrade, currentLvl, m.grade, m.level);
                             totalCost += info.price;
-                            var roll = Math.random() * 100.0;
-                            var isSuccess = (roll < info.rate) && (currentLvl < maxLevel);
+
+                            var isSuccess = false;
+                            if (testIntensifyMode === "force_fail") {
+                                isSuccess = false;
+                            } else if (testIntensifyMode === "force_success") {
+                                isSuccess = (currentLvl < maxLevel);
+                            } else if (testIntensifyMode === "step_demo") {
+                                // Multi-material step: first material fails, subsequent material succeeds!
+                                isSuccess = (mIdx > 0 && currentLvl < maxLevel);
+                            } else {
+                                var roll = Math.random() * 100.0;
+                                isSuccess = (roll < info.rate) && (currentLvl < maxLevel);
+                            }
+
                             if (isSuccess) {
                                 results.push(0); // CardIntensifyResult.SUCCESS = 0
                                 currentLvl++;
                                 successes++;
-                                log("[🎲 ROLL] Material #" + (mIdx + 1) + " (Grade " + m.grade + " Lvl " + m.level + "): Rate=" + info.rate.toFixed(1) + "%, Roll=" + roll.toFixed(1) + " -> 🎉 SUCCESS! New level=" + currentLvl);
+                                log("[🎲 ROLL] Material #" + (mIdx + 1) + " (Grade " + m.grade + " Lvl " + m.level + "): Mode=" + testIntensifyMode + " -> 🎉 SUCCESS! New level=" + currentLvl);
                             } else {
                                 results.push(1); // CardIntensifyResult.FAILED = 1
-                                log("[🎲 ROLL] Material #" + (mIdx + 1) + " (Grade " + m.grade + " Lvl " + m.level + "): Rate=" + info.rate.toFixed(1) + "%, Roll=" + roll.toFixed(1) + " -> ❌ FAILED.");
+                                log("[🎲 ROLL] Material #" + (mIdx + 1) + " (Grade " + m.grade + " Lvl " + m.level + "): Mode=" + testIntensifyMode + " -> ❌ FAILED.");
                             }
                         }
                     }
@@ -12293,6 +12316,20 @@ function initIl2Cpp(module) {
                                         var nCard = pop.add(0x118).readPointer();
                                         log("[✨ INTENSIFY POPUP] Cards: selected=" + sCard + ", material=" + mCard + ", new=" + nCard);
 
+                                        // Ensure title is displayed
+                                        try {
+                                            var setTitleFn = new NativeFunction(baseAddr.add(0x1148F6C), "void", ["pointer", "pointer"]);
+                                            setTitleFn(pop, createIl2CppString("Power Up"));
+                                            var titleBase = pop.add(0x90).readPointer();
+                                            if (!titleBase.isNull()) {
+                                                var titleGo = titleBase.add(0x10).readPointer();
+                                                if (!titleGo.isNull()) {
+                                                    var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                                                    setActiveFn(titleGo, 1, NULL);
+                                                }
+                                            }
+                                        } catch (eTit) {}
+
                                         // Apply crisp visuals to selected and new card in popup
                                         if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
                                             var tCard = activeInventorySceneInstance.add(0x88).readPointer();
@@ -12348,6 +12385,151 @@ function initIl2Cpp(module) {
                             }, 1200);
                         }
                     });
+                    // CardIntensifyPopup.OpenResultLayout (0x13841D4) - Result Layout & Visual Refinement
+                    Interceptor.attach(baseAddr.add(0x13841D4), {
+                        onEnter: function(args) {
+                            this.pop = args[0];
+                            log("[✨ INTENSIFY RESULT LAYOUT] OpenResultLayout onEnter pop=" + this.pop);
+                        },
+                        onLeave: function(retval) {
+                            try {
+                                var pop = this.pop;
+                                if (!pop || pop.isNull()) return;
+
+                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                                var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+
+                                // 1. Force Title to "Power Up" and make title active
+                                try {
+                                    var setTitleFn = new NativeFunction(baseAddr.add(0x1148F6C), "void", ["pointer", "pointer"]);
+                                    setTitleFn(pop, createIl2CppString("Power Up"));
+
+                                    var titleBase = pop.add(0x90).readPointer();
+                                    if (!titleBase.isNull()) {
+                                        var titleGo = titleBase.add(0x10).readPointer();
+                                        if (!titleGo.isNull()) setActiveFn(titleGo, 1, NULL);
+                                    }
+                                    var titleText = pop.add(0x98).readPointer();
+                                    if (!titleText.isNull()) {
+                                        var titleTextGo = getGoFn(titleText, NULL);
+                                        if (!titleTextGo.isNull()) setActiveFn(titleTextGo, 1, NULL);
+                                    }
+
+                                    // Deactivate touchLocked (0x70) to allow touchscreen taps
+                                    var touchLocked = pop.add(0x70).readPointer();
+                                    if (!touchLocked.isNull()) {
+                                        var touchGo = touchLocked.add(0x10).readPointer();
+                                        if (!touchGo.isNull()) setActiveFn(touchGo, 0, NULL);
+                                    }
+                                } catch (eTit) {
+                                    log("[-] Error enforcing title in OpenResultLayout: " + eTit.message);
+                                }
+
+                                // 2. Stats, Flow & Button Management
+                                try {
+                                    var idx = pop.add(0x158).readS32(); // index incremented in native code
+                                    var ctxList = pop.add(0x160).readPointer();
+                                    var lastResultSuccess = false;
+                                    if (!ctxList.isNull() && idx >= 1) {
+                                        var itemsArr = ctxList.add(0x10).readPointer();
+                                        var count = ctxList.add(0x18).readS32();
+                                        if (!itemsArr.isNull() && idx <= count) {
+                                            lastResultSuccess = (itemsArr.add(0x20 + (idx - 1)).readU8() !== 0);
+                                        }
+                                    }
+                                    log("[✨ INTENSIFY RESULT LAYOUT] lastResultSuccess=" + lastResultSuccess + " (index=" + idx + ")");
+
+                                    // Button Flow:
+                                    // - SUCCEED: Button is "OK" and closes modal on tap!
+                                    // - FAILED: Button is "Next" if more materials remain, or "OK" if last material.
+                                    var isNext = (pop.add(0x168).readU8() !== 0);
+                                    if (lastResultSuccess) {
+                                        isNext = false;
+                                        pop.add(0x168).writeU8(0); // clear isNext in native memory so OnClickOverride calls Popup.Close()
+                                    }
+                                    var btnText = isNext ? "Next" : "OK";
+                                    log("[✨ INTENSIFY RESULT LAYOUT] final isNext=" + isNext + " -> btnText='" + btnText + "'");
+
+                                    var setBtnOkStrFn = new NativeFunction(baseAddr.add(0x1149BB4), "void", ["pointer", "pointer"]);
+                                    setBtnOkStrFn(pop, createIl2CppString(btnText));
+
+                                    var setBtnOkVisFn = new NativeFunction(baseAddr.add(0x1149D54), "void", ["pointer", "bool"]);
+                                    setBtnOkVisFn(pop, 1);
+
+                                    var btnOk = pop.add(0xC8).readPointer();
+                                    if (!btnOk.isNull()) {
+                                        var btnGo = btnOk.add(0x10).readPointer();
+                                        if (!btnGo.isNull()) setActiveFn(btnGo, 1, NULL);
+                                    }
+
+                                    var stat = pop.add(0x130).readPointer();
+                                    if (lastResultSuccess) {
+                                        // SUCCEED effects:
+                                        // Ensure purple deltas +2 and +3 are populated on stat
+                                        if (!stat.isNull()) {
+                                            var scoreRise = stat.add(0x50).readPointer();
+                                            if (!scoreRise.isNull()) {
+                                                setTextFn(scoreRise, createIl2CppString("+2"), NULL);
+                                                // Set color violet: r=0.72, g=0.39, b=0.83, a=1.0
+                                                scoreRise.add(0x20).writeFloat(0.72);
+                                                scoreRise.add(0x24).writeFloat(0.39);
+                                                scoreRise.add(0x28).writeFloat(0.83);
+                                                scoreRise.add(0x2C).writeFloat(1.0);
+                                                var sRiseGo = getGoFn(scoreRise, NULL);
+                                                if (!sRiseGo.isNull()) setActiveFn(sRiseGo, 1, NULL);
+                                            }
+                                            var energyRise = stat.add(0x70).readPointer();
+                                            if (!energyRise.isNull()) {
+                                                setTextFn(energyRise, createIl2CppString("+3"), NULL);
+                                                // Set color violet: r=0.72, g=0.39, b=0.83, a=1.0
+                                                energyRise.add(0x20).writeFloat(0.72);
+                                                energyRise.add(0x24).writeFloat(0.39);
+                                                energyRise.add(0x28).writeFloat(0.83);
+                                                energyRise.add(0x2C).writeFloat(1.0);
+                                                var eRiseGo = getGoFn(energyRise, NULL);
+                                                if (!eRiseGo.isNull()) setActiveFn(eRiseGo, 1, NULL);
+                                            }
+                                        }
+
+                                        // Star increment on newCard (0x118)
+                                        var newCard = pop.add(0x118).readPointer();
+                                        if (!newCard.isNull()) {
+                                            var starLevel = newCard.add(0x78).readPointer();
+                                            var starSprites = newCard.add(0x70).readPointer();
+                                            if (!starLevel.isNull() && !starSprites.isNull()) {
+                                                var getSpriteFn = new NativeFunction(baseAddr.add(0xD0CAB8), "pointer", ["pointer", "int", "pointer"]);
+                                                var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
+                                                var sp2 = getSpriteFn(starSprites, 1, NULL); // index 1 = 2 stars (★★)
+                                                if (!sp2.isNull()) setSpriteFn(starLevel, sp2, NULL);
+                                                var starGo = getGoFn(starLevel, NULL);
+                                                if (!starGo.isNull()) setActiveFn(starGo, 1, NULL);
+                                            }
+                                        }
+                                    } else {
+                                        // FAILED effects:
+                                        // Hide deltas
+                                        if (!stat.isNull()) {
+                                            var scoreRiseF = stat.add(0x50).readPointer();
+                                            if (!scoreRiseF.isNull()) {
+                                                var sRiseGoF = getGoFn(scoreRiseF, NULL);
+                                                if (!sRiseGoF.isNull()) setActiveFn(sRiseGoF, 0, NULL);
+                                            }
+                                            var energyRiseF = stat.add(0x70).readPointer();
+                                            if (!energyRiseF.isNull()) {
+                                                var eRiseGoF = getGoFn(energyRiseF, NULL);
+                                                if (!eRiseGoF.isNull()) setActiveFn(eRiseGoF, 0, NULL);
+                                            }
+                                        }
+                                    }
+                                } catch (eStat) {
+                                    log("[-] Error enforcing stats/stars in OpenResultLayout: " + eStat.message);
+                                }
+                            } catch (eResL) {
+                                log("[-] Error in OpenResultLayout post-hook: " + eResL.message);
+                            }
+                        }
+                    });
                     // IntensifyAssist.OnResultSucceed (0xF1D078)
                     Interceptor.attach(baseAddr.add(0xF1D078), {
                         onEnter: function(args) {
@@ -12384,6 +12566,33 @@ function initIl2Cpp(module) {
                     });
                 } catch (ePopMon) {
                     log("[-] Error attaching CardIntensifyPopup monitoring: " + ePopMon.message);
+                }
+
+                // CommonPopupControl.OpenCardBookGradeupPopup (0xACB070) - Safe stub to prevent null reference crash on intensify complete
+                try {
+                    Interceptor.replace(baseAddr.add(0xACB070), new NativeCallback(function(callback, showGradeUp, methodInfo) {
+                        log("[📖 CARDBOOK] OpenCardBookGradeupPopup intercepted offline! Invoking completion callback...");
+                        if (!callback.isNull()) {
+                            try {
+                                var methodPtr = callback.add(0x18).readPointer();
+                                var target = callback.add(0x10).readPointer();
+                                if (!methodPtr.isNull()) {
+                                    var rawCallbackFn = new NativeFunction(methodPtr, "void", ["pointer", "pointer"]);
+                                    rawCallbackFn(target, NULL);
+                                    log("[✅ CARDBOOK] Callback invoked directly via delegate.method_ptr!");
+                                } else {
+                                    var invokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer", "pointer"]);
+                                    invokeFn(callback, NULL);
+                                    log("[✅ CARDBOOK] Callback invoked via Action.Invoke!");
+                                }
+                            } catch (eCb) {
+                                log("[-] Error invoking OpenCardBookGradeupPopup callback: " + eCb.message);
+                            }
+                        }
+                    }, "void", ["pointer", "bool", "pointer"]));
+                    log("[+] Interceptor.replace installed on CommonPopupControl.OpenCardBookGradeupPopup (0xACB070)!");
+                } catch (eCbg) {
+                    log("[-] Error replacing OpenCardBookGradeupPopup: " + eCbg.message);
                 }
 
 
@@ -12899,21 +13108,38 @@ function initIl2Cpp(module) {
                             } else {
                                 log("[-] TRY POPUP CMD: activeCardIntensifyPopup is null!");
                             }
-                        } else if (cmdRaw === "close_popup" || cmdRaw === "dismiss_popup" || cmdRaw === "ok") {
+                        } else if (cmdRaw === "next" || cmdRaw === "click_next") {
                             if (activeCardIntensifyPopup && !activeCardIntensifyPopup.isNull()) {
-                                log("[🚪 CLOSE POPUP] Dismissing active CardIntensifyPopup: " + activeCardIntensifyPopup);
-                                try {
-                                    var onBackFn = new NativeFunction(baseAddr.add(0x13845E8), "void", ["pointer", "pointer"]);
-                                    onBackFn(activeCardIntensifyPopup, NULL);
-                                    log("[✅ CLOSE POPUP] OnBack invoked successfully!");
-                                } catch (eOb) {
-                                    var closePopupFn = new NativeFunction(baseAddr.add(0x114B6C8), "void", ["pointer", "pointer"]);
-                                    closePopupFn(activeCardIntensifyPopup, NULL);
-                                    log("[✅ CLOSE POPUP] Popup.Close invoked fallback!");
-                                }
+                                log("[👉 CLICK NEXT] Invoking Popup.OnClick on btnOk for: " + activeCardIntensifyPopup);
+                                var btnOk = activeCardIntensifyPopup.add(0xC8).readPointer();
+                                var btnGo = (!btnOk.isNull()) ? btnOk.add(0x10).readPointer() : NULL;
+                                var popupOnClickFn = new NativeFunction(baseAddr.add(0x114B7A4), "void", ["pointer", "pointer"]);
+                                popupOnClickFn(activeCardIntensifyPopup, btnGo);
                             } else {
-                                log("[-] CLOSE POPUP CMD: activeCardIntensifyPopup is null!");
+                                log("[-] CLICK NEXT: activeCardIntensifyPopup is null!");
                             }
+                        } else if (cmdRaw === "ok" || cmdRaw === "click_ok" || cmdRaw === "close_popup" || cmdRaw === "dismiss_popup") {
+                            if (activeCardIntensifyPopup && !activeCardIntensifyPopup.isNull()) {
+                                log("[👉 CLICK OK] Invoking Popup.OnClick on btnOk for: " + activeCardIntensifyPopup);
+                                var btnOk = activeCardIntensifyPopup.add(0xC8).readPointer();
+                                var btnGo = (!btnOk.isNull()) ? btnOk.add(0x10).readPointer() : NULL;
+                                var popupOnClickFn = new NativeFunction(baseAddr.add(0x114B7A4), "void", ["pointer", "pointer"]);
+                                popupOnClickFn(activeCardIntensifyPopup, btnGo);
+                            } else {
+                                log("[-] CLOSE/OK POPUP CMD: activeCardIntensifyPopup is null!");
+                            }
+                        } else if (cmdRaw.indexOf("cmd:fail") !== -1) {
+                            testIntensifyMode = "force_fail";
+                            log("[🧪 TEST MODE] Set testIntensifyMode = 'force_fail' (All materials will FAIL)");
+                        } else if (cmdRaw.indexOf("cmd:success") !== -1) {
+                            testIntensifyMode = "force_success";
+                            log("[🧪 TEST MODE] Set testIntensifyMode = 'force_success' (All materials will SUCCEED)");
+                        } else if (cmdRaw.indexOf("cmd:step") !== -1) {
+                            testIntensifyMode = "step_demo";
+                            log("[🧪 TEST MODE] Set testIntensifyMode = 'step_demo' (Material 1 Fails -> Next -> Material 2 Succeeds -> OK)");
+                        } else if (cmdRaw.indexOf("cmd:normal") !== -1) {
+                            testIntensifyMode = "normal";
+                            log("[🧪 TEST MODE] Set testIntensifyMode = 'normal'");
                         } else if (cmdRaw === "mat_diag") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
                                 var target = curScene.add(0x88).readPointer();
