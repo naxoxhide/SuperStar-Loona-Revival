@@ -6015,15 +6015,57 @@ function initIl2Cpp(module) {
                                 }
                             } catch (eSc) {}
 
-                            // 3f. Equip Checkmark & Lock Mark (mark @ item + 0xC0, markSprites @ item + 0xB8)
+                            // 3f. Badges / Marks: Equip (0), Material (1), New (2), Lock (3), Leader (4)
                             try {
                                 var markImg = item.add(0xC0).readPointer();
                                 var markSprites = item.add(0xB8).readPointer();
                                 var isEquip = (rawC.add(0x28).readU8() === 1);
                                 var isLocked = (rawC.add(0x29).readU8() === 1);
-                                if (!markImg.isNull()) {
-                                    if ((isEquip || isLocked) && !markSprites.isNull()) {
-                                        var markIdx = isEquip ? 0 : 1; // MARK_INDEX.Equip = 0, Lock = 1
+                                var extractType = 0;
+                                if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                    try { extractType = activeInventorySceneInstance.add(0x50).readS32(); } catch (eEt) {}
+                                }
+
+                                if (!markImg.isNull() && !markSprites.isNull()) {
+                                    var showMark = false;
+                                    var markIdx = -1;
+
+                                    if (extractType === 2) {
+                                        // Material / Power Up mode:
+                                        // Check if card is registered in materialCardItemList (scene + 0xA0)
+                                        var isRegMat = false;
+                                        if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                            var matListPtr = activeInventorySceneInstance.add(0xA0).readPointer();
+                                            if (!matListPtr.isNull()) {
+                                                var mCount = matListPtr.add(0x18).readS32();
+                                                var mItems = matListPtr.add(0x10).readPointer();
+                                                if (!mItems.isNull()) {
+                                                    for (var mi = 0; mi < mCount; mi++) {
+                                                        var mc = mItems.add(0x20 + mi * 8).readPointer();
+                                                        if (!mc.isNull() && mc.equals(cardItem)) {
+                                                            isRegMat = true;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        // If registered material -> MARK_INDEX.Material = 1 (orange circular '+' badge)
+                                        // If not registered -> MARK_INDEX.New = 2 (pink circular 'N' badge)
+                                        markIdx = isRegMat ? 1 : 2;
+                                        showMark = true;
+                                    } else {
+                                        // Normal inventory mode:
+                                        if (isEquip) {
+                                            markIdx = 0; // MARK_INDEX.Equip = 0 (blue checkmark)
+                                            showMark = true;
+                                        } else if (isLocked) {
+                                            markIdx = 3; // MARK_INDEX.Lock = 3 (lock badge)
+                                            showMark = true;
+                                        }
+                                    }
+
+                                    if (showMark && markIdx >= 0) {
                                         var getSpriteFn = new NativeFunction(baseAddr.add(0xD0CAB8), "pointer", ["pointer", "int", "pointer"]);
                                         var markSprite = getSpriteFn(markSprites, markIdx, NULL);
                                         if (!markSprite.isNull()) {
@@ -6803,8 +6845,8 @@ function initIl2Cpp(module) {
                         var probHdrObj = intensifyView.add(0x48).readPointer();
                         if (!probHdrObj.isNull()) {
                             try {
-                                var pHdrStr = (isMaxLevel && tGrade < 4) ? "Probability of Upgrade : " :
-                                              (tGrade === 4) ? "Probability of Level Up : " : "Probability of Power Up : ";
+                                var pHdrStr = (isMaxLevel && tGrade < 4) ? "Upgrade Success Chance: " :
+                                              (tGrade === 4) ? "Power Up Success Chance: " : "Power Up Success Chance: ";
                                 setTextFn(probHdrObj, createIl2CppString(pHdrStr), NULL);
                             } catch (ePh) {}
                         }
@@ -6944,15 +6986,41 @@ function initIl2Cpp(module) {
                                     var eGo = getGameObjectFn(emptyImg, NULL);
                                     if (!eGo.isNull()) setActiveFn(eGo, 1, NULL);
                                     setEnabledFn(emptyImg, 1, NULL);
-                                    // Soft lavender-gray pedestal silhouette tint so empty pedestals stand out against white canvas
+                                    // Official SUPER STAR LOONA watermark texture styling
                                     try {
-                                        emptyImg.add(0x20).writeFloat(0.84);
-                                        emptyImg.add(0x24).writeFloat(0.85);
-                                        emptyImg.add(0x28).writeFloat(0.90);
-                                        emptyImg.add(0x2C).writeFloat(0.75);
+                                        var createSpriteFn = new NativeFunction(baseAddr.add(0x23E1268), "pointer", ["pointer", "pointer"]);
+                                        var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
+                                        var wmTex = loadLocalTexture2D("asiudgasg/pedestal_watermark.png");
+                                        if (wmTex && !wmTex.isNull()) {
+                                            var wmSprite = createSpriteFn(wmTex, NULL);
+                                            if (wmSprite && !wmSprite.isNull()) {
+                                                setSpriteFn(emptyImg, wmSprite, NULL);
+                                            }
+                                        }
+                                        emptyImg.add(0x20).writeFloat(1.0);
+                                        emptyImg.add(0x24).writeFloat(1.0);
+                                        emptyImg.add(0x28).writeFloat(1.0);
+                                        emptyImg.add(0x2C).writeFloat(1.0);
                                     } catch (eEmpCol) {}
                                 }
-                                if (!enabledGo.isNull()) setActiveFn(enabledGo, isSlotAvail ? 1 : 0, NULL);
+                                if (!enabledGo.isNull()) {
+                                    setActiveFn(enabledGo, isSlotAvail ? 1 : 0, NULL);
+                                    // Ensure white '+' Plus icon is visible inside Enabled
+                                    try {
+                                        var getTrFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                        var enTr = getTrFn(enabledGo, NULL);
+                                        if (!enTr.isNull()) {
+                                            var chCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
+                                            var getChFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                                            var nCh = chCountFn(enTr, NULL);
+                                            for (var k = 0; k < nCh; k++) {
+                                                var ch = getChFn(enTr, k, NULL);
+                                                var chG = getGameObjectFn(ch, NULL);
+                                                if (!chG.isNull()) setActiveFn(chG, 1, NULL);
+                                            }
+                                        }
+                                    } catch (ePlus) {}
+                                }
                                 if (!cardSmall.isNull()) {
                                     var csGo = getGameObjectFn(cardSmall, NULL);
                                     if (!csGo.isNull()) setActiveFn(csGo, 0, NULL);
@@ -6962,28 +7030,28 @@ function initIl2Cpp(module) {
 
                         var totalProbRate = (regCards.length > 0) ? (1.0 - failureProbProduct) * 100.0 : 0.0;
                         var probLabel = "Normal";
-                        if (totalProbRate >= 80.0) probLabel = "Very High";
-                        else if (totalProbRate >= 50.0) probLabel = "High";
-                        else if (totalProbRate >= 25.0) probLabel = "Normal";
-                        else if (totalProbRate > 0.0) probLabel = "Low";
+                        var probColor = { r: 0.96, g: 0.64, b: 0.38, a: 1.0 }; // Amber
+                        if (totalProbRate >= 50.0) {
+                            probLabel = "High";
+                            probColor = { r: 0.88, g: 0.19, b: 0.47, a: 1.0 }; // Magenta / Pink (#E03177)
+                        } else if (totalProbRate >= 25.0) {
+                            probLabel = "Normal";
+                            probColor = { r: 0.96, g: 0.64, b: 0.38, a: 1.0 }; // Amber
+                        } else if (totalProbRate > 0.0) {
+                            probLabel = "Low";
+                            probColor = { r: 0.90, g: 0.32, b: 0.35, a: 1.0 }; // Coral / Red
+                        }
 
                         var probTextObj = intensifyView.add(0x50).readPointer();
                         if (!probTextObj.isNull()) {
-                            var pStr = (regCards.length > 0) ? (probLabel + " (" + totalProbRate.toFixed(1) + "%)") : "-";
+                            var pStr = (regCards.length > 0) ? probLabel : "-";
                             setTextFn(probTextObj, createIl2CppString(pStr), NULL);
-                            // Apply dynamic color from probabilityLow (0x70) or probabilityHigh (0x74)
                             try {
-                                var isLowProb = (regCards.length > 0 && totalProbRate < 50.0);
-                                var colOffset = isLowProb ? 0x70 : 0x74;
-                                var cR = intensifyView.add(colOffset).readU8() / 255.0;
-                                var cG = intensifyView.add(colOffset + 1).readU8() / 255.0;
-                                var cB = intensifyView.add(colOffset + 2).readU8() / 255.0;
-                                var cA = intensifyView.add(colOffset + 3).readU8() / 255.0;
-                                if (cA > 0.01) {
-                                    probTextObj.add(0x20).writeFloat(cR);
-                                    probTextObj.add(0x24).writeFloat(cG);
-                                    probTextObj.add(0x28).writeFloat(cB);
-                                    probTextObj.add(0x2C).writeFloat(cA);
+                                if (regCards.length > 0) {
+                                    probTextObj.add(0x20).writeFloat(probColor.r);
+                                    probTextObj.add(0x24).writeFloat(probColor.g);
+                                    probTextObj.add(0x28).writeFloat(probColor.b);
+                                    probTextObj.add(0x2C).writeFloat(probColor.a);
                                 }
                             } catch (ePCol) {}
                         }
@@ -6991,7 +7059,7 @@ function initIl2Cpp(module) {
                         // Button labels & states: btnRecommend (0x58), btnTry (0x60), btnTryEvent (0x68), btnDisable (0x78)
                         var btnRecommend = intensifyView.add(0x58).readPointer();
                         if (!btnRecommend.isNull()) {
-                            try { setBtnTextFn(btnRecommend, createIl2CppString("RECOMMEND"), NULL); } catch (eBr) {}
+                            try { setBtnTextFn(btnRecommend, createIl2CppString("Recommended\nMaterial"), NULL); } catch (eBr) {}
                         }
 
                         var btnTryEvent = intensifyView.add(0x68).readPointer();
@@ -7008,7 +7076,7 @@ function initIl2Cpp(module) {
 
                         var formattedPrice = (totalPrice > 0) ? totalPrice.toLocaleString("en-US") : "0";
                         var il2cppPriceStr = createIl2CppString(formattedPrice);
-                        var tryActionLabel = (isMaxLevel && tGrade < 4) ? "UPGRADE" : "TRY";
+                        var tryActionLabel = (isMaxLevel && tGrade < 4) ? "Upgrade" : "Try";
                         var il2cppTryLabel = createIl2CppString(tryActionLabel);
 
                         if (!btnTry.isNull()) {
@@ -8508,8 +8576,8 @@ function initIl2Cpp(module) {
                                     cbFn(target, NULL);
                                     log("[✅ PRELOAD] Callback executed directly and safely!");
                                 } else {
-                                    var invokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer"]);
-                                    invokeFn(callback);
+                                    var invokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer", "pointer"]);
+                                    invokeFn(callback, NULL);
                                     log("[✅ PRELOAD] Callback invoked via Action.Invoke!");
                                 }
                             } catch (eInv) {
@@ -9973,13 +10041,23 @@ function initIl2Cpp(module) {
                                 if (!this.matView || this.matView.isNull()) return;
                                 var emptyImg = this.matView.add(0x38).readPointer();
                                 if (!emptyImg.isNull()) {
-                                    // Set subtle card slot container tint: rgba(0.2, 0.25, 0.45, 0.15)
-                                    emptyImg.add(0x20).writeFloat(0.25); // r
-                                    emptyImg.add(0x24).writeFloat(0.30); // g
-                                    emptyImg.add(0x28).writeFloat(0.50); // b
-                                    emptyImg.add(0x2C).writeFloat(0.18); // a
-                                    emptyImg.add(0x60).writeU8(1); // m_VertsDirty
-                                    emptyImg.add(0x61).writeU8(1); // m_MaterialDirty
+                                    try {
+                                        var createSpriteFn = new NativeFunction(baseAddr.add(0x23E1268), "pointer", ["pointer", "pointer"]);
+                                        var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
+                                        var wmTex = loadLocalTexture2D("asiudgasg/pedestal_watermark.png");
+                                        if (wmTex && !wmTex.isNull()) {
+                                            var wmSprite = createSpriteFn(wmTex, NULL);
+                                            if (wmSprite && !wmSprite.isNull()) {
+                                                setSpriteFn(emptyImg, wmSprite, NULL);
+                                            }
+                                        }
+                                        emptyImg.add(0x20).writeFloat(1.0);
+                                        emptyImg.add(0x24).writeFloat(1.0);
+                                        emptyImg.add(0x28).writeFloat(1.0);
+                                        emptyImg.add(0x2C).writeFloat(1.0);
+                                        emptyImg.add(0x60).writeU8(1); // m_VertsDirty
+                                        emptyImg.add(0x61).writeU8(1); // m_MaterialDirty
+                                    } catch (eMvrSp) {}
                                 }
                             } catch (eMvr) {}
                         }
@@ -11346,22 +11424,76 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing InventoryControl.Intensify: " + eIcInt.message);
                 }
 
-                // Hook native InventoryScene.OnIntensifyTry (0x105BA9C) to execute offline try safely
-                try {
-                    Interceptor.replace(baseAddr.add(0x105BA9C), new NativeCallback(function(sceneThis) {
-                        log("[⚡ NATIVE OnIntensifyTry] Intercepted on scene: " + sceneThis);
+                // Native trigger for intensify try: opens animated CardIntensifyPopup modal
+                var triggerNativeIntensifyTry = function(sceneThis) {
+                    try {
+                        if (!sceneThis || sceneThis.isNull()) sceneThis = activeInventorySceneInstance;
+                        if (!sceneThis || sceneThis.isNull()) {
+                            log("[-] triggerNativeIntensifyTry: sceneThis is null!");
+                            return;
+                        }
+                        var matList = sceneThis.add(0xA0).readPointer();
+                        var matCount = (!matList.isNull()) ? matList.add(0x18).readS32() : 0;
+                        if (matCount <= 0) {
+                            log("[-] triggerNativeIntensifyTry: No material cards registered (count=" + matCount + ")");
+                            return;
+                        }
+                        log("[⚡ TRIGGER NATIVE TRY] Calling native InventoryScene.OnIntensifyTry (0x105BA9C) on: " + sceneThis + " with " + matCount + " materials");
+                        var onTryFn = new NativeFunction(baseAddr.add(0x105BA9C), "void", ["pointer", "pointer"]);
+                        onTryFn(sceneThis, NULL);
+                    } catch (eTrigTry) {
+                        log("[-] Error in triggerNativeIntensifyTry: " + eTrigTry.message + " stack: " + eTrigTry.stack);
+                        // Fallback to executeOfflineTry if native call throws
                         executeOfflineTry(sceneThis);
-                    }, "void", ["pointer"]));
-                    log("[+] Interceptor.replace installed on InventoryScene.OnIntensifyTry (0x105BA9C)!");
+                    }
+                };
+
+                // Attach monitor to native InventoryScene.OnIntensifyTry (0x105BA9C) (NO REPLACE, allowing native popup instantiation)
+                try {
+                    Interceptor.attach(baseAddr.add(0x105BA9C), {
+                        onEnter: function(args) {
+                            log("[⚡ NATIVE OnIntensifyTry ENTER] scene=" + args[0]);
+                        }
+                    });
+                    Interceptor.attach(baseAddr.add(0xF1CBEC), {
+                        onEnter: function(args) {
+                            log("[⚡ IntensifyAssist.Open ENTER] params=" + args[0] + ", callback=" + args[1]);
+                        }
+                    });
+                    Interceptor.attach(baseAddr.add(0xF1CD34), {
+                        onEnter: function(args) {
+                            log("[⚡ IntensifyAssist.Start ENTER] assist=" + args[0]);
+                        }
+                    });
+                    Interceptor.attach(baseAddr.add(0xAAA0D0), {
+                        onEnter: function(args) {
+                            try {
+                                var pName = readIl2CppString(args[0]);
+                                log("[⚡ ViewControl.OpenPopup ENTER] name=" + pName + ", params=" + args[1]);
+                            } catch (eOp) {
+                                log("[⚡ ViewControl.OpenPopup ENTER] raw=" + args[0]);
+                            }
+                        }
+                    });
+                    Interceptor.attach(baseAddr.add(0x10605D8), {
+                        onEnter: function(args) {
+                            log("[⚡ InventoryView.Hide ENTER] view=" + args[0]);
+                            var bt = Thread.backtrace(this.context, Backtracer.ACCURATE);
+                            log("[⚡ InventoryView.Hide BT] " + bt.map(function(addr) {
+                                return "0x" + addr.sub(baseAddr).toString(16);
+                            }).join(" -> "));
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on InventoryScene.OnIntensifyTry (0x105BA9C) and tracers!");
                 } catch (eOit) {
-                    log("[-] Error replacing InventoryScene.OnIntensifyTry: " + eOit.message);
+                    log("[-] Error attaching to InventoryScene.OnIntensifyTry: " + eOit.message);
                 }
 
-                // Hook UI button click InvenCardIntensifyView.OnTry (0xF22758)
+                // Hook UI button click InvenCardIntensifyView.OnTry (0xF22758) -> Dispatches to native try
                 try {
                     Interceptor.replace(baseAddr.add(0xF22758), new NativeCallback(function(thiz) {
-                        log("[⚡ UI BUTTON TRY] InvenCardIntensifyView.OnTry clicked!");
-                        executeOfflineTry(activeInventorySceneInstance);
+                        log("[⚡ UI BUTTON TRY] InvenCardIntensifyView.OnTry clicked! Triggering native intensify try...");
+                        triggerNativeIntensifyTry(activeInventorySceneInstance);
                     }, "void", ["pointer"]));
                     log("[+] Interceptor.replace installed on InvenCardIntensifyView.OnTry (0xF22758)!");
                 } catch (eOtv) {
@@ -12015,19 +12147,76 @@ function initIl2Cpp(module) {
                 }
 
                 var activeCardIntensifyPopup = NULL;
-                // 4. Attach monitoring to CardIntensifyPopup
+                // 4. Attach monitoring & visuals to CardIntensifyPopup
                 try {
                     // CardIntensifyPopup.OnBuild (0x1383D5C)
                     Interceptor.attach(baseAddr.add(0x1383D5C), {
                         onEnter: function(args) {
-                            log("[✨ INTENSIFY POPUP] CardIntensifyPopup.OnBuild called! popup=" + args[0]);
-                            activeCardIntensifyPopup = args[0];
+                            var pop = args[0];
+                            log("[✨ INTENSIFY POPUP] CardIntensifyPopup.OnBuild called! popup=" + pop);
+                            activeCardIntensifyPopup = pop;
+
+                            setTimeout(function() {
+                                try {
+                                    if (pop && !pop.isNull()) {
+                                        var sCard = pop.add(0x138).readPointer();
+                                        var mCard = pop.add(0x140).readPointer();
+                                        var nCard = pop.add(0x118).readPointer();
+                                        log("[✨ INTENSIFY POPUP] Cards: selected=" + sCard + ", material=" + mCard + ", new=" + nCard);
+
+                                        // Apply crisp visuals to selected and new card in popup
+                                        if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                            var tCard = activeInventorySceneInstance.add(0x88).readPointer();
+                                            if (tCard.isNull()) tCard = activeInventorySceneInstance.add(0x98).readPointer();
+                                            if (!tCard.isNull()) {
+                                                var raw = tCard.add(0x10).readPointer();
+                                                if (!raw.isNull()) {
+                                                    var cid = raw.add(0x20).readS32();
+                                                    var gr = raw.add(0x24).readS32();
+                                                    var isP = (raw.add(0x2A).readU8() === 1);
+                                                    if (!sCard.isNull()) applyCardLargeVisuals(sCard, cid, gr, isP);
+                                                    if (!nCard.isNull()) applyCardLargeVisuals(nCard, cid, gr, isP);
+                                                }
+                                            }
+                                        }
+
+                                        // Auto-trigger OnTry if popup is idle at Arrow state (0)
+                                        var state = pop.add(0x10C).readS32();
+                                        log("[✨ INTENSIFY POPUP] State at 350ms: " + state);
+                                        if (state === 0) {
+                                            log("[✨ INTENSIFY POPUP] Auto-triggering CardIntensifyPopup.OnTry (0x13847D0)...");
+                                            var pTryFn = new NativeFunction(baseAddr.add(0x13847D0), "void", ["pointer", "pointer"]);
+                                            pTryFn(pop, NULL);
+                                        }
+                                    }
+                                } catch (ePopBld) {
+                                    log("[-] Error in CardIntensifyPopup post-build: " + ePopBld.message);
+                                }
+                            }, 350);
                         }
                     });
                     // CardIntensifyPopup.IntensifyResult (0x138467C)
                     Interceptor.attach(baseAddr.add(0x138467C), {
                         onEnter: function(args) {
+                            var popInst = args[0];
                             log("[✨ INTENSIFY POPUP] CardIntensifyPopup.IntensifyResult called! isMaxLevel=" + args[1] + ", contextList=" + args[2]);
+                            // Safety watchdog: ensure transition from Starting (1) to Result (2)
+                            setTimeout(function() {
+                                try {
+                                    if (popInst && !popInst.isNull()) {
+                                        var curSt = popInst.add(0x10C).readS32();
+                                        log("[✨ INTENSIFY POPUP] Watchdog check at 1200ms: State=" + curSt);
+                                        if (curSt === 1) {
+                                            log("[✨ INTENSIFY POPUP] Advancing Starting -> Result layout!");
+                                            popInst.add(0x10C).writeS32(2);
+                                            var openResFn = new NativeFunction(baseAddr.add(0x13841D4), "void", ["pointer", "pointer"]);
+                                            openResFn(popInst, NULL);
+                                        }
+                                    }
+                                } catch (eStWd) {
+                                    log("[-] Error in IntensifyResult watchdog: " + eStWd.message);
+                                }
+                            }, 1200);
                         }
                     });
                     // IntensifyAssist.OnResultSucceed (0xF1D078)
@@ -12042,6 +12231,28 @@ function initIl2Cpp(module) {
                             log("[✨ INTENSIFY RESULT] IntensifyAssist.OnResultFailed called! popup=" + args[1]);
                         }
                     });
+                    // IntensifyAssist.Complete (0xF1D048) -> Refresh scene after popup closes
+                    Interceptor.attach(baseAddr.add(0xF1D048), {
+                        onEnter: function(args) {
+                            log("[🏁 INTENSIFY COMPLETE] IntensifyAssist.Complete called with result: " + args[1]);
+                            activeCardIntensifyPopup = NULL;
+                            if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                try {
+                                    var sceneView = activeInventorySceneInstance.add(0x48).readPointer();
+                                    if (!sceneView.isNull()) {
+                                        var showFn = new NativeFunction(baseAddr.add(0x10607AC), "void", ["pointer", "pointer"]);
+                                        showFn(sceneView, NULL);
+                                    }
+                                } catch (eShw) {}
+                                setTimeout(function() {
+                                    try {
+                                        safeRefreshIntensifyView(activeInventorySceneInstance);
+                                        populateMaterialDisplayCardList(activeInventorySceneInstance);
+                                    } catch (eCmp) {}
+                                }, 300);
+                            }
+                        }
+                    });
                 } catch (ePopMon) {
                     log("[-] Error attaching CardIntensifyPopup monitoring: " + ePopMon.message);
                 }
@@ -12050,7 +12261,7 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.replace(baseAddr.add(0xE43660), new NativeCallback(function(thiz, methodInfo) {
                         return 1;
-                    }, "bool", ["pointer", "pointer"]));
+                    }, "int", ["pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on CardControl.Data.get_IsCardUseType (0xE43660)!");
                 } catch (eIcut) {
                     log("[-] Error replacing get_IsCardUseType: " + eIcut.message);
@@ -12497,8 +12708,8 @@ function initIl2Cpp(module) {
                             }
                         } else if (cmdRaw === "try") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
-                                log("[⚡ TRY CMD] Executing offline intensify try!");
-                                executeOfflineTry(curScene);
+                                log("[⚡ TRY CMD] Executing native intensify try with animated popup modal!");
+                                triggerNativeIntensifyTry(curScene);
                             }
                         } else if (cmdRaw === "try_popup") {
                             if (activeCardIntensifyPopup && !activeCardIntensifyPopup.isNull()) {
