@@ -12723,16 +12723,26 @@ function initIl2Cpp(module) {
                         } else if (cmdRaw === "go_lobby" || cmdRaw === "lobby") {
                             try {
                                 log("[🚀 SCENE CMD] Opening LobbyScene (3)...");
-                                var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
-                                openSceneFn(3, NULL, NULL);
+                                if (curScene && !curScene.isNull()) {
+                                    var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
+                                    setStateOpenSceneFn(curScene, 3, NULL, NULL, NULL);
+                                } else {
+                                    var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                                    openSceneFn(3, NULL, NULL, NULL);
+                                }
                             } catch (eGl) {
                                 log("[-] Error in go_lobby: " + eGl.message);
                             }
                         } else if (cmdRaw === "go_inven" || cmdRaw === "inven") {
                             try {
                                 log("[🚀 SCENE CMD] Opening InventoryScene (4)...");
-                                var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
-                                openSceneFn(4, NULL, NULL);
+                                if (curScene && !curScene.isNull()) {
+                                    var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
+                                    setStateOpenSceneFn(curScene, 4, NULL, NULL, NULL);
+                                } else {
+                                    var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                                    openSceneFn(4, NULL, NULL, NULL);
+                                }
                             } catch (eGi) {
                                 log("[-] Error in go_inven: " + eGi.message);
                             }

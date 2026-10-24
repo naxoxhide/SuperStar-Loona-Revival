@@ -4013,10 +4013,19 @@ function initIl2Cpp(module) {
                 ];
                 cardGettersRetOne.forEach(function (rva) {
                     try {
-                        Memory.protect(baseAddr.add(rva), 8, "rwx");
-                        baseAddr.add(rva).writeByteArray([0x20, 0x00, 0x80, 0x52, 0xc0, 0x03, 0x5f, 0xd6]); // mov w0, #1; ret
+                        Memory.patchCode(baseAddr.add(rva), 8, function(code) {
+                            code.writeByteArray([0x20, 0x00, 0x80, 0x52, 0xc0, 0x03, 0x5f, 0xd6]); // mov w0, #1; ret
+                        });
                     } catch (e) {}
                 });
+
+                // Patch InventoryScene.OnIntensifyTry tbz branch at 0x105BBD4 to NOP
+                try {
+                    Memory.patchCode(baseAddr.add(0x105BBD4), 4, function (code) {
+                        code.writeByteArray([0x1f, 0x20, 0x03, 0xd5]); // NOP
+                    });
+                    log("[🛡️ INIT] Patched InventoryScene.OnIntensifyTry branch at 0x105BBD4 to NOP!");
+                } catch (eNop) {}
 
                 var cardGettersRetNull = [
                     0xE433C4, // CardControl.Data.get_PrismData -> NULL
@@ -11531,33 +11540,18 @@ function initIl2Cpp(module) {
                     }
                 };
 
-                // Offline IntensifyAssist.Start (0xF1CD34) -> Instantly dispatch <Start>b__10_1 without CDN/network delays
+                // Native IntensifyAssist.Start (0xF1CD34) tracer
                 try {
-                    Interceptor.replace(baseAddr.add(0xF1CD34), new NativeCallback(function (assistInstance, methodInfo) {
-                        log("[⚡ IntensifyAssist.Start] Intercepted offline! assistInstance=" + assistInstance);
-                        try {
-                            // Clear loading indicator
-                            try {
-                                var loadingCompleteFn = new NativeFunction(baseAddr.add(0xB3E230), "void", ["pointer"]);
-                                loadingCompleteFn(NULL);
-                                log("[🛡️ IntensifyAssist.Start] LoadingIndicator.Complete() dispatched!");
-                            } catch (eLd) {}
-
-                            // Directly invoke <Start>b__10_1 (0xF1E158) to open CardIntensifyPopup!
-                            var openPopupCallbackFn = new NativeFunction(baseAddr.add(0xF1E158), "void", ["pointer", "pointer"]);
-                            log("[⚡ IntensifyAssist.Start] Dispatching <Start>b__10_1 (0xF1E158)...");
-                            openPopupCallbackFn(assistInstance, NULL);
-                            log("[✅ IntensifyAssist.Start] <Start>b__10_1 returned successfully!");
-                        } catch (eSt) {
-                            log("[-] Error in IntensifyAssist.Start: " + eSt.message + " stack: " + eSt.stack);
+                    Interceptor.attach(baseAddr.add(0xF1CD34), {
+                        onEnter: function (args) {
+                            log("[⚡ IntensifyAssist.Start ENTER] assistInstance=" + args[0]);
                         }
-                    }, "void", ["pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on IntensifyAssist.Start (0xF1CD34)!");
-                } catch (eIasReplace) {
-                    log("[-] Error replacing IntensifyAssist.Start: " + eIasReplace.message);
+                    });
+                } catch (eIasAttach) {
+                    log("[-] Error attaching to IntensifyAssist.Start: " + eIasAttach.message);
                 }
 
-                // Attach monitor to native InventoryScene.OnIntensifyTry (0x105BA9C) (NO REPLACE, allowing native popup instantiation)
+                // Attach monitor to native InventoryScene.OnIntensifyTry (0x105BA9C)
                 try {
                     Interceptor.attach(baseAddr.add(0x105BA9C), {
                         onEnter: function(args) {
@@ -11593,15 +11587,15 @@ function initIl2Cpp(module) {
                     log("[-] Error attaching to InventoryScene.OnIntensifyTry: " + eOit.message);
                 }
 
-                // Hook UI button click InvenCardIntensifyView.OnTry (0xF22758) -> Dispatches to popup
+                // Hook UI button click InvenCardIntensifyView.OnTry (0xF22758) tracer
                 try {
-                    Interceptor.replace(baseAddr.add(0xF22758), new NativeCallback(function(thiz) {
-                        log("[⚡ UI BUTTON TRY] InvenCardIntensifyView.OnTry clicked! Dispatching direct intensify popup...");
-                        triggerDirectPopup(activeInventorySceneInstance);
-                    }, "void", ["pointer"]));
-                    log("[+] Interceptor.replace installed on InvenCardIntensifyView.OnTry (0xF22758)!");
+                    Interceptor.attach(baseAddr.add(0xF22758), {
+                        onEnter: function(args) {
+                            log("[⚡ UI BUTTON TRY] InvenCardIntensifyView.OnTry clicked!");
+                        }
+                    });
                 } catch (eOtv) {
-                    log("[-] Error replacing InvenCardIntensifyView.OnTry: " + eOtv.message);
+                    log("[-] Error attaching to InvenCardIntensifyView.OnTry: " + eOtv.message);
                 }
 
                 // Hook Pedestal Click: InventoryScene.OnMaterial (0x105B2B8) -> Unregister clicked pedestal material card
@@ -12361,16 +12355,6 @@ function initIl2Cpp(module) {
                     log("[-] Error attaching CardIntensifyPopup monitoring: " + ePopMon.message);
                 }
 
-                // 5. CardControl.Data.get_IsCardUseType (0xE43660) -> Always true for offline cards
-                try {
-                    Interceptor.replace(baseAddr.add(0xE43660), new NativeCallback(function(thiz, methodInfo) {
-                        return 1;
-                    }, "int", ["pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on CardControl.Data.get_IsCardUseType (0xE43660)!");
-                } catch (eIcut) {
-                    log("[-] Error replacing get_IsCardUseType: " + eIcut.message);
-                }
-
 
                 // --- Helper to initialize CardBookControl.SharedInfo and MyInfo ---
                 function ensureCardBookControlData() {
@@ -12723,16 +12707,26 @@ function initIl2Cpp(module) {
                         } else if (cmdRaw === "go_lobby" || cmdRaw === "lobby") {
                             try {
                                 log("[🚀 SCENE CMD] Opening LobbyScene (3)...");
-                                var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
-                                openSceneFn(3, NULL, NULL);
+                                if (curScene && !curScene.isNull()) {
+                                    var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
+                                    setStateOpenSceneFn(curScene, 3, NULL, NULL, NULL);
+                                } else {
+                                    var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                                    openSceneFn(3, NULL, NULL, NULL);
+                                }
                             } catch (eGl) {
                                 log("[-] Error in go_lobby: " + eGl.message);
                             }
                         } else if (cmdRaw === "go_inven" || cmdRaw === "inven") {
                             try {
                                 log("[🚀 SCENE CMD] Opening InventoryScene (4)...");
-                                var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
-                                openSceneFn(4, NULL, NULL);
+                                if (curScene && !curScene.isNull()) {
+                                    var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
+                                    setStateOpenSceneFn(curScene, 4, NULL, NULL, NULL);
+                                } else {
+                                    var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                                    openSceneFn(4, NULL, NULL, NULL);
+                                }
                             } catch (eGi) {
                                 log("[-] Error in go_inven: " + eGi.message);
                             }
@@ -12886,6 +12880,15 @@ function initIl2Cpp(module) {
                                 var tCard = (!target.isNull()) ? target.add(0x18).readPointer() : NULL;
                                 var tCode = (!target.isNull()) ? target.add(0x20).readS16() : -1;
                                 log("[🔍 MAT_DIAG] target=" + target + " (Card=" + tCard + ", Code=" + tCode + "), matListCount=" + matCount + ", sv=" + sv + ", bbs=" + bbs + ", extractType=" + curScene.add(0x50).readS32());
+                                try {
+                                    var x22Ptr = baseAddr.add(0x30E40F0).readPointer();
+                                    var kPtr = (!x22Ptr.isNull()) ? x22Ptr.readPointer() : NULL;
+                                    var sfPtr = (!kPtr.isNull()) ? kPtr.add(0xB8).readPointer() : NULL;
+                                    var instPtr = (!sfPtr.isNull()) ? sfPtr.readPointer() : NULL;
+                                    log("[🔍 INTENSIFY_ASSIST_DIAG] x22=" + x22Ptr + " k=" + kPtr + " sf=" + sfPtr + " inst=" + instPtr);
+                                } catch (eIad) {
+                                    log("[-] Error reading intensify assist diag: " + eIad.message);
+                                }
                             }
                         } else if (cmdRaw === "diag_ui") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
