@@ -8565,16 +8565,6 @@ function initIl2Cpp(module) {
 
                 // Global PreloadTexture (0xAD2A48) -> Immediate callback execution in offline mode
                 try {
-                    // 1. Bypass image extraction to prevent NullReferenceException on dead CDN URLs
-                    Interceptor.replace(baseAddr.add(0xB562F4), new NativeCallback(function (thisCardItem, pathList, methodInfo) {
-                        log("[🖼️ EXTRACT] ExtractLargeImagePath bypassed cleanly for offline mode!");
-                    }, "void", ["pointer", "pointer", "pointer"]));
-
-                    Interceptor.replace(baseAddr.add(0xB56598), new NativeCallback(function (thisCardItem, pathList, methodInfo) {
-                        log("[🖼️ EXTRACT] ExtractSmallImagePath bypassed cleanly for offline mode!");
-                    }, "void", ["pointer", "pointer", "pointer"]));
-
-                    // 2. PreloadTexture: immediately invoke callback to open CardIntensifyPopup
                     Interceptor.replace(baseAddr.add(0xAD2A48), new NativeCallback(function (enumerator, callback, methodInfo) {
                         log("[🖼️ PRELOAD] PreloadTexture intercepted offline! callback=" + callback);
                         if (!callback.isNull()) {
@@ -8593,7 +8583,7 @@ function initIl2Cpp(module) {
                             log("[🛡️ PRELOAD] LoadingIndicator.Complete() dispatched!");
                         } catch (eLd) {}
                     }, "void", ["pointer", "pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on PreloadTexture (0xAD2A48) and ExtractImagePaths!");
+                    log("[+] Interceptor.replace installed on PreloadTexture (0xAD2A48)!");
                 } catch (ePltReplace) {
                     log("[-] Error replacing PreloadTexture: " + ePltReplace.message);
                 }
@@ -12263,16 +12253,6 @@ function initIl2Cpp(module) {
                     });
                 } catch (ePopMon) {
                     log("[-] Error attaching CardIntensifyPopup monitoring: " + ePopMon.message);
-                }
-
-                // 5. CardControl.Data.get_IsCardUseType (0xE43660) -> Always true for offline cards
-                try {
-                    Interceptor.replace(baseAddr.add(0xE43660), new NativeCallback(function(thiz, methodInfo) {
-                        return 1;
-                    }, "int", ["pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on CardControl.Data.get_IsCardUseType (0xE43660)!");
-                } catch (eIcut) {
-                    log("[-] Error replacing get_IsCardUseType: " + eIcut.message);
                 }
 
 
