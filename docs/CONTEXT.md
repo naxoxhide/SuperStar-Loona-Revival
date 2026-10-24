@@ -2475,6 +2475,26 @@ En el motor Dalcomsoft, los atributos, bonificaciones, precios y probabilidades 
    - **Quality Gate Checklist:** Verificación exhaustiva de 0 crashes, integridad de `player_profile.json`, fluidez a 60 FPS y cero artefactos visuales.
    - **Persistencia Visual Bidireccional (Requerimiento de Ignacio):** Validación rigurosa de que tanto en la escena de Power Up (`InvenCardIntensifyView`) como en la escena previa de Selección (`InvenCardSelectView`) y en la cuadrícula principal de inventario (`ShowDefaultLayout`), las imágenes de todas las cartas se mantengan nítidas, con sus fotos, marcos de grado, estrellas y niveles persistentes sin pérdida de texturas ni rectángulos blancos.
 
+7. **Fase 7 — Sistema de Subida de Grado (`Grade Up` / `Upgrade C5..S5 -> R1`) e Intercambio de Tema (`Theme Exchange`) (⏳ PLANIFICADA):**
+   - **Mecánica de Ascenso de Grado (`InvenCardGradeUpView` / `CardGradeUpControl`):** Fusión de dos cartas del mismo artista en nivel máximo (`C5+C5->B1`, `B5+B5->A1`, `A5+A5->S1`, `S5+S5->R1`).
+   - **Intercambio de Tema (`ThemeExchangeAssist` @ `0xC0` / `0x105AD6C`):** Interfaz para alternar el tema visual de cartas equipadas/guardadas.
+   - **Persistencia Atómica:** Consumo de la carta material y actualización de grado en `player_profile.json`.
+
+8. **Fase 8 — Álbum de Colección Oficial LOONA y CardBook (`CardBookScene`, Scene 5) (⏳ PLANIFICADA):**
+   - **Navegación e Integración de Escena:** Transición fluida `LobbyScene` (3) $\leftrightarrow$ `CardBookScene` (5) $\leftrightarrow$ `InventoryScene` (4).
+   - **Visualización de Colección:** Mapeo de cartas obtenidas a color vs siluetas oscuras para no obtenidas por cada integrante y tema.
+   - **Recompensas y Estadísticas de Grupo:** Conteo de cartas coleccionadas de LOONA OT11.
+
+9. **Fase 9 — Tienda Offline y Desempaquetado de Sobres de Cartas (`Card Store` / `Card Packs Gacha`) (⏳ PLANIFICADA):**
+   - **Apertura de Sobres (NCP 10/30, PCP 10/30):** Compra offline de sobres de cartas mediante RP y Diamantes.
+   - **Secuencia de Animación Gacha:** Desempaquetado y revelación visual de cartas obtenidas (`CardPackStoreView`).
+   - **Inyección en Inventario:** Incorporación inmediata al mazo `loonaCardItems` y guardado en `player_profile.json`.
+
+10. **Fase 10 — Gameplay Musical Offline en Vivo (`Song Select` $\to$ `IngameScene` con LOONA Beats) (⏳ PLANIFICADA):**
+    - **Selección y Preparación de Pista (`ReadyPopup` / `MusicControl`):** Selector de canciones oficiales LOONA y dificultad (Easy, Normal, Hard).
+    - **Motor de Notas y Ritmo (`RhythmControl` / `BeatGame`):** Carga offline de pistas de audio y sincronización de mapas de notas.
+    - **Puntuación en Vivo con Mazo R50:** Aplicación real del `StartGradeBonus` (+500,000 pts), multiplicador `ULTRA RAVE Lv 3` y pantalla de resultados (`ResultScene`).
+
 ### 24.12. Reporte de Quality Gate y Validación Integral de Persistencia Visual de Cartas (Fase 6)
 
 1. **Hallazgo y Corrección Crítica en el Pipeline Visual (`updateSingleCell`):**
