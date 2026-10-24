@@ -11419,6 +11419,70 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing InventoryControl.Intensify: " + eIcInt.message);
                 }
 
+                // Direct trigger for IntensifyAssist.Open: packs 56-byte IntensifyAssist.Params and dispatches modal
+                var triggerDirectPopup = function(sceneThis) {
+                    try {
+                        if (!sceneThis || sceneThis.isNull()) sceneThis = activeInventorySceneInstance;
+                        if (!sceneThis || sceneThis.isNull()) {
+                            log("[-] triggerDirectPopup: sceneThis is null!");
+                            return;
+                        }
+
+                        // Restore sceneView if hidden
+                        try {
+                            var sv = sceneThis.add(0x48).readPointer();
+                            if (!sv.isNull()) {
+                                var showFn = new NativeFunction(baseAddr.add(0x10607AC), "void", ["pointer", "pointer"]);
+                                showFn(sv, NULL);
+                            }
+                        } catch (eSv) {}
+
+                        var tCardItem = sceneThis.add(0x88).readPointer();
+                        var matList = sceneThis.add(0xA0).readPointer();
+                        var sv = sceneThis.add(0x48).readPointer();
+                        var bbs = (!sv.isNull()) ? sv.add(0xC0).readPointer() : NULL;
+                        var matCount = (!matList.isNull()) ? matList.add(0x18).readS32() : 0;
+                        if (matCount <= 0) {
+                            log("[-] triggerDirectPopup: No material cards registered (count=" + matCount + ")");
+                            return;
+                        }
+                        if (tCardItem.isNull()) {
+                            log("[-] triggerDirectPopup: Selected card item is null!");
+                            return;
+                        }
+
+                        var prob = sceneThis.add(0xA8).readDouble();
+                        var priceRate = sceneThis.add(0xB0).readDouble();
+                        var price = sceneThis.add(0xB8).readS32();
+
+                        var ratingupSprite = NULL;
+                        var powerupSprite = NULL;
+                        if (!bbs.isNull()) {
+                            var getSpriteFn = new NativeFunction(baseAddr.add(0xD0CAB8), "pointer", ["pointer", "int", "pointer"]);
+                            ratingupSprite = getSpriteFn(bbs, 1, NULL);
+                            powerupSprite = getSpriteFn(bbs, 0, NULL);
+                        }
+
+                        // 56-byte IntensifyAssist.Params struct
+                        var paramsBuf = Memory.alloc(56);
+                        paramsBuf.writePointer(tCardItem);                         // 0x00: selectedCardItem
+                        paramsBuf.add(0x08).writePointer(matList);                 // 0x08: materialCardItemList
+                        paramsBuf.add(0x10).writeU8(prob !== 1.0 ? 1 : 0);         // 0x10: isEvent
+                        paramsBuf.add(0x14).writeS32(price);                       // 0x14: price
+                        paramsBuf.add(0x18).writeDouble(prob);                     // 0x18: probabilityRate
+                        paramsBuf.add(0x20).writeDouble(priceRate);                // 0x20: priceRate
+                        paramsBuf.add(0x28).writePointer(ratingupSprite);          // 0x28: ratingupSprite
+                        paramsBuf.add(0x30).writePointer(powerupSprite);           // 0x30: powerupSprite
+
+                        log("[⚡ DIRECT POPUP] IntensifyAssist.Open (0xF1CBEC) with " + matCount + " mats, price=" + price + " RP, prob=" + (prob * 100).toFixed(1) + "%");
+                        var openFn = new NativeFunction(baseAddr.add(0xF1CBEC), "void", ["pointer", "pointer", "pointer"]);
+                        openFn(paramsBuf, NULL, NULL);
+                        log("[✅ DIRECT POPUP] IntensifyAssist.Open dispatched successfully!");
+                    } catch (eDir) {
+                        log("[-] Error in triggerDirectPopup: " + eDir.message + " stack: " + eDir.stack);
+                    }
+                };
+
                 // Native trigger for intensify try: opens animated CardIntensifyPopup modal
                 var triggerNativeIntensifyTry = function(sceneThis) {
                     try {
@@ -11433,13 +11497,27 @@ function initIl2Cpp(module) {
                             log("[-] triggerNativeIntensifyTry: No material cards registered (count=" + matCount + ")");
                             return;
                         }
-                        // Patch 0x105BBD4 to NOP (neutralize tbz w0, #0, #0x105bd54) to guarantee Path 1 to IntensifyAssist.Open
+
+                        // Restore sceneView if hidden
                         try {
-                            Memory.protect(baseAddr.add(0x105BBD4), 4, "rwx");
-                            baseAddr.add(0x105BBD4).writeByteArray([0x1f, 0x20, 0x03, 0xd5]); // NOP
-                            log("[🛡️ TRY GUARD] Patched 0x105BBD4 to NOP (error branch neutralized)!");
+                            var sv = sceneThis.add(0x48).readPointer();
+                            if (!sv.isNull()) {
+                                var showFn = new NativeFunction(baseAddr.add(0x10607AC), "void", ["pointer", "pointer"]);
+                                showFn(sv, NULL);
+                            }
+                        } catch (eSv) {}
+
+                        // Patch 0x105BBD4 to NOP using Memory.patchCode (guarantees ARM64 CPU cache flush)
+                        try {
+                            Memory.patchCode(baseAddr.add(0x105BBD4), 4, function (code) {
+                                code.writeByteArray([0x1f, 0x20, 0x03, 0xd5]); // NOP
+                            });
+                            log("[🛡️ TRY GUARD] Patched 0x105BBD4 to NOP via Memory.patchCode (cache flushed)!");
                         } catch (ePatchNop) {
-                            log("[-] Error patching 0x105BBD4: " + ePatchNop.message);
+                            try {
+                                Memory.protect(baseAddr.add(0x105BBD4), 4, "rwx");
+                                baseAddr.add(0x105BBD4).writeByteArray([0x1f, 0x20, 0x03, 0xd5]);
+                            } catch (eProt) {}
                         }
 
                         log("[⚡ TRIGGER NATIVE TRY] Calling native InventoryScene.OnIntensifyTry (0x105BA9C) on: " + sceneThis + " with " + matCount + " materials");
@@ -11448,8 +11526,8 @@ function initIl2Cpp(module) {
                         log("[⚡ TRIGGER NATIVE TRY] OnIntensifyTry returned cleanly!");
                     } catch (eTrigTry) {
                         log("[-] Error in triggerNativeIntensifyTry: " + eTrigTry.message + " stack: " + eTrigTry.stack);
-                        // Fallback to executeOfflineTry if native call throws
-                        executeOfflineTry(sceneThis);
+                        // Fallback to direct popup
+                        triggerDirectPopup(sceneThis);
                     }
                 };
 
@@ -11515,11 +11593,11 @@ function initIl2Cpp(module) {
                     log("[-] Error attaching to InventoryScene.OnIntensifyTry: " + eOit.message);
                 }
 
-                // Hook UI button click InvenCardIntensifyView.OnTry (0xF22758) -> Dispatches to native try
+                // Hook UI button click InvenCardIntensifyView.OnTry (0xF22758) -> Dispatches to popup
                 try {
                     Interceptor.replace(baseAddr.add(0xF22758), new NativeCallback(function(thiz) {
-                        log("[⚡ UI BUTTON TRY] InvenCardIntensifyView.OnTry clicked! Triggering native intensify try...");
-                        triggerNativeIntensifyTry(activeInventorySceneInstance);
+                        log("[⚡ UI BUTTON TRY] InvenCardIntensifyView.OnTry clicked! Dispatching direct intensify popup...");
+                        triggerDirectPopup(activeInventorySceneInstance);
                     }, "void", ["pointer"]));
                     log("[+] Interceptor.replace installed on InvenCardIntensifyView.OnTry (0xF22758)!");
                 } catch (eOtv) {
@@ -12571,6 +12649,7 @@ function initIl2Cpp(module) {
                 var cachedLobbyStr = NULL;
                 var globalSceneId = 0;
                 var globalIsChanging = 0;
+                var globalSceneInstance = NULL;
                 var isLobbyIntegrated = false;
                 var lastWorkerTid = 0;
                 var deadlockFrames = 0;
@@ -12599,6 +12678,8 @@ function initIl2Cpp(module) {
                             if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
                                 curScene = activeInventorySceneInstance;
                                 sceneId = 4;
+                            } else if (globalSceneInstance && !globalSceneInstance.isNull()) {
+                                curScene = globalSceneInstance;
                             } else {
                                 try {
                                     var klassPtr = baseAddr.add(0x3146538).readPointer();
@@ -12628,6 +12709,32 @@ function initIl2Cpp(module) {
                                 log("[🛡️ LOADING CMD] LoadingIndicator.Complete() dispatched!");
                             } catch (eHl) {
                                 log("[-] Error in hide_loading: " + eHl.message);
+                            }
+                        } else if (cmdRaw === "title_login" || cmdRaw === "login") {
+                            try {
+                                if (curScene && !curScene.isNull() && sceneId === 2) {
+                                    log("[🌟 TITLE CMD] Advancing TitleScene LoadingDone -> ExcuteLogin...");
+                                    var doneFn = new NativeFunction(baseAddr.add(0xB234E0), "void", ["pointer"]);
+                                    doneFn(curScene);
+                                }
+                            } catch (eTl) {
+                                log("[-] Error in title_login: " + eTl.message);
+                            }
+                        } else if (cmdRaw === "go_lobby" || cmdRaw === "lobby") {
+                            try {
+                                log("[🚀 SCENE CMD] Opening LobbyScene (3)...");
+                                var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
+                                openSceneFn(3, NULL, NULL);
+                            } catch (eGl) {
+                                log("[-] Error in go_lobby: " + eGl.message);
+                            }
+                        } else if (cmdRaw === "go_inven" || cmdRaw === "inven") {
+                            try {
+                                log("[🚀 SCENE CMD] Opening InventoryScene (4)...");
+                                var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
+                                openSceneFn(4, NULL, NULL);
+                            } catch (eGi) {
+                                log("[-] Error in go_inven: " + eGi.message);
                             }
                         } else if (cmdRaw.indexOf("card:") === 0) {
                             var cardArg = cmdRaw.substring(5).trim();
@@ -12742,8 +12849,22 @@ function initIl2Cpp(module) {
                             }
                         } else if (cmdRaw === "try") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
-                                log("[⚡ TRY CMD] Executing native intensify try with animated popup modal!");
+                                log("[⚡ TRY CMD] Executing direct intensify try with animated popup modal!");
+                                triggerDirectPopup(curScene);
+                            }
+                        } else if (cmdRaw === "try_native") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                log("[⚡ TRY NATIVE CMD] Executing native InventoryScene.OnIntensifyTry!");
                                 triggerNativeIntensifyTry(curScene);
+                            }
+                        } else if (cmdRaw === "show_view") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                var sv = curScene.add(0x48).readPointer();
+                                if (!sv.isNull()) {
+                                    var showFn = new NativeFunction(baseAddr.add(0x10607AC), "void", ["pointer", "pointer"]);
+                                    showFn(sv, NULL);
+                                    log("[👁️ SHOW VIEW CMD] InventoryView.Show (0x10607AC) called!");
+                                }
                             }
                         } else if (cmdRaw === "try_popup") {
                             if (activeCardIntensifyPopup && !activeCardIntensifyPopup.isNull()) {
@@ -13226,6 +13347,7 @@ function initIl2Cpp(module) {
 
                             globalSceneId = sceneId;
                             globalIsChanging = isChanging;
+                            globalSceneInstance = sceneInstance;
 
                             var isDone = false;
                             var mPtr = NULL;
