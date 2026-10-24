@@ -4027,6 +4027,14 @@ function initIl2Cpp(module) {
                     log("[🛡️ INIT] Patched InventoryScene.OnIntensifyTry branch at 0x105BBD4 to NOP!");
                 } catch (eNop) {}
 
+                // Patch CardIntensifyPopup.OnClickOverride at 0x1384128 (tbnz -> NOP) to allow dismissing / advancing results
+                try {
+                    Memory.patchCode(baseAddr.add(0x1384128), 4, function (code) {
+                        code.writeByteArray([0x1f, 0x20, 0x03, 0xd5]); // NOP
+                    });
+                    log("[🛡️ INIT] Patched CardIntensifyPopup.OnClickOverride branch at 0x1384128 to NOP!");
+                } catch (ePopNop) {}
+
                 var cardGettersRetNull = [
                     0xE433C4, // CardControl.Data.get_PrismData -> NULL
                     0xBD90D8, // PrismControl.Data.get_Locale -> NULL
@@ -12867,6 +12875,21 @@ function initIl2Cpp(module) {
                                 popupTryFn(activeCardIntensifyPopup);
                             } else {
                                 log("[-] TRY POPUP CMD: activeCardIntensifyPopup is null!");
+                            }
+                        } else if (cmdRaw === "close_popup" || cmdRaw === "dismiss_popup" || cmdRaw === "ok") {
+                            if (activeCardIntensifyPopup && !activeCardIntensifyPopup.isNull()) {
+                                log("[🚪 CLOSE POPUP] Dismissing active CardIntensifyPopup: " + activeCardIntensifyPopup);
+                                try {
+                                    var onBackFn = new NativeFunction(baseAddr.add(0x13845E8), "void", ["pointer", "pointer"]);
+                                    onBackFn(activeCardIntensifyPopup, NULL);
+                                    log("[✅ CLOSE POPUP] OnBack invoked successfully!");
+                                } catch (eOb) {
+                                    var closePopupFn = new NativeFunction(baseAddr.add(0x114B6C8), "void", ["pointer", "pointer"]);
+                                    closePopupFn(activeCardIntensifyPopup, NULL);
+                                    log("[✅ CLOSE POPUP] Popup.Close invoked fallback!");
+                                }
+                            } else {
+                                log("[-] CLOSE POPUP CMD: activeCardIntensifyPopup is null!");
                             }
                         } else if (cmdRaw === "mat_diag") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {

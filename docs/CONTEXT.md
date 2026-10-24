@@ -2564,3 +2564,23 @@ En el motor Dalcomsoft, los atributos, bonificaciones, precios y probabilidades 
    * **Emulación de Resultado Offline:** En `IntensifyAssist.OnRequestIntensify` (RVA `0xF1DA24`), se construye una instancia de `List<bool>` con `List<bool>..ctor` (`0x23BB330`) y `List<bool>.Add` (`0x23BC040`), y se invoca directamente `CardIntensifyPopup.IntensifyResult` (RVA `0x138467C`).
    * **Ciclo de Animación Nativo:** `IntensifyResult` coloca `State = 1` (`Starting`) y reproduce el destello esférico radial blanco oficial (`ANIM_STARTING` = 1). Al terminar la animación, `CardIntensifyPopup.Update` (RVA `0x138461C`) cambia a `State = 2` (`Result`) y dispara `OpenResultLayout` (RVA `0x13841D4`), revelando el resultado (`ANIM_SUCCEED` = 2 o `ANIM_FAILED` = 3), el shader de líneas diagonales en caso de fallo, y los botones `NEXT` / `OK` según el índice de la carta material.
 
+### 24.11. Integración Nativa Completa del Modal de Power Up (`CardIntensifyPopup`) y Captura de Evidencias en Vivo
+
+1. **Pipeline de Ejecución Nativa de Intensify Confirmado:**
+   * **Disparo Nativo desde UI:** Al presionar el botón `Try` en `InvenCardIntensifyView`, se ejecuta `InvenCardIntensifyView.OnTry` (RVA `0xF22758`), el cual despacha `View.DoEvent(2)` (EVENT.Try) hacia `InventoryScene`.
+   * **Recepción en `InventoryScene`:** `InventoryScene.OnIntensifyTry` (RVA `0x105BA9C`) valida los materiales (`count >= 1`), empaqueta los parámetros en el struct nativo de 56 bytes `IntensifyAssist.Params` en su stack frame y llama a `IntensifyAssist.Open` (RVA `0xF1CBEC`).
+   * **Parche de I-Cache ARM64 en Branch de `OnIntensifyTry` (`0x105BBD4`):** La instrucción condicional `tbz w0, #0, #0x105bd54` en `0x105BBD4` (que ocultaba la vista si fallaba la verificación de tipo) se neutralizó a NOP (`0x1F, 0x20, 0x03, 0xD5`) utilizando `Memory.patchCode` de Frida, garantizando el vaciado estricto del CPU Instruction Cache.
+   * **Delegación y Pre-carga de Texturas:** `IntensifyAssist.Open` delega a `IntensifyAssist.Start` (RVA `0xF1CD34`), el cual genera el delegado `<Start>b__10_1` (RVA `0xF1E158`) y llama a `AssetControl.PreloadTexture` (RVA `0xAD2A48`).
+   * **Apertura Instantánea Offline:** El hook en `PreloadTexture` ejecuta inmediatamente el delegado `Action.Invoke` (RVA `0x1DEBE44`) y despacha `LoadingIndicator.Complete()` (RVA `0xB3E230`), abriendo `ViewControl.OpenPopup("Custom/Popup_Card_Intensify_R")` (RVA `0xAAA0D0`).
+   * **Construcción y Ciclo de Animación Nativo:** `CardIntensifyPopup.OnBuild` (RVA `0x1383D5C`) instancia el prefab oficial de Dalcomsoft, monta las cartas y activa la secuencia animada:
+     - Estado inicial `Arrow` (`State = 0`).
+     - Al presionar Try / Power Up, entra a `Starting` (`State = 1`) reproduciendo `ANIM_STARTING` (destello esférico radial blanco).
+     - La lógica offline resuelve el RNG de probabilidad y despacha `CardIntensifyPopup.IntensifyResult` (RVA `0x138467C`).
+     - `CardIntensifyPopup.Update` (RVA `0x138461C`) transiciona a `Result` (`State = 2`) y ejecuta `OpenResultLayout` (RVA `0x13841D4`), reproduciendo el resultado oficial: `ANIM_FAILED` (shader de líneas diagonales sobre la carta, etiqueta roja "FAILED", estadísticas y destellos de lente) o `ANIM_SUCCEED` (estrellas ★★, aura lila, incremento de nivel).
+   * **Parche de Desbloqueo de Clics en Resultado (`0x1384128`):** Se neutralizó la instrucción `tbnz w0, #0, #0x13841b8` a NOP en `CardIntensifyPopup.OnClickOverride` (RVA `0x1384128`), permitiendo que el usuario pueda avanzar entre cartas o cerrar el modal al pulsar la pantalla o el botón de confirmación sin ser bloqueado por el estado de reproducción de la animación.
+
+2. **Evidencias Visuales Verificadas en Vivo (`emulator-5554`):**
+   * **Vista Completa de Pedestales con Materiales:** [screen_powerup_pedestals_clean.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_powerup_pedestals_clean.png) (YeoJin R50, 5 pedestales con cartas `C/B/A`, badges `+`, marquesina de artistas, probabilidad "Low" en color coral y botón "Try" con RP `94258`).
+   * **Modal de Resultado Oficial Renderizado:** [screen_powerup_popup_result.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_powerup_popup_result.png) (Modal nativo `CardIntensifyPopup` mostrando YeoJin R51 con el shader de líneas diagonales rayadas, texto "FAILED", Score 199, Energy 100, fondo modal difuminado y destello de iluminación oficial).
+
+
