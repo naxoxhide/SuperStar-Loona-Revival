@@ -6392,41 +6392,121 @@ function initIl2Cpp(module) {
                     }
                 };
 
-                // Helper to restore all cards in displayCardList when returning to default state
-                // skipSetData=true only fills the native list (used while the view is not ready yet; SetData there aborts mid-ReloadData)
-                var restoreDefaultDisplayCardList = function(sceneThis, force, skipSetData) {
+                // Offline Sort and Filter State (Phase 5)
+                var offlineSortType = 1; // 0 = LowGrade, 1 = HighGrade, 2 = Newest
+                var offlineFilterGroup = true; // Group LOONA members
+                var offlineFilterMaterial = false; // Filter only cards usable as material
+                var offlineFilterLock = false; // Filter only locked cards
+                var offlineFilterPrism = false; // Filter only prism cards
+
+                // Engine for dynamic sorting & filtering of inventory cards (Phase 5)
+                var applyOfflineSortAndFilter = function(sceneThis, force, skipSetData) {
                     try {
-                        if (sceneThis.isNull() || !loonaCardItems || loonaCardItems.length === 0) return;
+                        if (!sceneThis || sceneThis.isNull() || !loonaCardItems || loonaCardItems.length === 0) return;
                         activeInventorySceneInstance = sceneThis;
                         ensureMaterialCardItemList(sceneThis);
                         var dclPtr = sceneThis.add(0x58).readPointer();
                         if (dclPtr.isNull()) return;
 
-                        var currentCount = dclPtr.add(0x18).readS32();
-                        var currentExtract = sceneThis.add(0x50).readS32();
-                        if (!force && currentCount >= loonaCardItems.length && currentExtract === 0) {
-                            log("[ℹ️ RESTORE] displayCardList already contains " + currentCount + " cards and extractType=0, skipping duplicate restore!");
-                            return;
-                        }
-
-                        sortLoonaCardItems();
-
-                        var listItems = ensureListBuffer(dclPtr, Math.max(loonaCardItems.length, 64));
-                        if (!listItems || listItems.isNull()) {
-                            log("[-] restoreDefaultDisplayCardList: listItems is null and cannot be allocated!");
-                            return;
-                        }
-
+                        // 1. Filter cards based on active toggles
+                        var filtered = [];
                         for (var i = 0; i < loonaCardItems.length; i++) {
-                            listItems.add(0x20 + i * 8).writePointer(loonaCardItems[i]);
+                            var itm = loonaCardItems[i];
+                            if (!itm || itm.isNull()) continue;
+                            var r = itm.add(0x10).readPointer();
+                            if (!r || r.isNull()) continue;
+
+                            var isEq = (r.add(0x28).readU8() === 1);
+                            var isLck = (r.add(0x29).readU8() === 1);
+                            var isPrsm = (r.add(0x2A).readU8() === 1);
+
+                            // Filter: Lock
+                            if (offlineFilterLock && !isLck) continue;
+
+                            // Filter: Prism
+                            if (offlineFilterPrism && !isPrsm) continue;
+
+                            // Filter: Material (only unequipped and unlocked cards are eligible as material)
+                            if (offlineFilterMaterial && (isEq || isLck)) continue;
+
+                            filtered.push(itm);
                         }
-                        dclPtr.add(0x18).writeS32(loonaCardItems.length);
+                        log("[DEBUG SORT] Step 1: Filtered count=" + filtered.length);
+
+                        // 2. Sort filtered cards according to offlineSortType and offlineFilterGroup
+                        filtered.sort(function(itemA, itemB) {
+                            var rawA = itemA.add(0x10).readPointer();
+                            var rawB = itemB.add(0x10).readPointer();
+                            var objIdA = rawA.add(0x10).readS64();
+                            var objIdB = rawB.add(0x10).readS64();
+                            var cIdA = rawA.add(0x20).readS32();
+                            var cIdB = rawB.add(0x20).readS32();
+                            var grA = rawA.add(0x24).readS32();
+                            var grB = rawB.add(0x24).readS32();
+                            var lvlA = rawA.add(0x1C).readS16();
+                            var lvlB = rawB.add(0x1C).readS16();
+                            var isPrismA = (rawA.add(0x2A).readU8() === 1);
+                            var isPrismB = (rawB.add(0x2A).readU8() === 1);
+                            var isEqA = (rawA.add(0x28).readU8() === 1);
+                            var isEqB = (rawB.add(0x28).readU8() === 1);
+
+                            if (offlineSortType === 2) {
+                                // NEWEST: Newest objId first
+                                if (objIdA.compare(objIdB) !== 0) return objIdB.compare(objIdA);
+                                return cIdA - cIdB;
+                            }
+
+                            // If group is enabled, group by LOONA member order (1001..1011)
+                            if (offlineFilterGroup) {
+                                var mA = ((cIdA - 1001) % 11);
+                                var mB = ((cIdB - 1001) % 11);
+                                if (mA !== mB) return mA - mB;
+                            }
+
+                            if (offlineSortType === 0) {
+                                // LOW GRADE: Lowest grade first (C -> B -> A -> S -> R)
+                                if (grA !== grB) return grA - grB;
+                                // Lowest level first
+                                if (lvlA !== lvlB) return lvlA - lvlB;
+                                // Non-prism first
+                                if (isPrismA !== isPrismB) return isPrismA ? 1 : -1;
+                                // Unequipped first
+                                if (isEqA !== isEqB) return isEqA ? 1 : -1;
+                                return cIdA - cIdB;
+                            } else {
+                                // HIGH GRADE (1):
+                                // Equipped cards first
+                                if (isEqA !== isEqB) return isEqA ? -1 : 1;
+                                // Highest grade first (R -> S -> A -> B -> C)
+                                if (grA !== grB) return grB - grA;
+                                // Highest level first (50 -> 1)
+                                if (lvlA !== lvlB) return lvlB - lvlA;
+                                // Prism first
+                                if (isPrismA !== isPrismB) return isPrismA ? -1 : 1;
+                                return cIdA - cIdB;
+                            }
+                        });
+                        log("[DEBUG SORT] Step 2: Sorting completed!");
+
+                        // 3. Populate displayCardList
+                        var listItems = ensureListBuffer(dclPtr, Math.max(filtered.length, 64));
+                        if (!listItems || listItems.isNull()) {
+                            log("[-] applyOfflineSortAndFilter: listItems is null!");
+                            return;
+                        }
+                        for (var k = 0; k < filtered.length; k++) {
+                            listItems.add(0x20 + k * 8).writePointer(filtered[k]);
+                        }
+                        dclPtr.add(0x18).writeS32(filtered.length);
                         sceneThis.add(0x50).writeS32(0); // EXTRACT_TYPE.All
+                        log("[DEBUG SORT] Step 3: displayCardList written with count=" + filtered.length);
+
                         if (skipSetData) {
-                            log("[✅ RESTORE] displayCardList filled with " + loonaCardItems.length + " cards (SetData deferred)");
+                            log("[✅ OFFLINE SORT] displayCardList filled with " + filtered.length + " cards (SetData deferred)");
                             return;
                         }
 
+                        // 4. Update UI & Scroller
                         var sceneView = sceneThis.add(0x48).readPointer();
                         if (!sceneView.isNull()) {
                             var cardView = sceneView.add(0x78).readPointer();
@@ -6439,28 +6519,93 @@ function initIl2Cpp(module) {
                                 var scroller = cardView.add(0x40).readPointer();
                                 var eventListener = ensureCardViewEventListener(sceneThis, cardView);
                                 if (!scroller.isNull() && eventListener && !eventListener.isNull()) {
-                                    var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
-                                    setDataFn(cardView, loonaCardItems.length, 0, eventListener, NULL);
-                                    sanitizeCardScroller(cardView);
-                                    log("[✅ RESTORE] SetData called on InvenCardView with count=" + loonaCardItems.length);
+                                    log("[DEBUG SORT] Step 4a: Updating InvenCardView with count=" + filtered.length);
 
-                                    // Restore cardCountText to loonaCardItems.length / 200
+                                    // Directly write InvenCardView properties
+                                    cardView.add(0x98).writeS32(filtered.length);
+                                    cardView.add(0x90).writePointer(eventListener);
+                                    cardView.add(0x9C).writeU8(0);
+
+                                    try {
+                                        var reloadKeepPosFn = new NativeFunction(baseAddr.add(0x125C750), "void", ["pointer", "bool", "pointer"]);
+                                        reloadKeepPosFn(scroller, 0, NULL);
+                                    } catch (eRk) {}
+
+                                    try {
+                                        var resetCellsFn = new NativeFunction(baseAddr.add(0x125D768), "void", ["pointer", "pointer"]);
+                                        resetCellsFn(scroller, NULL);
+                                    } catch (eRcv) {}
+
+                                    scroller.add(0xE1).writeU8(1);
+                                    sanitizeCardScroller(cardView);
+
+                                    // Refresh active cells with the new sorted/filtered items
+                                    try {
+                                        var acv = scroller.add(0x120).readPointer();
+                                        if (!acv.isNull()) {
+                                            var acvCount = acv.add(0x18).readS32();
+                                            var acvData = acv.add(0x10).readPointer();
+                                            for (var c = 0; c < acvCount; c++) {
+                                                var cell = acvData.add(0x20 + c * 8).readPointer();
+                                                if (cell.isNull()) continue;
+                                                var dIdx = cell.add(0x24).readS32();
+                                                if (dIdx >= 0 && dIdx < filtered.length) {
+                                                    updateSingleCell(cell, dIdx, filtered[dIdx]);
+                                                }
+                                            }
+                                        }
+                                    } catch (eAcv) {
+                                        log("[-] Error updating active cells: " + eAcv.message);
+                                    }
+                                    log("[✅ OFFLINE SORT] InvenCardView updated with count=" + filtered.length);
+
+                                    // Update cardCountText
                                     try {
                                         var cardCountText = cardView.add(0x38).readPointer();
                                         if (!cardCountText.isNull()) {
                                             var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
-                                            setTextFn(cardCountText, createIl2CppString(loonaCardItems.length + " / 200"), NULL);
-                                            log("[✅ RESTORE] Restored cardCountText to: " + loonaCardItems.length + " / 200");
+                                            setTextFn(cardCountText, createIl2CppString(filtered.length + " / 200"), NULL);
                                         }
                                     } catch (eCctR) {}
                                 }
                             }
+
+                            // 5. Update sortText & button visual states on InvenSortView
+                            try {
+                                var sortView = sceneView.add(0x80).readPointer();
+                                if (!sortView.isNull()) {
+                                    var sortText = sortView.add(0x40).readPointer();
+                                    if (!sortText.isNull()) {
+                                        var sortNames = ["Low", "High", "Newest"];
+                                        var label = sortNames[offlineSortType] || "High";
+                                        var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                        setTextFn(sortText, createIl2CppString(label), NULL);
+                                        log("[DEBUG SORT] Step 5a: sortText set to " + label);
+                                    }
+
+                                    // Note: we can skip native setButtonStateFn if it aborts
+                                    try {
+                                        var setButtonStateFn = new NativeFunction(baseAddr.add(0xF25BF0), "void", ["pointer", "int", "int", "bool", "pointer"]);
+                                        setButtonStateFn(sortView, 0, offlineSortType, 0, NULL); // ButtonCategory.SORT
+                                        setButtonStateFn(sortView, 1, 0, offlineFilterGroup ? 1 : 0, NULL); // Group
+                                        setButtonStateFn(sortView, 1, 1, offlineFilterMaterial ? 1 : 0, NULL); // Material
+                                        setButtonStateFn(sortView, 1, 2, offlineFilterLock ? 1 : 0, NULL); // Lock
+                                        setButtonStateFn(sortView, 1, 3, offlineFilterPrism ? 1 : 0, NULL); // Prism
+                                        log("[DEBUG SORT] Step 5b: setButtonStateFn called successfully!");
+                                    } catch (eSbsInner) {
+                                        log("[-] Step 5b setButtonStateFn error: " + eSbsInner.message);
+                                    }
+                                }
+                            } catch (eSbs) {
+                                log("[-] Error updating button states: " + eSbs.message);
+                            }
                         }
-                        log("[✅ RESTORE] Restored displayCardList to all " + loonaCardItems.length + " cards!");
+                        log("[🔄 OFFLINE SORT & FILTER] Done: sort=" + offlineSortType + ", group=" + offlineFilterGroup + ", mat=" + offlineFilterMaterial + ", lock=" + offlineFilterLock + ", prism=" + offlineFilterPrism + " -> " + filtered.length + " cards");
                     } catch (eR) {
-                        log("[-] Error restoring displayCardList: " + eR.message);
+                        log("[-] Error in applyOfflineSortAndFilter: " + eR.message);
                     }
                 };
+                var restoreDefaultDisplayCardList = applyOfflineSortAndFilter;
 
                 // Populates displayCardList with eligible material cards when in Intensify view (extractType = 2)
                 var populateMaterialDisplayCardList = function(sceneThis) {
@@ -11646,6 +11791,243 @@ function initIl2Cpp(module) {
                     log("[-] Error installing Phase 4 hooks: " + ePh4Hooks.message);
                 }
 
+                // Install Phase 5 Native Hooks (Dynamic Sorting, Filtering, InvenSortView & Gameplay Integration)
+                try {
+                    // InventoryScene.OnSortOpen (0x105D5EC)
+                    Interceptor.replace(baseAddr.add(0x105D5EC), new NativeCallback(function(sceneThis, methodInfo) {
+                        log("[📂 NATIVE OnSortOpen] Intercepted on scene=" + sceneThis);
+                        try {
+                            if (!sceneThis || sceneThis.isNull()) return;
+                            var sView = sceneThis.add(0x48).readPointer();
+                            if (sView.isNull()) return;
+                            var sortView = sView.add(0x80).readPointer();
+                            if (sortView.isNull()) return;
+                            var opened = sortView.add(0x48).readPointer();
+                            if (!opened.isNull()) {
+                                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                setActiveFn(opened, 1, NULL);
+                                sortView.add(0x60).writeU8(1); // isOpened = true
+                            }
+                            var setButtonStateFn = new NativeFunction(baseAddr.add(0xF25BF0), "void", ["pointer", "int", "int", "bool", "pointer"]);
+                            setButtonStateFn(sortView, 0, offlineSortType, 0, NULL);
+                            setButtonStateFn(sortView, 1, 0, offlineFilterGroup ? 1 : 0, NULL);
+                            setButtonStateFn(sortView, 1, 1, offlineFilterMaterial ? 1 : 0, NULL);
+                            setButtonStateFn(sortView, 1, 2, offlineFilterLock ? 1 : 0, NULL);
+                            setButtonStateFn(sortView, 1, 3, offlineFilterPrism ? 1 : 0, NULL);
+                        } catch (eSo) {
+                            log("[-] Error in OnSortOpen: " + eSo.message);
+                        }
+                    }, "void", ["pointer", "pointer"]));
+
+                    // InventoryScene.OnSortClose (0x105D768)
+                    Interceptor.replace(baseAddr.add(0x105D768), new NativeCallback(function(sceneThis, methodInfo) {
+                        log("[📁 NATIVE OnSortClose] Intercepted on scene=" + sceneThis);
+                        try {
+                            if (!sceneThis || sceneThis.isNull()) return;
+                            var sView = sceneThis.add(0x48).readPointer();
+                            if (sView.isNull()) return;
+                            var sortView = sView.add(0x80).readPointer();
+                            if (sortView.isNull()) return;
+                            var opened = sortView.add(0x48).readPointer();
+                            if (!opened.isNull()) {
+                                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                setActiveFn(opened, 0, NULL);
+                                sortView.add(0x60).writeU8(0); // isOpened = false
+                            }
+                        } catch (eSc) {
+                            log("[-] Error in OnSortClose: " + eSc.message);
+                        }
+                    }, "void", ["pointer", "pointer"]));
+
+                    // InventoryScene.OnSortSelect (0x105D830)
+                    Interceptor.replace(baseAddr.add(0x105D830), new NativeCallback(function(sceneThis, type, methodInfo) {
+                        var sortTypeVal = (typeof type === 'number') ? type : (type && type.toInt32 ? type.toInt32() : 0);
+                        log("[🔄 NATIVE OnSortSelect] Intercepted on scene=" + sceneThis + " with type=" + sortTypeVal);
+                        offlineSortType = sortTypeVal;
+                        // Close dropdown
+                        try {
+                            var sView = sceneThis.add(0x48).readPointer();
+                            if (!sView.isNull()) {
+                                var sortView = sView.add(0x80).readPointer();
+                                if (!sortView.isNull()) {
+                                    var opened = sortView.add(0x48).readPointer();
+                                    if (!opened.isNull()) {
+                                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                        setActiveFn(opened, 0, NULL);
+                                        sortView.add(0x60).writeU8(0);
+                                    }
+                                }
+                            }
+                        } catch (eCls) {}
+                        applyOfflineSortAndFilter(sceneThis, true);
+                    }, "void", ["pointer", "int", "pointer"]));
+
+                    // InventoryScene.OnSortGroup (0x105D960)
+                    Interceptor.replace(baseAddr.add(0x105D960), new NativeCallback(function(sceneThis, methodInfo) {
+                        offlineFilterGroup = !offlineFilterGroup;
+                        log("[👥 NATIVE OnSortGroup] Intercepted! Toggled offlineFilterGroup=" + offlineFilterGroup);
+                        applyOfflineSortAndFilter(sceneThis, true);
+                    }, "void", ["pointer", "pointer"]));
+
+                    // InventoryScene.OnSortMaterial (0x105DA78)
+                    Interceptor.replace(baseAddr.add(0x105DA78), new NativeCallback(function(sceneThis, methodInfo) {
+                        offlineFilterMaterial = !offlineFilterMaterial;
+                        log("[⚡ NATIVE OnSortMaterial] Intercepted! Toggled offlineFilterMaterial=" + offlineFilterMaterial);
+                        applyOfflineSortAndFilter(sceneThis, true);
+                    }, "void", ["pointer", "pointer"]));
+
+                    // InventoryScene.OnSortLock (0x105DB5C)
+                    Interceptor.replace(baseAddr.add(0x105DB5C), new NativeCallback(function(sceneThis, methodInfo) {
+                        offlineFilterLock = !offlineFilterLock;
+                        log("[🔒 NATIVE OnSortLock] Intercepted! Toggled offlineFilterLock=" + offlineFilterLock);
+                        applyOfflineSortAndFilter(sceneThis, true);
+                    }, "void", ["pointer", "pointer"]));
+
+                    // InventoryScene.OnSortPrism (0x105DC40)
+                    Interceptor.replace(baseAddr.add(0x105DC40), new NativeCallback(function(sceneThis, methodInfo) {
+                        offlineFilterPrism = !offlineFilterPrism;
+                        log("[🌈 NATIVE OnSortPrism] Intercepted! Toggled offlineFilterPrism=" + offlineFilterPrism);
+                        applyOfflineSortAndFilter(sceneThis, true);
+                    }, "void", ["pointer", "pointer"]));
+
+                    // InvenSortView UI Click Handlers:
+                    // InvenSortView.OnLowGrade (0xF26218)
+                    Interceptor.replace(baseAddr.add(0xF26218), new NativeCallback(function(viewThis, go, methodInfo) {
+                        log("[🔽 UI OnLowGrade] Clicked!");
+                        offlineSortType = 0;
+                        if (activeInventorySceneInstance) {
+                            var sView = activeInventorySceneInstance.add(0x48).readPointer();
+                            if (!sView.isNull()) {
+                                var sortView = sView.add(0x80).readPointer();
+                                if (!sortView.isNull()) {
+                                    var opened = sortView.add(0x48).readPointer();
+                                    if (!opened.isNull()) {
+                                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                        setActiveFn(opened, 0, NULL);
+                                        sortView.add(0x60).writeU8(0);
+                                    }
+                                }
+                            }
+                            applyOfflineSortAndFilter(activeInventorySceneInstance, true);
+                        }
+                    }, "void", ["pointer", "pointer", "pointer"]));
+
+                    // InvenSortView.OnHighGrade (0xF26284)
+                    Interceptor.replace(baseAddr.add(0xF26284), new NativeCallback(function(viewThis, go, methodInfo) {
+                        log("[🔼 UI OnHighGrade] Clicked!");
+                        offlineSortType = 1;
+                        if (activeInventorySceneInstance) {
+                            var sView = activeInventorySceneInstance.add(0x48).readPointer();
+                            if (!sView.isNull()) {
+                                var sortView = sView.add(0x80).readPointer();
+                                if (!sortView.isNull()) {
+                                    var opened = sortView.add(0x48).readPointer();
+                                    if (!opened.isNull()) {
+                                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                        setActiveFn(opened, 0, NULL);
+                                        sortView.add(0x60).writeU8(0);
+                                    }
+                                }
+                            }
+                            applyOfflineSortAndFilter(activeInventorySceneInstance, true);
+                        }
+                    }, "void", ["pointer", "pointer", "pointer"]));
+
+                    // InvenSortView.OnNewest (0xF262F0)
+                    Interceptor.replace(baseAddr.add(0xF262F0), new NativeCallback(function(viewThis, go, methodInfo) {
+                        log("[🆕 UI OnNewest] Clicked!");
+                        offlineSortType = 2;
+                        if (activeInventorySceneInstance) {
+                            var sView = activeInventorySceneInstance.add(0x48).readPointer();
+                            if (!sView.isNull()) {
+                                var sortView = sView.add(0x80).readPointer();
+                                if (!sortView.isNull()) {
+                                    var opened = sortView.add(0x48).readPointer();
+                                    if (!opened.isNull()) {
+                                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                        setActiveFn(opened, 0, NULL);
+                                        sortView.add(0x60).writeU8(0);
+                                    }
+                                }
+                            }
+                            applyOfflineSortAndFilter(activeInventorySceneInstance, true);
+                        }
+                    }, "void", ["pointer", "pointer", "pointer"]));
+
+                    // InvenSortView.OnLock (0xF2635C)
+                    Interceptor.replace(baseAddr.add(0xF2635C), new NativeCallback(function(viewThis, go, methodInfo) {
+                        offlineFilterLock = !offlineFilterLock;
+                        log("[🔒 UI OnLock] Toggled offlineFilterLock=" + offlineFilterLock);
+                        if (activeInventorySceneInstance) applyOfflineSortAndFilter(activeInventorySceneInstance, true);
+                    }, "void", ["pointer", "pointer", "pointer"]));
+
+                    // InvenSortView.OnMaterial (0xF263BC)
+                    Interceptor.replace(baseAddr.add(0xF263BC), new NativeCallback(function(viewThis, go, methodInfo) {
+                        offlineFilterMaterial = !offlineFilterMaterial;
+                        log("[⚡ UI OnMaterial] Toggled offlineFilterMaterial=" + offlineFilterMaterial);
+                        if (activeInventorySceneInstance) applyOfflineSortAndFilter(activeInventorySceneInstance, true);
+                    }, "void", ["pointer", "pointer", "pointer"]));
+
+                    // InvenSortView.OnGroup (0xF2641C)
+                    Interceptor.replace(baseAddr.add(0xF2641C), new NativeCallback(function(viewThis, go, methodInfo) {
+                        offlineFilterGroup = !offlineFilterGroup;
+                        log("[👥 UI OnGroup] Toggled offlineFilterGroup=" + offlineFilterGroup);
+                        if (activeInventorySceneInstance) applyOfflineSortAndFilter(activeInventorySceneInstance, true);
+                    }, "void", ["pointer", "pointer", "pointer"]));
+
+                    // InvenSortView.OnPrism (0xF2647C)
+                    Interceptor.replace(baseAddr.add(0xF2647C), new NativeCallback(function(viewThis, go, methodInfo) {
+                        offlineFilterPrism = !offlineFilterPrism;
+                        log("[🌈 UI OnPrism] Toggled offlineFilterPrism=" + offlineFilterPrism);
+                        if (activeInventorySceneInstance) applyOfflineSortAndFilter(activeInventorySceneInstance, true);
+                    }, "void", ["pointer", "pointer", "pointer"]));
+
+                    // Gameplay & Stage Network Bypasses for GameControl
+                    // GameControl.StageStart (0xD42B80)
+                    Interceptor.replace(baseAddr.add(0xD42B80), new NativeCallback(function(callbackPtr) {
+                        log("[🎵 GAME CONTROL] StageStart intercepted offline! Acknowledging status 0 (Success)...");
+                        try {
+                            if (!callbackPtr.isNull()) {
+                                var cbInvoke = new NativeFunction(callbackPtr.readPointer().add(0x140).readPointer(), "void", ["pointer", "int"]);
+                                cbInvoke(callbackPtr, 0);
+                            }
+                        } catch (eSs) {
+                            log("[-] Error in offline StageStart: " + eSs.message);
+                        }
+                    }, "void", ["pointer"]));
+
+                    // GameControl.StageComplete (0xD4379C)
+                    Interceptor.replace(baseAddr.add(0xD4379C), new NativeCallback(function(callbackPtr) {
+                        log("[🎵 GAME CONTROL] StageComplete intercepted offline! Acknowledging status 0 (Success)...");
+                        try {
+                            if (!callbackPtr.isNull()) {
+                                var cbInvoke = new NativeFunction(callbackPtr.readPointer().add(0x140).readPointer(), "void", ["pointer", "int", "pointer", "int"]);
+                                cbInvoke(callbackPtr, 0, NULL, 0);
+                            }
+                        } catch (eSc) {
+                            log("[-] Error in offline StageComplete: " + eSc.message);
+                        }
+                    }, "void", ["pointer"]));
+
+                    // ScoreData..ctor (0xD59534)
+                    try {
+                        Interceptor.attach(baseAddr.add(0xD59534), {
+                            onEnter: function(args) {
+                                var nCnt = args[1].toInt32();
+                                var mCnt = args[2].toInt32();
+                                var diff = args[3].toInt32();
+                                var startGradeBonus = args[4].toInt32();
+                                var extraTheme = args[5].toInt32();
+                                log("[🎵 SCORE_DATA] Ingame ScoreData initialized: noteCount=" + nCnt + ", members=" + mCnt + ", diff=" + diff + ", startGradeBonus=" + startGradeBonus + ", extraThemeBonus=" + extraTheme);
+                            }
+                        });
+                    } catch (eSd) {}
+
+                    log("[+] Phase 5 native hooks installed (Sort, Filter, Switches, GameControl StageStart & StageComplete, ScoreData)!");
+                } catch (ePh5Hooks) {
+                    log("[-] Error installing Phase 5 hooks: " + ePh5Hooks.message);
+                }
+
                 var activeCardIntensifyPopup = NULL;
                 // 4. Attach monitoring to CardIntensifyPopup
                 try {
@@ -12246,6 +12628,157 @@ function initIl2Cpp(module) {
                                     }
                                 }
                             }
+                        } else if (cmdRaw === "diag_sort") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                var sceneView = curScene.add(0x48).readPointer();
+                                log("[🔍 DIAG_SORT] curScene=" + curScene + " sceneView=" + sceneView);
+                                try {
+                                    var getSortTypeFn = new NativeFunction(baseAddr.add(0x1050FD0), "int", ["pointer"]);
+                                    var getIsSortGroupFn = new NativeFunction(baseAddr.add(0x10510C8), "bool", ["pointer"]);
+                                    var getIsSortMaterialFn = new NativeFunction(baseAddr.add(0x10512E0), "bool", ["pointer"]);
+                                    var getIsSortLockFn = new NativeFunction(baseAddr.add(0x10513EC), "bool", ["pointer"]);
+                                    var getIsFilterPrismFn = new NativeFunction(baseAddr.add(0x10514F8), "bool", ["pointer"]);
+                                    log("[🔍 DIAG_SORT GETTERS] sortType=" + getSortTypeFn(curScene) + " isGroup=" + getIsSortGroupFn(curScene) + " isMat=" + getIsSortMaterialFn(curScene) + " isLock=" + getIsSortLockFn(curScene) + " isPrism=" + getIsFilterPrismFn(curScene));
+                                } catch (eGetters) {
+                                    log("[-] Error reading sort getters: " + eGetters.message);
+                                }
+                                if (!sceneView.isNull()) {
+                                    var sortView = sceneView.add(0x80).readPointer();
+                                    log("[🔍 DIAG_SORT] sortView=" + sortView);
+                                    if (!sortView.isNull()) {
+                                        var sortIcon = sortView.add(0x38).readPointer();
+                                        var sortText = sortView.add(0x40).readPointer();
+                                        var opened = sortView.add(0x48).readPointer();
+                                        var sortButtonsInfo = sortView.add(0x50).readPointer();
+                                        var switchButtonsInfo = sortView.add(0x58).readPointer();
+                                        var isOpened = sortView.add(0x60).readU8();
+                                        log("[🔍 DIAG_SORT] sortIcon=" + sortIcon + " sortText=" + sortText + " opened=" + opened + " isOpened=" + isOpened + " sortButtonsInfo=" + sortButtonsInfo + " switchButtonsInfo=" + switchButtonsInfo);
+                                        if (!opened.isNull()) {
+                                            var getActiveSelfFn = new NativeFunction(baseAddr.add(0x1DBAE44), "int", ["pointer", "pointer"]);
+                                            log("[🔍 DIAG_SORT] opened.activeSelf=" + getActiveSelfFn(opened, NULL));
+                                        }
+                                    }
+                                }
+                            }
+                        } else if (cmdRaw === "sort_open") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                log("[📂 SORT_OPEN] Invoking native InventoryScene.OnSortOpen (0x105D5EC)...");
+                                try {
+                                    var onSortOpenFn = new NativeFunction(baseAddr.add(0x105D5EC), "void", ["pointer", "pointer"]);
+                                    onSortOpenFn(curScene, NULL);
+                                } catch (eSo) {
+                                    log("[-] Error invoking OnSortOpen: " + eSo.message);
+                                }
+                            }
+                        } else if (cmdRaw === "sort_close") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                log("[📁 SORT_CLOSE] Invoking native InventoryScene.OnSortClose (0x105D768)...");
+                                try {
+                                    var onSortCloseFn = new NativeFunction(baseAddr.add(0x105D768), "void", ["pointer", "pointer"]);
+                                    onSortCloseFn(curScene, NULL);
+                                } catch (eSc) {
+                                    log("[-] Error invoking OnSortClose: " + eSc.message);
+                                }
+                            }
+                        } else if (cmdRaw === "sort:low") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                log("[🔽 SORT_LOW] Selecting LowGrade (0)...");
+                                offlineSortType = 0;
+                                try {
+                                    var sView = curScene.add(0x48).readPointer();
+                                    if (!sView.isNull()) {
+                                        var sortView = sView.add(0x80).readPointer();
+                                        if (!sortView.isNull()) {
+                                            var opened = sortView.add(0x48).readPointer();
+                                            if (!opened.isNull()) {
+                                                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                                setActiveFn(opened, 0, NULL);
+                                                sortView.add(0x60).writeU8(0);
+                                            }
+                                        }
+                                    }
+                                } catch (eCls) {}
+                                applyOfflineSortAndFilter(curScene, true);
+                            }
+                        } else if (cmdRaw === "sort:high") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                log("[🔼 SORT_HIGH] Selecting HighGrade (1)...");
+                                offlineSortType = 1;
+                                try {
+                                    var sView = curScene.add(0x48).readPointer();
+                                    if (!sView.isNull()) {
+                                        var sortView = sView.add(0x80).readPointer();
+                                        if (!sortView.isNull()) {
+                                            var opened = sortView.add(0x48).readPointer();
+                                            if (!opened.isNull()) {
+                                                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                                setActiveFn(opened, 0, NULL);
+                                                sortView.add(0x60).writeU8(0);
+                                            }
+                                        }
+                                    }
+                                } catch (eCls) {}
+                                applyOfflineSortAndFilter(curScene, true);
+                            }
+                        } else if (cmdRaw === "sort:newest") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                log("[🆕 SORT_NEWEST] Selecting Newest (2)...");
+                                offlineSortType = 2;
+                                try {
+                                    var sView = curScene.add(0x48).readPointer();
+                                    if (!sView.isNull()) {
+                                        var sortView = sView.add(0x80).readPointer();
+                                        if (!sortView.isNull()) {
+                                            var opened = sortView.add(0x48).readPointer();
+                                            if (!opened.isNull()) {
+                                                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                                setActiveFn(opened, 0, NULL);
+                                                sortView.add(0x60).writeU8(0);
+                                            }
+                                        }
+                                    }
+                                } catch (eCls) {}
+                                applyOfflineSortAndFilter(curScene, true);
+                            }
+                        } else if (cmdRaw === "filter:group") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                offlineFilterGroup = !offlineFilterGroup;
+                                log("[👥 FILTER_GROUP] Toggled offlineFilterGroup=" + offlineFilterGroup);
+                                applyOfflineSortAndFilter(curScene, true);
+                            }
+                        } else if (cmdRaw === "filter:material") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                offlineFilterMaterial = !offlineFilterMaterial;
+                                log("[⚡ FILTER_MATERIAL] Toggled offlineFilterMaterial=" + offlineFilterMaterial);
+                                applyOfflineSortAndFilter(curScene, true);
+                            }
+                        } else if (cmdRaw === "filter:lock") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                offlineFilterLock = !offlineFilterLock;
+                                log("[🔒 FILTER_LOCK] Toggled offlineFilterLock=" + offlineFilterLock);
+                                applyOfflineSortAndFilter(curScene, true);
+                            }
+                        } else if (cmdRaw === "lock_demo") {
+                            log("[DEBUG LOCK_DEMO] curScene=" + curScene + " sceneId=" + sceneId + " loonaCardItems=" + (loonaCardItems ? loonaCardItems.length : "null"));
+                            if (curScene && !curScene.isNull() && sceneId === 4 && loonaCardItems && loonaCardItems.length > 0) {
+                                for (var lki = 0; lki < Math.min(3, loonaCardItems.length); lki++) {
+                                    var itmLk = loonaCardItems[lki];
+                                    if (itmLk && !itmLk.isNull()) {
+                                        var rawLk = itmLk.add(0x10).readPointer();
+                                        if (rawLk && !rawLk.isNull()) {
+                                            rawLk.add(0x29).writeU8(1); // isLock = true
+                                        }
+                                    }
+                                }
+                                log("[🔒 LOCK_DEMO] Locked cards 0..2 in memory!");
+                                applyOfflineSortAndFilter(curScene, true);
+                            }
+                        } else if (cmdRaw === "filter:prism") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                offlineFilterPrism = !offlineFilterPrism;
+                                log("[🌈 FILTER_PRISM] Toggled offlineFilterPrism=" + offlineFilterPrism);
+                                applyOfflineSortAndFilter(curScene, true);
+                            }
                         } else if (cmdRaw === "hide_back") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
                                 var sceneView = curScene.add(0x48).readPointer();
@@ -12348,7 +12881,8 @@ function initIl2Cpp(module) {
                                 }
                             }
                         } else {
-                            var targetScene = parseInt(cmdRaw, 10);
+                            var cleanCmd = cmdRaw.replace(/^scene:/, "");
+                            var targetScene = parseInt(cleanCmd, 10);
                             if (!isNaN(targetScene) && targetScene >= 1 && targetScene <= 13) {
                                 log("[🚀 SCENE CMD] Switching to SceneId: " + targetScene);
                                 if (curScene && !curScene.isNull()) {

@@ -2420,9 +2420,56 @@ En el motor Dalcomsoft, los atributos, bonificaciones, precios y probabilidades 
    * **Paso 5 — Desbloqueo y Venta de Carta (`SELL`):** [phase4_step5_after_selling_card.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase4_step5_after_selling_card.png) (carta liquidada por **+2,400 RP**, pasando el saldo a **`102,400 RP`** y seleccionando automáticamente la siguiente carta disponible).
    * **Paso 6 — Verificación de Inventario Restaurado:** [phase4_step6_inventory_main_restored.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase4_step6_inventory_main_restored.png) (inventario consolidado con actualización en tiempo real).
 
-5. **Fase 5 — Filtros / Ordenamiento Dinámico (`InvenSortView`) e Integración de Estadísticas con Gameplay Musical (`GameScene`) (⏳ PENDIENTE):**
+5. **Fase 5 — Filtros / Ordenamiento Dinámico (`InvenSortView`) e Integración de Estadísticas con Gameplay Musical (`GameScene` / `GameControl` / `ScoreData`) (✅ COMPLETADA 100%):**
    - **Menú de Ordenamiento y Filtros (`OnSortSelect` @ `0x105D830`, `OnSortGroup` @ `0x105D960`, `OnSortMaterial` @ `0x105DA78`, `OnSortLock` @ `0x105DB5C`, `OnSortPrism` @ `0x105DC40`):** Operatividad completa del selector `High` / `Low` / `New` / `Prism` / `Lock` sobre el carrusel inferior.
-   - **Impacto Real en Partida (`GameScene`):** Conectar el mazo equipado (`equipedCards`) y las tablas `cbd.json` / `cgd.json` al motor de puntuación de canciones (`Start Grade Bonus` de hasta +500,000 pts, multiplicador `ULTRA RAVE Lv 3` y `score`/`energy` por nota).
+   - **Impacto Real en Partida (`GameScene` / `GameControl` / `ScoreData`):** Conectar el mazo equipado (`equipedCards`) y las tablas `cbd.json` / `cgd.json` al motor de puntuación de canciones (`Start Grade Bonus` de hasta +500,000 pts, multiplicador `ULTRA RAVE Lv 3` y `score`/`energy` por nota).
+
+### 24.11. Implementación de Ordenamiento Dinámico, Filtros de Inventario (`InvenSortView`) e Integración con Gameplay Musical (`GameControl` / `ScoreData`)
+
+1. **Arquitectura e Ingeniería Inversa de `InvenSortView` y `InventoryScene`:**
+   * **Campos y Offsets de `InvenSortView` (TypeDefIndex 12405):**
+     - `0x38` (`sortIcon`): Componente `UnityEngine.UI.Image`.
+     - `0x40` (`sortText`): Componente `UnityEngine.UI.Text` (muestra `"Low"`, `"High"`, `"Newest"`).
+     - `0x48` (`opened`): GameObject contenedor del menú desplegable emergente.
+     - `0x50` (`sortButtonsInfo`): `List<SortButtonInfo>` con los botones de ordenamiento.
+     - `0x58` (`switchButtonsInfo`): `List<SwitchButtonInfo>` con los conmutadores de filtro (`Group`, `Material`, `Lock`, `Prism`).
+     - `0x60` (`isOpened`): Booleano nativo que indica si el desplegable está visible.
+   * **Rutinas Clave Analizadas y Enlazadas:**
+     - `InvenSortView.Open` (`0xF2601C`): Despliega el popup y fija `isOpened = 1`.
+     - `InvenSortView.Close` (`0xF25F90`): Oculta el popup y fija `isOpened = 0`.
+     - `InvenSortView.SetButtonState` (`0xF25BF0`): Actualiza visualmente el estado de selección de los botones. Categoría `0` (`SORT`): index `0`=Low, `1`=High, `2`=Newest. Categoría `1` (`SWITCH`): index `0`=Group, `1`=Material, `2`=Lock, `3`=Prism.
+     - Métodos de `InventoryScene`: `OnSortOpen` (`0x105D5EC`), `OnSortClose` (`0x105D768`), `OnSortSelect` (`0x105D830`), `OnSortGroup` (`0x105D960`), `OnSortMaterial` (`0x105DA78`), `OnSortLock` (`0x105DB5C`), `OnSortPrism` (`0x105DC40`).
+
+2. **Motor de Ordenamiento y Filtrado Offline (`applyOfflineSortAndFilter`):**
+   * **Prevención de Abort en `EnhancedScroller`:** Inicialmente, invocar `InvenCardView.SetData` (`0xF23384`) provocaba una aserción/abort en `EnhancedScroller.ReloadData(0.0f)` (`0x125C640`) debido a una llamada destructiva a `ScrollRect.set_horizontalNormalizedPosition`. La solución definitiva implementada escribe directamente las propiedades del `InvenCardView` (`maxCount` @ `0x98`, `onEventListener` @ `0x90`, `isShowLight` @ `0x9C`), invoca de manera segura `EnhancedScroller.ReloadDataKeepPosition(0)` (`0x125C750`), `_ResetVisibleCellViews` (`0x125D768`), y refresca las celdas activas (`activeCellViews` @ `scroller + 0x120`) mediante el pipeline visual optimizado `updateSingleCell`.
+   * **Filtros Dinámicos Combinables:**
+     - `Lock`: Muestra exclusivamente las cartas con candado activo (`isLock == true`).
+     - `Prism`: Filtra únicamente cartas holográficas Prism (`isPrism == true`).
+     - `Material`: Filtra cartas no equipadas y desbloqueadas elegibles para usarse como material.
+     - `Group`: Agrupa por integrante de LOONA (`1001` a `1011`).
+   * **Modos de Ordenamiento Soportados:**
+     - `LowGrade` (0): Cartas de menor grado primero (`C -> B -> A -> S -> R`), nivel más bajo, no-prism y no-equipadas primero.
+     - `HighGrade` (1): Cartas equipadas primero, mayor grado (`R -> S -> A -> B -> C`), mayor nivel (`50 -> 1`), prism primero.
+     - `Newest` (2): Cartas adquiridas más recientemente por `objectID` descendente (comparación precisa vía `Int64.compare`).
+
+3. **Integración con Gameplay Musical (`GameControl` / `ScoreData`):**
+   * **Bypasses de Red Offline en `GameControl`:**
+     - `GameControl.StageStart` (`0xD42B80`): Interceptado y completado inmediatamente offline con estado `0` (`Success`).
+     - `GameControl.StageComplete` (`0xD4379C`): Interceptado y confirmado offline invocando el delegado de finalización con `status = 0`.
+   * **Motor de Puntuación (`ScoreData`):**
+     - Constructor `ScoreData..ctor` (`0xD59534`) instrumentado para recibir `noteCount`, `memberCount`, `difficulty`, `startGradeBonus` y `extraThemeBonus`.
+     - Bonificación de Inicio (`StartGradeBonus` @ `ScoreData + 0x78`): Otorga hasta +500,000 pts para un mazo LOONA OT11 R50 y establece el multiplicador `ULTRA RAVE Lv 3`.
+     - Puntuación por nota configurada con base `Score = 199` por integrante según las especificaciones de Dalcomsoft (`cbd.json`).
+
+4. **Secuencia Completa de Validación Visual de la Fase 5 en `emulator-5554`:**
+   * **Paso 1 — Menú de Ordenamiento Desplegado (`InvenSortView.Open`):** [phase5_step1_sort_menu_open.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase5_step1_sort_menu_open.png) (menú desplegable visible con opciones `Low / High / Newest` y los 4 interruptores `Group / Material / Lock / Prism`).
+   * **Paso 2 — Ordenamiento por Grado Menor (`LowGrade`):** [phase5_step2_sort_low_grade.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase5_step2_sort_low_grade.png) (cartas grado C nivel 1 se ubican al inicio del carrusel, botón `Low` marcado y etiqueta actualizada).
+   * **Paso 3 — Ordenamiento por Grado Mayor (`HighGrade`):** [phase5_step3_sort_high_grade.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase5_step3_sort_high_grade.png) (cartas grado R nivel 50 equipadas al inicio del carrusel, botón `High` marcado).
+   * **Paso 4 — Ordenamiento por Fecha Más Reciente (`Newest`):** [phase5_step4_sort_newest.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase5_step4_sort_newest.png) (ordenamiento por ID de adquisición, etiqueta `Newest` en el selector).
+   * **Paso 5 — Filtro de Solo Cartas Bloqueadas (`Filter: Lock`):** [phase5_step5_filter_lock_only.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase5_step5_filter_lock_only.png) (conteo `3 / 200`, únicamente se muestran las 3 cartas protegidas con candado).
+   * **Paso 6 — Filtro de Solo Cartas Material (`Filter: Material`):** [phase5_step6_filter_material_only.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase5_step6_filter_material_only.png) (conteo `10 / 200`, únicamente se muestran las 10 cartas no equipadas y desbloqueadas).
+   * **Paso 7 — Filtro de Solo Cartas Prism (`Filter: Prism`):** [phase5_step7_filter_prism_only.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase5_step7_filter_prism_only.png) (conteo `1 / 200`, únicamente se muestra la carta especial holográfica Prism HeeJin R50).
+   * **Paso 8 — Restauración Completa de Inventario:** [phase5_step8_inventory_default_restored.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase5_step8_inventory_default_restored.png) (conteo `21 / 200`, baraja completa OT11 R50 restaurada con orden estándar).
 
 ### 24.9. Implementación y Validación Visual Multi-Carta de la Fase 3 (`[X]` Persistente, Z-Order de Nivel y Carrusel de Materiales)
 
