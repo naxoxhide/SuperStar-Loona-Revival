@@ -6550,7 +6550,7 @@ function initIl2Cpp(module) {
                                                 if (cell.isNull()) continue;
                                                 var dIdx = cell.add(0x24).readS32();
                                                 if (dIdx >= 0 && dIdx < filtered.length) {
-                                                    updateSingleCell(cell, dIdx, filtered[dIdx]);
+                                                    updateSingleCell(cell, filtered[dIdx], dIdx, false);
                                                 }
                                             }
                                         }
@@ -7678,21 +7678,7 @@ function initIl2Cpp(module) {
                                     log("[-] Error in ShowDefaultLayout: " + eSdl.message);
                                 }
 
-                                // 2. Refresh & JumpToDataIndex on groupView (0x70)
-                                try {
-                                    var groupView = sceneView.add(0x70).readPointer();
-                                    if (!groupView.isNull()) {
-                                        var invenGroupRefreshFn = new NativeFunction(baseAddr.add(0xF25124), "void", ["pointer", "pointer"]);
-                                        invenGroupRefreshFn(groupView, NULL);
-                                        var invenGroupJumpFn = new NativeFunction(baseAddr.add(0xF25140), "void", ["pointer", "int", "bool", "pointer"]);
-                                        invenGroupJumpFn(groupView, 0, 0, NULL);
-                                        log("[✅ ON_BACK] InvenGroupView.Refresh and JumpToDataIndex executed!");
-                                    }
-                                } catch (eGv) {
-                                    log("[-] Error in InvenGroupView refresh: " + eGv.message);
-                                }
-
-                                // 3. Restore displayCardList (sets 24 cards and calls InvenCardView.SetData in 0xF23384)
+                                // 2. Restore displayCardList (sets cards and calls safe scroller update)
                                 restoreDefaultDisplayCardList(sceneThis, true);
                             }
                         } else if (curState === 5) { // STATE.Default (5)

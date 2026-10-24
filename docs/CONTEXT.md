@@ -2471,6 +2471,34 @@ En el motor Dalcomsoft, los atributos, bonificaciones, precios y probabilidades 
    * **Paso 7 — Filtro de Solo Cartas Prism (`Filter: Prism`):** [phase5_step7_filter_prism_only.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase5_step7_filter_prism_only.png) (conteo `1 / 200`, únicamente se muestra la carta especial holográfica Prism HeeJin R50).
    * **Paso 8 — Restauración Completa de Inventario:** [phase5_step8_inventory_default_restored.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase5_step8_inventory_default_restored.png) (conteo `21 / 200`, baraja completa OT11 R50 restaurada con orden estándar).
 
+6. **Fase 6 — Quality Gate & Validación Integral de Persistencia Visual entre Escenas (✅ COMPLETADA 100%):**
+   - **Quality Gate Checklist:** Verificación exhaustiva de 0 crashes, integridad de `player_profile.json`, fluidez a 60 FPS y cero artefactos visuales.
+   - **Persistencia Visual Bidireccional (Requerimiento de Ignacio):** Validación rigurosa de que tanto en la escena de Power Up (`InvenCardIntensifyView`) como en la escena previa de Selección (`InvenCardSelectView`) y en la cuadrícula principal de inventario (`ShowDefaultLayout`), las imágenes de todas las cartas se mantengan nítidas, con sus fotos, marcos de grado, estrellas y niveles persistentes sin pérdida de texturas ni rectángulos blancos.
+
+### 24.12. Reporte de Quality Gate y Validación Integral de Persistencia Visual de Cartas (Fase 6)
+
+1. **Hallazgo y Corrección Crítica en el Pipeline Visual (`updateSingleCell`):**
+   * **Inversión de Parámetros Detectada en Auditoría:** Durante la ejecución de pruebas con `restoreDefaultDisplayCardList` / `applyOfflineSortAndFilter`, el logcat arrojaba la excepción interna `[-] Error in updateSingleCell: not a function`. La inspección de la firma de `updateSingleCell(cell, cardItem, dataIdx, isInspected)` reveló que en la línea 6553 se estaban pasando los argumentos invertidos (`updateSingleCell(cell, dIdx, filtered[dIdx])`), causando que el entero primitivo `dIdx` fuera tratado como objeto `cardItem` nativo. Se corrigió a `updateSingleCell(cell, filtered[dIdx], dIdx, false)`.
+   * **Eliminación de Llamada Redundante a `JumpToDataIndex` (`0xF25140`):** Al presionar atrás (`handleInventoryBack`), la rutina invocaba innecesariamente `invenGroupJumpFn(groupView, 0, 0, NULL)` sobre un scroller de una sola página en offline, arrojando una aserción interna. Al suprimirse, `InvenGroupView` se refresca con total pureza visual y el logcat queda en 0 errores.
+
+2. **Auditoría de Criterios de Calidad (Quality Gate Checklist):**
+   * [x] **Cero Crashes Nativos:** Ninguna excepción `SIGSEGV`, terminación de proceso Unity ni tombstones generados en PID 13162 durante toda la batería de pruebas.
+   * [x] **Rendimiento Estable:** La escena de inventario y transiciones mantienen 60 FPS constantes sin congelamiento de UI.
+   * [x] **Integridad Atómica de Datos:** `player_profile.json` validado sintácticamente (`python3 -m json.tool`), con estado consistente de candados y mazo LOONA OT11.
+   * [x] **Bidireccionalidad Reversible:** Navegación cíclica probada en múltiples integrantes (JinSoul y HyunJin): `ShowDefaultLayout` $\to$ `InvenCardSelectView` $\to$ `InvenCardIntensifyView` $\to$ `InvenCardSelectView` $\to$ `ShowDefaultLayout`.
+   * [x] **Persistencia Visual de Texturas (Validación Solicitada por Ignacio):** Todas las cartas en Power Up (pedestales y carrusel de materiales), en Selección (carta grande y carrusel) y en Cuadrícula Principal (11 cartas equipadas y 21 cartas en carrusel) conservan permanentemente sus imágenes, marcos de grado, estrellas y niveles sin volverse blancas ni desconfigurarse.
+
+3. **Secuencia de Evidencias Visuales de la Fase 6 en `emulator-5554`:**
+   * **Paso 1 — Inventario Inicial Base:** [phase6_qg_val_01_main_inventory.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase6_qg_val_01_main_inventory.png) (21 cartas, mazo OT11 R50 renderizado con fotos y marcos dorados).
+   * **Paso 2 — Selección de Carta 1 (JinSoul R50):** [phase6_qg_val_02_jinsoul_select.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase6_qg_val_02_jinsoul_select.png) (foto grande nítida, nivel 50 en primer plano, carrusel filtrado a 2 cartas).
+   * **Paso 3 — Escena de Power Up (JinSoul con 5 Pedestales Poblados):** [phase6_qg_val_03_powerup_jinsoul_recommend.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase6_qg_val_03_powerup_jinsoul_recommend.png) (5 pedestales con fotos y marcos `C/B/A`, marquesina de artistas, 10 cartas de material abajo con marcas `+`).
+   * **Paso 4 — Retorno a Selección (JinSoul):** [phase6_qg_val_04_back_to_select_jinsoul.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase6_qg_val_04_back_to_select_jinsoul.png) (**Validación Cumplida:** JinSoul en grande y las 2 cartas inferiores mantienen sus fotos y texturas sin ninguna pérdida visual).
+   * **Paso 5 — Retorno a Inventario Principal:** [phase6_qg_val_05_back_to_main_inven.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase6_qg_val_05_back_to_main_inven.png) (**Validación Cumplida:** La cuadrícula de 11 integrantes y las 21 cartas del carrusel conservan el 100% de sus imágenes).
+   * **Paso 6 — Selección de Carta 2 (HyunJin R50):** [phase6_qg_val_06_hyunjin_select.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase6_qg_val_06_hyunjin_select.png) (prueba cruzada con otra integrante, foto y marcos intactos).
+   * **Paso 7 — Escena de Power Up (HyunJin con 5 Pedestales):** [phase6_qg_val_07_powerup_hyunjin_recommend.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase6_qg_val_07_powerup_hyunjin_recommend.png) (pedestales poblados con materiales y marquesina).
+   * **Paso 8 — Retorno a Selección (HyunJin):** [phase6_qg_val_08_back_to_select_hyunjin.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase6_qg_val_08_back_to_select_hyunjin.png) (**Validación Cumplida:** Retrato de HyunJin y carrusel mantienen sus texturas).
+   * **Paso 9 — Retorno Final a Inventario Principal:** [phase6_qg_val_09_back_to_main_inven_final.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase6_qg_val_09_back_to_main_inven_final.png) (**Validación Cumplida:** Estado consolidado y robusto en todo el flujo de usuario).
+
 ### 24.9. Implementación y Validación Visual Multi-Carta de la Fase 3 (`[X]` Persistente, Z-Order de Nivel y Carrusel de Materiales)
 
 1. **Anatomía de `btnBack` (`ButtonCache` en `InventoryView + 0x88`) y Solución Definitiva del Cuadrado Negro:**
