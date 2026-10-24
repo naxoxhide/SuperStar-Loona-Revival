@@ -2543,3 +2543,24 @@ En el motor Dalcomsoft, los atributos, bonificaciones, precios y probabilidades 
    * **Paso 5 — Escena Power Up (`InvenCardIntensifyView`) y `RECOMMEND` en Carta 2 (`HyunJin`):** [phase3_step5_card2_hyunjin_intensify.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase3_step5_card2_hyunjin_intensify.png) y [phase3_step5b_card2_hyunjin_recommend.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase3_step5b_card2_hyunjin_recommend.png) (`[X]` permanece nítido y sin cuadrado negro en la esquina superior derecha, 5 pedestales poblados, 10 cartas de material con insignias `+` en las 5 primeras cartas `C/B/A`).
    * **Paso 6 — Ejecución de `TRY` en Carta 2 (`HyunJin` R50 $\to$ R51):** [phase3_step6_card2_hyunjin_after_try.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/phase3_step6_card2_hyunjin_after_try.png) (HyunJin sube a nivel **`51`**, RP se actualiza de `100.000` a `5.742`, las 5 cartas de material usadas se consumen quedando `5 / 200` en el carrusel inferior, y el botón `[X]` permanece limpio y funcional).
 
+### 24.10. Desbloqueo del Modal Animado de Power Up (`CardIntensifyPopup`) y Estilización de Pedestales con Marca de Agua
+
+1. **Texturas y Pedestales Vacíos Oficiales:**
+   * **Generación de Marca de Agua HD:** Se creó la textura `pedestal_watermark.png` (196x272 con borde redondeado translúcido, logotipo oficial "SUPER STAR LOONΔ" y símbolo "+" centrado) y se desplegó en `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/pedestal_watermark.png`.
+   * **Inyección Nativa de Sprites:** Dado que `emptyImg` en los pedestales es un `UnityEngine.UI.Image` (no `RawImage`), se utiliza `Texture2DExtensions.CreateSprite` (RVA `0x23E1268`) y `Image.set_sprite` (RVA `0x1ECB61C`) en `safeRefreshIntensifyView` e `InvenMaterialView.Refresh`, garantizando que los 5 pedestales se rendericen idénticos al juego oficial cuando están vacíos.
+
+2. **Insignias del Carrusel Inferior y Botones Dinámicos:**
+   * **Insignias de Material y Nuevas:** Se integró en `updateSingleCell` la inyección de `MARK_INDEX.Material = 1` (badge naranja circular `+` en las 5 cartas seleccionadas como material) y `MARK_INDEX.New = 2` (badge rosa circular `N` para las cartas no seleccionadas).
+   * **Estilizado de Botones:** Botón `Recommended\nMaterial` en dos líneas, costo dinámico de RP en cápsula oscura y probabilidad de éxito con color semántico (`Low` en magenta/rojo `#E03177`, `Normal` en ámbar y `High` en verde).
+
+3. **Diagnóstico del Bloqueo del Modal Nativo (`LoadingIndicator.Active` vs `CardIntensifyPopup`):**
+   * **Cadena de Ejecución:** `InventoryScene.OnIntensifyTry` (RVA `0x105BA9C`) $\to$ `LoadingIndicator.Active` (RVA `0xB3BBB4`) $\to$ `IntensifyAssist.Open` (RVA `0xF1CBEC`) $\to$ `IntensifyAssist.Start` (RVA `0xF1CD34`).
+   * **Causa Raíz del Congelamiento:** En `IntensifyAssist.Start`, el motor intentaba extraer rutas de descarga de texturas mediante `InventoryControl.CardItem.ExtractLargeImagePath` (RVA `0xB562F4`) y `ExtractSmallImagePath` (RVA `0xB56598`). Al no existir los servidores CDN de Dalcomsoft, se producía un fallo o espera infinita antes de invocar `PreloadTexture` (RVA `0xAD2A48`).
+   * **Consecuencia:** El delegado `<Start>b__10_1` (RVA `0xF1E158`), encargado de llamar a `ViewControl.OpenPopup("CardIntensifyPopup", ...)` (RVA `0xAAA0D0`), nunca se ejecutaba. Por ende, el delegado de carga `<Start>b__10_4` (RVA `0xB52188`, que invoca `LoadingIndicator.Complete()` en `0xB3E230`) jamás corría, dejando la pantalla opacada con el gradiente lila del indicador de carga.
+
+4. **Solución y Desbloqueo de la Animación de Power Up:**
+   * **Bypass de Extracción de Rutas:** Se implementó `Interceptor.replace` no-op en `ExtractLargeImagePath` (`0xB562F4`) y `ExtractSmallImagePath` (`0xB56598`).
+   * **PreloadTexture Offline Directo:** En `PreloadTexture` (`0xAD2A48`), se ejecuta inmediatamente el callback mediante `Action.Invoke` (RVA `0x1DEBE44`) y se despacha `LoadingIndicator.Complete()` (`0xB3E230`), abriendo de inmediato el prefab nativo `Prefabs/Popup/CardIntensifyPopup`.
+   * **Emulación de Resultado Offline:** En `IntensifyAssist.OnRequestIntensify` (RVA `0xF1DA24`), se construye una instancia de `List<bool>` con `List<bool>..ctor` (`0x23BB330`) y `List<bool>.Add` (`0x23BC040`), y se invoca directamente `CardIntensifyPopup.IntensifyResult` (RVA `0x138467C`).
+   * **Ciclo de Animación Nativo:** `IntensifyResult` coloca `State = 1` (`Starting`) y reproduce el destello esférico radial blanco oficial (`ANIM_STARTING` = 1). Al terminar la animación, `CardIntensifyPopup.Update` (RVA `0x138461C`) cambia a `State = 2` (`Result`) y dispara `OpenResultLayout` (RVA `0x13841D4`), revelando el resultado (`ANIM_SUCCEED` = 2 o `ANIM_FAILED` = 3), el shader de líneas diagonales en caso de fallo, y los botones `NEXT` / `OK` según el índice de la carta material.
+

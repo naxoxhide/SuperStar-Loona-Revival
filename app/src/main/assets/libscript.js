@@ -8565,27 +8565,35 @@ function initIl2Cpp(module) {
 
                 // Global PreloadTexture (0xAD2A48) -> Immediate callback execution in offline mode
                 try {
+                    // 1. Bypass image extraction to prevent NullReferenceException on dead CDN URLs
+                    Interceptor.replace(baseAddr.add(0xB562F4), new NativeCallback(function (thisCardItem, pathList, methodInfo) {
+                        log("[🖼️ EXTRACT] ExtractLargeImagePath bypassed cleanly for offline mode!");
+                    }, "void", ["pointer", "pointer", "pointer"]));
+
+                    Interceptor.replace(baseAddr.add(0xB56598), new NativeCallback(function (thisCardItem, pathList, methodInfo) {
+                        log("[🖼️ EXTRACT] ExtractSmallImagePath bypassed cleanly for offline mode!");
+                    }, "void", ["pointer", "pointer", "pointer"]));
+
+                    // 2. PreloadTexture: immediately invoke callback to open CardIntensifyPopup
                     Interceptor.replace(baseAddr.add(0xAD2A48), new NativeCallback(function (enumerator, callback, methodInfo) {
                         log("[🖼️ PRELOAD] PreloadTexture intercepted offline! callback=" + callback);
                         if (!callback.isNull()) {
                             try {
-                                var methodPtr = callback.add(0x10).readPointer();
-                                var target = callback.add(0x20).readPointer();
-                                if (!methodPtr.isNull()) {
-                                    var cbFn = new NativeFunction(methodPtr, "void", ["pointer", "pointer"]);
-                                    cbFn(target, NULL);
-                                    log("[✅ PRELOAD] Callback executed directly and safely!");
-                                } else {
-                                    var invokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer", "pointer"]);
-                                    invokeFn(callback, NULL);
-                                    log("[✅ PRELOAD] Callback invoked via Action.Invoke!");
-                                }
+                                var invokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer", "pointer"]);
+                                invokeFn(callback, NULL);
+                                log("[✅ PRELOAD] Callback invoked via Action.Invoke successfully!");
                             } catch (eInv) {
                                 log("[-] Error invoking preload callback: " + eInv.message);
                             }
                         }
+                        // Clear loading indicator
+                        try {
+                            var loadingCompleteFn = new NativeFunction(baseAddr.add(0xB3E230), "void", ["pointer"]);
+                            loadingCompleteFn(NULL);
+                            log("[🛡️ PRELOAD] LoadingIndicator.Complete() dispatched!");
+                        } catch (eLd) {}
                     }, "void", ["pointer", "pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on PreloadTexture (0xAD2A48)!");
+                    log("[+] Interceptor.replace installed on PreloadTexture (0xAD2A48) and ExtractImagePaths!");
                 } catch (ePltReplace) {
                     log("[-] Error replacing PreloadTexture: " + ePltReplace.message);
                 }
@@ -12595,6 +12603,14 @@ function initIl2Cpp(module) {
 
                         if (cmdRaw === "dismiss" || cmdRaw === "close_popups" || cmdRaw === "dismiss_popups") {
                             log("[🛡️ POPUP CMD] Popups dismissed cleanly via Popup.CloseAll(0)!");
+                        } else if (cmdRaw === "hide_loading" || cmdRaw === "clear_loading") {
+                            try {
+                                var lcFn = new NativeFunction(baseAddr.add(0xB3E230), "void", ["pointer"]);
+                                lcFn(NULL);
+                                log("[🛡️ LOADING CMD] LoadingIndicator.Complete() dispatched!");
+                            } catch (eHl) {
+                                log("[-] Error in hide_loading: " + eHl.message);
+                            }
                         } else if (cmdRaw.indexOf("card:") === 0) {
                             var cardArg = cmdRaw.substring(5).trim();
                             log("[🃏 CARD CMD] Triggering card select for arg: '" + cardArg + "' on scene: " + curScene);
@@ -13083,15 +13099,9 @@ function initIl2Cpp(module) {
                             if (!isNaN(targetScene) && targetScene >= 1 && targetScene <= 13) {
                                 log("[🚀 SCENE CMD] Switching to SceneId: " + targetScene);
                                 if (curScene && !curScene.isNull()) {
-                                    if ((sceneId === 2 || sceneId === 3) && targetScene === 4) {
-                                        log("[🚀 SCENE CMD] Invoking LobbyScene.OnInventory (0xB4C418) cleanly on LobbyScene: " + curScene);
-                                        var onInvenFn = new NativeFunction(baseAddr.add(0xB4C418), 'void', ['pointer', 'pointer']);
-                                        onInvenFn(curScene, NULL);
-                                    } else {
-                                        log("[🚀 SCENE CMD] Invoking Scene.SetStateOpenScene (0xD5338C) on curScene: " + curScene + " -> target: " + targetScene);
-                                        var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
-                                        setStateOpenSceneFn(curScene, targetScene, NULL, NULL, NULL);
-                                    }
+                                    log("[🚀 SCENE CMD] Invoking Scene.SetStateOpenScene (0xD5338C) on curScene: " + curScene + " -> target: " + targetScene);
+                                    var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
+                                    setStateOpenSceneFn(curScene, targetScene, NULL, NULL, NULL);
                                 } else {
                                     log("[🚀 SCENE CMD] curScene is null, invoking SceneControl.OpenScene direct (0xD534BC)");
                                     var openSceneDirectFn = new NativeFunction(baseAddr.add(0xD534BC), 'void', ['int', 'pointer', 'pointer']);
