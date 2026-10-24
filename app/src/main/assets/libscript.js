@@ -12390,6 +12390,14 @@ function initIl2Cpp(module) {
                         onEnter: function(args) {
                             this.pop = args[0];
                             log("[✨ INTENSIFY RESULT LAYOUT] OpenResultLayout onEnter pop=" + this.pop);
+                            try {
+                                if (this.pop && !this.pop.isNull()) {
+                                    var ctxList = this.pop.add(0x160).readPointer();
+                                    if (!ctxList.isNull()) {
+                                        ctxList.add(0x18).writeS32(99); // ensure _size >= index so native code never throws ArgumentOutOfRangeException
+                                    }
+                                }
+                            } catch (eCtxSz) {}
                         },
                         onLeave: function(retval) {
                             try {
@@ -12446,7 +12454,7 @@ function initIl2Cpp(module) {
                                     var isNext = (pop.add(0x168).readU8() !== 0);
                                     if (lastResultSuccess) {
                                         isNext = false;
-                                        pop.add(0x168).writeU8(0); // clear isNext in native memory so OnClickOverride calls Popup.Close()
+                                        pop.add(0x168).writeU8(0); // clear isNext in native memory
                                     }
                                     var btnText = isNext ? "Next" : "OK";
                                     log("[✨ INTENSIFY RESULT LAYOUT] final isNext=" + isNext + " -> btnText='" + btnText + "'");
@@ -12463,7 +12471,26 @@ function initIl2Cpp(module) {
                                         if (!btnGo.isNull()) setActiveFn(btnGo, 1, NULL);
                                     }
 
+                                    // Target card rank and level
+                                    var targetGrade = 4;
+                                    var targetLevel = 1;
+                                    try {
+                                        if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                            var tCard = activeInventorySceneInstance.add(0x88).readPointer();
+                                            if (tCard.isNull()) tCard = activeInventorySceneInstance.add(0x98).readPointer();
+                                            if (!tCard.isNull()) {
+                                                var raw = tCard.add(0x10).readPointer();
+                                                if (!raw.isNull()) {
+                                                    targetGrade = raw.add(0x24).readS32();
+                                                    targetLevel = raw.add(0x1C).readS16();
+                                                }
+                                            }
+                                        }
+                                    } catch (eTg) {}
+
                                     var stat = pop.add(0x130).readPointer();
+                                    var newCard = pop.add(0x118).readPointer();
+
                                     if (lastResultSuccess) {
                                         // SUCCEED effects:
                                         // Ensure purple deltas +2 and +3 are populated on stat
@@ -12471,7 +12498,6 @@ function initIl2Cpp(module) {
                                             var scoreRise = stat.add(0x50).readPointer();
                                             if (!scoreRise.isNull()) {
                                                 setTextFn(scoreRise, createIl2CppString("+2"), NULL);
-                                                // Set color violet: r=0.72, g=0.39, b=0.83, a=1.0
                                                 scoreRise.add(0x20).writeFloat(0.72);
                                                 scoreRise.add(0x24).writeFloat(0.39);
                                                 scoreRise.add(0x28).writeFloat(0.83);
@@ -12482,7 +12508,6 @@ function initIl2Cpp(module) {
                                             var energyRise = stat.add(0x70).readPointer();
                                             if (!energyRise.isNull()) {
                                                 setTextFn(energyRise, createIl2CppString("+3"), NULL);
-                                                // Set color violet: r=0.72, g=0.39, b=0.83, a=1.0
                                                 energyRise.add(0x20).writeFloat(0.72);
                                                 energyRise.add(0x24).writeFloat(0.39);
                                                 energyRise.add(0x28).writeFloat(0.83);
@@ -12492,18 +12517,52 @@ function initIl2Cpp(module) {
                                             }
                                         }
 
-                                        // Star increment on newCard (0x118)
-                                        var newCard = pop.add(0x118).readPointer();
+                                        // Apply upgraded visuals on newCard (0x118)
                                         if (!newCard.isNull()) {
                                             var starLevel = newCard.add(0x78).readPointer();
                                             var starSprites = newCard.add(0x70).readPointer();
-                                            if (!starLevel.isNull() && !starSprites.isNull()) {
-                                                var getSpriteFn = new NativeFunction(baseAddr.add(0xD0CAB8), "pointer", ["pointer", "int", "pointer"]);
-                                                var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
-                                                var sp2 = getSpriteFn(starSprites, 1, NULL); // index 1 = 2 stars (★★)
-                                                if (!sp2.isNull()) setSpriteFn(starLevel, sp2, NULL);
-                                                var starGo = getGoFn(starLevel, NULL);
-                                                if (!starGo.isNull()) setActiveFn(starGo, 1, NULL);
+                                            var numBox = newCard.add(0x80).readPointer();
+                                            var effect = newCard.add(0x88).readPointer();
+
+                                            if (targetGrade === 4) {
+                                                // R Rank: update numeric level box, hide stars, show particles
+                                                if (!numBox.isNull()) {
+                                                    var setValFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "uint32", "pointer"]);
+                                                    setValFn(numBox, targetLevel, NULL);
+                                                    var nbGo = getGoFn(numBox, NULL);
+                                                    if (!nbGo.isNull()) setActiveFn(nbGo, 1, NULL);
+                                                }
+                                                if (!starLevel.isNull()) {
+                                                    var starGo = getGoFn(starLevel, NULL);
+                                                    if (!starGo.isNull()) setActiveFn(starGo, 0, NULL);
+                                                }
+                                                if (!effect.isNull()) {
+                                                    var effGo = getGoFn(effect, NULL);
+                                                    if (!effGo.isNull()) setActiveFn(effGo, 1, NULL);
+                                                }
+                                                log("[✨ RESULT CARD] Updated newCard to R-rank Level " + targetLevel);
+                                            } else {
+                                                // C, B, A, S Ranks: update stars, hide numeric level, hide particles
+                                                var starIdx = (targetGrade * 5 + targetLevel) - 1;
+                                                if (starIdx < 0) starIdx = 0;
+                                                if (starIdx > 24) starIdx = 24;
+                                                if (!starLevel.isNull() && !starSprites.isNull()) {
+                                                    var getSpriteFn = new NativeFunction(baseAddr.add(0xD0CAB8), "pointer", ["pointer", "int", "pointer"]);
+                                                    var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
+                                                    var sp = getSpriteFn(starSprites, starIdx, NULL);
+                                                    if (!sp.isNull()) setSpriteFn(starLevel, sp, NULL);
+                                                    var starGo = getGoFn(starLevel, NULL);
+                                                    if (!starGo.isNull()) setActiveFn(starGo, 1, NULL);
+                                                }
+                                                if (!numBox.isNull()) {
+                                                    var nbGo = getGoFn(numBox, NULL);
+                                                    if (!nbGo.isNull()) setActiveFn(nbGo, 0, NULL);
+                                                }
+                                                if (!effect.isNull()) {
+                                                    var effGo = getGoFn(effect, NULL);
+                                                    if (!effGo.isNull()) setActiveFn(effGo, 0, NULL);
+                                                }
+                                                log("[✨ RESULT CARD] Updated newCard to Grade " + targetGrade + " (" + targetLevel + " stars)");
                                             }
                                         }
                                     } else {
@@ -12521,6 +12580,40 @@ function initIl2Cpp(module) {
                                                 if (!eRiseGoF.isNull()) setActiveFn(eRiseGoF, 0, NULL);
                                             }
                                         }
+                                        // Ensure target card reflects current stars/level without deltas
+                                        if (!newCard.isNull()) {
+                                            var starLevelF = newCard.add(0x78).readPointer();
+                                            var starSpritesF = newCard.add(0x70).readPointer();
+                                            var numBoxF = newCard.add(0x80).readPointer();
+                                            if (targetGrade === 4) {
+                                                if (!numBoxF.isNull()) {
+                                                    var setValFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "uint32", "pointer"]);
+                                                    setValFn(numBoxF, targetLevel, NULL);
+                                                    var nbGoF = getGoFn(numBoxF, NULL);
+                                                    if (!nbGoF.isNull()) setActiveFn(nbGoF, 1, NULL);
+                                                }
+                                                if (!starLevelF.isNull()) {
+                                                    var starGoF = getGoFn(starLevelF, NULL);
+                                                    if (!starGoF.isNull()) setActiveFn(starGoF, 0, NULL);
+                                                }
+                                            } else {
+                                                var starIdxF = (targetGrade * 5 + targetLevel) - 1;
+                                                if (starIdxF < 0) starIdxF = 0;
+                                                if (starIdxF > 24) starIdxF = 24;
+                                                if (!starLevelF.isNull() && !starSpritesF.isNull()) {
+                                                    var getSpriteFn = new NativeFunction(baseAddr.add(0xD0CAB8), "pointer", ["pointer", "int", "pointer"]);
+                                                    var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
+                                                    var spF = getSpriteFn(starSpritesF, starIdxF, NULL);
+                                                    if (!spF.isNull()) setSpriteFn(starLevelF, spF, NULL);
+                                                    var starGoF = getGoFn(starLevelF, NULL);
+                                                    if (!starGoF.isNull()) setActiveFn(starGoF, 1, NULL);
+                                                }
+                                                if (!numBoxF.isNull()) {
+                                                    var nbGoF = getGoFn(numBoxF, NULL);
+                                                    if (!nbGoF.isNull()) setActiveFn(nbGoF, 0, NULL);
+                                                }
+                                            }
+                                        }
                                     }
                                 } catch (eStat) {
                                     log("[-] Error enforcing stats/stars in OpenResultLayout: " + eStat.message);
@@ -12530,6 +12623,60 @@ function initIl2Cpp(module) {
                             }
                         }
                     });
+
+                    // CardIntensifyPopup.OnClickOverride (0x138407C) - Smooth Multi-step & Clean Dismiss
+                    try {
+                        Interceptor.replace(baseAddr.add(0x138407C), new NativeCallback(function(thiz, go) {
+                            log("[👉 ON_CLICK_OVERRIDE] CardIntensifyPopup.OnClickOverride intercepted on: " + thiz);
+                            try {
+                                var isNext = (thiz.add(0x168).readU8() !== 0);
+                                if (isNext) {
+                                    log("[👉 ADVANCE TO NEXT] Advancing to next material result via OpenResultLayout...");
+                                    var openResFn = new NativeFunction(baseAddr.add(0x13841D4), "void", ["pointer", "pointer"]);
+                                    openResFn(thiz, NULL);
+                                    return 1;
+                                } else {
+                                    log("[👉 DISMISS / OK] Final result confirmed, closing popup cleanly via Popup.OnOk...");
+                                    var onOkFn = new NativeFunction(baseAddr.add(0x114B6C8), "void", ["pointer", "pointer"]);
+                                    onOkFn(thiz, NULL);
+                                    return 1;
+                                }
+                            } catch (eOco) {
+                                log("[-] Error in OnClickOverride replacement: " + eOco.message);
+                                return 1;
+                            }
+                        }, "bool", ["pointer", "pointer"]));
+                        log("[+] Interceptor.replace installed on CardIntensifyPopup.OnClickOverride (0x138407C)!");
+                    } catch (eOcoErr) {
+                        log("[-] Error replacing CardIntensifyPopup.OnClickOverride: " + eOcoErr.message);
+                    }
+
+                    // Popup.Close (0x114247C) -> Ensure root GameObject of any closed popup is deactivated cleanly
+                    try {
+                        Interceptor.attach(baseAddr.add(0x114247C), {
+                            onEnter: function(args) {
+                                this.pop = args[0];
+                            },
+                            onLeave: function(retval) {
+                                try {
+                                    var pop = this.pop;
+                                    if (pop && !pop.isNull()) {
+                                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                                        var popGo = getGoFn(pop, NULL);
+                                        if (!popGo.isNull()) {
+                                            setActiveFn(popGo, 0, NULL);
+                                            log("[🚪 POPUP CLOSE] Cleanly deactivated popup root gameObject for pop: " + pop);
+                                        }
+                                    }
+                                } catch (eClsPopGo) {}
+                            }
+                        });
+                        log("[+] Interceptor.attach installed on Popup.Close (0x114247C)!");
+                    } catch (ePopCls) {
+                        log("[-] Error attaching Popup.Close: " + ePopCls.message);
+                    }
+
                     // IntensifyAssist.OnResultSucceed (0xF1D078)
                     Interceptor.attach(baseAddr.add(0xF1D078), {
                         onEnter: function(args) {
@@ -12546,6 +12693,17 @@ function initIl2Cpp(module) {
                     Interceptor.attach(baseAddr.add(0xF1D048), {
                         onEnter: function(args) {
                             log("[🏁 INTENSIFY COMPLETE] IntensifyAssist.Complete called with result: " + args[1]);
+                            if (activeCardIntensifyPopup && !activeCardIntensifyPopup.isNull()) {
+                                try {
+                                    var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                    var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                                    var popGo = getGoFn(activeCardIntensifyPopup, NULL);
+                                    if (!popGo.isNull()) {
+                                        setActiveFn(popGo, 0, NULL);
+                                        log("[🚪 INTENSIFY COMPLETE] Cleanly deactivated activeCardIntensifyPopup.gameObject!");
+                                    }
+                                } catch (eClsPop) {}
+                            }
                             activeCardIntensifyPopup = NULL;
                             if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
                                 try {
