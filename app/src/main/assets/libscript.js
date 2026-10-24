@@ -1467,6 +1467,17 @@ function initIl2Cpp(module) {
                             } catch (eParam) {
                                 log("[-] Error injecting Popup.Params: " + eParam.message);
                             }
+                        } else if ((this.pName === "Custom/Popup_Card_Intensify" || this.pName === "Custom/Popup_Card_Intensify_R") && !args[1].isNull()) {
+                            var pParams = args[1];
+                            try {
+                                pParams.add(0x18).writePointer(createIl2CppString("Power Up"));
+                                pParams.add(0x48).writePointer(createIl2CppString("OK"));
+                                pParams.add(0x88).writePointer(createIl2CppString("Power Up"));
+                                pParams.add(0x90).writePointer(createIl2CppString("Next"));
+                                log("[✨ INTENSIFY PARAMS] Injected title='Power Up', okText='OK', nextText='Next', powerupText='Power Up' into CardIntensifyPopup.Params!");
+                            } catch (eIntParam) {
+                                log("[-] Error injecting CardIntensifyPopup.Params: " + eIntParam.message);
+                            }
                         }
                     }
                 });
@@ -10027,7 +10038,17 @@ function initIl2Cpp(module) {
                         0x3029D5B: "Low",
                         0x3029D5C: "Normal",
                         0x3029D5D: "High",
-                        0x3029D5E: "Very High"
+                        0x3029D5E: "Very High",
+                        0x72A2313: "Power Up",
+                        0x72A2314: "Upgrade",
+                        0x72A2315: "Power Up",
+                        0x72A1F29: "Power Up",
+                        0x72A2AE1: "OK",
+                        0x72A2AE2: "Cancel",
+                        0x302A143: "Rating Up",
+                        0x72A2AE4: "Power Up",
+                        0x72A2AE5: "Upgrade",
+                        0x72A2AE3: "Next"
                     };
 
                     Interceptor.attach(baseAddr.add(0xCF1064), {
@@ -10037,6 +10058,8 @@ function initIl2Cpp(module) {
                         onLeave: function (retval) {
                             if (offlineLocaleStrings[this.code32] !== undefined) {
                                 retval.replace(createIl2CppString(offlineLocaleStrings[this.code32]));
+                            } else {
+                                log("[🌐 LOCALE MISS] Code 0x" + this.code32.toString(16).toUpperCase());
                             }
                         }
                     });
