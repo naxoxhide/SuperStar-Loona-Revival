@@ -5187,9 +5187,10 @@ function initIl2Cpp(module) {
                 }
 
                 // Shared helper for CardLargeView visual rendering (photo + grade/tier frame + level badge)
-                function applyCardLargeVisuals(card, cId, gr, isPrism) {
+                function applyCardLargeVisuals(card, cId, gr, isPrism, lvlOpt) {
                     try {
                         if (!card || card.isNull()) return;
+                        var lvl = (lvlOpt !== undefined) ? lvlOpt : 1;
                         var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                         var getTrFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
                         var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
@@ -5257,13 +5258,14 @@ function initIl2Cpp(module) {
                             setPhotoVisFn(card, 1, NULL);
                         }
 
-                        // 5. Tier Frame (card + 0x68) -> load golden R frame
+                        // 5. Tier Frame (card + 0x68) -> load golden R / S / A / B / C frame
                         var tier = card.add(0x68).readPointer();
                         if (!tier.isNull()) {
                             var gLetter = (gr === 4) ? "r" : (gr === 3) ? "s" : (gr === 2) ? "a" : (gr === 1) ? "b" : "c";
-                            var tierRelPath = (gr === 1) ? "0b_l.i.bytes" : ("0_" + gLetter + "_l.i.bytes");
+                            var tierRelPath = (gr === 0) ? "0c_l.i.bytes" : (gr === 1) ? "0b_l.i.bytes" : ("0_" + gLetter + "_l.i.bytes");
                             var tierTex = loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/" + tierRelPath) ||
-                                          loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gLetter + "_l.i.bytes");
+                                          loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gLetter + "_l.i.bytes") ||
+                                          loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/0" + gLetter + "_l.i.bytes");
                             if (tierTex && !tierTex.isNull()) {
                                 setTextureFn(tier, tierTex, NULL);
                                 card.add(0x60).writePointer(tierTex);
@@ -5324,6 +5326,7 @@ function initIl2Cpp(module) {
                                 }
                             }
                             var starLevel = card.add(0x78).readPointer();
+                            var starSprites = card.add(0x70).readPointer();
                             if (!starLevel.isNull()) {
                                 var slGo = getGoFn(starLevel, NULL);
                                 if (!slGo.isNull()) {
@@ -5331,6 +5334,15 @@ function initIl2Cpp(module) {
                                     if (gr < 4) {
                                         var slTr = getTrFn(starLevel, NULL);
                                         if (!slTr.isNull()) setAsLastSiblingFn(slTr, NULL);
+                                        if (!starSprites.isNull()) {
+                                            var starIdx = (gr * 5 + lvl) - 1;
+                                            if (starIdx < 0) starIdx = 0;
+                                            if (starIdx > 24) starIdx = 24;
+                                            var getSpriteFn = new NativeFunction(baseAddr.add(0xD0CAB8), "pointer", ["pointer", "int", "pointer"]);
+                                            var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
+                                            var sp = getSpriteFn(starSprites, starIdx, NULL);
+                                            if (!sp.isNull()) setSpriteFn(starLevel, sp, NULL);
+                                        }
                                     }
                                 }
                             }
@@ -5445,7 +5457,7 @@ function initIl2Cpp(module) {
                                     }
                                 } catch (eNumL) {}
                             }
-                            applyCardLargeVisuals(card, cId, gr, isPrism);
+                            applyCardLargeVisuals(card, cId, gr, isPrism, lvl);
                         }
 
                         // Eliminate black square in selectView
@@ -7658,7 +7670,7 @@ function initIl2Cpp(module) {
                                     try {
                                         var eqCard = equipView.add(0x38).readPointer();
                                         if (!eqCard.isNull()) {
-                                            applyCardLargeVisuals(eqCard, cId, gr, isPrism);
+                                            applyCardLargeVisuals(eqCard, cId, gr, isPrism, lvl);
                                             try {
                                                 var numLevel = eqCard.add(0x80).readPointer();
                                                 if (!numLevel.isNull()) {
@@ -12634,12 +12646,10 @@ function initIl2Cpp(module) {
                                     log("[👉 ADVANCE TO NEXT] Advancing to next material result via OpenResultLayout...");
                                     var openResFn = new NativeFunction(baseAddr.add(0x13841D4), "void", ["pointer", "pointer"]);
                                     openResFn(thiz, NULL);
-                                    return 1;
+                                    return 0; // Return 0 (false) so Popup.OnClick does NOT close popup on Next!
                                 } else {
-                                    log("[👉 DISMISS / OK] Final result confirmed, closing popup cleanly via Popup.OnOk...");
-                                    var onOkFn = new NativeFunction(baseAddr.add(0x114B6C8), "void", ["pointer", "pointer"]);
-                                    onOkFn(thiz, NULL);
-                                    return 1;
+                                    log("[👉 DISMISS / OK] Final result confirmed, closing popup cleanly via Popup.OnClick -> Close...");
+                                    return 1; // Return 1 (true) so Popup.OnClick proceeds to Popup.Close()
                                 }
                             } catch (eOco) {
                                 log("[-] Error in OnClickOverride replacement: " + eOco.message);
@@ -12751,6 +12761,20 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on CommonPopupControl.OpenCardBookGradeupPopup (0xACB070)!");
                 } catch (eCbg) {
                     log("[-] Error replacing OpenCardBookGradeupPopup: " + eCbg.message);
+                }
+
+                // InventoryControl.CheckIntensifyEvent (0xF2C14C) - Safe stub to prevent null reference crash on intensify complete
+                try {
+                    Interceptor.replace(baseAddr.add(0xF2C14C), new NativeCallback(function(cardData, probRatePtr, priceRatePtr, methodInfo) {
+                        try {
+                            if (!probRatePtr.isNull()) probRatePtr.writeDouble(1.0);
+                            if (!priceRatePtr.isNull()) priceRatePtr.writeDouble(1.0);
+                        } catch (eWr) {}
+                        log("[🛡️ INTENSIFY EVENT] CheckIntensifyEvent safely handled offline (rates=1.0)!");
+                    }, "void", ["pointer", "pointer", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryControl.CheckIntensifyEvent (0xF2C14C)!");
+                } catch (eCie) {
+                    log("[-] Error replacing InventoryControl.CheckIntensifyEvent: " + eCie.message);
                 }
 
 
@@ -13152,6 +13176,30 @@ function initIl2Cpp(module) {
                                                 if (!isEqC) {
                                                     targetCardItem = itm;
                                                     log("[🃏 CARD CMD] Found unequipped card in loonaCardItems at index " + lk + " (cardID=" + cid + ", artist=" + aName + ")");
+                                                    break;
+                                                }
+                                                continue;
+                                            }
+                                            if (argLower === "a" || argLower === "rank:a" || argLower === "grade:2") {
+                                                if (!r.isNull() && r.add(0x24).readS32() === 2) {
+                                                    targetCardItem = itm;
+                                                    log("[🃏 CARD CMD] Found Grade 2 (A-Rank) card in loonaCardItems at index " + lk + " (cardID=" + cid + ")");
+                                                    break;
+                                                }
+                                                continue;
+                                            }
+                                            if (argLower === "s" || argLower === "rank:s" || argLower === "grade:3") {
+                                                if (!r.isNull() && r.add(0x24).readS32() === 3) {
+                                                    targetCardItem = itm;
+                                                    log("[🃏 CARD CMD] Found Grade 3 (S-Rank) card in loonaCardItems at index " + lk + " (cardID=" + cid + ")");
+                                                    break;
+                                                }
+                                                continue;
+                                            }
+                                            if (argLower === "c" || argLower === "rank:c" || argLower === "grade:0") {
+                                                if (!r.isNull() && r.add(0x24).readS32() === 0) {
+                                                    targetCardItem = itm;
+                                                    log("[🃏 CARD CMD] Found Grade 0 (C-Rank) card in loonaCardItems at index " + lk + " (cardID=" + cid + ")");
                                                     break;
                                                 }
                                                 continue;

@@ -2607,4 +2607,44 @@ En el motor Dalcomsoft, los atributos, bonificaciones, precios y probabilidades 
    * **Paso 2 (SUCCEED con botón 'OK'):** [screen_step2_succeed.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_step2_succeed.png) (Título `"Power Up"` centrado, carta con destellos y aura de luz radiales, etiqueta violeta `"SUCCEED"`, deltas `+2` Score y `+3` Energy en violeta, botón hexagonal centrado `"OK"`).
    * **Paso 3 (Retorno Limpio a Inventario tras presionar 'OK'):** [screen_step_done_inven.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_step_done_inven.png) (Modal cerrado, pedestales limpios y vacíos, carta YeoJin R59 actualizada, interfaz receptiva).
 
+### 24.13. Batería Completa de Pruebas por Rangos Visuales (C, B, A, S, R) y Estabilización Definitiva de Transición y Cierre de Modal
+
+1. **Diferenciación Visual por Rangos Dalcomsoft:**
+   * **Grados Regulares (C, B, A, S):**
+     - **Marcos Metálicos Oficiales:** Mapeo a texturas binarias en `asiudgasg/asodhsg/aoeiwhslc/uhex/`: Grado C bronce (`0c_l.i.bytes`), Grado B cobre (`0b_l.i.bytes`), Grado A plata/violeta (`0_a_l.i.bytes`), Grado S oro (`0_s_l.i.bytes`).
+     - **Estrellas y Siluetas:** Activación de `starLevel` (`CardLargeView + 0x78`) con cálculo de índice en el atlas `starSprites` (`0x70`): `starIdx = (grade * 5 + level) - 1` (rango 0 a 24).
+     - **Supresión Numérica y de Partículas:** Desactivación explícita de `numberLevel` (`0x80`) y del sistema de partículas/brillo `effect` (`0x88`), garantizando la estética limpia Dalcomsoft.
+   * **Grado Legendario (R):**
+     - **Marco Prismático/Dorado:** Carga de `0_r_l.i.bytes`.
+     - **Nivel Numérico Activo:** Activación de `numberLevel` (`0x80`) llamando a `NumberBox.SetValue` (RVA `0xC10448`) con niveles 1 a 99.
+     - **Estrellas Ocultas y Shimmer Activo:** Ocultación de `starLevel` y activación de partículas resplandecientes `effect` (`0x88`).
+
+2. **Reemplazo Nativo de `CardIntensifyPopup.OnClickOverride` (RVA `0x138407C`):**
+   * **Causa Raíz de Crash SIGSEGV (`fault addr 0xf0000000000008`):** Al pulsar "Next" en el modal nativo, `OnClickOverride` en `0x1384168` llamaba a `materialCardParams(index)` -> `GetLargeCardViewData` -> `0xABE79C`, el cual desreferenciaba `CardSpritesControl.Instance` (`0x3113B18 + 0xB8`). Al ser null en modo offline, se producía un fallo de desreferenciación no capturado que abortaba el proceso de Unity.
+   * **Lógica del Reemplazo Nativo:**
+     - Al presionar **"Next"** (`isNext == true`): Despacha directamente `OpenResultLayout(thiz, NULL)` (RVA `0x13841D4`) y **retorna 0 (`false`)**. El retorno de 0 es crítico: previene que el invocador `Popup.OnClick` (RVA `0x114B7A4`) llame a `Popup.Close()`, permitiendo que el modal permanezca en pantalla mostrando el siguiente resultado de material.
+     - Al presionar **"OK"** (`isNext == false`): **Retorna 1 (`true`)**, permitiendo que `Popup.OnClick` ejecute normalmente la transición de salida hacia `Popup.Close()`.
+
+3. **Safe Stub de `InventoryControl.CheckIntensifyEvent` (RVA `0xF2C14C`):**
+   * **Causa Raíz de Crash al Finalizar Cartas de Grado A:** Al alcanzar el nivel máximo o grado completado (`result == 2`), `<OnIntensifyTry>b__1` (RVA `0xB5B3E8`) ejecuta `InventoryControl.CheckIntensifyEvent` (RVA `0xF2C14C`). Al no existir estructuras de eventos en memoria offline, desreferenciaba punteros nulos generando un `NullReferenceException` fatal.
+   * **Implementación:** `Interceptor.replace` en `0xF2C14C` escribe tasas neutras `1.0` en `probRatePtr` y `priceRatePtr`, permitiendo una salida limpia hacia `InventoryScene.SetStateIntensify` (RVA `0x1056BCC`) sin excepciones.
+
+4. **Desactivación Integral del Modal en `Popup.Close` (RVA `0x114247C`):**
+   * Dalcomsoft nativamente solo desactiva `popupBase` (`0x68`), manteniendo los elementos secundarios de la jerarquía UI en pantalla.
+   * El hook en `Popup.Close` localiza el `GameObject` raíz (`0x1DB6AD4`) y aplica `SetActive(0)` (RVA `0x1DBADF4`), logrando una desaparición instantánea sin congelamientos ni remanentes visuales.
+
+5. **Evidencias Visuales Verificadas en Vivo (`emulator-5554`):**
+   * **Prueba 1: YeoJin Grado R (R50):**
+     - [docs/walkthroughs/media/screen_r50_step1_failed.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_r50_step1_failed.png): Paso 1 FAILED (Etiqueta roja FAILED, shader de líneas diagonales rayadas, botón hexagonal centrado "Next").
+     - [docs/walkthroughs/media/screen_r50_step2_succeed.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_r50_step2_succeed.png): Paso 2 SUCCEED (Etiqueta violeta SUCCEED, destello radial blanco, YeoJin R54 con marco dorado/prismático y partículas activas, deltas violetas `+2` y `+3`, botón hexagonal "OK").
+     - [docs/walkthroughs/media/screen_r50_step3_closed_inven.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_r50_step3_closed_inven.png): Paso 3 Retorno Limpio (Modal completamente cerrado, pedestales limpios con marca de agua translúcida HD `pedestal_watermark.png`, carrusel poblado permanentemente con 44 cartas de LOONA).
+   * **Prueba 2: HeeJin Grado A:**
+     - [docs/walkthroughs/media/screen_a_rank_view.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_a_rank_view.png): Vista de detalle de Grado A (Marco plata/violeta oficial `0_a_l.i.bytes`, 1 estrella `★`, nivel numérico oculto, partículas desactivadas).
+     - [docs/walkthroughs/media/screen_a_rank_step1_failed.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_a_rank_step1_failed.png): Paso 1 FAILED (Marco Grado A con siluetas de estrellas, shader diagonal rayado, botón "Next").
+     - [docs/walkthroughs/media/screen_a_rank_step2_succeed.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_a_rank_step2_succeed.png): Paso 2 SUCCEED (Destello de luz, 2 estrellas `★★`, deltas violetas `+2` y `+3`, botón "OK").
+     - [docs/walkthroughs/media/screen_a_rank_step3_closed_inven.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_a_rank_step3_closed_inven.png): Paso 3 Retorno Limpio (Modal cerrado, HeeJin Grado A con 5 estrellas completas y botón nativo automáticamente transicionado a "Upgrade").
+   * **Prueba 3: Verificación Visual Grados C y S:**
+     - [docs/walkthroughs/media/screen_c_rank_view.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_c_rank_view.png): Vista Grado C (Marco metálico bronce oficial `0c_l.i.bytes`, 1 estrella `★`, nivel numérico oculto, partículas desactivadas).
+     - [docs/walkthroughs/media/screen_s_rank_view.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/screen_s_rank_view.png): Vista Grado S (Marco metálico oro oficial `0_s_l.i.bytes`, 1 estrella dorada `★`, nivel numérico oculto, partículas desactivadas).
+
 
