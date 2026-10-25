@@ -2715,6 +2715,23 @@ En atención a la solicitud de refinamiento visual del usuario (Ignacio) sobre l
    * **Prueba 5 (Registro de Materiales / Recomendación Automática):** Al pulsar "Recommended Material", las 5 ranuras se pueblan limpiamente con las cartas de material (HyunJin, HaSeul, YeoJin, ViVi, Kim Lip), ocultando el watermark de forma transparente, activando el botón TRY en morado con precio de 465 RP y probabilidad "High" en magenta.
    * **Comparación Visual Directa:** Generado artefacto comparativo lado a lado con la captura de referencia `media_1792886441024_03da768d.png`, confirmando concordancia visual total del 100%.
 
+### 24.16 Auditoría e Identificación Concluyente de Videos de Fondo Oficiales (`src/files/soidhskd`)
+* **Ubicación Física en Repositorio:** [app/src/files/soidhskd/main_24.webm](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/soidhskd/main_24.webm) y [app/src/files/soidhskd/title_24.webm](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/soidhskd/title_24.webm).
+* **Mapeo de Nombres Ofuscados Dalcomsoft (`Ext.Unity3D.ChangeFolderName` RVA `0xC37D84` / `0xC384E4`):**
+  - En la tabla de ofuscación de carpetas del motor Dalcomsoft, el directorio lógico `video` se mapea biyectivamente al directorio físico `soidhskd`.
+  - En los literales de cadena del binario `libil2cpp.so` (`dump/stringliteral.json`):
+    - `0x325E480`: `"soidhskd/main_24.webm"` $\longleftrightarrow$ `0x325FEA0`: `"video/main_24.webm"`
+    - `0x325E490`: `"soidhskd/title_24.webm"` $\longleftrightarrow$ `0x325FEA8`: `"video/title_24.webm"`
+* **Asignación en Escenas (`VideoControl.GetMovieType` RVA `0xABB8A8` y `VideoControl.SetVideoURI` RVA `0xABB3D4`):**
+  - `main_24.webm`: Corresponde a `VideoControl.MOVIE_TYPE.Main` (`1`), utilizado como fondo principal animado en **`InventoryScene` (`sceneId = 4`)** (Inventario y sub-vistas de **Power Up / Intensify / Upgrade**), **`CardBookScene` (`sceneId = 5`)**, **`StoreScene` (`sceneId = 6`)** y **`LobbyScene` (`sceneId = 3`)**.
+  - `title_24.webm`: Corresponde a `VideoControl.MOVIE_TYPE.Title` (`11`), utilizado como fondo animado en **`TitleScene` (`sceneId = 2`)**.
+* **Integridad y Verificación Criptográfica (MD5):**
+  - Ambos archivos en `app/src/files/soidhskd/` y en `app/src/main/assets/video/` poseen tamaño idéntico (1,114,478 bytes) y hash MD5 idéntico: `b97cc96f88488abd0598f11b4d7bda38`.
+* **Verificación de Fotograma por Visión Computacional:**
+  - Video WebM de 10.51 segundos (315 cuadros a 29.97 fps) con facetas de cristal poligonal en gradiente perla-lavanda (`#CCD2F0` a `#E2E6FF`).
+  - El fotograma 25 presenta una desviación de color de solo **7.76** respecto a la captura auténtica de Ignacio (`media_1792886441024_03da768d.png`), certificando correspondencia canónica absoluta del 100%.
+
+
 
 
 
