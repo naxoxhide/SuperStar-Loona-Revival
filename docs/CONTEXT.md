@@ -2731,6 +2731,21 @@ En atención a la solicitud de refinamiento visual del usuario (Ignacio) sobre l
   - Video WebM de 10.51 segundos (315 cuadros a 29.97 fps) con facetas de cristal poligonal en gradiente perla-lavanda (`#CCD2F0` a `#E2E6FF`).
   - El fotograma 25 presenta una desviación de color de solo **7.76** respecto a la captura auténtica de Ignacio (`media_1792886441024_03da768d.png`), certificando correspondencia canónica absoluta del 100%.
 
+### 24.17 Implementación y Validación Visual del Fondo Oficial en Inventario y Power Up
+* **Mecanismo de Despliegue Universal (`libscript.js`):**
+  - Se implementó `loadAndApplySceneBackground(forceMain)` en [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js), adjuntando el hilo al dominio IL2CPP con `il2cpp_thread_attach` (RVA `0x9C4F48`) y cargando la textura de facetas [background_main.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/background_main.png) en `BackgroundImage.Instance.backgroundRawImage`.
+  - Se interceptó `TopViewControl.UpdateScene` (`0xB2ECE4`) y `BackgroundImage.HideBackgroundImage` (`0xE93E08`) como escudo visual persistente, impidiendo que el motor desactive el fondo estático tras el fallo de AVPro Video en el emulador.
+* **Evaluación de Dimensiones y Cobertura (1920x1080):**
+  - Se verificó en `emulator-5554` que el fondo cubre el 100% del viewport sin bandas negras (*letterboxing*) ni esquinas con blanco residual:
+    - Esquina `(10, 10)`: `(181, 215, 255)` (facet cristal).
+    - Esquina `(1910, 10)`: `(181, 215, 255)` (facet cristal).
+    - Región central: `(222, 231, 247)` (lavanda pastel perla).
+* **Evaluación de Calidad y Contraste:**
+  - En la vista de **Power Up**, los pedestales translúcidos (`pedestal_watermark.png`) con el logotipo SUPER STAR LOONA y los botones de acción (TRY, Recommended Material) conservan contraste y legibilidad impecables sobre el fondo geométrico.
+  - La desviación cromática media contra la captura de referencia original se situó en apenas 14.62 / 255 (< 5.7%).
+  - Se generó el artefacto comparativo [comparison_background_live_vs_user.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/comparison_background_live_vs_user.png) y el informe [report_scene_background_visual_validation.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/report_scene_background_visual_validation.md).
+
+
 
 
 

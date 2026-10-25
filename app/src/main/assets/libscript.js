@@ -2119,21 +2119,19 @@ function initIl2Cpp(module) {
                     "bg7.i.bytes.png"
                 ];
 
-                function loadAndApplyTitleBackground() {
+                function loadAndApplySceneBackground(forceMain) {
                     try {
-                        if (globalSceneId !== 2 && globalSceneId !== 0) {
-                            return;
+                        var domain = il2cpp_domain_get ? il2cpp_domain_get() : NULL;
+                        if (domain && !domain.isNull() && il2cpp_thread_attach) {
+                            try { il2cpp_thread_attach(domain); } catch (eAtt) {}
                         }
-                        log("[🎨 BACKGROUND] Selecting random official title background from kswoks...");
+                        var isTitle = (!forceMain && (globalSceneId === 2 || globalSceneId === 0));
+                        log("[🎨 BACKGROUND] Loading background for sceneId=" + globalSceneId + " (isTitle=" + isTitle + ")...");
                         var getBgInstancePtr = baseAddr.add(0xE93AAC);
                         var getBgInstanceFn = new NativeFunction(getBgInstancePtr, "pointer", []);
                         var bgInstance = getBgInstanceFn();
                         log("[🎨 BACKGROUND] BackgroundImage.Instance: " + bgInstance);
                         if (!bgInstance || bgInstance.isNull()) {
-                            if (globalSceneId === 2) {
-                                log("[-] BackgroundImage.Instance is null, scheduling retry in 500ms...");
-                                setTimeout(loadAndApplyTitleBackground, 500);
-                            }
                             return;
                         }
 
@@ -2144,11 +2142,21 @@ function initIl2Cpp(module) {
                             return;
                         }
 
-                        // 1. Elegir fondo aleatorio entre los 8 oficiales de kswoks
-                        var randIdx = Math.floor(Math.random() * officialBgFiles.length);
-                        var selectedFileName = officialBgFiles[randIdx];
-                        var primaryPath = "/sdcard/kswoks/" + selectedFileName;
-                        log("[🎲 RANDOM BACKGROUND] Selected index " + randIdx + ": " + selectedFileName);
+                        var primaryPath = "";
+                        var altPath = "";
+                        var selectedFileName = "";
+                        if (isTitle) {
+                            var randIdx = Math.floor(Math.random() * officialBgFiles.length);
+                            selectedFileName = officialBgFiles[randIdx];
+                            primaryPath = "/sdcard/kswoks/" + selectedFileName;
+                            altPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/kswoks/" + selectedFileName;
+                            log("[🎲 RANDOM TITLE BACKGROUND] Selected index " + randIdx + ": " + selectedFileName);
+                        } else {
+                            selectedFileName = "background_main.png";
+                            primaryPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/background_main.png";
+                            altPath = "/sdcard/background_main.png";
+                            log("[💎 SCENE BACKGROUND] Applying official crystal facet background (" + selectedFileName + ")");
+                        }
 
                         var readAllBytesMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllBytes", 1);
                         var pathStr = createIl2CppString(primaryPath);
@@ -2158,7 +2166,6 @@ function initIl2Cpp(module) {
                         exc.writePointer(NULL);
                         var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
                         if (!bytesObj || bytesObj.isNull()) {
-                            var altPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/kswoks/" + selectedFileName;
                             pathStr = createIl2CppString(altPath);
                             args1.writePointer(pathStr);
                             bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
@@ -2228,10 +2235,54 @@ function initIl2Cpp(module) {
                             }
                         } catch (eIntro) {}
 
-                        log("[🎉 BACKGROUND SUCCESS] Official randomized background (" + selectedFileName + ") active!");
+                        log("[🎉 BACKGROUND SUCCESS] Official background (" + selectedFileName + ") active for scene " + globalSceneId + "!");
                     } catch (e) {
-                        log("[-] Error in loadAndApplyTitleBackground: " + e.message);
+                        log("[-] Error in loadAndApplySceneBackground: " + e.message);
                     }
+                }
+
+                var loadAndApplyTitleBackground = function () {
+                    loadAndApplySceneBackground(false);
+                };
+
+                // Hook TopViewControl.UpdateScene (0xB2ECE4) to ensure background is applied on scene switches
+                try {
+                    Interceptor.attach(baseAddr.add(0xB2ECE4), {
+                        onEnter: function (args) {
+                            var scId = args[1].toInt32();
+                            log("[🎨 UPDATE SCENE] TopViewControl.UpdateScene called for sceneId=" + scId);
+                        },
+                        onLeave: function (retval) {
+                            if (globalSceneId === 3 || globalSceneId === 4 || globalSceneId === 5 || globalSceneId === 6 || globalSceneId === 7) {
+                                loadAndApplySceneBackground(true);
+                            }
+                        }
+                    });
+                    log("[+] Hooked TopViewControl.UpdateScene (0xB2ECE4) for seamless background continuity");
+                } catch (eUsc) {
+                    log("[-] Error hooking UpdateScene: " + eUsc.message);
+                }
+
+                // Hook BackgroundImage.HideBackgroundImage (0xE93E08) to shield background from blanking out
+                try {
+                    Interceptor.attach(baseAddr.add(0xE93E08), {
+                        onEnter: function (args) {
+                            if (globalSceneId === 3 || globalSceneId === 4 || globalSceneId === 5 || globalSceneId === 6 || globalSceneId === 7) {
+                                var bgInst = args[0];
+                                if (!bgInst.isNull()) {
+                                    setTimeout(function () {
+                                        try {
+                                            var showBgFn = new NativeFunction(baseAddr.add(0xE93E00), "void", ["pointer"]);
+                                            showBgFn(bgInst);
+                                        } catch (eSh) {}
+                                    }, 50);
+                                }
+                            }
+                        }
+                    });
+                    log("[+] Hooked BackgroundImage.HideBackgroundImage (0xE93E08) as display shield");
+                } catch (eHbg) {
+                    log("[-] Error hooking HideBackgroundImage: " + eHbg.message);
                 }
 
                 var isAtTouchToStart = false;
@@ -13705,7 +13756,30 @@ function initIl2Cpp(module) {
                             } catch (eRel) {
                                 log("[-] Reload error: " + eRel.message);
                             }
-
+                        } else if (cmdRaw === "bg_apply") {
+                            log("[🎨 BG CMD] Manually forcing loadAndApplySceneBackground(true)...");
+                            loadAndApplySceneBackground(true);
+                        } else if (cmdRaw === "bg_diag") {
+                            try {
+                                var getBgInstancePtr = baseAddr.add(0xE93AAC);
+                                var getBgInstanceFn = new NativeFunction(getBgInstancePtr, "pointer", []);
+                                var bgInstance = getBgInstanceFn();
+                                log("[🩺 BG DIAG] BackgroundImage.Instance=" + bgInstance);
+                                if (!bgInstance.isNull()) {
+                                    var rawImage = bgInstance.add(0x38).readPointer();
+                                    var isSetDone = bgInstance.add(0x40).readU8();
+                                    var isValid = bgInstance.add(0x58).readU8();
+                                    log("[🩺 BG DIAG] rawImage=" + rawImage + " isSetDone=" + isSetDone + " isValid=" + isValid);
+                                    if (!rawImage.isNull()) {
+                                        var tex = rawImage.add(0x60).readPointer(); // or texture pointer
+                                        var getTrFn = new NativeFunction(baseAddr.add(0x1DBC744), "pointer", ["pointer", "pointer"]);
+                                        var tr = getTrFn(rawImage, NULL);
+                                        log("[🩺 BG DIAG] rawImage texture=" + tex + " RectTransform=" + tr);
+                                    }
+                                }
+                            } catch (eBgD) {
+                                log("[-] Error in bg_diag: " + eBgD.message);
+                            }
                         } else if (cmdRaw === "equip") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
                                 log("[🗃️ EQUIP CMD] Triggering OnEquip directly!");
