@@ -2226,6 +2226,12 @@ function initIl2Cpp(module) {
                         }
 
                         if (rawImage && !rawImage.isNull()) {
+                            // Ensure rawImage color is white (1, 1, 1, 1)
+                            rawImage.add(0x20).writeFloat(1.0);
+                            rawImage.add(0x24).writeFloat(1.0);
+                            rawImage.add(0x28).writeFloat(1.0);
+                            rawImage.add(0x2C).writeFloat(1.0);
+
                             // 1. Update texture via official RawImage.set_texture
                             if (!cachedRawImageSetTextureFn) {
                                 cachedRawImageSetTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
@@ -2251,11 +2257,16 @@ function initIl2Cpp(module) {
                                     cachedCanvasRendererSetTextureFn = new NativeFunction(baseAddr.add(0x258CAF8), "void", ["pointer", "pointer", "pointer"]);
                                 }
                                 cachedCanvasRendererSetTextureFn(cr, tex, NULL);
+                                var crSetAlphaFn = new NativeFunction(baseAddr.add(0x258CC28), "void", ["pointer", "float", "pointer"]);
+                                crSetAlphaFn(cr, 1.0, NULL);
                             }
 
                             debugFrameCount++;
                             if (debugFrameCount <= 5 || debugFrameCount % 30 === 0) {
                                 log("[🎬 BG FRAME TICK] Applied frame " + frameIdx + " (tex=" + tex + ", cr=" + cr + ") (tick #" + debugFrameCount + ")");
+                            }
+                            if (debugFrameCount % 60 === 0) {
+                                ensureBackgroundHierarchyActive(rawImage, NULL);
                             }
                         }
                     } catch (e) {
@@ -2270,14 +2281,50 @@ function initIl2Cpp(module) {
                         var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
                         var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
 
+                        // Neutralize VideoControl DisplayUGUI and VideoPlayer GameObject
+                        try {
+                            var getVcInstanceFn = new NativeFunction(baseAddr.add(0xABAE34), "pointer", []);
+                            var vc = getVcInstanceFn();
+                            if (vc && !vc.isNull()) {
+                                var hideDispFn = new NativeFunction(baseAddr.add(0xABCE98), "void", ["pointer", "pointer"]);
+                                hideDispFn(vc, NULL);
+                                var display = vc.add(0x28).readPointer();
+                                if (display && !display.isNull()) {
+                                    var dispGo = getGoFn(display, NULL);
+                                    if (dispGo && !dispGo.isNull()) setActiveFn(dispGo, 0, NULL);
+                                }
+                                var targetTr = vc.add(0x38).readPointer();
+                                if (targetTr && !targetTr.isNull()) {
+                                    var tGo = getGoFn(targetTr, NULL);
+                                    if (tGo && !tGo.isNull()) setActiveFn(tGo, 0, NULL);
+                                }
+                            }
+                        } catch (eVcD) {}
+
                         if (bgInstance && !bgInstance.isNull()) {
                             var bgGo = getGoFn(bgInstance, NULL);
                             if (bgGo && !bgGo.isNull()) setActiveFn(bgGo, 1, NULL);
                         }
 
+                        if (!rawImage || rawImage.isNull()) {
+                            var getBgInstancePtr = baseAddr.add(0xE93AAC);
+                            var getBgInstanceFn = new NativeFunction(getBgInstancePtr, "pointer", []);
+                            var bInst = getBgInstanceFn();
+                            if (bInst && !bInst.isNull()) {
+                                rawImage = bInst.add(0x38).readPointer();
+                                var bGo = getGoFn(bInst, NULL);
+                                if (bGo && !bGo.isNull()) setActiveFn(bGo, 1, NULL);
+                            }
+                        }
                         if (!rawImage || rawImage.isNull()) return;
+
                         var rawGo = getGoFn(rawImage, NULL);
                         if (rawGo && !rawGo.isNull()) setActiveFn(rawGo, 1, NULL);
+
+                        rawImage.add(0x20).writeFloat(1.0);
+                        rawImage.add(0x24).writeFloat(1.0);
+                        rawImage.add(0x28).writeFloat(1.0);
+                        rawImage.add(0x2C).writeFloat(1.0);
 
                         var tr = getTransformFn(rawImage, NULL);
                         var maxDepth = 10;
@@ -2394,6 +2441,11 @@ function initIl2Cpp(module) {
                         }
 
                         // 4. RawImage.set_texture(texObj) & CanvasRenderer.SetTexture(cr, texObj)
+                        rawImage.add(0x20).writeFloat(1.0);
+                        rawImage.add(0x24).writeFloat(1.0);
+                        rawImage.add(0x28).writeFloat(1.0);
+                        rawImage.add(0x2C).writeFloat(1.0);
+
                         var setTexturePtr = baseAddr.add(0x194C074);
                         var setTextureFn = new NativeFunction(setTexturePtr, "void", ["pointer", "pointer", "pointer"]);
                         setTextureFn(rawImage, texObj, NULL);
@@ -2408,6 +2460,8 @@ function initIl2Cpp(module) {
                             cachedCanvasRenderer = crInit;
                             var crSetTexFn = new NativeFunction(baseAddr.add(0x258CAF8), "void", ["pointer", "pointer", "pointer"]);
                             crSetTexFn(crInit, texObj, NULL);
+                            var crSetAlphaFn = new NativeFunction(baseAddr.add(0x258CC28), "void", ["pointer", "float", "pointer"]);
+                            crSetAlphaFn(crInit, 1.0, NULL);
                         }
 
                         // 5. Activar GameObject del RawImage
@@ -2479,6 +2533,21 @@ function initIl2Cpp(module) {
                     log("[🛡️ BACKGROUND SHIELD] Successfully patched TopViewControl.UpdateScene bl HideBackgroundImage with NOP!");
                 } catch (eNop) {
                     log("[-] Error patching 0xB2ED70 with NOP: " + eNop.message);
+                }
+
+                // Neutralize VideoControl.Show (0xABBDA8) and VideoControl.ShowDisplay (0xABCEC8) with RET
+                // This permanently prevents AVPro's broken DisplayUGUI quad from rendering solid white over BackgroundImage
+                try {
+                    Memory.protect(baseAddr.add(0xABBDA8), 4, 'rwx');
+                    baseAddr.add(0xABBDA8).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]); // ret
+                    Memory.protect(baseAddr.add(0xABBDA8), 4, 'r-x');
+
+                    Memory.protect(baseAddr.add(0xABCEC8), 4, 'rwx');
+                    baseAddr.add(0xABCEC8).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]); // ret
+                    Memory.protect(baseAddr.add(0xABCEC8), 4, 'r-x');
+                    log("[🛡️ VIDEO SHIELD] Successfully neutralized VideoControl.Show and ShowDisplay with RET!");
+                } catch (eRet) {
+                    log("[-] Error patching VideoControl Show/ShowDisplay with RET: " + eRet.message);
                 }
 
                 var isAtTouchToStart = false;
@@ -14126,6 +14195,79 @@ function initIl2Cpp(module) {
                                 }
                             } catch (eHd) {
                                 log("[-] Error in hide_display: " + eHd.message);
+                            }
+                        } else if (cmdRaw === "inven_dump") {
+                            try {
+                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
+                                var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                                var getActiveFn = new NativeFunction(baseAddr.add(0x1DBAE44), "int", ["pointer", "pointer"]);
+                                var getSiblingIdxFn = new NativeFunction(baseAddr.add(0x181EE00), "int", ["pointer", "pointer"]);
+                                var getChildCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
+                                var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+
+                                log("[🔬 INVEN DUMP] === DIAGNOSTIC START ===");
+                                var getBgInstanceFn = new NativeFunction(baseAddr.add(0xE93AAC), "pointer", []);
+                                var bg = getBgInstanceFn();
+                                if (bg && !bg.isNull()) {
+                                    var rawImage = bg.add(0x38).readPointer();
+                                    var bGo = getGoFn(bg, NULL);
+                                    var rGo = rawImage && !rawImage.isNull() ? getGoFn(rawImage, NULL) : NULL;
+                                    log("[🔬 INVEN DUMP] bg=" + bg + " bGo=" + bGo + " (act=" + (bGo && !bGo.isNull() ? getActiveFn(bGo, NULL) : "null") + ")");
+                                    log("[🔬 INVEN DUMP] rawImage=" + rawImage + " rGo=" + rGo + " (act=" + (rGo && !rGo.isNull() ? getActiveFn(rGo, NULL) : "null") + ")");
+                                    if (rawImage && !rawImage.isNull()) {
+                                        var rTr = getTransformFn(rawImage, NULL);
+                                        var sIdx = rTr && !rTr.isNull() ? getSiblingIdxFn(rTr, NULL) : -1;
+                                        log("[🔬 INVEN DUMP] rawImage siblingIndex=" + sIdx);
+                                        var pTr = rTr;
+                                        var depth = 0;
+                                        while (pTr && !pTr.isNull() && depth++ < 10) {
+                                            var pGo = getGoFn(pTr, NULL);
+                                            var pNm = pGo && !pGo.isNull() ? readIl2CppString(getNameFn(pGo, NULL)) : "null";
+                                            var pAct = pGo && !pGo.isNull() ? getActiveFn(pGo, NULL) : -1;
+                                            var pSib = getSiblingIdxFn(pTr, NULL);
+                                            log("[🔬 INVEN DUMP] parent[" + depth + "]: " + pNm + " (act=" + pAct + ", sib=" + pSib + ")");
+                                            pTr = getParentFn(pTr, NULL);
+                                        }
+                                    }
+                                }
+
+                                var getVcInstanceFn = new NativeFunction(baseAddr.add(0xABAE34), "pointer", []);
+                                var vc = getVcInstanceFn();
+                                if (vc && !vc.isNull()) {
+                                    var display = vc.add(0x28).readPointer();
+                                    var targetTr = vc.add(0x38).readPointer();
+                                    var dGo = display && !display.isNull() ? getGoFn(display, NULL) : NULL;
+                                    var tGo = targetTr && !targetTr.isNull() ? getGoFn(targetTr, NULL) : NULL;
+                                    log("[🔬 INVEN DUMP] VideoControl displayGo=" + dGo + " (act=" + (dGo && !dGo.isNull() ? getActiveFn(dGo, NULL) : "null") + ")");
+                                    log("[🔬 INVEN DUMP] VideoControl targetGo=" + tGo + " (act=" + (tGo && !tGo.isNull() ? getActiveFn(tGo, NULL) : "null") + ")");
+                                }
+
+                                if (curScene && !curScene.isNull() && sceneId === 4) {
+                                    var sView = curScene.add(0x48).readPointer();
+                                    if (sView && !sView.isNull()) {
+                                        var svTr = getTransformFn(sView, NULL);
+                                        log("[🔬 INVEN DUMP] Dumping sceneView hierarchy...");
+                                        function dumpNode(tr, indent, dLimit) {
+                                            if (dLimit <= 0) return;
+                                            var go = getGoFn(tr, NULL);
+                                            var nm = go && !go.isNull() ? readIl2CppString(getNameFn(go, NULL)) : "null";
+                                            var act = go && !go.isNull() ? getActiveFn(go, NULL) : -1;
+                                            var sib = getSiblingIdxFn(tr, NULL);
+                                            log(indent + "- " + nm + " (act=" + act + ", sib=" + sib + ")");
+                                            var cCount = getChildCountFn(tr, NULL);
+                                            for (var c = 0; c < cCount; c++) {
+                                                var cTr = getChildFn(tr, c, NULL);
+                                                if (cTr && !cTr.isNull()) dumpNode(cTr, indent + "  ", dLimit - 1);
+                                            }
+                                        }
+                                        dumpNode(svTr, "  ", 4);
+                                    }
+                                }
+                                log("[🔬 INVEN DUMP] === DIAGNOSTIC END ===");
+                            } catch (eDump) {
+                                log("[-] Error in inven_dump: " + eDump.message);
                             }
                         } else if (cmdRaw === "equip") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
