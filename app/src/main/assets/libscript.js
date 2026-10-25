@@ -2267,7 +2267,7 @@ function initIl2Cpp(module) {
                     try {
                         var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                         var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
-                        var getParentFn = new NativeFunction(baseAddr.add(0x1DBC7E0), "pointer", ["pointer", "pointer"]);
+                        var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
                         var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
 
                         if (bgInstance && !bgInstance.isNull()) {
@@ -2280,7 +2280,8 @@ function initIl2Cpp(module) {
                         if (rawGo && !rawGo.isNull()) setActiveFn(rawGo, 1, NULL);
 
                         var tr = getTransformFn(rawImage, NULL);
-                        while (tr && !tr.isNull()) {
+                        var maxDepth = 10;
+                        while (tr && !tr.isNull() && maxDepth-- > 0) {
                             var pTr = getParentFn(tr, NULL);
                             if (!pTr || pTr.isNull()) break;
                             var pGo = getGoFn(pTr, NULL);
@@ -14022,6 +14023,28 @@ function initIl2Cpp(module) {
                                 }
                             } catch (eBgD) {
                                 log("[-] Error in bg_diag: " + eBgD.message);
+                            }
+                        } else if (cmdRaw === "bg_red") {
+                            try {
+                                var getBgInstancePtr = baseAddr.add(0xE93AAC);
+                                var getBgInstanceFn = new NativeFunction(getBgInstancePtr, "pointer", []);
+                                var bgInstance = getBgInstanceFn();
+                                if (bgInstance && !bgInstance.isNull()) {
+                                    var rawImage = bgInstance.add(0x38).readPointer();
+                                    if (rawImage && !rawImage.isNull()) {
+                                        rawImage.add(0x20).writeFloat(1.0); // R
+                                        rawImage.add(0x24).writeFloat(0.0); // G
+                                        rawImage.add(0x28).writeFloat(0.0); // B
+                                        rawImage.add(0x2C).writeFloat(1.0); // A
+                                        var setVertsDirtyFn = new NativeFunction(baseAddr.add(0x1614F4C), "void", ["pointer", "pointer"]);
+                                        var setMatDirtyFn = new NativeFunction(baseAddr.add(0x1614FE4), "void", ["pointer", "pointer"]);
+                                        setVertsDirtyFn(rawImage, NULL);
+                                        setMatDirtyFn(rawImage, NULL);
+                                        log("[🔴 BG RED] Applied RED color to rawImage!");
+                                    }
+                                }
+                            } catch (eRed) {
+                                log("[-] Error in bg_red: " + eRed.message);
                             }
                         } else if (cmdRaw === "equip") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
