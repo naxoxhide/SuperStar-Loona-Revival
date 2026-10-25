@@ -2171,8 +2171,10 @@ function initIl2Cpp(module) {
 
                             var res = loadImageFn(texObj, bytesObj);
                             if (res === 1) {
+                                var applyFn = new NativeFunction(baseAddr.add(0x181BBAC), "void", ["pointer"]);
+                                applyFn(texObj);
                                 if (il2cpp_gchandle_new) {
-                                    il2cpp_gchandle_new(texObj, 2); // 2 = Pinned handle
+                                    il2cpp_gchandle_new(texObj, 2); // 2 = Normal handle (pinned in Unity GC)
                                 }
                                 bgVideoTextures.push(texObj);
                                 loadedCount++;
@@ -2194,6 +2196,10 @@ function initIl2Cpp(module) {
 
                 var cachedSetVerticesDirtyFn = null;
                 var cachedSetMaterialDirtyFn = null;
+                var cachedCanvasRendererSetTextureFn = null;
+                var cachedGetCanvasRendererFn = null;
+                var cachedRawImageSetTextureFn = null;
+                var cachedCanvasRenderer = NULL;
                 var debugFrameCount = 0;
 
                 function updateBackgroundVideoFrame() {
@@ -2215,28 +2221,76 @@ function initIl2Cpp(module) {
                             if (bgInstance && !bgInstance.isNull()) {
                                 rawImage = bgInstance.add(0x38).readPointer();
                                 cachedRawImage = rawImage;
+                                cachedCanvasRenderer = NULL;
                             }
                         }
 
                         if (rawImage && !rawImage.isNull()) {
-                            // Direct write into RawImage.m_Texture (0xD0) to bypass op_Equality null check
-                            rawImage.add(0xD0).writePointer(tex);
-
-                            if (!cachedSetVerticesDirtyFn) {
-                                var vtable = rawImage.readPointer();
-                                cachedSetVerticesDirtyFn = new NativeFunction(vtable.add(0x2F8).readPointer(), "void", ["pointer", "pointer"]);
-                                cachedSetMaterialDirtyFn = new NativeFunction(vtable.add(0x308).readPointer(), "void", ["pointer", "pointer"]);
+                            // 1. Update texture via official RawImage.set_texture
+                            if (!cachedRawImageSetTextureFn) {
+                                cachedRawImageSetTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
                             }
-                            cachedSetVerticesDirtyFn(rawImage, NULL);
-                            cachedSetMaterialDirtyFn(rawImage, NULL);
+                            cachedRawImageSetTextureFn(rawImage, tex, NULL);
+
+                            // 2. Fetch or retrieve CanvasRenderer
+                            var cr = cachedCanvasRenderer;
+                            if (!cr || cr.isNull()) {
+                                cr = rawImage.add(0x50).readPointer();
+                                if (!cr || cr.isNull()) {
+                                    if (!cachedGetCanvasRendererFn) {
+                                        cachedGetCanvasRendererFn = new NativeFunction(baseAddr.add(0x1615834), "pointer", ["pointer", "pointer"]);
+                                    }
+                                    cr = cachedGetCanvasRendererFn(rawImage, NULL);
+                                }
+                                cachedCanvasRenderer = cr;
+                            }
+
+                            // 3. Immediately update GPU texture binding on CanvasRenderer
+                            if (cr && !cr.isNull()) {
+                                if (!cachedCanvasRendererSetTextureFn) {
+                                    cachedCanvasRendererSetTextureFn = new NativeFunction(baseAddr.add(0x258CAF8), "void", ["pointer", "pointer", "pointer"]);
+                                }
+                                cachedCanvasRendererSetTextureFn(cr, tex, NULL);
+                            }
 
                             debugFrameCount++;
                             if (debugFrameCount <= 5 || debugFrameCount % 30 === 0) {
-                                log("[🎬 BG FRAME TICK] Direct wrote frame " + frameIdx + " (tex=" + tex + ") to rawImage.m_Texture (tick #" + debugFrameCount + ")");
+                                log("[🎬 BG FRAME TICK] Applied frame " + frameIdx + " (tex=" + tex + ", cr=" + cr + ") (tick #" + debugFrameCount + ")");
                             }
                         }
                     } catch (e) {
                         log("[-] Error in updateBackgroundVideoFrame: " + e.message);
+                    }
+                }
+
+                function ensureBackgroundHierarchyActive(rawImage, bgInstance) {
+                    try {
+                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                        var getParentFn = new NativeFunction(baseAddr.add(0x1DBC7E0), "pointer", ["pointer", "pointer"]);
+                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+
+                        if (bgInstance && !bgInstance.isNull()) {
+                            var bgGo = getGoFn(bgInstance, NULL);
+                            if (bgGo && !bgGo.isNull()) setActiveFn(bgGo, 1, NULL);
+                        }
+
+                        if (!rawImage || rawImage.isNull()) return;
+                        var rawGo = getGoFn(rawImage, NULL);
+                        if (rawGo && !rawGo.isNull()) setActiveFn(rawGo, 1, NULL);
+
+                        var tr = getTransformFn(rawImage, NULL);
+                        while (tr && !tr.isNull()) {
+                            var pTr = getParentFn(tr, NULL);
+                            if (!pTr || pTr.isNull()) break;
+                            var pGo = getGoFn(pTr, NULL);
+                            if (pGo && !pGo.isNull()) {
+                                setActiveFn(pGo, 1, NULL);
+                            }
+                            tr = pTr;
+                        }
+                    } catch (eH) {
+                        log("[-] Error in ensureBackgroundHierarchyActive: " + eH.message);
                     }
                 }
 
@@ -2258,11 +2312,14 @@ function initIl2Cpp(module) {
 
                         var rawImage = bgInstance.add(0x38).readPointer();
                         cachedRawImage = rawImage;
+                        cachedCanvasRenderer = NULL;
                         log("[🎨 BACKGROUND] backgroundRawImage (RawImage): " + rawImage);
                         if (!rawImage || rawImage.isNull()) {
                             log("[-] backgroundRawImage is null!");
                             return;
                         }
+
+                        ensureBackgroundHierarchyActive(rawImage, bgInstance);
 
                         var texObj = NULL;
                         var selectedFileName = "";
@@ -2335,10 +2392,22 @@ function initIl2Cpp(module) {
                             return;
                         }
 
-                        // 4. RawImage.set_texture(texObj)
+                        // 4. RawImage.set_texture(texObj) & CanvasRenderer.SetTexture(cr, texObj)
                         var setTexturePtr = baseAddr.add(0x194C074);
                         var setTextureFn = new NativeFunction(setTexturePtr, "void", ["pointer", "pointer", "pointer"]);
                         setTextureFn(rawImage, texObj, NULL);
+                        rawImage.add(0xD0).writePointer(texObj);
+
+                        var crInit = rawImage.add(0x50).readPointer();
+                        if (!crInit || crInit.isNull()) {
+                            var getCrFn = new NativeFunction(baseAddr.add(0x1615834), "pointer", ["pointer", "pointer"]);
+                            crInit = getCrFn(rawImage, NULL);
+                        }
+                        if (crInit && !crInit.isNull()) {
+                            cachedCanvasRenderer = crInit;
+                            var crSetTexFn = new NativeFunction(baseAddr.add(0x258CAF8), "void", ["pointer", "pointer", "pointer"]);
+                            crSetTexFn(crInit, texObj, NULL);
+                        }
 
                         // 5. Activar GameObject del RawImage
                         var getGoPtr = baseAddr.add(0x1DB6AD4);
@@ -2401,26 +2470,14 @@ function initIl2Cpp(module) {
                     log("[-] Error hooking UpdateScene: " + eUsc.message);
                 }
 
-                // Hook BackgroundImage.HideBackgroundImage (0xE93E08) to shield background from blanking out
+                // NOP out the single call to BackgroundImage.HideBackgroundImage at TopViewControl.UpdateScene (0xB2ED70)
                 try {
-                    Interceptor.attach(baseAddr.add(0xE93E08), {
-                        onEnter: function (args) {
-                            if (globalSceneId === 3 || globalSceneId === 4 || globalSceneId === 5 || globalSceneId === 6 || globalSceneId === 7) {
-                                var bgInst = args[0];
-                                if (!bgInst.isNull()) {
-                                    setTimeout(function () {
-                                        try {
-                                            var showBgFn = new NativeFunction(baseAddr.add(0xE93E00), "void", ["pointer"]);
-                                            showBgFn(bgInst);
-                                        } catch (eSh) {}
-                                    }, 50);
-                                }
-                            }
-                        }
-                    });
-                    log("[+] Hooked BackgroundImage.HideBackgroundImage (0xE93E08) as display shield");
-                } catch (eHbg) {
-                    log("[-] Error hooking HideBackgroundImage: " + eHbg.message);
+                    Memory.protect(baseAddr.add(0xB2ED70), 4, 'rwx');
+                    baseAddr.add(0xB2ED70).writeByteArray([0x1f, 0x20, 0x03, 0xd5]); // NOP
+                    Memory.protect(baseAddr.add(0xB2ED70), 4, 'r-x');
+                    log("[🛡️ BACKGROUND SHIELD] Successfully patched TopViewControl.UpdateScene bl HideBackgroundImage with NOP!");
+                } catch (eNop) {
+                    log("[-] Error patching 0xB2ED70 with NOP: " + eNop.message);
                 }
 
                 var isAtTouchToStart = false;
@@ -13941,6 +13998,26 @@ function initIl2Cpp(module) {
                                         var loadImageFn = new NativeFunction(baseAddr.add(0x25B3E90), "int", ["pointer", "pointer"]);
                                         var loadRes = loadImageFn(testObj, bytesObj);
                                         log("[🩺 BG DIAG] After loadImageFn: loadRes=" + loadRes + " m_CachedPtr=" + testObj.add(0x10).readPointer());
+
+                                        var crDirect = rawImage.add(0x50).readPointer();
+                                        log("[🩺 BG DIAG] rawImage.m_CanvasRenderer (0x50)=" + crDirect);
+                                        var getCrFn = new NativeFunction(baseAddr.add(0x1615834), "pointer", ["pointer", "pointer"]);
+                                        var crGetter = getCrFn(rawImage, NULL);
+                                        log("[🩺 BG DIAG] Graphic.get_canvasRenderer()=" + crGetter);
+
+                                        var crToUse = crDirect && !crDirect.isNull() ? crDirect : crGetter;
+                                        if (crToUse && !crToUse.isNull()) {
+                                            var crSetTexFn = new NativeFunction(baseAddr.add(0x258CAF8), "void", ["pointer", "pointer", "pointer"]);
+                                            crSetTexFn(crToUse, testObj, NULL);
+                                            log("[🩺 BG DIAG] CanvasRenderer.SetTexture executed successfully on " + crToUse + " with testObj=" + testObj + "!");
+                                        }
+
+                                        // Ensure and inspect background hierarchy
+                                        ensureBackgroundHierarchyActive(rawImage, bgInstance);
+
+                                        // Force reapply scene background
+                                        loadAndApplySceneBackground(true);
+                                        log("[🩺 BG DIAG] Forced loadAndApplySceneBackground(true)!");
                                     }
                                 }
                             } catch (eBgD) {
