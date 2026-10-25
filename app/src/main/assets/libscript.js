@@ -2199,8 +2199,34 @@ function initIl2Cpp(module) {
                 var cachedCanvasRendererSetTextureFn = null;
                 var cachedGetCanvasRendererFn = null;
                 var cachedRawImageSetTextureFn = null;
+                var cachedForceUpdateCanvasesFn = null;
                 var cachedCanvasRenderer = NULL;
                 var debugFrameCount = 0;
+
+                var v2BufZero = Memory.alloc(8);
+                v2BufZero.writeFloat(0.0);
+                v2BufZero.add(4).writeFloat(0.0);
+                var v2BufOne = Memory.alloc(8);
+                v2BufOne.writeFloat(1.0);
+                v2BufOne.add(4).writeFloat(1.0);
+
+                var cachedSetAnchorMinFn = null;
+                var cachedSetAnchorMaxFn = null;
+                var cachedSetAnchoredPosFn = null;
+                var cachedSetSizeDeltaFn = null;
+
+                function stretchRectTransform(rt) {
+                    if (!rt || rt.isNull()) return;
+                    if (!cachedSetAnchorMinFn) cachedSetAnchorMinFn = new NativeFunction(baseAddr.add(0x180D888), "void", ["pointer", "pointer"]);
+                    if (!cachedSetAnchorMaxFn) cachedSetAnchorMaxFn = new NativeFunction(baseAddr.add(0x180D9D4), "void", ["pointer", "pointer"]);
+                    if (!cachedSetAnchoredPosFn) cachedSetAnchoredPosFn = new NativeFunction(baseAddr.add(0x180DB20), "void", ["pointer", "pointer"]);
+                    if (!cachedSetSizeDeltaFn) cachedSetSizeDeltaFn = new NativeFunction(baseAddr.add(0x180DC6C), "void", ["pointer", "pointer"]);
+
+                    cachedSetAnchorMinFn(rt, v2BufZero);
+                    cachedSetAnchorMaxFn(rt, v2BufOne);
+                    cachedSetAnchoredPosFn(rt, v2BufZero);
+                    cachedSetSizeDeltaFn(rt, v2BufZero);
+                }
 
                 function updateBackgroundVideoFrame() {
                     try {
@@ -2326,7 +2352,9 @@ function initIl2Cpp(module) {
                         rawImage.add(0x28).writeFloat(1.0);
                         rawImage.add(0x2C).writeFloat(1.0);
 
+                        var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
                         var tr = getTransformFn(rawImage, NULL);
+                        stretchRectTransform(tr);
                         var maxDepth = 10;
                         while (tr && !tr.isNull() && maxDepth-- > 0) {
                             var pTr = getParentFn(tr, NULL);
@@ -2334,6 +2362,10 @@ function initIl2Cpp(module) {
                             var pGo = getGoFn(pTr, NULL);
                             if (pGo && !pGo.isNull()) {
                                 setActiveFn(pGo, 1, NULL);
+                                var pName = readIl2CppString(getNameFn(pGo, NULL));
+                                if (pName === "Background" || pName === "Layout") {
+                                    stretchRectTransform(pTr);
+                                }
                             }
                             tr = pTr;
                         }
@@ -14507,6 +14539,16 @@ function initIl2Cpp(module) {
 
                                     var bscRt = getParentFn(layoutRt, NULL);
                                     printRt("BackgroundSystemCanvas", bscRt);
+
+                                    if (curScene && !curScene.isNull() && sceneId === 4) {
+                                        var sView = curScene.add(0x48).readPointer();
+                                        if (sView && !sView.isNull()) {
+                                            var svTr = getTransformFn(sView, NULL);
+                                            var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                                            var cTr = getChildFn(svTr, 0, NULL);
+                                            printRt("Scene Canvas", cTr);
+                                        }
+                                    }
                                 }
                             } catch (eRd) {
                                 log("[-] Error in rect_diag: " + eRd.message);
