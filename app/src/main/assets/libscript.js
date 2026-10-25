@@ -14046,6 +14046,87 @@ function initIl2Cpp(module) {
                             } catch (eRed) {
                                 log("[-] Error in bg_red: " + eRed.message);
                             }
+                        } else if (cmdRaw === "vc_diag") {
+                            try {
+                                var getVcInstancePtr = baseAddr.add(0xABAE34);
+                                var getVcInstanceFn = new NativeFunction(getVcInstancePtr, "pointer", []);
+                                var vc = getVcInstanceFn();
+                                log("[🎬 VC DIAG] VideoControl.Instance=" + vc);
+                                if (vc && !vc.isNull()) {
+                                    var mpArray = vc.add(0x18).readPointer();
+                                    var vp = vc.add(0x20).readPointer();
+                                    var display = vc.add(0x28).readPointer();
+                                    var rtTr = vc.add(0x30).readPointer();
+                                    var targetTr = vc.add(0x38).readPointer();
+                                    var uriDefault = vc.add(0x50).readPointer();
+                                    var fileDefault = vc.add(0x58).readPointer();
+                                    var curOpenData = vc.add(0x68).readPointer();
+                                    var curMediaIdx = vc.add(0x70).readS32();
+                                    var isInit = vc.add(0x78).readU8();
+                                    var focused = vc.add(0x7C).readS32();
+                                    var isSetDone = vc.add(0x80).readU8();
+                                    var isUseManifest = vc.add(0x81).readU8();
+                                    log("[🎬 VC DIAG] mpArray=" + mpArray + " vp=" + vp + " display=" + display);
+                                    log("[🎬 VC DIAG] rtTr=" + rtTr + " targetTr=" + targetTr);
+                                    log("[🎬 VC DIAG] curMediaIdx=" + curMediaIdx + " isInit=" + isInit + " focused=" + focused + " isSetDone=" + isSetDone + " isUseManifest=" + isUseManifest);
+                                    if (uriDefault && !uriDefault.isNull()) log("[🎬 VC DIAG] uriDefault: " + readIl2CppString(uriDefault));
+                                    if (fileDefault && !fileDefault.isNull()) log("[🎬 VC DIAG] fileDefault: " + readIl2CppString(fileDefault));
+                                    if (curOpenData && !curOpenData.isNull()) {
+                                        var uri = curOpenData.add(0x10).readPointer();
+                                        var fn = curOpenData.add(0x18).readPointer();
+                                        log("[🎬 VC DIAG] curOpenData: uri=" + (uri && !uri.isNull() ? readIl2CppString(uri) : "null") + " fn=" + (fn && !fn.isNull() ? readIl2CppString(fn) : "null"));
+                                    }
+                                    if (display && !display.isNull()) {
+                                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                        var getActiveFn = new NativeFunction(baseAddr.add(0x1DBAE44), "int", ["pointer", "pointer"]);
+                                        var dispGo = getGoFn(display, NULL);
+                                        log("[🎬 VC DIAG] display GameObject=" + dispGo + " active=" + (dispGo && !dispGo.isNull() ? getActiveFn(dispGo, NULL) : "null"));
+                                        var dispMp = display.add(0xD0).readPointer();
+                                        var dispDefTex = display.add(0xF8).readPointer();
+                                        var dispLastTex = display.add(0x110).readPointer();
+                                        log("[🎬 VC DIAG] display _mediaPlayer=" + dispMp + " _defaultTexture=" + dispDefTex + " _lastTexture=" + dispLastTex);
+                                    }
+                                    if (mpArray && !mpArray.isNull()) {
+                                        var arrLen = mpArray.add(0x18).readS32();
+                                        log("[🎬 VC DIAG] mpArray length=" + arrLen);
+                                        for (var i = 0; i < arrLen; i++) {
+                                            var mp = mpArray.add(0x20 + i * Process.pointerSize).readPointer();
+                                            if (mp && !mp.isNull()) {
+                                                var vLoc = mp.add(0x18).readS32();
+                                                var vPath = mp.add(0x20).readPointer();
+                                                var vOpened = mp.add(0x124).readU8();
+                                                log("[🎬 VC DIAG] mp[" + i + "]=" + mp + " loc=" + vLoc + " path=" + (vPath && !vPath.isNull() ? readIl2CppString(vPath) : "null") + " opened=" + vOpened);
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (eVcD) {
+                                log("[-] Error in vc_diag: " + eVcD.message);
+                            }
+                        } else if (cmdRaw === "hide_display") {
+                            try {
+                                var getVcInstancePtr = baseAddr.add(0xABAE34);
+                                var getVcInstanceFn = new NativeFunction(getVcInstancePtr, "pointer", []);
+                                var vc = getVcInstanceFn();
+                                if (vc && !vc.isNull()) {
+                                    var hideDispFn = new NativeFunction(baseAddr.add(0xABCE98), "void", ["pointer", "pointer"]);
+                                    hideDispFn(vc, NULL);
+                                    log("[🎬 HIDE_DISPLAY] Successfully invoked VideoControl.HideDisplay() on vc=" + vc + "!");
+
+                                    var targetTr = vc.add(0x38).readPointer();
+                                    if (targetTr && !targetTr.isNull()) {
+                                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                                        var tGo = getGoFn(targetTr, NULL);
+                                        if (tGo && !tGo.isNull()) {
+                                            setActiveFn(tGo, 0, NULL);
+                                            log("[🎬 HIDE_DISPLAY] Deactivated targetRectTransform GameObject=" + tGo + "!");
+                                        }
+                                    }
+                                }
+                            } catch (eHd) {
+                                log("[-] Error in hide_display: " + eHd.message);
+                            }
                         } else if (cmdRaw === "equip") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
                                 log("[🗃️ EQUIP CMD] Triggering OnEquip directly!");
