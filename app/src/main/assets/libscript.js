@@ -2209,11 +2209,15 @@ function initIl2Cpp(module) {
                 var v2BufOne = Memory.alloc(8);
                 v2BufOne.writeFloat(1.0);
                 v2BufOne.add(4).writeFloat(1.0);
+                var v2BufHalf = Memory.alloc(8);
+                v2BufHalf.writeFloat(0.5);
+                v2BufHalf.add(4).writeFloat(0.5);
 
                 var cachedSetAnchorMinFn = null;
                 var cachedSetAnchorMaxFn = null;
                 var cachedSetAnchoredPosFn = null;
                 var cachedSetSizeDeltaFn = null;
+                var cachedSetPivotFn = null;
 
                 function stretchRectTransform(rt) {
                     if (!rt || rt.isNull()) return;
@@ -2226,6 +2230,25 @@ function initIl2Cpp(module) {
                     cachedSetAnchorMaxFn(rt, v2BufOne);
                     cachedSetAnchoredPosFn(rt, v2BufZero);
                     cachedSetSizeDeltaFn(rt, v2BufZero);
+                }
+
+                function setExactCenterRectTransform(rt, w, h) {
+                    if (!rt || rt.isNull()) return;
+                    if (!cachedSetAnchorMinFn) cachedSetAnchorMinFn = new NativeFunction(baseAddr.add(0x180D888), "void", ["pointer", "pointer"]);
+                    if (!cachedSetAnchorMaxFn) cachedSetAnchorMaxFn = new NativeFunction(baseAddr.add(0x180D9D4), "void", ["pointer", "pointer"]);
+                    if (!cachedSetAnchoredPosFn) cachedSetAnchoredPosFn = new NativeFunction(baseAddr.add(0x180DB20), "void", ["pointer", "pointer"]);
+                    if (!cachedSetSizeDeltaFn) cachedSetSizeDeltaFn = new NativeFunction(baseAddr.add(0x180DC6C), "void", ["pointer", "pointer"]);
+                    if (!cachedSetPivotFn) cachedSetPivotFn = new NativeFunction(baseAddr.add(0x180DDB8), "void", ["pointer", "pointer"]);
+
+                    var sizeBuf = Memory.alloc(8);
+                    sizeBuf.writeFloat(w);
+                    sizeBuf.add(4).writeFloat(h);
+
+                    cachedSetAnchorMinFn(rt, v2BufHalf);
+                    cachedSetAnchorMaxFn(rt, v2BufHalf);
+                    cachedSetAnchoredPosFn(rt, v2BufZero);
+                    cachedSetPivotFn(rt, v2BufHalf);
+                    cachedSetSizeDeltaFn(rt, sizeBuf);
                 }
 
                 function updateBackgroundVideoFrame() {
@@ -2354,7 +2377,7 @@ function initIl2Cpp(module) {
 
                         var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
                         var tr = getTransformFn(rawImage, NULL);
-                        stretchRectTransform(tr);
+                        setExactCenterRectTransform(tr, 1138.0, 640.0);
                         var maxDepth = 10;
                         while (tr && !tr.isNull() && maxDepth-- > 0) {
                             var pTr = getParentFn(tr, NULL);
@@ -2363,7 +2386,9 @@ function initIl2Cpp(module) {
                             if (pGo && !pGo.isNull()) {
                                 setActiveFn(pGo, 1, NULL);
                                 var pName = readIl2CppString(getNameFn(pGo, NULL));
-                                if (pName === "Background" || pName === "Layout") {
+                                if (pName === "Background") {
+                                    setExactCenterRectTransform(pTr, 1138.0, 640.0);
+                                } else if (pName === "Layout") {
                                     stretchRectTransform(pTr);
                                 }
                             }
@@ -14540,6 +14565,15 @@ function initIl2Cpp(module) {
                                     var bscRt = getParentFn(layoutRt, NULL);
                                     printRt("BackgroundSystemCanvas", bscRt);
 
+                                    var getCanvasFn = new NativeFunction(baseAddr.add(0x16148BC), "pointer", ["pointer", "pointer"]);
+                                    var cv = getCanvasFn(rawImage, NULL);
+                                    if (cv && !cv.isNull()) {
+                                        var getSortFn = new NativeFunction(baseAddr.add(0x258BC48), "int", ["pointer", "pointer"]);
+                                        var getOverSortFn = new NativeFunction(baseAddr.add(0x258BBB8), "bool", ["pointer", "pointer"]);
+                                        var getRenderModeFn = new NativeFunction(baseAddr.add(0x258B948), "int", ["pointer", "pointer"]);
+                                        log("[🎨 CANVAS] BackgroundSystemCanvas cv=" + cv + " sort=" + getSortFn(cv, NULL) + " overSort=" + getOverSortFn(cv, NULL) + " renderMode=" + getRenderModeFn(cv, NULL));
+                                    }
+
                                     if (curScene && !curScene.isNull() && sceneId === 4) {
                                         var sView = curScene.add(0x48).readPointer();
                                         if (sView && !sView.isNull()) {
@@ -14552,6 +14586,36 @@ function initIl2Cpp(module) {
                                 }
                             } catch (eRd) {
                                 log("[-] Error in rect_diag: " + eRd.message);
+                            }
+                        } else if (cmdRaw === "fix_bg_rect") {
+                            try {
+                                ensureBackgroundHierarchyActive();
+                                log("[📐 FIX_BG_RECT] Called ensureBackgroundHierarchyActive!");
+                            } catch (eFbr) {
+                                log("[-] Error in fix_bg_rect: " + eFbr.message);
+                            }
+                        } else if (cmdRaw.startsWith("set_sort")) {
+                            try {
+                                var parts = cmdRaw.split(" ");
+                                var sVal = parseInt(parts[1] || "0");
+                                var getBgInstanceFn = new NativeFunction(baseAddr.add(0xE93AAC), "pointer", []);
+                                var bg = getBgInstanceFn();
+                                if (bg && !bg.isNull()) {
+                                    var rawImage = bg.add(0x38).readPointer();
+                                    if (rawImage && !rawImage.isNull()) {
+                                        var getCanvasFn = new NativeFunction(baseAddr.add(0x16148BC), "pointer", ["pointer", "pointer"]);
+                                        var cv = getCanvasFn(rawImage, NULL);
+                                        if (cv && !cv.isNull()) {
+                                            var setOverSortFn = new NativeFunction(baseAddr.add(0x258BBF8), "void", ["pointer", "int", "pointer"]);
+                                            var setSortFn = new NativeFunction(baseAddr.add(0x258BC88), "void", ["pointer", "int", "pointer"]);
+                                            setOverSortFn(cv, 1, NULL);
+                                            setSortFn(cv, sVal, NULL);
+                                            log("[🎨 CANVAS] Set BackgroundSystemCanvas sortingOrder to: " + sVal);
+                                        }
+                                    }
+                                }
+                            } catch (eSs) {
+                                log("[-] Error in set_sort: " + eSs.message);
                             }
                         } else if (cmdRaw === "deep_diag") {
                             try {
