@@ -14262,7 +14262,7 @@ function initIl2Cpp(module) {
                                                 if (cTr && !cTr.isNull()) dumpNode(cTr, indent + "  ", dLimit - 1);
                                             }
                                         }
-                                        dumpNode(svTr, "  ", 4);
+                                        dumpNode(svTr, "  ", 8);
                                     }
                                 }
                                 log("[🔬 INVEN DUMP] === DIAGNOSTIC END ===");
@@ -14274,6 +14274,115 @@ function initIl2Cpp(module) {
                                 log("[🗃️ EQUIP CMD] Triggering OnEquip directly!");
                                 var onEquipFn = new NativeFunction(baseAddr.add(0x105AFC8), "void", ["pointer", "pointer"]);
                                 onEquipFn(curScene, NULL);
+                            }
+                        } else if (cmdRaw === "cam_diag") {
+                            try {
+                                var getAllCamsFn = new NativeFunction(baseAddr.add(0x1DB54EC), "pointer", []);
+                                var cams = getAllCamsFn();
+                                if (cams && !cams.isNull()) {
+                                    var len = cams.add(0x18).readS32();
+                                    log("[📷 CAM DIAG] Cameras count: " + len);
+                                    var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                                    var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                    var getClearFlagsFn = new NativeFunction(baseAddr.add(0x1DB4A80), "int", ["pointer", "pointer"]);
+                                    var getDepthFn = new NativeFunction(baseAddr.add(0x1DB4888), "float", ["pointer", "pointer"]);
+                                    for (var i = 0; i < len; i++) {
+                                        var cam = cams.add(0x20 + i * Process.pointerSize).readPointer();
+                                        if (cam && !cam.isNull()) {
+                                            var cGo = getGoFn(cam, NULL);
+                                            var nm = cGo && !cGo.isNull() ? readIl2CppString(getNameFn(cGo, NULL)) : "null";
+                                            var cf = getClearFlagsFn(cam, NULL);
+                                            var d = getDepthFn(cam, NULL);
+                                            log("[📷 CAM DIAG] cam[" + i + "]: " + nm + " clearFlags=" + cf + " depth=" + d);
+                                        }
+                                    }
+                                }
+                            } catch (eCam) {
+                                log("[-] Error in cam_diag: " + eCam.message);
+                            }
+                        } else if (cmdRaw === "test_hide_bg") {
+                            try {
+                                if (curScene && !curScene.isNull() && sceneId === 4) {
+                                    var sView = curScene.add(0x48).readPointer();
+                                    if (sView && !sView.isNull()) {
+                                        var selView = sView.add(0x48).readPointer();
+                                        log("[🧪 TEST_HIDE_BG] selView=" + selView);
+                                        if (selView && !selView.isNull()) {
+                                            var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                            var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                                            var svTr = getTransformFn(selView, NULL);
+                                            var bgTr = getChildFn(svTr, 0, NULL);
+                                            var bgGo = getGoFn(bgTr, NULL);
+                                            log("[🧪 TEST_HIDE_BG] bgTr=" + bgTr + " bgGo=" + bgGo);
+                                            setActiveFn(bgGo, 0, NULL);
+                                            log("[🧪 TEST_HIDE_BG] Deactivated CardSelect -> Bg!");
+                                        }
+                                    }
+                                }
+                            } catch (eHbg) {
+                                log("[-] Error in test_hide_bg: " + eHbg.message);
+                            }
+                        } else if (cmdRaw === "deep_diag") {
+                            try {
+                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                                var getLayerFn = new NativeFunction(baseAddr.add(0x1DBAD64), "int", ["pointer", "pointer"]);
+                                var getAllCamsFn = new NativeFunction(baseAddr.add(0x1DB54EC), "pointer", []);
+                                var getCullingMaskFn = new NativeFunction(baseAddr.add(0x1DB4908), "int", ["pointer", "pointer"]);
+                                var getClearFlagsFn = new NativeFunction(baseAddr.add(0x1DB4A80), "int", ["pointer", "pointer"]);
+                                var getSortFn = new NativeFunction(baseAddr.add(0x258BC48), "int", ["pointer", "pointer"]);
+                                var getRmFn = new NativeFunction(baseAddr.add(0x258B948), "int", ["pointer", "pointer"]);
+                                var getCanvasFn = new NativeFunction(baseAddr.add(0x16148BC), "pointer", ["pointer", "pointer"]);
+
+                                var cams = getAllCamsFn();
+                                if (cams && !cams.isNull()) {
+                                    var len = cams.add(0x18).readS32();
+                                    for (var i = 0; i < len; i++) {
+                                        var c = cams.add(0x20 + i * Process.pointerSize).readPointer();
+                                        if (c && !c.isNull()) {
+                                            var cGo = getGoFn(c, NULL);
+                                            var nm = cGo && !cGo.isNull() ? readIl2CppString(getNameFn(cGo, NULL)) : "null";
+                                            var mask = getCullingMaskFn(c, NULL);
+                                            var cf = getClearFlagsFn(c, NULL);
+                                            log("[🔍 DEEP] Cam: " + nm + " mask=0x" + mask.toString(16) + " clearFlags=" + cf);
+                                        }
+                                    }
+                                }
+
+                                var getBgInstanceFn = new NativeFunction(baseAddr.add(0xE93AAC), "pointer", []);
+                                var bg = getBgInstanceFn();
+                                if (bg && !bg.isNull()) {
+                                    var rawImage = bg.add(0x38).readPointer();
+                                    if (rawImage && !rawImage.isNull()) {
+                                        var rGo = getGoFn(rawImage, NULL);
+                                        var rLayer = rGo && !rGo.isNull() ? getLayerFn(rGo, NULL) : -1;
+                                        var rCv = getCanvasFn(rawImage, NULL);
+                                        var rCvGo = rCv && !rCv.isNull() ? getGoFn(rCv, NULL) : NULL;
+                                        var rCvLayer = rCvGo && !rCvGo.isNull() ? getLayerFn(rCvGo, NULL) : -1;
+                                        var rSort = rCv && !rCv.isNull() ? getSortFn(rCv, NULL) : -999;
+                                        var rRm = rCv && !rCv.isNull() ? getRmFn(rCv, NULL) : -999;
+                                        log("[🔍 DEEP] rawImage layer=" + rLayer + " cv=" + rCv + " cvLayer=" + rCvLayer + " sortOrder=" + rSort + " renderMode=" + rRm);
+                                    }
+                                }
+
+                                if (curScene && !curScene.isNull() && sceneId === 4) {
+                                    var sView = curScene.add(0x48).readPointer();
+                                    if (sView && !sView.isNull()) {
+                                        var svGo = getGoFn(sView, NULL);
+                                        var svLayer = svGo && !svGo.isNull() ? getLayerFn(svGo, NULL) : -1;
+                                        var svTr = getTransformFn(sView, NULL);
+                                        var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                                        var cTr = getChildFn(svTr, 0, NULL);
+                                        var cGo = getGoFn(cTr, NULL);
+                                        var cLayer = cGo && !cGo.isNull() ? getLayerFn(cGo, NULL) : -1;
+                                        log("[🔍 DEEP] sceneView layer=" + svLayer + " CanvasGo=" + cGo + " cLayer=" + cLayer);
+                                    }
+                                }
+                            } catch (eDeep) {
+                                log("[-] Error in deep_diag: " + eDeep.message);
                             }
                         } else if (cmdRaw === "diag_back") {
                             try {
