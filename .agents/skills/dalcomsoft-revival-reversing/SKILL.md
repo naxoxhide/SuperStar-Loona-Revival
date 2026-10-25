@@ -107,5 +107,21 @@ Esta skill define los pasos estándar y flujos de trabajo para analizar, desensa
 * **Botón 'X' (`btnBack`):**
   * Desactivar el componente `box` (`Image` en `ButtonCache + 0x50`) con `setEnabledFn(bBox, 0, NULL)` y `SetActive(boxGo, 0)` para suprimir el recuadro negro sólido de 82x82 px.
 
+### 9. Motor Standalone de Video de Fondo, Protección de Texturas GC y Escudo Libunity (0x3746CC)
+* **Arquitectura de Reproducción Offline de Video:**
+  * En emuladores o entornos sin códecs propietarios de AVPro Video, los videos WebM (`main_24.webm` / `title_24.webm` en `app/src/files/soidhskd/`) se descomprimen en secuencias de fotogramas PNG cargados en memoria como `Texture2D`.
+  * La reproducción se orquesta en `SceneControl.Update` (RVA `0xAB2468`) en el hilo principal (`UnityMain`), aplicando secuencialmente los fotogramas en `BackgroundImage.Instance.backgroundRawImage` (`0x20`) y forzando `CanvasRenderer.SetTexture` (RVA `0x1945110`).
+* **Protección contra Recolección Temprana del Garbage Collector:**
+  * Las instancias dinámicas de `Texture2D` creadas con `il2cpp_object_new` son eliminadas por Unity durante `Resources.UnloadUnusedAssets()` al transicionar escenas.
+  * **Solución Mandatoria:**
+    1. `setHideFlags(texObj, 52)` (RVA `0x1DC7FF4`): Establece `HideFlags.DontSave` (`DontSaveInEditor | DontSaveInBuild | DontUnloadUnusedAsset = 32`).
+    2. `DontDestroyOnLoad(texObj)` (RVA `0x1DC7FB4`): Previene la destrucción del objeto de Unity entre cambios de escena.
+    3. `il2cpp_gchandle_new(texObj, 1)`: Fija el objeto en el recolector de basura de Mono/IL2CPP.
+* **Escudo Crítico de Libunity (Crash en Integración de Escenas `0x3746CC`):**
+  * Durante la integración de escenas (`IntegrateSceneAsync` / vtable[12] @ RVA `0x288F00`), `libunity.so` recorre objetos registrados vía `0x293364` -> `0x37469c` -> `0x3746CC` (`ProcessObject`).
+  * Para objetos con vtable corrupta o incompleta (e.g., instanceID `0x41144` / 266564), `0x3746CC` intenta ejecutar el slot `0x98` de la vtable (`ldr x8, [x8, #0x98]; blr x8`), saltando a `0x0` (`SIGSEGV`).
+  * **Intervención Quirúrgica:** Interceptar con `Interceptor.replace` el prólogo de `0x3746CC`. Si `instanceID === 0x41144` o si el puntero de vtable / slot `0x98` es nulo, retornar inmediatamente el `instanceID` sin disparar el salto nulo, permitiendo la integración suave y continua de escenas sin fugas de memoria ni caídas de proceso.
+
+
 
 

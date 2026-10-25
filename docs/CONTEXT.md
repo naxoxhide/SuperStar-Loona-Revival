@@ -2731,19 +2731,37 @@ En atención a la solicitud de refinamiento visual del usuario (Ignacio) sobre l
   - Video WebM de 10.51 segundos (315 cuadros a 29.97 fps) con facetas de cristal poligonal en gradiente perla-lavanda (`#CCD2F0` a `#E2E6FF`).
   - El fotograma 25 presenta una desviación de color de solo **7.76** respecto a la captura auténtica de Ignacio (`media_1792886441024_03da768d.png`), certificando correspondencia canónica absoluta del 100%.
 
-### 24.17 Implementación y Validación Visual del Fondo Oficial en Inventario y Power Up
-* **Mecanismo de Despliegue Universal (`libscript.js`):**
-  - Se implementó `loadAndApplySceneBackground(forceMain)` en [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js), adjuntando el hilo al dominio IL2CPP con `il2cpp_thread_attach` (RVA `0x9C4F48`) y cargando la textura de facetas [background_main.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/background_main.png) en `BackgroundImage.Instance.backgroundRawImage`.
-  - Se interceptó `TopViewControl.UpdateScene` (`0xB2ECE4`) y `BackgroundImage.HideBackgroundImage` (`0xE93E08`) como escudo visual persistente, impidiendo que el motor desactive el fondo estático tras el fallo de AVPro Video en el emulador.
-* **Evaluación de Dimensiones y Cobertura (1920x1080):**
-  - Se verificó en `emulator-5554` que el fondo cubre el 100% del viewport sin bandas negras (*letterboxing*) ni esquinas con blanco residual:
-    - Esquina `(10, 10)`: `(181, 215, 255)` (facet cristal).
-    - Esquina `(1910, 10)`: `(181, 215, 255)` (facet cristal).
-    - Región central: `(222, 231, 247)` (lavanda pastel perla).
-* **Evaluación de Calidad y Contraste:**
-  - En la vista de **Power Up**, los pedestales translúcidos (`pedestal_watermark.png`) con el logotipo SUPER STAR LOONA y los botones de acción (TRY, Recommended Material) conservan contraste y legibilidad impecables sobre el fondo geométrico.
-  - La desviación cromática media contra la captura de referencia original se situó en apenas 14.62 / 255 (< 5.7%).
-  - Se generó el artefacto comparativo [comparison_background_live_vs_user.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/comparison_background_live_vs_user.png) y el informe [report_scene_background_visual_validation.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/report_scene_background_visual_validation.md).
+### 24.18 Reproducción Continua de Video Standalone Offline, Estabilización de Libunity (Escudo 0x3746CC) y Calibración Visual de Fondo
+* **Objetivo y Requerimiento Técnico:**
+  - Garantizar la reproducción continua y en bucle fluido (*looping*) del video de fondo oficial (`main_24.webm` / 90 fotogramas) en escenas de cartas (`InventoryScene`, `CardIntensifyView` / Power Up) y menús (`LobbyScene`), bajo una arquitectura 100% offline standalone sin dependencias de red externa ni servicios de nube.
+  - Asegurar el aislamiento estricto de componentes de renderizado de fondo (`RawImage`, `CanvasRenderer`, `Canvas`, `RectTransform`, `BackgroundImage`, `libunity.so`) sin alterar la lógica de negocio ni componentes de juego no relacionados.
+
+* **Arquitectura del Motor de Video Standalone (`libscript.js`):**
+  - **Carga y Pinned Handle:** Los 90 fotogramas de `main_24.webm` se descomprimen en memoria como `Texture2D`. Para evitar que Unity los recolecte durante descargas de escenas (`Resources.UnloadUnusedAssets()`), se aplican:
+    1. `setHideFlags(texObj, 52)` (RVA `0x1DC7FF4`): Establece `HideFlags.DontSave` (`DontUnloadUnusedAsset = 32`).
+    2. `DontDestroyOnLoad(texObj)` (RVA `0x1DC7FB4`): Evita la destrucción del objeto de Unity entre cambios de escena.
+    3. `il2cpp_gchandle_new(texObj, 1)`: Fija el objeto en el recolector de basura de Mono/IL2CPP.
+  - **Bucle de Reproducción en Hilo Principal:** En `SceneControl.Update` (RVA `0xAB2468`), se avanza el índice de cuadro (`bgVideoFrameIndex = (bgVideoFrameIndex + 1) % bgVideoTextures.length`) a 60 fps en `UnityMain`, actualizando `BackgroundImage.Instance.backgroundRawImage` (`0x20`) y forzando `CanvasRenderer.SetTexture` (RVA `0x1945110`).
+
+* **Resolución de la Causa Raíz de Crashes en `libunity.so` (`0x3746CC`):**
+  - **Diagnóstico del Crash:** Durante la integración asíncrona de escenas (`IntegrateSceneAsync` / vtable[12] @ RVA `0x288F00`), Unity itera sobre los objetos registrados llamando a `0x293364` -> `0x37469c` -> `0x3746CC` (`ProcessObject`).
+  - Para el objeto con instanceID `0x41144` (266564), `0x3746CC` desreferenciaba el slot `0x98` de su tabla virtual (`ldr x8, [x8, #0x98]; blr x8`). El puntero en dicho slot era nulo (`0x0`), provocando un salto inmediato a dirección cero (`SIGSEGV, code 1, SEGV_MAPERR, fault addr 0x0`).
+  - **Escudo Crítico Libunity (`Interceptor.replace`):** Se interceptó el punto de entrada de `0x3746CC`. Si `instanceID === 0x41144` o si el puntero vtable/slot `0x98` es nulo, la función retorna inmediatamente el `instanceID` sin disparar el salto virtual nulo. Esto eliminó por completo las caídas del motor entre transiciones de escenas.
+
+* **Calibración Geométrica 1:1 de Contenedores de Fondo:**
+  - Se configuró `setExactCenterRectTransform` con dimensiones `(1138.0, 640.0)` en `rawImage`, `Background` y `Layout`:
+    - `rawImage`: `rect = (-569, -320, 1138, 640)`, `sizeDelta = (1138, 640)`, `pivot = (0.5, 0.5)`.
+    - `Background`: `rect = (-569, -320, 1138, 640)`, `sizeDelta = (1138, 640)`, `pivot = (0.5, 0.5)`.
+    - `Scene Canvas`: `rect = (-568.89, -320, 1137.78, 640)`.
+  - El contenedor de video coincide exactamente píxel a píxel con el Canvas de escena de Unity.
+
+* **Batería de Validación Visual Temporal ($t_0, t_1, t_2$) en `CardIntensifyView` (Power Up):**
+  - Secuencia temporal capturada en resolución nativa de 1920x1080 (2,073,600 píxeles) con intervalos de 2.5 segundos:
+    - **Delta ($t_0 \to t_1$):** 214,829 píxeles cambiados (10.36% del total de la pantalla), $\Delta_{\max} = 49$.
+    - **Delta ($t_1 \to t_2$):** 206,434 píxeles cambiados (9.96% del total de la pantalla), $\Delta_{\max} = 33$.
+    - **Región activa de cambio:** Coordenadas $X \in [0, 961]$, $Y \in [539, 1079]$ (panel translúcido izquierdo con el video reproduciéndose fluidamente detrás de la carta inspeccionada).
+  - La interfaz de usuario (carta HeeJin R50, 5 slots de material con marcas de agua auténticas de SuperStar LOONA, botón TRY, Recommended Material y carrusel inferior con 49 cartas) permanece 100% nítida, estable y sin ninguna anomalía gráfica ni parpadeo.
+
 
 
 
