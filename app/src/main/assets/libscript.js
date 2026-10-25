@@ -2175,8 +2175,14 @@ function initIl2Cpp(module) {
                             if (res === 1) {
                                 var applyFn = new NativeFunction(baseAddr.add(0x181BBAC), "void", ["pointer"]);
                                 applyFn(texObj);
+                                try {
+                                    var dontDestroyOnLoadFn = new NativeFunction(baseAddr.add(0x1DC7FB4), "void", ["pointer"]);
+                                    var setHideFlagsFn = new NativeFunction(baseAddr.add(0x1DC7FF4), "void", ["pointer", "int"]);
+                                    setHideFlagsFn(texObj, 52);
+                                    dontDestroyOnLoadFn(texObj);
+                                } catch (eDh) {}
                                 if (il2cpp_gchandle_new) {
-                                    il2cpp_gchandle_new(texObj, 2); // 2 = Normal handle (pinned in Unity GC)
+                                    il2cpp_gchandle_new(texObj, 1);
                                 }
                                 bgVideoTextures.push(texObj);
                                 loadedCount++;
@@ -2376,6 +2382,12 @@ function initIl2Cpp(module) {
                         rawImage.add(0x28).writeFloat(1.0);
                         rawImage.add(0x2C).writeFloat(1.0);
 
+                        // Ensure UV rect spans full 0..1
+                        rawImage.add(0xD8).writeFloat(0.0);
+                        rawImage.add(0xDC).writeFloat(0.0);
+                        rawImage.add(0xE0).writeFloat(1.0);
+                        rawImage.add(0xE4).writeFloat(1.0);
+
                         var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
                         var tr = getTransformFn(rawImage, NULL);
                         setExactCenterRectTransform(tr, 1138.0, 640.0);
@@ -2387,10 +2399,8 @@ function initIl2Cpp(module) {
                             if (pGo && !pGo.isNull()) {
                                 setActiveFn(pGo, 1, NULL);
                                 var pName = readIl2CppString(getNameFn(pGo, NULL));
-                                if (pName === "Background") {
+                                if (pName === "Background" || pName === "Layout") {
                                     setExactCenterRectTransform(pTr, 1138.0, 640.0);
-                                } else if (pName === "Layout") {
-                                    stretchRectTransform(pTr);
                                 }
                             }
                             tr = pTr;
@@ -2460,6 +2470,13 @@ function initIl2Cpp(module) {
                                 var loadImagePtr = baseAddr.add(0x25B3E90);
                                 var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
                                 loadImageFn(texObj, bytesObj);
+                                try {
+                                    var dontDestroyOnLoadFn = new NativeFunction(baseAddr.add(0x1DC7FB4), "void", ["pointer"]);
+                                    var setHideFlagsFn = new NativeFunction(baseAddr.add(0x1DC7FF4), "void", ["pointer", "int"]);
+                                    setHideFlagsFn(texObj, 52);
+                                    dontDestroyOnLoadFn(texObj);
+                                } catch (eDh) {}
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(texObj, 1);
                             }
                         } else {
                             // Active card or menu scene: activate authentic video playback
@@ -13864,6 +13881,19 @@ function initIl2Cpp(module) {
                                                 var sP = dPos(sch, NULL);
                                                 var sSz = dSize(sch, NULL);
                                                 log("[🔍 DIAG_UI]   sub[" + si + "] " + sName + " pos=[" + sP.map(function(v){return v.toFixed(0);}).join(",") + "] size=[" + sSz.map(function(v){return v.toFixed(0);}).join(",") + "]");
+                                                // Scan sub-sub level
+                                                var sub2Count = dChildCount(sch, NULL);
+                                                for (var s2i = 0; s2i < sub2Count; s2i++) {
+                                                    var s2ch = dGetChild(sch, s2i, NULL);
+                                                    if (s2ch.isNull()) continue;
+                                                    var s2Go = dGo(s2ch, NULL);
+                                                    if (dActHier(s2Go, NULL)) {
+                                                        var s2Name = readName(s2Go);
+                                                        var s2P = dPos(s2ch, NULL);
+                                                        var s2Sz = dSize(s2ch, NULL);
+                                                        log("[🔍 DIAG_UI]     sub2[" + s2i + "] " + s2Name + " pos=[" + s2P.map(function(v){return v.toFixed(0);}).join(",") + "] size=[" + s2Sz.map(function(v){return v.toFixed(0);}).join(",") + "]");
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -14615,6 +14645,35 @@ function initIl2Cpp(module) {
                             } catch (eSs) {
                                 log("[-] Error in set_sort: " + eSs.message);
                             }
+                        } else if (cmdRaw === "cam_diag") {
+                            try {
+                                var getAllCamerasFn = new NativeFunction(baseAddr.add(0x1DB54EC), "pointer", []);
+                                var camArray = getAllCamerasFn();
+                                if (!camArray.isNull()) {
+                                    var camCount = camArray.add(Process.pointerSize * 3).readInt();
+                                    log("[📷 CAM_DIAG] Total active cameras: " + camCount);
+                                    var getClearFlagsFn = new NativeFunction(baseAddr.add(0x1DB4A80), "int", ["pointer"]);
+                                    var getDepthFn = new NativeFunction(baseAddr.add(0x1DB4D68), "float", ["pointer"]);
+                                    var getCullFn = new NativeFunction(baseAddr.add(0x1DB4D18), "int", ["pointer"]);
+                                    var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                                    var getRectInjFn = new NativeFunction(baseAddr.add(0x1DB4B68), "void", ["pointer", "pointer"]);
+                                    var rBuf = Memory.alloc(16);
+                                    for (var ci = 0; ci < camCount; ci++) {
+                                        var cam = camArray.add(Process.pointerSize * 4 + ci * Process.pointerSize).readPointer();
+                                        if (!cam.isNull()) {
+                                            var cName = readIl2CppString(getNameFn(cam, NULL));
+                                            var cflags = getClearFlagsFn(cam);
+                                            var cdepth = getDepthFn(cam);
+                                            var ccull = getCullFn(cam);
+                                            getRectInjFn(cam, rBuf);
+                                            var rx = rBuf.readFloat(), ry = rBuf.add(4).readFloat(), rw = rBuf.add(8).readFloat(), rh = rBuf.add(12).readFloat();
+                                            log("[📷 CAM_DIAG] Cam " + ci + ": '" + cName + "' depth=" + cdepth + " clear=" + cflags + " cull=0x" + ccull.toString(16) + " rect=(" + rx + "," + ry + "," + rw + "," + rh + ")");
+                                        }
+                                    }
+                                }
+                            } catch (eCam) {
+                                log("[-] Error in cam_diag: " + eCam.message);
+                            }
                         } else if (cmdRaw === "deep_diag") {
                             try {
                                 var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
@@ -15181,6 +15240,43 @@ function initIl2Cpp(module) {
                                 log("[⚙️ UNITY INTEGRATE] 0x288F00 (vtable[12]) COMPLETED! Retval: " + retval);
                             }
                         });
+
+                        // 🛡️ LIBUNITY CRASH SHIELD: Defend against corrupted/null vtable slot 0x98 during scene integration
+                        try {
+                            var idBuf = Memory.alloc(4);
+                            var findObjFn = new NativeFunction(unityMod.base.add(0xDB7E4), "pointer", ["pointer"]);
+                            var orig_3746cc = new NativeFunction(unityMod.base.add(0x3746CC), "int", ["pointer", "int", "int"]);
+
+                            Interceptor.replace(unityMod.base.add(0x3746CC), new NativeCallback(function (typeInfo, instanceID, flags) {
+                                if (instanceID === 0x41144) {
+                                    log("[🛡️ LIBUNITY SHIELD] Defended against known crash object: instanceID=0x41144 (266564)");
+                                    return instanceID;
+                                }
+                                try {
+                                    idBuf.writeS32(instanceID);
+                                    var obj = findObjFn(idBuf);
+                                    if (!obj.isNull()) {
+                                        var vt = obj.readPointer();
+                                        if (vt.isNull()) {
+                                            log("[🛡️ LIBUNITY SHIELD] Bypassed null vtable on instanceID=" + instanceID);
+                                            return instanceID;
+                                        }
+                                        var fn = vt.add(0x98).readPointer();
+                                        if (fn.isNull()) {
+                                            log("[🛡️ LIBUNITY SHIELD] Bypassed null vtable slot 0x98 on instanceID=" + instanceID);
+                                            return instanceID;
+                                        }
+                                    }
+                                } catch (eChk) {
+                                    log("[🛡️ LIBUNITY SHIELD] Exception checking instanceID=" + instanceID + ": " + eChk.message);
+                                    return instanceID;
+                                }
+                                return orig_3746cc(typeInfo, instanceID, flags);
+                            }, "int", ["pointer", "int", "int"]));
+                            log("[+] Libunity Crash Shield successfully installed at 0x3746CC!");
+                        } catch (eShield) {
+                            log("[-] Error installing Libunity Crash Shield: " + eShield.message);
+                        }
                     }
                 } catch (e) {
                     log("[-] Error installing Unity hooks: " + e.message);
