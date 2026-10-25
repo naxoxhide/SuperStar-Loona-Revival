@@ -7060,6 +7060,15 @@ function initIl2Cpp(module) {
                                     var eGo = getGameObjectFn(emptyImg, NULL);
                                     if (!eGo.isNull()) setActiveFn(eGo, 1, NULL);
                                     setEnabledFn(emptyImg, 1, NULL);
+                                    // Calibrate emptyImg RectTransform to cover full slot (100x180 at pos 0,0)
+                                    try {
+                                        var eRect = getRectTrFn(emptyImg, NULL);
+                                        if (!eRect.isNull()) {
+                                            setSizeDeltaFn(eRect, 100.0, 180.0, NULL);
+                                            var setAnchoredPosFn = new NativeFunction(baseAddr.add(0x180DACC), "void", ["pointer", "float", "float", "pointer"]);
+                                            setAnchoredPosFn(eRect, 0.0, 0.0, NULL);
+                                        }
+                                    } catch (eERect) {}
                                     // Official SUPER STAR LOONA watermark texture styling
                                     try {
                                         var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
@@ -7084,7 +7093,7 @@ function initIl2Cpp(module) {
                                     }
                                 }
                                 if (!enabledGo.isNull()) {
-                                    setActiveFn(enabledGo, isSlotAvail ? 1 : 0, NULL);
+                                    setActiveFn(enabledGo, 0, NULL);
                                 }
                                 if (!cardSmall.isNull()) {
                                     var csGo = getGameObjectFn(cardSmall, NULL);

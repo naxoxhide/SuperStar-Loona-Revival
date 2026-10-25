@@ -2680,5 +2680,41 @@ En respuesta a la revisión visual del usuario (Ignacio), se identificaron y sol
    * **Caso 4 (Grado C):** Verificación de carta base grado C nivel 1, estética UI 100% idéntica y limpia.
    * **Caso 5 (Recomendación & Deselección Dinámica):** Registro automático de 5 cartas de material mediante `recommend` (`totalPrice = 83,220 RP`, probabilidad `4.9% (Low)`), botón `"TRY"` transicionado a estado activo con tipografía limpia y recuadro de precio formateado.
 
+### 24.15 Implementación Oficial del Watermark en Material Card (SUPER STAR LOONA + Plus) y Verificación Visual Multi-Rango
+
+En atención a la solicitud de refinamiento visual del usuario (Ignacio) sobre la sección de cartas de material vacías en la vista de Power Up / Level Up (`InvenCardIntensifyView`), se realizó una investigación en profundidad y se implementó la solución con fidelidad del 100%:
+
+1. **Investigación de Assets y Arquitectura del Motor Dalcom:**
+   * **¿Invoca la función de UI alguna imagen desde `src/files`?**
+     - **No.** Se inspeccionaron exhaustivamente los 11,927 archivos `.png` y los índices `url.json`, `url2.json` y `url_shared_map.json` en `app/src/files`. No existen imágenes sueltas para el watermark de los pedestales en dicha carpeta.
+     - **Descubrimiento de Assets Nativos en Unity:** Los elementos gráficos oficiales están empaquetados directamente en el bundle binario interno de Unity [app/src/main/assets/bin/Data/sharedassets5.assets](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/bin/Data/sharedassets5.assets):
+       - `material_empty` (Texture2D / Sprite, 98×136 px, path_id 10 / 22): Logotipo oficial completo **SUPER STAR LOONA** con tipografía biselada y estilizada.
+       - `material_tier` (Texture2D / Sprite, 96×134 px, path_id 12 / 24): Marco / borde redondeado de la carta pedestal.
+       - `material_plus` (Texture2D / Sprite, 32×32 px, path_id 3 / 15): Glifo blanco de la cruz `+`.
+       - `material_empty_effect` (Texture2D / Sprite, 88×89 px, path_id 11 / 23): Efecto de resplandor.
+   * **Causa de la Falta de Gráfico Previa:**
+     - En `safeRefreshIntensifyView`, el sprite `pedestal_watermark.png` generado anteriormente era un rectángulo redondeado liso sin los emblemas oficiales. Además, el `RectTransform` de `emptyImg` (`0x38`) mantenía tamaño nativo de 98×136 centrado en `y = 36`, desalineado respecto al contenedor total del slot de 100×180.
+
+2. **Ingeniería del Asset Maestro Auténtico (`pedestal_watermark.png`):**
+   * Se diseñó el asset compuesto de alta resolución (200×360 px, proporción exacta 100:180):
+     - **Relleno y Borde:** Relleno de carta en tono lavanda suave (`#E4E8FA`, alfa 0.92) que garantiza visibilidad y contraste perfecto sobre cualquier fondo de diálogo, delimitado por un borde blanco nítido (`#FFFFFF`) de 3 px con radio de 16 px.
+     - **Logotipo SUPER STAR LOONA:** Extraído de `material_empty` nativo, escalado a 160 px de ancho (80.2% del ancho del slot) y posicionado a 41 px desde la parte superior (11.4% de altura).
+     - **Glifo Cruz (`+`):** Glifo blanco en negrita (`#FFFFFF`) con barras de 60 px de envergadura y 12 px de grosor, centrado con precisión matemática a 255 px desde la parte superior (70.8% de altura).
+   * Almacenado en [app/src/files/asiudgasg/pedestal_watermark.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/pedestal_watermark.png) y sincronizado con `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/pedestal_watermark.png`.
+
+3. **Calibración Quirúrgica en `libscript.js`:**
+   * En `safeRefreshIntensifyView`, se calibra dinámicamente el `RectTransform` de `emptyImg` mediante `setSizeDeltaFn(eRect, 100.0, 180.0, NULL)` (RVA `0x180DC18`) y `setAnchoredPosFn(eRect, 0.0, 0.0, NULL)` (RVA `0x180DACC`), ocupando exactamente el slot completo de la ranura.
+   * Se fuerza `setActiveFn(enabledGo, 0, NULL)` para evitar que el componente hijo nativo `Plus` dibuje una segunda cruz desplazada.
+   * Se preserva íntegramente la lógica existente (TRY, TRY EVENT desactivado, Recommended Material, probabilidades, precios RP y Level/Grade up).
+
+4. **Batería de Pruebas Visuales Multi-Rango y Validación de Calidad (`emulator-5554`):**
+   * **Prueba 1 (Rango R - HeeJin R50):** Los 5 pedestales despliegan el logotipo oficial SUPER STAR LOONA y la cruz `+` con fidelidad idéntica a la captura de Ignacio. Botón TRY en 0 RP y Recommended Material limpios.
+   * **Prueba 2 (Rango S - HeeJin S1):** Los 5 pedestales despliegan el watermark auténtico de forma homogénea e instantánea.
+   * **Prueba 3 (Rango A - HeeJin A1):** Transición nativa verificada, 5 pedestales con la marca de agua completa.
+   * **Prueba 4 (Rango C - HeeJin C1):** Verificación con carta base grado C nivel 1; los 5 pedestales presentan la estética visual completa sin anomalías.
+   * **Prueba 5 (Registro de Materiales / Recomendación Automática):** Al pulsar "Recommended Material", las 5 ranuras se pueblan limpiamente con las cartas de material (HyunJin, HaSeul, YeoJin, ViVi, Kim Lip), ocultando el watermark de forma transparente, activando el botón TRY en morado con precio de 465 RP y probabilidad "High" en magenta.
+   * **Comparación Visual Directa:** Generado artefacto comparativo lado a lado con la captura de referencia `media_1792886441024_03da768d.png`, confirmando concordancia visual total del 100%.
+
+
 
 
