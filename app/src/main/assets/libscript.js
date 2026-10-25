@@ -2119,6 +2119,127 @@ function initIl2Cpp(module) {
                     "bg7.i.bytes.png"
                 ];
 
+                // =========================================================================
+                // 🎬 Background Video Reproduction Engine (main_24.webm authentic loop)
+                // =========================================================================
+                var bgVideoTextures = [];
+                var bgVideoLoaded = false;
+                var bgVideoLoading = false;
+                var bgVideoActive = false;
+                var lastBgVideoFrameIdx = -1;
+                var BG_VIDEO_TOTAL_FRAMES = 90;
+                var BG_VIDEO_LOOP_DURATION_MS = 10510; // 10.51s authentic loop period of main_24.webm
+                var BG_VIDEO_FRAME_INTERVAL_MS = BG_VIDEO_LOOP_DURATION_MS / BG_VIDEO_TOTAL_FRAMES; // ~116.77ms per frame (8.56 fps)
+                var cachedRawImage = NULL;
+
+                function initBackgroundVideoPlayer() {
+                    if (bgVideoLoaded || bgVideoLoading) return;
+                    bgVideoLoading = true;
+                    try {
+                        var domain = il2cpp_domain_get ? il2cpp_domain_get() : NULL;
+                        if (domain && !domain.isNull() && il2cpp_thread_attach) {
+                            try { il2cpp_thread_attach(domain); } catch (eAtt) {}
+                        }
+
+                        var readAllBytesMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllBytes", 1);
+                        var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
+                        var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
+                        var loadImageFn = new NativeFunction(baseAddr.add(0x25B3E90), "int", ["pointer", "pointer"]);
+
+                        var exc = Memory.alloc(Process.pointerSize);
+                        var args1 = Memory.alloc(Process.pointerSize);
+
+                        log("[🎬 BG VIDEO PLAYER] Preloading " + BG_VIDEO_TOTAL_FRAMES + " video frames from storage...");
+                        var loadedCount = 0;
+                        var basePath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/bg_video/frame_";
+
+                        for (var i = 0; i < BG_VIDEO_TOTAL_FRAMES; i++) {
+                            var numStr = i < 10 ? ("00" + i) : (i < 100 ? ("0" + i) : ("" + i));
+                            var filePath = basePath + numStr + ".jpg";
+                            var pathStr = createIl2CppString(filePath);
+                            args1.writePointer(pathStr);
+                            exc.writePointer(NULL);
+
+                            var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
+                            if (!bytesObj || bytesObj.isNull()) {
+                                log("[-] Failed to read frame: " + filePath);
+                                continue;
+                            }
+
+                            var texObj = il2cpp_object_new(tex2dClass);
+                            texCtorFn(texObj, 2, 2, NULL);
+
+                            var res = loadImageFn(texObj, bytesObj);
+                            if (res === 1) {
+                                if (il2cpp_gchandle_new) {
+                                    il2cpp_gchandle_new(texObj, 2); // 2 = Pinned handle
+                                }
+                                bgVideoTextures.push(texObj);
+                                loadedCount++;
+                            }
+                        }
+
+                        if (loadedCount > 0) {
+                            bgVideoLoaded = true;
+                            log("[🎉 BG VIDEO PLAYER] Successfully loaded and pinned " + loadedCount + " frames in Unity memory!");
+                        } else {
+                            log("[-] Failed to load any background video frames.");
+                        }
+                    } catch (e) {
+                        log("[-] Error in initBackgroundVideoPlayer: " + e.message);
+                    } finally {
+                        bgVideoLoading = false;
+                    }
+                }
+
+                var cachedSetVerticesDirtyFn = null;
+                var cachedSetMaterialDirtyFn = null;
+                var debugFrameCount = 0;
+
+                function updateBackgroundVideoFrame() {
+                    try {
+                        if (!bgVideoActive || !bgVideoLoaded || bgVideoTextures.length === 0) return;
+                        var now = Date.now();
+                        var frameIdx = Math.floor((now % BG_VIDEO_LOOP_DURATION_MS) / BG_VIDEO_FRAME_INTERVAL_MS);
+                        if (frameIdx === lastBgVideoFrameIdx) return;
+                        lastBgVideoFrameIdx = frameIdx;
+
+                        var tex = bgVideoTextures[frameIdx];
+                        if (!tex || tex.isNull()) return;
+
+                        var rawImage = cachedRawImage;
+                        if (!rawImage || rawImage.isNull()) {
+                            var getBgInstancePtr = baseAddr.add(0xE93AAC);
+                            var getBgInstanceFn = new NativeFunction(getBgInstancePtr, "pointer", []);
+                            var bgInstance = getBgInstanceFn();
+                            if (bgInstance && !bgInstance.isNull()) {
+                                rawImage = bgInstance.add(0x38).readPointer();
+                                cachedRawImage = rawImage;
+                            }
+                        }
+
+                        if (rawImage && !rawImage.isNull()) {
+                            // Direct write into RawImage.m_Texture (0xD0) to bypass op_Equality null check
+                            rawImage.add(0xD0).writePointer(tex);
+
+                            if (!cachedSetVerticesDirtyFn) {
+                                var vtable = rawImage.readPointer();
+                                cachedSetVerticesDirtyFn = new NativeFunction(vtable.add(0x2F8).readPointer(), "void", ["pointer", "pointer"]);
+                                cachedSetMaterialDirtyFn = new NativeFunction(vtable.add(0x308).readPointer(), "void", ["pointer", "pointer"]);
+                            }
+                            cachedSetVerticesDirtyFn(rawImage, NULL);
+                            cachedSetMaterialDirtyFn(rawImage, NULL);
+
+                            debugFrameCount++;
+                            if (debugFrameCount <= 5 || debugFrameCount % 30 === 0) {
+                                log("[🎬 BG FRAME TICK] Direct wrote frame " + frameIdx + " (tex=" + tex + ") to rawImage.m_Texture (tick #" + debugFrameCount + ")");
+                            }
+                        }
+                    } catch (e) {
+                        log("[-] Error in updateBackgroundVideoFrame: " + e.message);
+                    }
+                }
+
                 function loadAndApplySceneBackground(forceMain) {
                     try {
                         var domain = il2cpp_domain_get ? il2cpp_domain_get() : NULL;
@@ -2136,66 +2257,83 @@ function initIl2Cpp(module) {
                         }
 
                         var rawImage = bgInstance.add(0x38).readPointer();
+                        cachedRawImage = rawImage;
                         log("[🎨 BACKGROUND] backgroundRawImage (RawImage): " + rawImage);
                         if (!rawImage || rawImage.isNull()) {
                             log("[-] backgroundRawImage is null!");
                             return;
                         }
 
-                        var primaryPath = "";
-                        var altPath = "";
+                        var texObj = NULL;
                         var selectedFileName = "";
+
                         if (isTitle) {
+                            bgVideoActive = false;
                             var randIdx = Math.floor(Math.random() * officialBgFiles.length);
                             selectedFileName = officialBgFiles[randIdx];
-                            primaryPath = "/sdcard/kswoks/" + selectedFileName;
-                            altPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/kswoks/" + selectedFileName;
+                            var primaryPath = "/sdcard/kswoks/" + selectedFileName;
+                            var altPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/kswoks/" + selectedFileName;
                             log("[🎲 RANDOM TITLE BACKGROUND] Selected index " + randIdx + ": " + selectedFileName);
-                        } else {
-                            selectedFileName = "background_main.png";
-                            primaryPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/background_main.png";
-                            altPath = "/sdcard/background_main.png";
-                            log("[💎 SCENE BACKGROUND] Applying official crystal facet background (" + selectedFileName + ")");
-                        }
 
-                        var readAllBytesMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllBytes", 1);
-                        var pathStr = createIl2CppString(primaryPath);
-                        var args1 = Memory.alloc(Process.pointerSize);
-                        args1.writePointer(pathStr);
-                        var exc = Memory.alloc(Process.pointerSize);
-                        exc.writePointer(NULL);
-                        var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
-                        if (!bytesObj || bytesObj.isNull()) {
-                            pathStr = createIl2CppString(altPath);
+                            var readAllBytesMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllBytes", 1);
+                            var pathStr = createIl2CppString(primaryPath);
+                            var args1 = Memory.alloc(Process.pointerSize);
                             args1.writePointer(pathStr);
-                            bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
+                            var exc = Memory.alloc(Process.pointerSize);
+                            exc.writePointer(NULL);
+                            var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
+                            if (!bytesObj || bytesObj.isNull()) {
+                                pathStr = createIl2CppString(altPath);
+                                args1.writePointer(pathStr);
+                                bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
+                            }
+
+                            if (bytesObj && !bytesObj.isNull()) {
+                                var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
+                                texObj = il2cpp_object_new(tex2dClass);
+                                var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
+                                texCtorFn(texObj, 2, 2, NULL);
+
+                                var loadImagePtr = baseAddr.add(0x25B3E90);
+                                var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
+                                loadImageFn(texObj, bytesObj);
+                            }
+                        } else {
+                            // Active card or menu scene: activate authentic video playback
+                            bgVideoActive = true;
+                            if (!bgVideoLoaded && !bgVideoLoading) {
+                                initBackgroundVideoPlayer();
+                            }
+                            if (bgVideoLoaded && bgVideoTextures.length > 0) {
+                                selectedFileName = "main_24.webm (active 90-frame video loop)";
+                                texObj = bgVideoTextures[0];
+                            } else {
+                                selectedFileName = "background_main.png (fallback)";
+                                var primaryPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/background_main.png";
+                                var readAllBytesMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllBytes", 1);
+                                var pathStr = createIl2CppString(primaryPath);
+                                var args1 = Memory.alloc(Process.pointerSize);
+                                args1.writePointer(pathStr);
+                                var exc = Memory.alloc(Process.pointerSize);
+                                exc.writePointer(NULL);
+                                var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
+                                if (bytesObj && !bytesObj.isNull()) {
+                                    var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
+                                    texObj = il2cpp_object_new(tex2dClass);
+                                    var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
+                                    texCtorFn(texObj, 2, 2, NULL);
+
+                                    var loadImagePtr = baseAddr.add(0x25B3E90);
+                                    var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
+                                    loadImageFn(texObj, bytesObj);
+                                }
+                            }
                         }
 
-                        if (!bytesObj || bytesObj.isNull()) {
-                            log("[-] Failed to read background file: " + selectedFileName);
+                        if (!texObj || texObj.isNull()) {
+                            log("[-] Failed to initialize background texture!");
                             return;
                         }
-                        var byteLen = bytesObj.add(0x18).readInt();
-                        log("[🎨 BACKGROUND] Loaded official PNG bytes length: " + byteLen);
-
-                        // 2. Crear Texture2D(2, 2)
-                        var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
-                        var texObj = il2cpp_object_new(tex2dClass);
-                        var texCtor = findMethod("UnityEngine.CoreModule", "UnityEngine", "Texture2D", ".ctor", 2);
-                        var pWidth = Memory.alloc(4);
-                        pWidth.writeInt(2);
-                        var pHeight = Memory.alloc(4);
-                        pHeight.writeInt(2);
-                        var argsCtor = Memory.alloc(Process.pointerSize * 2);
-                        argsCtor.writePointer(pWidth);
-                        argsCtor.add(Process.pointerSize).writePointer(pHeight);
-                        il2cpp_runtime_invoke(texCtor, texObj, argsCtor, exc);
-
-                        // 3. ImageConversion.LoadImage(texObj, bytesObj)
-                        var loadImagePtr = baseAddr.add(0x25B3E90);
-                        var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
-                        var loadSuccess = loadImageFn(texObj, bytesObj);
-                        log("[🎨 BACKGROUND] ImageConversion.LoadImage result: " + loadSuccess);
 
                         // 4. RawImage.set_texture(texObj)
                         var setTexturePtr = baseAddr.add(0x194C074);
@@ -13759,6 +13897,14 @@ function initIl2Cpp(module) {
                         } else if (cmdRaw === "bg_apply") {
                             log("[🎨 BG CMD] Manually forcing loadAndApplySceneBackground(true)...");
                             loadAndApplySceneBackground(true);
+                        } else if (cmdRaw === "bg_video_status") {
+                            log("[🎬 BG VIDEO STATUS] active=" + bgVideoActive + " loaded=" + bgVideoLoaded + " textures=" + bgVideoTextures.length + " currentFrame=" + lastBgVideoFrameIdx);
+                        } else if (cmdRaw === "bg_video_reload") {
+                            log("[🎬 BG VIDEO RELOAD] Reinitializing BackgroundVideoPlayer...");
+                            bgVideoLoaded = false;
+                            bgVideoLoading = false;
+                            bgVideoTextures = [];
+                            initBackgroundVideoPlayer();
                         } else if (cmdRaw === "bg_diag") {
                             try {
                                 var getBgInstancePtr = baseAddr.add(0xE93AAC);
@@ -13771,10 +13917,30 @@ function initIl2Cpp(module) {
                                     var isValid = bgInstance.add(0x58).readU8();
                                     log("[🩺 BG DIAG] rawImage=" + rawImage + " isSetDone=" + isSetDone + " isValid=" + isValid);
                                     if (!rawImage.isNull()) {
-                                        var tex = rawImage.add(0x60).readPointer(); // or texture pointer
-                                        var getTrFn = new NativeFunction(baseAddr.add(0x1DBC744), "pointer", ["pointer", "pointer"]);
-                                        var tr = getTrFn(rawImage, NULL);
-                                        log("[🩺 BG DIAG] rawImage texture=" + tex + " RectTransform=" + tr);
+                                        var texD0 = rawImage.add(0xD0).readPointer();
+                                        log("[🩺 BG DIAG] rawImage m_Texture (offset 0xD0)=" + texD0);
+
+                                        // Detailed single-frame texture lifecycle test
+                                        var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
+                                        var testObj = il2cpp_object_new(tex2dClass);
+                                        log("[🩺 BG DIAG] Allocated new texObj=" + testObj + " initial m_CachedPtr=" + testObj.add(0x10).readPointer());
+
+                                        var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
+                                        texCtorFn(testObj, 2, 2, NULL);
+                                        log("[🩺 BG DIAG] After texCtorFn(2,2): m_CachedPtr=" + testObj.add(0x10).readPointer());
+
+                                        var readAllBytesMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllBytes", 1);
+                                        var pathStr = createIl2CppString("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/bg_video/frame_000.jpg");
+                                        var args1 = Memory.alloc(Process.pointerSize);
+                                        args1.writePointer(pathStr);
+                                        var exc = Memory.alloc(Process.pointerSize);
+                                        exc.writePointer(NULL);
+                                        var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
+                                        log("[🩺 BG DIAG] Loaded frame_000 bytesObj=" + bytesObj);
+
+                                        var loadImageFn = new NativeFunction(baseAddr.add(0x25B3E90), "int", ["pointer", "pointer"]);
+                                        var loadRes = loadImageFn(testObj, bytesObj);
+                                        log("[🩺 BG DIAG] After loadImageFn: loadRes=" + loadRes + " m_CachedPtr=" + testObj.add(0x10).readPointer());
                                     }
                                 }
                             } catch (eBgD) {
@@ -13906,6 +14072,9 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.attach(baseAddr.add(0xD5330C), {
                         onEnter: function (args) {
+                            // Advance background video frame if active
+                            updateBackgroundVideoFrame();
+
                             if (pendingSceneCommand) {
                                 var cmd = pendingSceneCommand;
                                 pendingSceneCommand = null;
@@ -13915,7 +14084,7 @@ function initIl2Cpp(module) {
                             }
                         }
                     });
-                    log("[+] Interceptor.attach installed on Scene.Update (0xD5330C) for main-thread command dispatch!");
+                    log("[+] Interceptor.attach installed on Scene.Update (0xD5330C) for main-thread command dispatch & video playback!");
                 } catch (eScUp) {
                     log("[-] Error attaching to Scene.Update: " + eScUp.message);
                 }
@@ -13946,6 +14115,10 @@ function initIl2Cpp(module) {
                 Interceptor.attach(baseAddr.add(0xD55EE8), {
                     onEnter: function (args) {
                         sceneUpdateCounter++;
+
+                        // 🎬 Continuous Background Video Frame Update across ALL scenes (Main Thread 60fps)
+                        updateBackgroundVideoFrame();
+
                         if (pendingSceneCommand) {
                             var cmd = pendingSceneCommand;
                             pendingSceneCommand = null;
