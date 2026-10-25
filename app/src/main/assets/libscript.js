@@ -14324,6 +14324,193 @@ function initIl2Cpp(module) {
                             } catch (eHbg) {
                                 log("[-] Error in test_hide_bg: " + eHbg.message);
                             }
+                        } else if (cmdRaw === "bg_tree") {
+                            try {
+                                log("[🌳 BG_TREE] === BACKGROUND TREE START ===");
+                                var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
+                                var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                                var getChildCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
+                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                                var getActiveSelfFn = new NativeFunction(baseAddr.add(0x1DBAE44), "int", ["pointer", "pointer"]);
+                                var getActiveInHierFn = new NativeFunction(baseAddr.add(0x1DBAE84), "int", ["pointer", "pointer"]);
+                                var getCanvasFn = new NativeFunction(baseAddr.add(0x16148BC), "pointer", ["pointer", "pointer"]);
+                                var getSortFn = new NativeFunction(baseAddr.add(0x258BC48), "int", ["pointer", "pointer"]);
+                                var getRmFn = new NativeFunction(baseAddr.add(0x258B948), "int", ["pointer", "pointer"]);
+                                var getWorldCamFn = new NativeFunction(baseAddr.add(0x258BE90), "pointer", ["pointer", "pointer"]);
+
+                                var getBgInstanceFn = new NativeFunction(baseAddr.add(0xE93AAC), "pointer", []);
+                                var bg = getBgInstanceFn();
+                                if (bg && !bg.isNull()) {
+                                    var rawImage = bg.add(0x38).readPointer();
+                                    log("[🌳 BG_TREE] BackgroundImage=" + bg + " rawImage=" + rawImage);
+                                    if (rawImage && !rawImage.isNull()) {
+                                        var rGo = getGoFn(rawImage, NULL);
+                                        var cur = getTransformFn(rawImage, NULL);
+                                        var bscTr = NULL;
+                                        for (var p = 0; p < 10; p++) {
+                                            var pGo = getGoFn(cur, NULL);
+                                            var pName = pGo && !pGo.isNull() ? readIl2CppString(getNameFn(pGo, NULL)) : "null";
+                                            if (pName === "BackgroundSystemCanvas") {
+                                                bscTr = cur;
+                                                break;
+                                            }
+                                            var parent = getParentFn(cur, NULL);
+                                            if (!parent || parent.isNull()) break;
+                                            cur = parent;
+                                        }
+                                        if (bscTr && !bscTr.isNull()) {
+                                            function dumpBgNode(tr, indent, dLimit) {
+                                                if (dLimit <= 0 || !tr || tr.isNull()) return;
+                                                var go = getGoFn(tr, NULL);
+                                                var name = go && !go.isNull() ? readIl2CppString(getNameFn(go, NULL)) : "null";
+                                                var act = go && !go.isNull() ? getActiveSelfFn(go, NULL) : -1;
+                                                var actH = go && !go.isNull() ? getActiveInHierFn(go, NULL) : -1;
+                                                var cnt = getChildCountFn(tr, NULL);
+                                                log(indent + "- " + name + " (self=" + act + ", hier=" + actH + ", children=" + cnt + ") [go=" + go + "]");
+                                                for (var i = 0; i < cnt; i++) {
+                                                    var ch = getChildFn(tr, i, NULL);
+                                                    if (ch && !ch.isNull()) dumpBgNode(ch, indent + "  ", dLimit - 1);
+                                                }
+                                            }
+                                            dumpBgNode(bscTr, "  ", 6);
+                                        } else {
+                                            log("[-] BackgroundSystemCanvas not found in parent chain!");
+                                        }
+                                    }
+                                }
+
+                                if (curScene && !curScene.isNull() && sceneId === 4) {
+                                    log("[🌳 BG_TREE] Dumping InventoryScene Canvas...");
+                                    var sView = curScene.add(0x48).readPointer();
+                                    if (sView && !sView.isNull()) {
+                                        var svTr = getTransformFn(sView, NULL);
+                                        var cTr = getChildFn(svTr, 0, NULL);
+                                        var cGo = getGoFn(cTr, NULL);
+                                        var cName = cGo && !cGo.isNull() ? readIl2CppString(getNameFn(cGo, NULL)) : "null";
+                                        var cAct = cGo && !cGo.isNull() ? getActiveSelfFn(cGo, NULL) : -1;
+                                        var cCnt = getChildCountFn(cTr, NULL);
+                                        log("  - Scene Canvas: " + cName + " (act=" + cAct + ", children=" + cCnt + ") [go=" + cGo + "]");
+                                        for (var i = 0; i < cCnt; i++) {
+                                            var ch = getChildFn(cTr, i, NULL);
+                                            if (ch && !ch.isNull()) {
+                                                var chGo = getGoFn(ch, NULL);
+                                                var chNm = chGo && !chGo.isNull() ? readIl2CppString(getNameFn(chGo, NULL)) : "null";
+                                                var chAct = chGo && !chGo.isNull() ? getActiveSelfFn(chGo, NULL) : -1;
+                                                log("    - [" + i + "] " + chNm + " (act=" + chAct + ") [go=" + chGo + "]");
+                                            }
+                                        }
+                                    }
+                                }
+                                log("[🌳 BG_TREE] === BACKGROUND TREE END ===");
+                            } catch (eTree) {
+                                log("[-] Error in bg_tree: " + eTree.message);
+                            }
+                        } else if (cmdRaw.startsWith("test_red_sort")) {
+                            try {
+                                var sortVal = 50;
+                                var parts = cmdRaw.split(" ");
+                                if (parts.length > 1) sortVal = parseInt(parts[1]);
+
+                                log("[🔴 TEST_RED_SORT] Starting test with sortOrder=" + sortVal + "...");
+                                var getBgInstanceFn = new NativeFunction(baseAddr.add(0xE93AAC), "pointer", []);
+                                var bg = getBgInstanceFn();
+                                if (bg && !bg.isNull()) {
+                                    var rawImage = bg.add(0x38).readPointer();
+                                    if (rawImage && !rawImage.isNull()) {
+                                        var readAllBytesMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllBytes", 1);
+                                        var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
+                                        var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
+                                        var loadImageFn = new NativeFunction(baseAddr.add(0x25B3E90), "int", ["pointer", "pointer"]);
+
+                                        var exc = Memory.alloc(Process.pointerSize);
+                                        var args1 = Memory.alloc(Process.pointerSize);
+                                        var pathStr = createIl2CppString("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/red.jpg");
+                                        args1.writePointer(pathStr);
+                                        exc.writePointer(NULL);
+
+                                        var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
+                                        var redTex = il2cpp_object_new(tex2dClass);
+                                        texCtorFn(redTex, 2, 2, NULL);
+                                        var lRes = loadImageFn(redTex, bytesObj);
+                                        var applyFn = new NativeFunction(baseAddr.add(0x181BBAC), "void", ["pointer"]);
+                                        applyFn(redTex);
+                                        log("[🔴 TEST_RED_SORT] Loaded red.jpg: res=" + lRes + " redTex=" + redTex);
+
+                                        var rawImageSetTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                                        rawImageSetTexFn(rawImage, redTex, NULL);
+
+                                        var getCrFn = new NativeFunction(baseAddr.add(0x1615834), "pointer", ["pointer", "pointer"]);
+                                        var cr = getCrFn(rawImage, NULL);
+                                        if (cr && !cr.isNull()) {
+                                            var crSetTexFn = new NativeFunction(baseAddr.add(0x258CAF8), "void", ["pointer", "pointer", "pointer"]);
+                                            crSetTexFn(cr, redTex, NULL);
+                                            var crSetAlphaFn = new NativeFunction(baseAddr.add(0x258CC28), "void", ["pointer", "float", "pointer"]);
+                                            crSetAlphaFn(cr, 1.0, NULL);
+                                        }
+
+                                        var getCanvasFn = new NativeFunction(baseAddr.add(0x16148BC), "pointer", ["pointer", "pointer"]);
+                                        var cv = getCanvasFn(rawImage, NULL);
+                                        if (cv && !cv.isNull()) {
+                                            var getSortFn = new NativeFunction(baseAddr.add(0x258BC48), "int", ["pointer", "pointer"]);
+                                            var setOverSortFn = new NativeFunction(baseAddr.add(0x258BBF8), "void", ["pointer", "int", "pointer"]);
+                                            var setSortFn = new NativeFunction(baseAddr.add(0x258BC88), "void", ["pointer", "int", "pointer"]);
+                                            var oldSort = getSortFn(cv, NULL);
+                                            setOverSortFn(cv, 1, NULL);
+                                            setSortFn(cv, sortVal, NULL);
+                                            var newSort = getSortFn(cv, NULL);
+                                            log("[🔴 TEST_RED_SORT] Canvas=" + cv + " oldSort=" + oldSort + " -> newSort=" + newSort);
+                                        }
+                                    }
+                                }
+                            } catch (eTrs) {
+                                log("[-] Error in test_red_sort: " + eTrs.message);
+                            }
+                        } else if (cmdRaw === "rect_diag") {
+                            try {
+                                var getBgInstanceFn = new NativeFunction(baseAddr.add(0xE93AAC), "pointer", []);
+                                var bg = getBgInstanceFn();
+                                if (bg && !bg.isNull()) {
+                                    var rawImage = bg.add(0x38).readPointer();
+                                    var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                    var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
+                                    var getRectInjectedFn = new NativeFunction(baseAddr.add(0x180D73C), "void", ["pointer", "pointer"]);
+                                    var getSizeDeltaInjectedFn = new NativeFunction(baseAddr.add(0x180DBC8), "void", ["pointer", "pointer"]);
+                                    var getAnchorMinInjectedFn = new NativeFunction(baseAddr.add(0x180D7E4), "void", ["pointer", "pointer"]);
+                                    var getAnchorMaxInjectedFn = new NativeFunction(baseAddr.add(0x180D930), "void", ["pointer", "pointer"]);
+
+                                    var rectBuf = Memory.alloc(16);
+                                    var v2Buf = Memory.alloc(8);
+
+                                    function printRt(name, rt) {
+                                        if (!rt || rt.isNull()) return;
+                                        getRectInjectedFn(rt, rectBuf);
+                                        var rx = rectBuf.readFloat(), ry = rectBuf.add(4).readFloat(), rw = rectBuf.add(8).readFloat(), rh = rectBuf.add(12).readFloat();
+                                        getSizeDeltaInjectedFn(rt, v2Buf);
+                                        var sdx = v2Buf.readFloat(), sdy = v2Buf.add(4).readFloat();
+                                        getAnchorMinInjectedFn(rt, v2Buf);
+                                        var aminX = v2Buf.readFloat(), aminY = v2Buf.add(4).readFloat();
+                                        getAnchorMaxInjectedFn(rt, v2Buf);
+                                        var amaxX = v2Buf.readFloat(), amaxY = v2Buf.add(4).readFloat();
+                                        log("[📐 RECT] " + name + ": rect=(" + rx + "," + ry + "," + rw + "," + rh + ") sizeDelta=(" + sdx + "," + sdy + ") anchorMin=(" + aminX + "," + aminY + ") anchorMax=(" + amaxX + "," + amaxY + ")");
+                                    }
+
+                                    var rRt = getTransformFn(rawImage, NULL);
+                                    printRt("rawImage", rRt);
+
+                                    var bgRt = getTransformFn(bg, NULL);
+                                    printRt("Background", bgRt);
+
+                                    var layoutRt = getParentFn(bgRt, NULL);
+                                    printRt("Layout", layoutRt);
+
+                                    var bscRt = getParentFn(layoutRt, NULL);
+                                    printRt("BackgroundSystemCanvas", bscRt);
+                                }
+                            } catch (eRd) {
+                                log("[-] Error in rect_diag: " + eRd.message);
+                            }
                         } else if (cmdRaw === "deep_diag") {
                             try {
                                 var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
