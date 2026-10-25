@@ -2122,6 +2122,8 @@ function initIl2Cpp(module) {
                 // =========================================================================
                 // 🎬 Background Video Reproduction Engine (main_24.webm authentic loop)
                 // =========================================================================
+                var globalSceneId = 0;
+                var globalIsChanging = 0;
                 var bgVideoTextures = [];
                 var bgVideoLoaded = false;
                 var bgVideoLoading = false;
@@ -2254,6 +2256,8 @@ function initIl2Cpp(module) {
                 function updateBackgroundVideoFrame() {
                     try {
                         if (!bgVideoActive || !bgVideoLoaded || bgVideoTextures.length === 0) return;
+                        if (globalSceneId === 0 || globalSceneId === 1 || globalSceneId === 2) return;
+                        if (globalIsChanging !== 0) return;
                         var now = Date.now();
                         var frameIdx = Math.floor((now % BG_VIDEO_LOOP_DURATION_MS) / BG_VIDEO_FRAME_INTERVAL_MS);
                         if (frameIdx === lastBgVideoFrameIdx) return;
@@ -2313,9 +2317,6 @@ function initIl2Cpp(module) {
                             debugFrameCount++;
                             if (debugFrameCount <= 5 || debugFrameCount % 30 === 0) {
                                 log("[🎬 BG FRAME TICK] Applied frame " + frameIdx + " (tex=" + tex + ", cr=" + cr + ") (tick #" + debugFrameCount + ")");
-                            }
-                            if (debugFrameCount % 60 === 0) {
-                                ensureBackgroundHierarchyActive(rawImage, NULL);
                             }
                         }
                     } catch (e) {
@@ -2568,11 +2569,12 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.attach(baseAddr.add(0xB2ECE4), {
                         onEnter: function (args) {
-                            var scId = args[1].toInt32();
-                            log("[🎨 UPDATE SCENE] TopViewControl.UpdateScene called for sceneId=" + scId);
+                            this.scId = args[1].toInt32();
+                            log("[🎨 UPDATE SCENE] TopViewControl.UpdateScene called for sceneId=" + this.scId);
                         },
                         onLeave: function (retval) {
-                            if (globalSceneId === 3 || globalSceneId === 4 || globalSceneId === 5 || globalSceneId === 6 || globalSceneId === 7) {
+                            if (this.scId === 3 || this.scId === 4 || this.scId === 5 || this.scId === 6 || this.scId === 7) {
+                                globalSceneId = this.scId;
                                 loadAndApplySceneBackground(true);
                             }
                         }
@@ -2616,8 +2618,6 @@ function initIl2Cpp(module) {
                         hasTriggeredLobbyTransition = false;
                         dismissFade();
                         loadAndApplyTitleBackground();
-                        setTimeout(loadAndApplyTitleBackground, 500);
-                        setTimeout(loadAndApplyTitleBackground, 1500);
                     }
                 });
                 Interceptor.attach(baseAddr.add(0xB23F38), {
@@ -2664,22 +2664,22 @@ function initIl2Cpp(module) {
                     }
                 }
 
-                // Click handler en <SetStateMain>b__25_0 (0xB273C4)
-                var setStateMainClickHandler = baseAddr.add(0xB273C4);
-                Interceptor.attach(setStateMainClickHandler, {
-                    onEnter: function (args) {
-                        log("[🎉 TOUCH TO START] Click event detected on <SetStateMain>b__25_0!");
+                // Click handler en <SetStateMain>b__25_0 (0xB273C4) - Replace instead of attach to prevent double dispatch
+                try {
+                    Interceptor.replace(baseAddr.add(0xB273C4), new NativeCallback(function (thiz, evt, go) {
+                        log("[🎉 TOUCH TO START] Click event on <SetStateMain>b__25_0! Cleanly dispatching Lobby transition...");
                         triggerLobbyTransition("<SetStateMain>b__25_0");
-                    }
-                });
+                    }, "void", ["pointer", "int", "pointer"]));
+                    log("[+] Hooked <SetStateMain>b__25_0 (0xB273C4) with Interceptor.replace!");
+                } catch (eSsm) {}
 
                 // TitleView.OnLogin (0xB2A4B4)
-                Interceptor.attach(baseAddr.add(0xB2A4B4), {
-                    onEnter: function (args) {
+                try {
+                    Interceptor.replace(baseAddr.add(0xB2A4B4), new NativeCallback(function (thiz) {
                         log("[🎉 TITLEVIEW ONLOGIN] TitleView.OnLogin called!");
                         triggerLobbyTransition("TitleView.OnLogin");
-                    }
-                });
+                    }, "void", ["pointer"]));
+                } catch (eTvOl) {}
 
                 // TitleScene.SetStateTermsAndPolicy (0xB22514) -> auto bypass to SetStateLoading (0xB22D64)
                 try {
@@ -2694,7 +2694,7 @@ function initIl2Cpp(module) {
                 // TitleScene.SetStateSelectLogin (0xB245AC)
                 try {
                     Interceptor.replace(baseAddr.add(0xB245AC), new NativeCallback(function (thiz, toggleIndex, methodInfo) {
-                        log("[🚀 TITLE SCENE] TitleScene.SetStateSelectLogin intercepted! Redirecting directly to Lobby...");
+                        log("[🚀 TITLE SCENE] TitleScene.SetStateSelectLogin intercepted!");
                         globalTitleScene = thiz;
                         triggerLobbyTransition("SetStateSelectLogin");
                     }, "void", ["pointer", "int", "pointer"]));
@@ -13492,8 +13492,6 @@ function initIl2Cpp(module) {
                 // Periodic SceneControl State Monitor & LobbyScene Auto-Enlace
                 var sceneUpdateCounter = 0;
                 var cachedLobbyStr = NULL;
-                var globalSceneId = 0;
-                var globalIsChanging = 0;
                 var globalSceneInstance = NULL;
                 var isLobbyIntegrated = false;
                 var lastWorkerTid = 0;
@@ -14797,9 +14795,6 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.attach(baseAddr.add(0xD5330C), {
                         onEnter: function (args) {
-                            // Advance background video frame if active
-                            updateBackgroundVideoFrame();
-
                             if (pendingSceneCommand) {
                                 var cmd = pendingSceneCommand;
                                 pendingSceneCommand = null;
@@ -15174,12 +15169,6 @@ function initIl2Cpp(module) {
                                 if (ret !== lastLoggedIsReady) {
                                     lastLoggedIsReady = ret;
                                     log("[⚙️ VTABLE[11]] IsReadyToIntegrate (0x288EBC) state changed -> " + ret);
-                                }
-                                if (!this.mPtr.isNull()) {
-                                    var doneVal = this.mPtr.add(0x48).readU32();
-                                    if (doneVal >= 1) {
-                                        retval.replace(1);
-                                    }
                                 }
                             }
                         });
