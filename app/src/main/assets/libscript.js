@@ -2176,13 +2176,11 @@ function initIl2Cpp(module) {
                                 var applyFn = new NativeFunction(baseAddr.add(0x181BBAC), "void", ["pointer"]);
                                 applyFn(texObj);
                                 try {
-                                    var dontDestroyOnLoadFn = new NativeFunction(baseAddr.add(0x1DC7FB4), "void", ["pointer"]);
-                                    var setHideFlagsFn = new NativeFunction(baseAddr.add(0x1DC7FF4), "void", ["pointer", "int"]);
-                                    setHideFlagsFn(texObj, 52);
-                                    dontDestroyOnLoadFn(texObj);
+                                    var setHideFlagsFn = new NativeFunction(baseAddr.add(0x1DC7FF4), "void", ["pointer", "int", "pointer"]);
+                                    setHideFlagsFn(texObj, 52, NULL); // HideFlags.DontUnloadUnusedAsset (32) | DontSaveInEditor (4) | DontSaveInBuild (16) = 52
                                 } catch (eDh) {}
                                 if (il2cpp_gchandle_new) {
-                                    il2cpp_gchandle_new(texObj, 1);
+                                    il2cpp_gchandle_new(texObj, 2); // 2 = Normal handle (pinned in Unity GC)
                                 }
                                 bgVideoTextures.push(texObj);
                                 loadedCount++;
@@ -2227,20 +2225,22 @@ function initIl2Cpp(module) {
                 var cachedSetSizeDeltaFn = null;
                 var cachedSetPivotFn = null;
 
-                function stretchRectTransform(rt) {
+                function applyStretchTransform(rt) {
                     if (!rt || rt.isNull()) return;
                     if (!cachedSetAnchorMinFn) cachedSetAnchorMinFn = new NativeFunction(baseAddr.add(0x180D888), "void", ["pointer", "pointer"]);
                     if (!cachedSetAnchorMaxFn) cachedSetAnchorMaxFn = new NativeFunction(baseAddr.add(0x180D9D4), "void", ["pointer", "pointer"]);
                     if (!cachedSetAnchoredPosFn) cachedSetAnchoredPosFn = new NativeFunction(baseAddr.add(0x180DB20), "void", ["pointer", "pointer"]);
                     if (!cachedSetSizeDeltaFn) cachedSetSizeDeltaFn = new NativeFunction(baseAddr.add(0x180DC6C), "void", ["pointer", "pointer"]);
+                    if (!cachedSetPivotFn) cachedSetPivotFn = new NativeFunction(baseAddr.add(0x180DDB8), "void", ["pointer", "pointer"]);
 
+                    cachedSetPivotFn(rt, v2BufHalf);
                     cachedSetAnchorMinFn(rt, v2BufZero);
                     cachedSetAnchorMaxFn(rt, v2BufOne);
                     cachedSetAnchoredPosFn(rt, v2BufZero);
                     cachedSetSizeDeltaFn(rt, v2BufZero);
                 }
 
-                function setExactCenterRectTransform(rt, w, h) {
+                function applyCenterCoverTransform(rt, w, h) {
                     if (!rt || rt.isNull()) return;
                     if (!cachedSetAnchorMinFn) cachedSetAnchorMinFn = new NativeFunction(baseAddr.add(0x180D888), "void", ["pointer", "pointer"]);
                     if (!cachedSetAnchorMaxFn) cachedSetAnchorMaxFn = new NativeFunction(baseAddr.add(0x180D9D4), "void", ["pointer", "pointer"]);
@@ -2252,10 +2252,10 @@ function initIl2Cpp(module) {
                     sizeBuf.writeFloat(w);
                     sizeBuf.add(4).writeFloat(h);
 
+                    cachedSetPivotFn(rt, v2BufHalf);
                     cachedSetAnchorMinFn(rt, v2BufHalf);
                     cachedSetAnchorMaxFn(rt, v2BufHalf);
                     cachedSetAnchoredPosFn(rt, v2BufZero);
-                    cachedSetPivotFn(rt, v2BufHalf);
                     cachedSetSizeDeltaFn(rt, sizeBuf);
                 }
 
@@ -2285,6 +2285,17 @@ function initIl2Cpp(module) {
                         }
 
                         if (rawImage && !rawImage.isNull()) {
+                            // Verify native texture pointer is still valid; if unloaded, reload video textures
+                            var mCachedPtr = tex.add(0x10).readPointer();
+                            if (!mCachedPtr || mCachedPtr.isNull()) {
+                                log("[⚠️ BG VIDEO] Detected unloaded native texture at frame " + frameIdx + ", reloading 90 HD frames...");
+                                bgVideoLoaded = false;
+                                bgVideoTextures = [];
+                                initBackgroundVideoPlayer();
+                                tex = bgVideoTextures[frameIdx];
+                                if (!tex || tex.isNull()) return;
+                            }
+
                             // Ensure rawImage color is white (1, 1, 1, 1)
                             rawImage.add(0x20).writeFloat(1.0);
                             rawImage.add(0x24).writeFloat(1.0);
@@ -2296,6 +2307,16 @@ function initIl2Cpp(module) {
                                 cachedRawImageSetTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
                             }
                             cachedRawImageSetTextureFn(rawImage, tex, NULL);
+                            rawImage.add(0xD0).writePointer(tex);
+
+                            if (!cachedSetVerticesDirtyFn) {
+                                cachedSetVerticesDirtyFn = new NativeFunction(baseAddr.add(0x1614F4C), "void", ["pointer", "pointer"]);
+                            }
+                            if (!cachedSetMaterialDirtyFn) {
+                                cachedSetMaterialDirtyFn = new NativeFunction(baseAddr.add(0x1614FE4), "void", ["pointer", "pointer"]);
+                            }
+                            cachedSetVerticesDirtyFn(rawImage, NULL);
+                            cachedSetMaterialDirtyFn(rawImage, NULL);
 
                             // 2. Fetch or retrieve CanvasRenderer
                             var cr = cachedCanvasRenderer;
@@ -2322,7 +2343,10 @@ function initIl2Cpp(module) {
 
                             debugFrameCount++;
                             if (debugFrameCount <= 5 || debugFrameCount % 30 === 0) {
-                                log("[🎬 BG FRAME TICK] Applied frame " + frameIdx + " (tex=" + tex + ", cr=" + cr + ") (tick #" + debugFrameCount + ")");
+                                log("[🎬 BG FRAME TICK] Applied frame " + frameIdx + " (tex=" + tex + ", mPtr=" + mCachedPtr + ", cr=" + cr + ") (tick #" + debugFrameCount + ")");
+                            }
+                            if (debugFrameCount % 60 === 1) {
+                                ensureBackgroundHierarchyActive(rawImage, NULL);
                             }
                         }
                     } catch (e) {
@@ -2336,6 +2360,7 @@ function initIl2Cpp(module) {
                         var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
                         var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
                         var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                        var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
 
                         // Neutralize VideoControl DisplayUGUI and VideoPlayer GameObject
                         try {
@@ -2388,23 +2413,37 @@ function initIl2Cpp(module) {
                         rawImage.add(0xE0).writeFloat(1.0);
                         rawImage.add(0xE4).writeFloat(1.0);
 
-                        var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
                         var tr = getTransformFn(rawImage, NULL);
-                        setExactCenterRectTransform(tr, 1138.0, 640.0);
-                        var maxDepth = 10;
-                        while (tr && !tr.isNull() && maxDepth-- > 0) {
-                            var pTr = getParentFn(tr, NULL);
-                            if (!pTr || pTr.isNull()) break;
-                            var pGo = getGoFn(pTr, NULL);
+
+                        // Apply full centered cover (1280x640 for 2:1 video over 1138x640 canvas) to rawImage
+                        applyCenterCoverTransform(tr, 1280.0, 640.0);
+
+                        // Traverse ancestors: ensure Background and Layout are centered and full-size (1280x640 / 1138x640)
+                        var pTr = tr;
+                        var maxDepth = 5;
+                        while (pTr && !pTr.isNull() && maxDepth-- > 0) {
+                            var parent = getParentFn(pTr, NULL);
+                            if (!parent || parent.isNull()) break;
+                            var pGo = getGoFn(parent, NULL);
                             if (pGo && !pGo.isNull()) {
                                 setActiveFn(pGo, 1, NULL);
                                 var pName = readIl2CppString(getNameFn(pGo, NULL));
                                 if (pName === "Background" || pName === "Layout") {
-                                    setExactCenterRectTransform(pTr, 1138.0, 640.0);
+                                    applyCenterCoverTransform(parent, 1280.0, 640.0);
                                 }
                             }
-                            tr = pTr;
+                            pTr = parent;
                         }
+
+                        // Ensure SetVerticesDirty and SetMaterialDirty so Graphic rebuilds mesh with new rect
+                        if (!cachedSetVerticesDirtyFn) {
+                            cachedSetVerticesDirtyFn = new NativeFunction(baseAddr.add(0x1614F4C), "void", ["pointer", "pointer"]);
+                        }
+                        if (!cachedSetMaterialDirtyFn) {
+                            cachedSetMaterialDirtyFn = new NativeFunction(baseAddr.add(0x1614FE4), "void", ["pointer", "pointer"]);
+                        }
+                        cachedSetVerticesDirtyFn(rawImage, NULL);
+                        cachedSetMaterialDirtyFn(rawImage, NULL);
                     } catch (eH) {
                         log("[-] Error in ensureBackgroundHierarchyActive: " + eH.message);
                     }
@@ -2470,13 +2509,7 @@ function initIl2Cpp(module) {
                                 var loadImagePtr = baseAddr.add(0x25B3E90);
                                 var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
                                 loadImageFn(texObj, bytesObj);
-                                try {
-                                    var dontDestroyOnLoadFn = new NativeFunction(baseAddr.add(0x1DC7FB4), "void", ["pointer"]);
-                                    var setHideFlagsFn = new NativeFunction(baseAddr.add(0x1DC7FF4), "void", ["pointer", "int"]);
-                                    setHideFlagsFn(texObj, 52);
-                                    dontDestroyOnLoadFn(texObj);
-                                } catch (eDh) {}
-                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(texObj, 1);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(texObj, 2);
                             }
                         } else {
                             // Active card or menu scene: activate authentic video playback
@@ -14578,7 +14611,19 @@ function initIl2Cpp(module) {
                                         var aminX = v2Buf.readFloat(), aminY = v2Buf.add(4).readFloat();
                                         getAnchorMaxInjectedFn(rt, v2Buf);
                                         var amaxX = v2Buf.readFloat(), amaxY = v2Buf.add(4).readFloat();
-                                        log("[📐 RECT] " + name + ": rect=(" + rx + "," + ry + "," + rw + "," + rh + ") sizeDelta=(" + sdx + "," + sdy + ") anchorMin=(" + aminX + "," + aminY + ") anchorMax=(" + amaxX + "," + amaxY + ")");
+                                        var getAnchoredPosInjectedFn = new NativeFunction(baseAddr.add(0x180DA7C), "void", ["pointer", "pointer"]);
+                                        var getPivotInjectedFn = new NativeFunction(baseAddr.add(0x180DD14), "void", ["pointer", "pointer"]);
+                                        var getLocalPosInjectedFn = new NativeFunction(baseAddr.add(0x181DA20), "void", ["pointer", "pointer"]);
+                                        var getPosInjectedFn = new NativeFunction(baseAddr.add(0x181D928), "void", ["pointer", "pointer"]);
+                                        getAnchoredPosInjectedFn(rt, v2Buf);
+                                        var apX = v2Buf.readFloat(), apY = v2Buf.add(4).readFloat();
+                                        getPivotInjectedFn(rt, v2Buf);
+                                        var pivX = v2Buf.readFloat(), pivY = v2Buf.add(4).readFloat();
+                                        getLocalPosInjectedFn(rt, rectBuf);
+                                        var lpX = rectBuf.readFloat(), lpY = rectBuf.add(4).readFloat(), lpZ = rectBuf.add(8).readFloat();
+                                        getPosInjectedFn(rt, rectBuf);
+                                        var wpX = rectBuf.readFloat(), wpY = rectBuf.add(4).readFloat(), wpZ = rectBuf.add(8).readFloat();
+                                        log("[📐 RECT] " + name + ": rect=(" + rx + "," + ry + "," + rw + "," + rh + ") sizeDelta=(" + sdx + "," + sdy + ") anchorMin=(" + aminX + "," + aminY + ") anchorMax=(" + amaxX + "," + amaxY + ") anchoredPos=(" + apX + "," + apY + ") pivot=(" + pivX + "," + pivY + ") localPos=(" + lpX + "," + lpY + "," + lpZ + ") worldPos=(" + wpX + "," + wpY + "," + wpZ + ")");
                                     }
 
                                     var rRt = getTransformFn(rawImage, NULL);

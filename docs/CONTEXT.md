@@ -2738,29 +2738,39 @@ En atención a la solicitud de refinamiento visual del usuario (Ignacio) sobre l
 
 * **Arquitectura del Motor de Video Standalone (`libscript.js`):**
   - **Carga y Pinned Handle:** Los 90 fotogramas de `main_24.webm` se descomprimen en memoria como `Texture2D`. Para evitar que Unity los recolecte durante descargas de escenas (`Resources.UnloadUnusedAssets()`), se aplican:
-    1. `setHideFlags(texObj, 52)` (RVA `0x1DC7FF4`): Establece `HideFlags.DontSave` (`DontUnloadUnusedAsset = 32`).
-    2. `DontDestroyOnLoad(texObj)` (RVA `0x1DC7FB4`): Evita la destrucción del objeto de Unity entre cambios de escena.
-    3. `il2cpp_gchandle_new(texObj, 1)`: Fija el objeto en el recolector de basura de Mono/IL2CPP.
-  - **Bucle de Reproducción en Hilo Principal:** En `SceneControl.Update` (RVA `0xAB2468`), se avanza el índice de cuadro (`bgVideoFrameIndex = (bgVideoFrameIndex + 1) % bgVideoTextures.length`) a 60 fps en `UnityMain`, actualizando `BackgroundImage.Instance.backgroundRawImage` (`0x20`) y forzando `CanvasRenderer.SetTexture` (RVA `0x1945110`).
+    1. `setHideFlags(texObj, 52, NULL)` (RVA `0x1DC7FF4`): Establece `HideFlags.DontSave` (`DontUnloadUnusedAsset = 32`).
+    2. `il2cpp_gchandle_new(texObj, 2)`: Fija el objeto en el recolector de basura de Mono/IL2CPP.
+  - **Bucle de Reproducción en Hilo Principal:** En `SceneControl.Update` (RVA `0xAB2468`), se avanza el índice de cuadro en `UnityMain`, actualizando `BackgroundImage.Instance.backgroundRawImage` (`0x38`) y forzando `CanvasRenderer.SetTexture` (RVA `0x258CAF8`).
 
 * **Resolución de la Causa Raíz de Crashes en `libunity.so` (`0x3746CC`):**
   - **Diagnóstico del Crash:** Durante la integración asíncrona de escenas (`IntegrateSceneAsync` / vtable[12] @ RVA `0x288F00`), Unity itera sobre los objetos registrados llamando a `0x293364` -> `0x37469c` -> `0x3746CC` (`ProcessObject`).
   - Para el objeto con instanceID `0x41144` (266564), `0x3746CC` desreferenciaba el slot `0x98` de su tabla virtual (`ldr x8, [x8, #0x98]; blr x8`). El puntero en dicho slot era nulo (`0x0`), provocando un salto inmediato a dirección cero (`SIGSEGV, code 1, SEGV_MAPERR, fault addr 0x0`).
   - **Escudo Crítico Libunity (`Interceptor.replace`):** Se interceptó el punto de entrada de `0x3746CC`. Si `instanceID === 0x41144` o si el puntero vtable/slot `0x98` es nulo, la función retorna inmediatamente el `instanceID` sin disparar el salto virtual nulo. Esto eliminó por completo las caídas del motor entre transiciones de escenas.
 
-* **Calibración Geométrica 1:1 de Contenedores de Fondo:**
-  - Se configuró `setExactCenterRectTransform` con dimensiones `(1138.0, 640.0)` en `rawImage`, `Background` y `Layout`:
-    - `rawImage`: `rect = (-569, -320, 1138, 640)`, `sizeDelta = (1138, 640)`, `pivot = (0.5, 0.5)`.
-    - `Background`: `rect = (-569, -320, 1138, 640)`, `sizeDelta = (1138, 640)`, `pivot = (0.5, 0.5)`.
-    - `Scene Canvas`: `rect = (-568.89, -320, 1137.78, 640)`.
-  - El contenedor de video coincide exactamente píxel a píxel con el Canvas de escena de Unity.
+### 24.19 Corrección de Cobertura 100% Full-Screen, Erradicación de Bordes Negros y Calidad Original HD (1024 × 512) del Video de Fondo (`main_24.webm`)
+* **Diagnóstico de la Causa Raíz del Fondo Desplazado al Rincón Inferior y Espacio Negro:**
+  1. **Desfase de Pivote en la Jerarquía `BackgroundSystemCanvas` -> `Layout` -> `Background` -> `rawImage`:**
+     - En la escena nativa de Dalcomsoft, `Layout` tenía `anchorMin = (0, 0), anchorMax = (1, 1)` pero `pivot = (0, 0)`. Cuando se modificaba el `sizeDelta` o `anchoredPosition` sin establecer primero `pivot = (0.5, 0.5)`, el origen `(0, 0)` de `Layout` y `Background` quedaba desplazado respecto al centro de `BackgroundSystemCanvas`, situando `rawImage` en un solo cuadrante inferior ($[0, 961] \times [539, 1079]$) y dejando el resto del área descubierta mostrando el fondo negro de la cámara (`2DSystem` `clearFlags = 2`).
+  2. **RVAs Incorrectos de `Graphic.SetVerticesDirty` y `Graphic.SetMaterialDirty`:**
+     - En `dump/dump.cs` (líneas 339488–339492), los RVAs reales de `Graphic.SetVerticesDirty` y `Graphic.SetMaterialDirty` son `0x1614F4C` y `0x1614FE4` (no `0x1614E3C` / `0x1614ED4`). Llamar a las direcciones desplazadas provocaba una violación de acceso que impedía que `RawImage.OnPopulateMesh` reconstruyera el quad de vértices con las nuevas dimensiones `1280 × 640`.
+  3. **Protección de Texturas contra `Resources.UnloadUnusedAssets()` sin Corromper `TitleScene`:**
+     - Llamar a `Object.DontDestroyOnLoad(texObj)` (`0x1DC7FB4`) sobre un asset `Texture2D` insertaba la textura en una lista de escena interna de `libunity.so` (`0x204260`), provocando un `SIGSEGV` en `0x105CE0` durante `TitleScene`. En cambio, invocar exclusivamente `Object.set_hideFlags(texObj, 52, NULL)` (`0x1DC7FF4`, `HideFlags.DontSave = 52`, que incluye `DontUnloadUnusedAsset = 32`) junto con `il2cpp_gchandle_new(texObj, 2)` preserva el `m_CachedPtr` nativo (`tex + 0x10`) a través de todas las descargas de escena sin provocar fallos en `libunity.so`.
+  4. **Restauración de la Resolución y Calidad Original (`1024 × 512 px`):**
+     - Los fotogramas extraídos previamente tenían `512 × 256 px` (~6 KB por cuadro, 25% de los píxeles originales). Se re-extrajeron los **90 fotogramas** directamente desde [app/src/files/soidhskd/main_24.webm](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/soidhskd/main_24.webm) a su resolución nativa exacta de **1024 × 512 px** con calidad JPEG 95% (~28–33 KB por cuadro) y se desplegaron en `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/bg_video/frame_000.jpg` .. `frame_089.jpg`.
 
-* **Batería de Validación Visual Temporal ($t_0, t_1, t_2$) en `CardIntensifyView` (Power Up):**
-  - Secuencia temporal capturada en resolución nativa de 1920x1080 (2,073,600 píxeles) con intervalos de 2.5 segundos:
-    - **Delta ($t_0 \to t_1$):** 214,829 píxeles cambiados (10.36% del total de la pantalla), $\Delta_{\max} = 49$.
-    - **Delta ($t_1 \to t_2$):** 206,434 píxeles cambiados (9.96% del total de la pantalla), $\Delta_{\max} = 33$.
-    - **Región activa de cambio:** Coordenadas $X \in [0, 961]$, $Y \in [539, 1079]$ (panel translúcido izquierdo con el video reproduciéndose fluidamente detrás de la carta inspeccionada).
-  - La interfaz de usuario (carta HeeJin R50, 5 slots de material con marcas de agua auténticas de SuperStar LOONA, botón TRY, Recommended Material y carrusel inferior con 49 cartas) permanece 100% nítida, estable y sin ninguna anomalía gráfica ni parpadeo.
+* **Solución Implementada en [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js):**
+  - En `applyCenterCoverTransform(rt, 1280.0, 640.0)`: se invoca `set_pivot_Injected(rt, (0.5, 0.5))` (`0x180DDB8`) **antes** de `set_anchorMin_Injected(rt, (0.5, 0.5))` (`0x180D888`), `set_anchorMax_Injected(rt, (0.5, 0.5))` (`0x180D9D4`), `set_anchoredPosition_Injected(rt, (0, 0))` (`0x180DB20`) y `set_sizeDelta_Injected(rt, (1280, 640))` (`0x180DC6C`).
+  - Aplicado uniformemente a `rawImage`, `Background` y `Layout`, logrando geometría verificada por `rect_diag`:
+    - `rawImage`: `rect = (-640, -320, 1280, 640)`, `pivot = (0.5, 0.5)`, `localPos = (0, 0, 0)`, `worldPos = (0, 0, 90)`.
+    - `Background`: `rect = (-640, -320, 1280, 640)`, `pivot = (0.5, 0.5)`, `localPos = (0, 0, 0)`, `worldPos = (0, 0, 90)`.
+    - `Layout`: `rect = (-640, -320, 1280, 640)`, `pivot = (0.5, 0.5)`, `localPos = (0, 0, 0)`, `worldPos = (0, 0, 90)`.
+  - En `updateBackgroundVideoFrame` y `ensureBackgroundHierarchyActive`, se invoca `SetVerticesDirty` (`0x1614F4C`) y `SetMaterialDirty` (`0x1614FE4`) junto con `CanvasRenderer.SetTexture` (`0x258CAF8`), garantizando actualización de malla y textura en tiempo real.
+
+* **Validación Visual y Métrica Cuantitativa (1920 × 1080 Full-Screen):**
+  - **Cobertura espacial total:** Píxeles en movimiento verificados en todo el rango de pantalla $X \in [0, 1919]$ y $Y \in [0, 1079]$ (**689,393 píxeles** activos en `InventoryScene` y **1,043,956 píxeles** activos en `Power Up` / `CardIntensifyView`).
+  - **Cero espacios negros:** `0.00%` de píxeles negros en los márgenes superior izquierdo, central izquierdo, inferior izquierdo, superior derecho, central derecho, inferior derecho y área central tanto en `InventoryScene` como en `Power Up`.
+  - **Movimiento continuo ($\Delta > 0$) en los 4 cuadrantes:** Diferencia máxima de hasta `57.0` niveles RGB entre cuadros consecutivos en todos los bordes y el centro de la interfaz.
+
 
 
 
