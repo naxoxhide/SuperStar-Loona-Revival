@@ -101,3 +101,30 @@ Para vigilar la ejecución de Frida y detectar excepciones nativas de inmediato:
   ```bash
   adb logcat -d | grep -E "DEBUG|tombstone|SIGSEGV|AndroidRuntime|Unity" | tail -n 50
   ```
+
+---
+
+## 7. Protocolo de Validación Visual y Control de Intentos en Power Up (`CardIntensifyPopup`)
+
+Para validar visualmente y certificar que la cantidad de intentos y las cartas de material corresponden fielmente a los pedestales seleccionados:
+
+1. **Poblado de Pedestales ($1$ a $5$ Materiales):**
+   ```bash
+   adb shell "echo recommend > /storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt"
+   ```
+2. **Configuración de Modos de Intento:**
+   * `cmd:step`: Demostración escalonada (Intento 1 Fails $\rightarrow$ Next $\rightarrow$ Intentos posteriores Succeed $\rightarrow$ OK).
+   * `cmd:fail`: Todos los intentos fallan.
+   * `cmd:success`: Todos los intentos tienen éxito.
+   * `cmd:normal`: Cálculo estocástico de tasa de éxito Dalcomsoft.
+   ```bash
+   adb shell "echo cmd:step > /storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt"
+   ```
+3. **Apertura del Modal e Inicio de Try:**
+   * Abrir modal TRY: `adb shell input tap 1650 700`
+   * Iniciar animación de Try ("Rating Up"): `adb shell input tap 1220 890`
+4. **Validación de Secuencia de Intentos y Botón:**
+   * En los intentos intermedios ($1 .. N-1$), verificar banner de resultado y botón **"Next"** (`(960, 890)`).
+   * En el intento final ($N$), verificar que el botón conmuta a **"OK"** (`(960, 890)`).
+   * Pulsar "OK" y confirmar que el modal se cierra y la vista de pedestales queda limpia y lista sin bloqueos.
+

@@ -2771,6 +2771,62 @@ En atención a la solicitud de refinamiento visual del usuario (Ignacio) sobre l
   - **Cero espacios negros:** `0.00%` de píxeles negros en los márgenes superior izquierdo, central izquierdo, inferior izquierdo, superior derecho, central derecho, inferior derecho y área central tanto en `InventoryScene` como en `Power Up`.
   - **Movimiento continuo ($\Delta > 0$) en los 4 cuadrantes:** Diferencia máxima de hasta `57.0` niveles RGB entre cuadros consecutivos en todos los bordes y el centro de la interfaz.
 
+### 24.20 Fidelidad Visual HD de Material Cards, Control Exacto de Intentos y Restauración Limpia en el Modal Power Up (`CardIntensifyPopup`)
+* **Diagnóstico de la Causa Raíz de Desincronización y Crashes:**
+  1. **Fallo de Segmentación en `List<T>.Add (0x23BC040)`:**
+     - La rutina genérica IL2CPP de `List<bool>.Add` en ARM64 requiere que el registro `x2` contenga el descriptor de metadatos `MethodInfo*` correspondiente para invocar `EnsureCapacity`. Al pasar `NULL` o un puntero inválido, el motor generaba una violación de acceso (`access violation accessing 0x18`) al intentar redimensionar el arreglo interno.
+  2. **Crashes por Puntero Nulo en Handlers Nativos de Red (`IntensifyAssist`):**
+     - En el flujo online original, `CardIntensifyPopup.OpenResultLayout` invoca a `IntensifyAssist.OnResultFailed (0xF1D894)` o `IntensifyAssist.OnResultSucceed (0xF1D078)`. Dichos métodos intentaban acceder a `[x20 + 0x18]` (el DTO de respuesta HTTP deserializado), el cual era `0x0` en modo offline local, detonando `NullReferenceException` con terminación abrupta del proceso.
+  3. **Desincronización Visual de las Material Cards (`0x140`) en Intentos Múltiples:**
+     - El componente nativo `CardLarge` para la carta material (`popup + 0x140`) mantenía únicamente los parámetros de la primera carta asignada en la vista previa, sin actualizar la textura de la integrante ni su marco visual al transicionar de un intento a otro mediante el botón "Next".
+  4. **Cierre Incompleto del Modal y Congelamiento de Pantalla:**
+     - El método nativo `CardIntensifyPopup.OnClickOverride (0x138407C)` no manejaba adecuadamente la condición de bifurcación (`isNext` en `popup + 0x168`). Al pulsar "OK" en el intento final, la escena quedaba en un estado suspendido con la cámara desenfocada sin reactivar los controles de `InvenCardIntensifyView`.
+
+* **Solución Implementada en [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js):**
+  1. **Estructura Legítima Persistente en Heap para `List<bool>` IL2CPP (`createIl2CppBoolList`):**
+     - Se asigna un bloque de memoria heap IL2CPP de 64 bytes (`Memory.alloc(64)`) estructurado con:
+       - `+0x00`: Puntero de clase (`klass`) de `List<bool>`.
+       - `+0x10`: Puntero al arreglo `bool[]` (`_items`).
+       - `+0x18`: Contador de elementos `_size` (int32 exacto al número de materiales).
+       - `+0x1C`: `_version` (int32 = 1).
+     - El arreglo interno `bool[]` contiene:
+       - `+0x00`: Puntero de clase de arreglo booleano.
+       - `+0x18`: Longitud máxima `max_length` (int32).
+       - `+0x20 + i`: Valores booleanos individuales de cada intento (`0x00` = Failed, `0x01` = Success).
+  2. **Neutralización Preventiva de `IntensifyAssist` (`Interceptor.replace`):**
+     - Se reemplazaron `IntensifyAssist.OnResultFailed (0xF1D894)` e `IntensifyAssist.OnResultSucceed (0xF1D078)` con stubs seguros que retornan inmediatamente, delegando el 100% de la lógica visual, cálculo de deltas y partículas al hook en `OpenResultLayout`.
+  3. **Sincronización Dinámica de `materialCard` (`0x140`) en Cada Intento:**
+     - En `OnClickOverride (0x138407C)` y en el hook `OpenResultLayout (0x13841D4)`, se consulta `activePopupSession.steps[idx].material` y se invoca `applyPopupCardLargeState(materialCard, step.material)` para garantizar que el retrato, estrellas y grado correspondan con la integrante de LOONA consumida en ese pedestal específico.
+  4. **Control Preciso del Botón Modal "Next" vs "OK" y Retorno Limpio:**
+     - En `OnClickOverride`:
+       - Mientras `isNext === true` (`idx < totalAttempts`): se actualizan los retratos, se ejecuta `OpenResultLayout` para el siguiente intento y se retorna `0` para mantener el modal abierto.
+       - Cuando `isNext === false` (`idx === totalAttempts`): se despacha `triggerSafeOnIntensify(activeInventorySceneInstance)` para reactivar la vista de pedestales con los slots vaciados y se retorna `1` para permitir que el modal se cierre limpiamente mediante `Popup.Close()`.
+
+* **Validación Visual Confirmada en Emulador ADB (1920 × 1080):**
+  - **Caso 1 Material:**
+    - [val_1mat_pedestal.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_1mat_pedestal.png): 1 pedestal ocupado con HeeJin C1.
+    - [val_1mat_popup_preview.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_1mat_popup_preview.png): Modal mostrando HeeJin R50 (izq) y HeeJin C1 (der).
+    - [val_1mat_try_anim.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_1mat_try_anim.png): Efecto Try con partículas y sunflare activo.
+    - [val_1mat_result_fail_ok.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_1mat_result_fail_ok.png): Banner FAILED, 1 solo intento y botón "OK".
+    - [val_1mat_after_dismiss.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_1mat_after_dismiss.png): Restauración limpia a pedestales vacíos.
+  - **Caso 3 Materiales:**
+    - [val_3mat_pedestals.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_3mat_pedestals.png): 3 pedestales (HeeJin C1, HyunJin C1, HaSeul C1).
+    - [val_3mat_preview.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_3mat_preview.png): Modal inicial con HeeJin R50 y HeeJin C1.
+    - [val_3mat_step1_fail_next.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_3mat_step1_fail_next.png): Intento 1/3 FAILED con botón "Next".
+    - [val_3mat_step2_success_next.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_3mat_step2_success_next.png): Intento 2/3 SUCCEED (HyunJin C1 consumida, +2 Score, +3 Energy) con botón "Next".
+    - [val_3mat_step3_ok.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_3mat_step3_ok.png): Intento 3/3 SUCCEED (HaSeul C1 consumida) con botón final "OK".
+    - [val_3mat_after_dismiss.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_3mat_after_dismiss.png): Retorno limpio con pedestales limpios.
+  - **Caso 5 Materiales (Completo):**
+    - [val_5mat_pedestals.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_5mat_pedestals.png): 5 pedestales ocupados (HeeJin C1, HyunJin C1, HaSeul C1, YeoJin C1, ViVi C1).
+    - [val_5mat_preview.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_5mat_preview.png): Vista previa inicial del modal con HeeJin R50 y HeeJin C1.
+    - [val_5mat_step1_next.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_5mat_step1_next.png): Intento 1/5 FAILED (HeeJin C1) con botón "Next".
+    - [val_5mat_step2_next.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_5mat_step2_next.png): Intento 2/5 SUCCEED (HyunJin C1, +2 Score, +3 Energy) con botón "Next".
+    - [val_5mat_step3_next.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_5mat_step3_next.png): Intento 3/5 SUCCEED (HaSeul C1, +2 Score, +3 Energy) con botón "Next".
+    - [val_5mat_step4_next.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_5mat_step4_next.png): Intento 4/5 SUCCEED (YeoJin C1, +2 Score, +3 Energy) con botón "Next".
+    - [val_5mat_step5_ok.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_5mat_step5_ok.png): Intento 5/5 SUCCEED (ViVi C1, +2 Score, +3 Energy) con botón final "OK".
+    - [val_5mat_after_dismiss.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_5mat_after_dismiss.png): Modal cerrado y vista de pedestales restaurada limpiamente a cero cartas.
+
+
 
 
 
