@@ -2915,3 +2915,48 @@ Se ejecutaron y capturaron pruebas visuales con diferentes volúmenes y tipos de
 
 
 
+
+### Módulo: Perfeccionamiento y Robustecimiento Offline de la Escena Intensify / Power Up
+
+#### 1. Diagnóstico de Gaps y Arquitectura de Resiliencia Binaria
+Durante la integración y pruebas de la escena de Intensify en modo offline autónomo, se identificaron varios puntos críticos de fallo estructural y de UX:
+1. **Desreferenciación Nula en `Popup.OnClick` (`0x114B7A4`):**
+   - Dalcomsoft asume que todo popup derivado de `Popup` contiene botones estándar: `btnOk` (`+0xC8`), `btnCancel` (`+0xD0`) y `btnX` (`+0xD8`).
+   - En el prefab `Custom/Popup_Card_Intensify_R`, `btnX` es nulo. Al presionar "Next" u "OK", el código nativo evaluaba `0x114B8AC: cbz x8, #0x114bb98`, saltando a una llamada que desreferenciaba el puntero nulo y provocaba un `NullReferenceException` con caída de la aplicación.
+   - **Solución Binaria ARM64:**
+     - En `0x114B8AC`, se parcheó a `cbz x8, #0x114b8e4` (`c8 01 00 b4`) para saltar de inmediato al siguiente botón si `btnX` es nulo.
+     - En `0x114B994`, se parcheó a `cbz x8, #0x114ba94` (`08 08 00 b4`) protegiendo análogamente `btnCancel`.
+2. **Protección en `InventoryScene.OnIntensifyTry` (`0x105BA9C`):**
+   - El código Dalcomsoft desreferenciaba `sceneView.btnBoxSprites` (`0xC0`) en `0x105BC4C` y `0x105BC6C`. En offline, esta estructura no estaba poblada, saltando al abort nativo `0x105BDDC`.
+   - **Solución Binaria ARM64:** Parcheo con `stur xzr, [x29, #-0x30]; b #0x14; nop; nop; nop` para continuar la ejecución de manera segura sin excepción.
+3. **Protección de Prism Sprites en `GetLargeCardViewData` (`0xABE5FC`):**
+   - Al cargar vistas de cartas de grado R o Prismáticas, el método evaluaba `CardSpritesControl.Instance` en `0xABE7D0`. Al ser nulo en modo offline, abortaba la ejecución.
+   - **Solución Binaria ARM64:** Parcheo en `0xABE7D0` a `cbz x21, #0xabe7e8` (`d5 00 00 b4`), evitando la búsqueda de sprites prismáticos sin interrumpir el flujo.
+4. **Desvío de Delegados en `CardIntensifyPopup.OnClickOverride` (`0x138407C`):**
+   - En `0x1384128`, el motor invocaba un delegado de red para notificar el resultado. Parcheado a `NOP` (`1f 20 03 d5`) para delegar el control secuencial localmente a `OpenResultLayout`.
+
+#### 2. Mejoras de Audio y UX Táctil Offline
+1. **Inyección de SFX Nativos:**
+   - En `IntensifyAssist.Start` (`0xF1CD34`), se inyectan los nombres de audio oficiales: `powerupsuccess` en `+0xA8`, `powerupfail` en `+0xB0`, y se activan eventos sonoros `cardselect` al interactuar con carruseles y pedestales.
+2. **Desregistro Táctil Interactivo de Pedestales:**
+   - Se interceptó el toque táctil sobre los pedestales (`InvenMaterialView`, `0xF226A4`), permitiendo que al presionar cualquier pedestal ocupado (ej. Pedestal 4 en `1795 385`), este se desmonte de inmediato, libere el slot (`+`), devuelva la carta a estado elegible en el carrusel (badge naranja `+` removido a `N`) y reduzca el costo de RP en el botón TRY en tiempo real.
+3. **Botón Físico Nativo "Recommended Material":**
+   - Ubicado en pantalla en `(x=1200, y=690)` (`InventoryScene.OnRecommend`, `0x105B4F4`). Al ser pulsado por el usuario, analiza el mazo no equipado y monta automáticamente las cartas de menor grado disponibles respetando el límite máximo.
+4. **Deducción Dinámica de RP en UI Superior (`TopView`):**
+   - Se conectó la rutina `commitConsumedMaterials` con `TopView.RefreshRhythmPoint` (`0xB2BE9C`), actualizando en vivo el saldo de Rhythm Points tanto en pantalla como en el archivo `player_profile.json`.
+
+#### 3. Batería de Pruebas y Validación Visual Multi-Escenario (QA Sign-off)
+* **Escenario de Prueba 4 — Consumo de 2 Materiales sobre Carta R50 (JinSoul):**
+  - **Setup:** JinSoul R50 con Olivia Hye C1 y YeoJin C2 ([qa_test4_ready.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test4_ready.png)). Saldo inicial: 466,712 RP. Total cartas: 50.
+  - **Ejecución:** Toque físico en botón TRY (`1660 690`) -> Apertura de modal nativo `CardIntensifyPopup` ([qa_test4_popup_new.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test4_popup_new.png)) -> Toque en "Rating Up" (`1225 920`).
+  - **Resultados:** Intento 1 FAILED con botón "Next" ([qa_test4_attempt1_new.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test4_attempt1_new.png)). Toque físico en "Next" (`960 900`) -> Intento 2 FAILED con botón "OK" ([qa_test4_attempt2_ok.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test4_attempt2_ok.png)).
+  - **Post-Cierre:** Al pulsar "OK", el modal se cierra limpiamente ([qa_test4_after_ok.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test4_after_ok.png)). Carrusel actualizado a **`37 / 200`**; grid de inventario actualizado a **`48 / 200`** ([qa_test4_inven_grid_final.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test4_inven_grid_final.png)). Saldo en `player_profile.json`: 432,924 RP (deducción exacta de 33,788 RP).
+* **Escenario de Prueba 5 — Flujo Completo con Smart Recommend, Desregistro Táctil y 4 Materiales sobre HeeJin R50:**
+  - **Setup:** Selección de HeeJin R50 ([qa_test5_heejin_intensify.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test5_heejin_intensify.png)).
+  - **Recomendación Inteligente:** Toque físico en botón "Recommended Material" en `(1200, 690)` -> Montaje de 5 materiales (YeoJin C3, HeeJin B1, HyunJin B1, HaSeul B1, YeoJin B1) con costo 94,851 RP ([qa_test5_5cards_mounted.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test5_5cards_mounted.png)).
+  - **Desregistro Táctil de Pedestal:** Toque físico en el Pedestal 4 en `(1795, 385)` -> Desregistro instantáneo de YeoJin B1 ([qa_test5_unreg4.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test5_unreg4.png)), retorno de slot a vacío (`+`), eliminación de badge en carrusel y recálculo automático de precio TRY a 75,553 RP.
+  - **Intento y Secuencia Multi-Paso:** Toque físico en TRY (`1660 690`) -> Modal `CardIntensifyPopup` ([qa_test5_popup_opened.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test5_popup_opened.png)) -> Toque en "Rating Up" (`1225 920`). Deducción de 75,553 RP en tiempo real. Secuencia de 4 intentos navegados con "Next" hasta el intento final con botón "OK" ([qa_test5_attempt4_ok.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test5_attempt4_ok.png)).
+  - **Confirmación Final:** Al presionar "OK", se regresa al estado Intensify con pedestales reseteados y contador carrusel en **`33 / 200`** ([qa_test5_after_ok.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test5_after_ok.png)). Al salir al inventario general, el contador muestra exactamente **`44 / 200`** ([qa_test5_inven_grid_final.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test5_inven_grid_final.png)).
+  - **Verificación en Disco ([player_profile.json](file:///storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/player_profile.json)):**
+    - `rhythmPoint`: 357,371 RP (exactamente $432,924 - 75,553$).
+    - `inventoryCards`: 44 elementos (exactamente $48 - 4$).

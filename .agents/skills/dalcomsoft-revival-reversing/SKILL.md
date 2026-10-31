@@ -125,3 +125,23 @@ Esta skill define los pasos estándar y flujos de trabajo para analizar, desensa
 
 
 
+
+
+### 10. Pipeline Offline de Intensify / Power Up y Mitigación de Desreferenciaciones Nulas en Popups
+* **Arquitectura de Resiliencia ARM64 en Dalcomsoft Popups:**
+  * **Null Guard en `Popup.OnClick` (RVA `0x114B7A4`):**
+    * Dalcomsoft asume por defecto que todos los popups contienen `btnOk` (`+0xC8`), `btnCancel` (`+0xD0`) y `btnX` (`+0xD8`).
+    * En popups especializados como `CardIntensifyPopup`, `btnX` es nulo, provocando una caída por desreferenciación nula en `0x114B8AC`.
+    * **Parche ARM64:** Escribir en `0x114B8AC` la instrucción `cbz x8, #0x114b8e4` (`c8 01 00 b4`) para omitir `btnX` si es nulo. Análogamente, en `0x114B994` escribir `cbz x8, #0x114ba94` (`08 08 00 b4`) para omitir `btnCancel` si es nulo.
+  * **Null Guard en `InventoryScene.OnIntensifyTry` (RVA `0x105BA9C`):**
+    * Los offsets `0x105BC4C` y `0x105BC6C` desreferencian `sceneView.btnBoxSprites` (`0xC0`), que en offline está ausente.
+    * **Parche ARM64:** Escribir `stur xzr, [x29, #-0x30]; b #0x14; nop; nop; nop` para continuar la ejecución de forma segura.
+  * **Null Guard en `GetLargeCardViewData` (RVA `0xABE5FC`):**
+    * Al procesar cartas R o prismáticas, `0xABE7D0` desreferencia `CardSpritesControl.Instance`.
+    * **Parche ARM64:** Escribir `cbz x21, #0xabe7e8` (`d5 00 00 b4`) para omitir la lectura de sprites prismáticos sin abortar.
+* **Consumo Atómico y Descuento en Tiempo Real:**
+  * La rutina `commitConsumedMaterials` actualiza en memoria `loonaCardItems`, persiste el nuevo estado en `player_profile.json` en disco, descuenta el saldo de Rhythm Points (RP) y llama a `TopView.RefreshRhythmPoint` (RVA `0xB2BE9C`) para refrescar la UI superior en vivo.
+  * Desregistra las cartas consumidas en `InventoryControl.CardMap` (RVA `0xF2751C`).
+* **Interacción Táctil y Smart Recommendation:**
+  * **Smart Recommend (`0x105B4F4`):** Accesible físicamente en `(x=1200, y=690)`. Monta las cartas de menor grado disponibles.
+  * **Desregistro Táctil de Pedestales (`InvenMaterialView`, `0xF226A4`):** Al tocar cualquier pedestal con material montado, la carta se libera inmediatamente (`+`), el badge del carrusel se revierte a `N` y el costo de RP en el botón TRY se recalcula en tiempo real.
