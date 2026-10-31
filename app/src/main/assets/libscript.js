@@ -4503,6 +4503,19 @@ function initIl2Cpp(module) {
                     log("[🛡️ INIT] Patched InventoryScene.OnIntensifyTry branch at 0x105BBD4 to NOP!");
                 } catch (eNop) {}
 
+                // Patch InventoryScene.OnIntensifyTry null btnBoxSprites dereferences at 0x105BC4C and 0x105BC6C
+                try {
+                    Memory.patchCode(baseAddr.add(0x105BC4C), 20, function (code) {
+                        // stur xzr, [x29, #-0x30]; b #0x14; nop; nop; nop
+                        code.writeByteArray([0xbf, 0x03, 0x1d, 0xf8, 0x05, 0x00, 0x00, 0x14, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5]);
+                    });
+                    Memory.patchCode(baseAddr.add(0x105BC6C), 20, function (code) {
+                        // stur xzr, [x29, #-0x28]; b #0x14; nop; nop; nop
+                        code.writeByteArray([0xbf, 0x83, 0x1d, 0xf8, 0x05, 0x00, 0x00, 0x14, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5]);
+                    });
+                    log("[🛡️ INIT] Patched InventoryScene.OnIntensifyTry null btnBoxSprites guards at 0x105BC4C & 0x105BC6C!");
+                } catch (eBbsNop) {}
+
                 // Patch CardIntensifyPopup.OnClickOverride at 0x1384128 (tbnz -> NOP) to allow dismissing / advancing results
                 try {
                     Memory.patchCode(baseAddr.add(0x1384128), 4, function (code) {
@@ -12283,7 +12296,13 @@ function initIl2Cpp(module) {
                             Memory.patchCode(baseAddr.add(0x105BBD4), 4, function (code) {
                                 code.writeByteArray([0x1f, 0x20, 0x03, 0xd5]); // NOP
                             });
-                            log("[🛡️ TRY GUARD] Patched 0x105BBD4 to NOP via Memory.patchCode (cache flushed)!");
+                            Memory.patchCode(baseAddr.add(0x105BC4C), 20, function (code) {
+                                code.writeByteArray([0xbf, 0x03, 0x1d, 0xf8, 0x05, 0x00, 0x00, 0x14, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5]);
+                            });
+                            Memory.patchCode(baseAddr.add(0x105BC6C), 20, function (code) {
+                                code.writeByteArray([0xbf, 0x83, 0x1d, 0xf8, 0x05, 0x00, 0x00, 0x14, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5]);
+                            });
+                            log("[🛡️ TRY GUARD] Patched 0x105BBD4, 0x105BC4C, 0x105BC6C via Memory.patchCode (cache flushed)!");
                         } catch (ePatchNop) {
                             try {
                                 Memory.protect(baseAddr.add(0x105BBD4), 4, "rwx");
@@ -12390,7 +12409,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 }
                             } catch (eName) {}
 
-                            // Fallback: match goOrIdx against intensifyView.materialList (0..4)
+                            // Fallback: match goOrIdx or its transform ancestors against intensifyView.materialList (0..4)
                             if (slotIdx < 0) {
                                 try {
                                     var sv = sceneThis.add(0x48).readPointer();
@@ -12402,18 +12421,35 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                                 var mCount = mList.add(0x18).readS32();
                                                 var mItems = mList.add(0x10).readPointer();
                                                 var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                                var getTrFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                                var getParentTrFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
+
+                                                var testPtrs = [goOrIdx];
+                                                try {
+                                                    var curTr = getTrFn(goOrIdx, NULL);
+                                                    var depth = 0;
+                                                    while (!curTr.isNull() && depth < 5) {
+                                                        testPtrs.push(curTr);
+                                                        var curGo = getGoFn(curTr, NULL);
+                                                        if (!curGo.isNull()) testPtrs.push(curGo);
+                                                        curTr = getParentTrFn(curTr, NULL);
+                                                        depth++;
+                                                    }
+                                                } catch (eTrClimb) {}
+
                                                 for (var si = 0; si < mCount; si++) {
                                                     var mv = mItems.add(0x20 + si * 8).readPointer();
                                                     if (!mv.isNull()) {
-                                                        if (mv.equals(goOrIdx)) { slotIdx = si; break; }
                                                         var mvGo = getGoFn(mv, NULL);
-                                                        if (!mvGo.isNull() && mvGo.equals(goOrIdx)) { slotIdx = si; break; }
-                                                        var emptyImg = mv.add(0x38).readPointer();
-                                                        if (!emptyImg.isNull() && getGoFn(emptyImg, NULL).equals(goOrIdx)) { slotIdx = si; break; }
-                                                        var cardSmall = mv.add(0x58).readPointer();
-                                                        if (!cardSmall.isNull() && getGoFn(cardSmall, NULL).equals(goOrIdx)) { slotIdx = si; break; }
-                                                        var mountObj = mv.add(0x60).readPointer();
-                                                        if (!mountObj.isNull() && mountObj.equals(goOrIdx)) { slotIdx = si; break; }
+                                                        var mvTr = getTrFn(mv, NULL);
+                                                        for (var tp = 0; tp < testPtrs.length; tp++) {
+                                                            var p = testPtrs[tp];
+                                                            if (mv.equals(p) || (!mvGo.isNull() && mvGo.equals(p)) || (!mvTr.isNull() && mvTr.equals(p))) {
+                                                                slotIdx = si;
+                                                                break;
+                                                            }
+                                                        }
+                                                        if (slotIdx >= 0) break;
                                                     }
                                                 }
                                             }
@@ -14381,6 +14417,53 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
                                 handleUnregisterPedestalSlot(curScene, slotArg);
                             }
+                        } else if (cmdRaw.indexOf("tap_cell:") === 0) {
+                            var cellArg = parseInt(cmdRaw.substring(9).trim(), 10) || 0;
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                log("[📱 TAP_CELL CMD] Simulating carousel tap on cell index: " + cellArg);
+                                try {
+                                    var dcl = curScene.add(0x58).readPointer();
+                                    if (!dcl.isNull()) {
+                                        var dclCount = dcl.add(0x18).readS32();
+                                        var dclItems = dcl.add(0x10).readPointer();
+                                        if (cellArg >= 0 && cellArg < dclCount && !dclItems.isNull()) {
+                                            var clickedCard = dclItems.add(0x20 + cellArg * 8).readPointer();
+                                            if (!clickedCard.isNull()) {
+                                                var curState = curScene.add(0x24).readS32();
+                                                if (curState === 8) {
+                                                    var matList = curScene.add(0xA0).readPointer();
+                                                    var curCount = (!matList.isNull()) ? matList.add(0x18).readS32() : 0;
+                                                    if (curCount < 5) {
+                                                        var clickedRaw = clickedCard.add(0x10).readPointer();
+                                                        if (!clickedRaw.isNull()) {
+                                                            var cId = clickedRaw.add(0x20).readS32();
+                                                            var ccd = getOrCreateCardControlData(cId);
+                                                            clickedCard.add(0x18).writePointer(ccd || NULL);
+                                                            var gr = clickedRaw.add(0x24).readS32();
+                                                            var lvl = clickedRaw.add(0x1C).readS16();
+                                                            var fCode = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
+                                                            clickedCard.add(0x20).writeS16(fCode);
+                                                        }
+                                                        var regFn = new NativeFunction(baseAddr.add(0x1056B5C), "void", ["pointer", "pointer"]);
+                                                        regFn(curScene, clickedCard);
+                                                        try {
+                                                            var playSeFn = new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"]);
+                                                            playSeFn(createIl2CppString("cardselect"), NULL);
+                                                        } catch (eSeC) {}
+                                                        safeRefreshIntensifyView(curScene);
+                                                        populateMaterialDisplayCardList(curScene);
+                                                        log("[📱 TAP_CELL SUCCESS] Registered cell[" + cellArg + "] into pedestal!");
+                                                    } else {
+                                                        log("[⚠️ TAP_CELL] Pedestal slots full (5/5)!");
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (eTapCell) {
+                                    log("[-] Error in tap_cell: " + eTapCell.message);
+                                }
+                            }
                         } else if (cmdRaw === "change") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
                                 log("[🗃️ CHANGE CMD] Triggering OnChange directly!");
@@ -15563,7 +15646,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                 Interceptor.attach(baseAddr.add(0xD55EE8), {
                     onEnter: function (args) {
-                        sceneUpdateCounter++;
+                        try {
+                            sceneUpdateCounter++;
 
                         // 🎬 Continuous Background Video Frame Update across ALL scenes (Main Thread 60fps)
                         updateBackgroundVideoFrame();
@@ -15811,7 +15895,10 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 log("[-] SceneControl hook error: " + e.message);
                             }
                         }
+                    } catch (eOuter) {
+                        log("[-] Fatal SceneControl.Update error: " + eOuter.message);
                     }
+                }
                 });
 
                 // Standalone Thread-Independent FastMutex Watchdog
