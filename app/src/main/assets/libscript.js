@@ -13479,16 +13479,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                                     log("[👉 DISMISS / OK] Final result confirmed, closing popup cleanly via Popup.OnClick -> Close...");
                                     try {
                                         if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
-                                            var sceneView = activeInventorySceneInstance.add(0x48).readPointer();
-                                            if (!sceneView.isNull()) {
-                                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                                                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
-                                                var svGo = getGoFn(sceneView, NULL);
-                                                if (!svGo.isNull()) setActiveFn(svGo, 1, NULL);
-                                            }
-                                            var showIntLayoutFn = new NativeFunction(baseAddr.add(0x1057B6C), "void", ["pointer", "int", "pointer"]);
-                                            showIntLayoutFn(activeInventorySceneInstance, 1, NULL);
-                                            safeRefreshIntensifyView(activeInventorySceneInstance);
+                                            triggerSafeOnIntensify(activeInventorySceneInstance);
                                         }
                                     } catch (eResInven) {}
                                     return 1; // Return 1 (true) so Popup.OnClick proceeds to Popup.Close()
@@ -13577,19 +13568,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                             activeCardIntensifyPopup = NULL;
                             if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
                                 try {
-                                    var sceneView = activeInventorySceneInstance.add(0x48).readPointer();
-                                    if (!sceneView.isNull()) {
-                                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
-                                        var svGo = getGoFn(sceneView, NULL);
-                                        if (!svGo.isNull()) {
-                                            setActiveFn(svGo, 1, NULL);
-                                        }
-                                    }
-                                    var showIntLayoutFn = new NativeFunction(baseAddr.add(0x1057B6C), "void", ["pointer", "int", "pointer"]);
-                                    showIntLayoutFn(activeInventorySceneInstance, 1, NULL);
-                                    safeRefreshIntensifyView(activeInventorySceneInstance);
-                                    populateMaterialDisplayCardList(activeInventorySceneInstance);
+                                    triggerSafeOnIntensify(activeInventorySceneInstance);
                                 } catch (eShw) {}
                             }
                         }
