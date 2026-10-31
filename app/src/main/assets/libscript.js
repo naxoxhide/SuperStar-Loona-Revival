@@ -282,6 +282,42 @@ function initIl2Cpp(module) {
         log("[-] Error hooking __cxa_throw: " + eCxa.message);
     }
 
+    try {
+        var raiseExcAddr = Module.findExportByName("libil2cpp.so", "il2cpp_raise_exception") || il2cppBase.add(0x9C4B08);
+        if (raiseExcAddr) {
+            Interceptor.attach(raiseExcAddr, {
+                onEnter: function(args) {
+                    try {
+                        var exc = args[0];
+                        var name = "unknown";
+                        var msg = "";
+                        if (!exc.isNull()) {
+                            var klass = exc.readPointer();
+                            if (!klass.isNull()) {
+                                var namePtr = klass.add(0x10).readPointer();
+                                if (!namePtr.isNull()) name = namePtr.readCString();
+                            }
+                        }
+                        log("🚨 [IL2CPP EXCEPTION RAISED] Class=" + name + " (exc=" + exc + ")");
+                        var bt = Thread.backtrace(this.context, Backtracer.ACCURATE);
+                        log("🚨 [EXCEPTION STACK]:\n" + bt.map(function(addr) {
+                            try {
+                                var m = Process.findModuleByAddress(addr);
+                                if (m) return "  " + m.name + "!" + addr.sub(m.base);
+                            } catch (e) {}
+                            return "  " + addr;
+                        }).join("\n"));
+                    } catch (eRel) {
+                        log("[-] Error in il2cpp_raise_exception onEnter: " + eRel.message);
+                    }
+                }
+            });
+            log("[+] Interceptor.attach installed on il2cpp_raise_exception!");
+        }
+    } catch (eRe) {
+        log("[-] Error hooking il2cpp_raise_exception: " + eRe.message);
+    }
+
     // --- RESOLVE IL2CPP EXPORTED C-APIs ---
     function getExport(name, retType, argTypes) {
         var addr = Module.findExportByName("libil2cpp.so", name);
