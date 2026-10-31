@@ -6,6 +6,34 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ✅ CHECKPOINT 12 — Investigación Exhaustiva de la Escena de Power Up (Intensify), Gaps de UI/UX, Audio SFX y Sincronización TopView (2026-11-01)
+
+**Investigación y análisis de ingeniería inversa completado en IL2CPP Dalcom:**
+
+1. **Gaps Identificados en la Escena de Power Up / Intensify (`STATE.Intensify` = 8):**
+   - **Gap 1: Descuento y Refresco en Vivo de Rhythm Points (RP) en `TopView`:**
+     - En `commitConsumedMaterials`, `profile.rhythmPoint` se deduce correctamente en memoria y en [player_profile.json](file:///storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/player_profile.json), pero la barra superior `TopView` (`0xB2BE9C`) no se actualizaba en pantalla, permaneciendo estática en `1.000.000` RP.
+     - **Solución identificada:** Invocación de `TopView.RefreshRhythmPoint(int rhythmPoint, int delta = -1)` (`0xB2BE9C`) a través de `TopViewControl.Instance.topView` (`0xB13204` + `0x20`).
+   - **Gap 2: Firma Incorrecta en `InventoryScene.OnMaterial` (`0x105B2B8`):**
+     - El hook en Frida asumía firma `(sceneThis, idx)`. El desensamblado nativo demostró que la firma real es `void OnMaterial(GameObject go)`.
+     - Al tocar un pedestal, el segundo argumento es el puntero al `GameObject` de 64 bits. Al ser interpretado como entero por `parseInt`, el desregistro del pedestal fallaba.
+     - **Solución identificada:** Corregir firma a `["pointer", "pointer", "pointer"]`, extraer `go.name` o índice de slot `0..4`, e invocar `UnregistMaterialCardItem`.
+   - **Gap 3: Sincronización de `go.name` en Carrusel Inferior (`EnhancedScroller`):**
+     - En `populateMaterialDisplayCardList`, al reciclar celdas se actualizaba `cCell.dataIndex` pero no `cGo.name = dIdx.toString()`.
+     - `InventoryScene.OnCardItem` (`0x105CEE8`) lee `go.name` para buscar la carta en `displayCardList`. La sincronización explícita permite añadir/quitar cartas tocando directamente el carrusel.
+   - **Gap 4: Inyección de Efectos de Sonido Originales (Audio SFX):**
+     - Se identificaron los clips legítimos en `soundfx/`: `powerupsuccess.a.bytes`, `powerupfail.a.bytes`, `cardselect.a.bytes` y `decide.a.bytes`.
+     - En `CardIntensifyPopup.Params`, los campos `soundSucceed` (offset `0xA8`) y `soundFailed` (offset `0xB0`) deben inyectarse con las cadenas `"powerupsuccess"` y `"powerupfail"`, y los botones de UI deben disparar `SoundControl.PlaySE("cardselect")`.
+   - **Gap 5: Estados Visuales de Pedestal (`InvenMaterialView.effect` y `enabled`):**
+     - `InvenMaterialView` cuenta con `effect` (offset `0x40`) y `enabled` (offset `0x48`). En modo Upgrade (C5, B5, A5, S5), únicamente el pedestal 0 está habilitado (`isEnabled = true`) y los pedestales 1..4 deben atenuarse.
+   - **Gap 6: Desacople de Red Completado:**
+     - `InventoryControl.Intensify_Step_2` (`0xF2C84C`) está completamente desacoplado del backend HTTP. La lógica opera 100% cliente con la matriz de `cid.json`.
+
+2. **Artefacto de Planificación:**
+   - Hoja de ruta técnica formal elaborada en [plan_powerup_offline_enhancements.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/plan_powerup_offline_enhancements.md).
+
+---
+
 ### ✅ CHECKPOINT 11 — Estabilización Integral de CardBookScene (SceneId: 5), Renderizado de Temas LOONA, CardBookDetailPopup y Navegación Bidireccional Limpia (2026-10-06)
 
 **Estado verificado y validado en sesión activa en emulador (`127.0.0.1:5555`) con PID 11890:**
