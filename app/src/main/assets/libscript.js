@@ -13002,32 +13002,36 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                 var popupTryCountdown = -1;
                 var popupResultWatchdogCountdown = -1;
 
+                var persistentBoolList = null;
+                var persistentBoolArr = null;
+
                 function createIl2CppBoolList(boolArray) {
                     try {
-                        var klassPtr = baseAddr.add(0x313CF88).readPointer();
-                        if (klassPtr.isNull()) {
-                            log("[-] createIl2CppBoolList: klassPtr is null");
-                            return NULL;
+                        var count = boolArray ? boolArray.length : 0;
+                        persistentBoolArr = Memory.alloc(64);
+                        persistentBoolList = Memory.alloc(64);
+
+                        // Populate array: capacity at +0x18, elements at +0x20 + i
+                        persistentBoolArr.add(0x18).writeS32(Math.max(count, 8));
+                        for (var i = 0; i < count; i++) {
+                            persistentBoolArr.add(0x20 + i).writeU8(boolArray[i] ? 1 : 0);
                         }
-                        var klass = klassPtr.readPointer();
-                        if (klass.isNull()) {
-                            log("[-] createIl2CppBoolList: klass is null");
-                            return NULL;
-                        }
-                        var objNewFn = new NativeFunction(baseAddr.add(0xA43CB8), "pointer", ["pointer"]);
-                        var listObj = objNewFn(klass);
-                        if (listObj.isNull()) {
-                            log("[-] createIl2CppBoolList: listObj is null");
-                            return NULL;
-                        }
-                        var ctorFn = new NativeFunction(baseAddr.add(0x23BB330), "void", ["pointer", "pointer"]);
-                        ctorFn(listObj, NULL);
-                        var addFn = new NativeFunction(baseAddr.add(0x23BC040), "void", ["pointer", "bool", "pointer"]);
-                        for (var i = 0; i < boolArray.length; i++) {
-                            addFn(listObj, boolArray[i] ? 1 : 0, NULL);
-                        }
-                        log("[✨ BOOL_LIST] Created Il2Cpp List<bool> with " + boolArray.length + " items: " + JSON.stringify(boolArray));
-                        return listObj;
+
+                        // Try setting klass if available
+                        try {
+                            var klassPtr = baseAddr.add(0x313CF88).readPointer();
+                            if (!klassPtr.isNull() && !klassPtr.readPointer().isNull()) {
+                                persistentBoolList.writePointer(klassPtr.readPointer());
+                            }
+                        } catch (eKp) {}
+
+                        // Populate List<bool>: _items at +0x10, _size at +0x18
+                        persistentBoolList.add(0x10).writePointer(persistentBoolArr);
+                        persistentBoolList.add(0x18).writeS32(count);
+                        persistentBoolList.add(0x1C).writeS32(0);
+
+                        log("[✨ BOOL_LIST] Created Il2Cpp List<bool> with " + count + " items: " + JSON.stringify(boolArray) + " (list=" + persistentBoolList + ", arr=" + persistentBoolArr + ")");
+                        return persistentBoolList;
                     } catch (eList) {
                         log("[-] Error creating Il2CppBoolList: " + eList.message);
                         return NULL;
