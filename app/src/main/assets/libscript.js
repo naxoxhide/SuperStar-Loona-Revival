@@ -13217,8 +13217,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                                             }
                                         }
                                     } catch (eTit0) {}
-                                    // Schedule OnTry on Unity Main Thread in ~20 frames (~330ms)
-                                    popupTryCountdown = 20;
+                                    // Do not auto-trigger immediately, allow inspection & manual tap on Rating Up (or explicit try_popup command)
+                                    popupTryCountdown = -1;
                                 }
                             } catch (eObLeave) {
                                 log("[-] Error in CardIntensifyPopup.OnBuild onLeave: " + eObLeave.message);
@@ -13477,6 +13477,20 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                                     return 0; // Return 0 (false) so Popup.OnClick does NOT close popup on Next!
                                 } else {
                                     log("[👉 DISMISS / OK] Final result confirmed, closing popup cleanly via Popup.OnClick -> Close...");
+                                    try {
+                                        if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                            var sceneView = activeInventorySceneInstance.add(0x48).readPointer();
+                                            if (!sceneView.isNull()) {
+                                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                                                var svGo = getGoFn(sceneView, NULL);
+                                                if (!svGo.isNull()) setActiveFn(svGo, 1, NULL);
+                                            }
+                                            var showIntLayoutFn = new NativeFunction(baseAddr.add(0x1057B6C), "void", ["pointer", "int", "pointer"]);
+                                            showIntLayoutFn(activeInventorySceneInstance, 1, NULL);
+                                            safeRefreshIntensifyView(activeInventorySceneInstance);
+                                        }
+                                    } catch (eResInven) {}
                                     return 1; // Return 1 (true) so Popup.OnClick proceeds to Popup.Close()
                                 }
                             } catch (eOco) {
@@ -13565,13 +13579,11 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                                 try {
                                     var sceneView = activeInventorySceneInstance.add(0x48).readPointer();
                                     if (!sceneView.isNull()) {
-                                        var svBase = sceneView.add(0x40).readPointer();
-                                        if (!svBase.isNull()) {
-                                            var svGo = svBase.add(0x10).readPointer();
-                                            if (!svGo.isNull()) {
-                                                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
-                                                setActiveFn(svGo, 1, NULL);
-                                            }
+                                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                                        var svGo = getGoFn(sceneView, NULL);
+                                        if (!svGo.isNull()) {
+                                            setActiveFn(svGo, 1, NULL);
                                         }
                                     }
                                     var showIntLayoutFn = new NativeFunction(baseAddr.add(0x1057B6C), "void", ["pointer", "int", "pointer"]);
