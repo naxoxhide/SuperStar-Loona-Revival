@@ -7252,9 +7252,10 @@ function initIl2Cpp(module) {
                                             for (var cIdx = 0; cIdx < acvCount; cIdx++) {
                                                 var cCell = acvData.add(0x20 + cIdx * 8).readPointer();
                                                 if (cCell.isNull()) continue;
-                                                var dIdx = cCell.add(0x24).readS32();
+                                                var dIdx = cIdx;
+                                                cCell.add(0x24).writeS32(dIdx);
                                                 var cGo = getGoFnBase(cCell, NULL);
-                                                if (dIdx >= 0 && dIdx < eligible.length && cIdx < eligible.length) {
+                                                if (dIdx >= 0 && dIdx < eligible.length) {
                                                     if (!cGo.isNull()) setActFnBase(cGo, 1, NULL);
                                                     updateSingleCell(cCell, eligible[dIdx], dIdx, false);
                                                 } else {
@@ -7270,6 +7271,7 @@ function initIl2Cpp(module) {
                                 if (!cardCountText.isNull()) {
                                     var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
                                     setTextFn(cardCountText, createIl2CppString(eligible.length + " / 200"), NULL);
+                                    log("[📊 CARD COUNT] Updated intensify count text to: " + eligible.length + " / 200");
                                 }
                             }
                         }
@@ -7751,10 +7753,11 @@ function initIl2Cpp(module) {
                     }
                 };
 
-                // Smart recommend material selection: picks up to 5 lowest grade cards and calls RegistMaterialCardItem
-                var executeRecommend = function(sceneThis) {
+                // Smart recommend material selection: picks up to N (default 5) lowest grade cards and calls RegistMaterialCardItem
+                var executeRecommend = function(sceneThis, maxCountOverride) {
                     try {
-                        log("[⚡ RECOMMEND EXEC] Starting smart recommend material selection...");
+                        var targetMax = (typeof maxCountOverride === 'number' && maxCountOverride > 0) ? maxCountOverride : 5;
+                        log("[⚡ RECOMMEND EXEC] Starting smart recommend material selection (targetMax=" + targetMax + ")...");
                         if (!sceneThis || sceneThis.isNull()) return;
 
                         // 1. Clear existing materials
@@ -7852,8 +7855,8 @@ function initIl2Cpp(module) {
                             log("[⚡ RECOMMEND] Set scene.selectedArtistData to artist " + targetArtistCode);
                         }
 
-                        // 6. Register up to 5 material cards
-                        var pickCount = Math.min(5, candidates.length);
+                        // 6. Register up to targetMax material cards
+                        var pickCount = Math.min(targetMax, candidates.length);
                         var regFn = new NativeFunction(baseAddr.add(0x1056B5C), "void", ["pointer", "pointer"]);
                         for (var p = 0; p < pickCount; p++) {
                             var cand = candidates[p];
@@ -13038,6 +13041,113 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                     }
                 }
 
+                function commitConsumedMaterials(session) {
+                    try {
+                        if (!session || !session.materials || session.materials.length === 0) return;
+                        if (session.consumedCommitted) return;
+                        session.consumedCommitted = true;
+
+                        var consumedCount = session.materials.length;
+                        var consumedIds = {};
+                        for (var k = 0; k < session.materials.length; k++) {
+                            var m = session.materials[k];
+                            if (m && m.objId !== undefined) {
+                                consumedIds[m.objId] = true;
+                                consumedIds[m.objId.toString()] = true;
+                            }
+                        }
+                        log("[🔥 CONSUME MATERIALS] Burning " + consumedCount + " cards: " + JSON.stringify(session.materials.map(function(mat) { return { objId: mat.objId, cId: mat.cardId, gr: mat.grade, lvl: mat.level }; })));
+
+                        // 1. Update target card in memory (if available)
+                        var targetCardPtr = session.targetCard;
+                        if (!targetCardPtr || targetCardPtr.isNull()) {
+                            if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                targetCardPtr = activeInventorySceneInstance.add(0x88).readPointer();
+                                if (targetCardPtr.isNull()) targetCardPtr = activeInventorySceneInstance.add(0x98).readPointer();
+                            }
+                        }
+                        if (targetCardPtr && !targetCardPtr.isNull() && session.finalTargetStats) {
+                            var rawObj = targetCardPtr.add(0x10).readPointer();
+                            if (!rawObj.isNull()) {
+                                rawObj.add(0x18).writeS16(session.finalTargetStats.energy);
+                                rawObj.add(0x1A).writeS16(session.finalTargetStats.score);
+                                rawObj.add(0x1C).writeS16(session.finalTargetStats.level);
+                                rawObj.add(0x24).writeS32(session.finalTargetStats.grade);
+                                var finLvl = session.finalTargetStats.level;
+                                var finGr = session.finalTargetStats.grade;
+                                var newCode = (finGr < 4) ? (finGr * 5 + Math.min(4, finLvl - 1)) : (20 + Math.min(98, finLvl - 1));
+                                targetCardPtr.add(0x20).writeS16(newCode);
+                                log("[⚡ TARGET UPDATED] Target card updated in memory: Grade=" + finGr + ", Level=" + finLvl);
+                            }
+                        }
+
+                        // 2. Filter global loonaCardItems
+                        if (loonaCardItems && loonaCardItems.length > 0) {
+                            var countBefore = loonaCardItems.length;
+                            loonaCardItems = loonaCardItems.filter(function(ci) {
+                                if (!ci || ci.isNull()) return false;
+                                var r = ci.add(0x10).readPointer();
+                                if (!r || r.isNull()) return false;
+                                var oId = r.add(0x10).readS64();
+                                return !consumedIds[oId] && !consumedIds[oId.toString()];
+                            });
+                            log("[🃏 LOONA CARD ITEMS] Filtered loonaCardItems: " + countBefore + " -> " + loonaCardItems.length);
+                        }
+
+                        // 3. Persist to player_profile.json
+                        try {
+                            var profile = loadPlayerProfile();
+                            if (profile && profile.inventoryCards && Array.isArray(profile.inventoryCards)) {
+                                var profBefore = profile.inventoryCards.length;
+                                profile.inventoryCards = profile.inventoryCards.filter(function(cj) {
+                                    return !consumedIds[cj.objectID] && !consumedIds[cj.objectID ? cj.objectID.toString() : ""];
+                                });
+                                if (session.targetInitial && session.finalTargetStats) {
+                                    var tOId = session.targetInitial.objId;
+                                    var tCId = session.targetInitial.cardId;
+                                    for (var pc = 0; pc < profile.inventoryCards.length; pc++) {
+                                        var cardEntry = profile.inventoryCards[pc];
+                                        if (cardEntry.objectID === tOId || cardEntry.cardID === tCId) {
+                                            cardEntry.grade = session.finalTargetStats.grade;
+                                            cardEntry.level = session.finalTargetStats.level;
+                                            cardEntry.score = session.finalTargetStats.score;
+                                            cardEntry.energy = session.finalTargetStats.energy;
+                                        }
+                                    }
+                                }
+                                log("[💾 PROFILE UPDATED] profile.inventoryCards: " + profBefore + " -> " + profile.inventoryCards.length);
+                                savePlayerProfile(profile);
+                            }
+                        } catch (eProf) {
+                            log("[-] Error updating player_profile.json: " + eProf.message);
+                        }
+
+                        // 4. Remove consumed cards from native CardMap Dictionary
+                        try {
+                            var getCardMapFn = new NativeFunction(baseAddr.add(0xF2751C), "pointer", ["pointer"]);
+                            var cardMap = getCardMapFn(NULL);
+                            if (cardMap && !cardMap.isNull()) {
+                                var dictRemoveFn = findMethod("mscorlib", "System.Collections.Generic", "Dictionary`2", "Remove", 1);
+                                if (dictRemoveFn) {
+                                    for (var rmId in consumedIds) {
+                                        var mIdNum = parseInt(rmId, 10);
+                                        if (isNaN(mIdNum)) continue;
+                                        var remArgs = Memory.alloc(Process.pointerSize * 2);
+                                        remArgs.writeS64(mIdNum);
+                                        remArgs.add(Process.pointerSize).writePointer(NULL);
+                                        il2cpp_runtime_invoke(dictRemoveFn, cardMap, remArgs, NULL);
+                                    }
+                                    log("[🗑️ CARDMAP] Consumed cards removed from in-memory CardMap Dictionary");
+                                }
+                            }
+                        } catch (eMap) {
+                            log("[-] Error removing from CardMap: " + eMap.message);
+                        }
+                    } catch (eCcm) {
+                        log("[-] Error in commitConsumedMaterials: " + eCcm.message);
+                    }
+                }
+
                 function triggerPopupIntensifyResult(pop) {
                     try {
                         if (!pop || pop.isNull()) {
@@ -13058,20 +13168,66 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                             log("[✨ INTENSIFY RESULT] Allocated CardIntensifyPopup.Result: " + newRes);
                         }
 
-                        // 2. Build boolArray from activePopupSession.steps
+                        // 2. Build boolArray from activePopupSession.steps & compute stat progression
                         var boolArr = [];
                         if (activePopupSession && activePopupSession.steps && activePopupSession.steps.length > 0) {
+                            var tInit = activePopupSession.targetInitial || { cardId: 1001, grade: 0, level: 1, score: 100, energy: 100, isPrism: false };
+                            var curLevel = tInit.level;
+                            var curGrade = tInit.grade;
+                            var isPrism = !!tInit.isPrism;
+                            var maxLevel = (curGrade === 4) ? 99 : 5;
+
                             for (var s = 0; s < activePopupSession.steps.length; s++) {
                                 var st = activePopupSession.steps[s];
+                                var stepBeforeLevel = curLevel;
+                                var stepBeforeStats = getCardBaseStats(curGrade, stepBeforeLevel, isPrism);
+
                                 if (testIntensifyMode === "force_fail") {
                                     st.isSuccess = false;
                                 } else if (testIntensifyMode === "force_success") {
-                                    st.isSuccess = true;
+                                    st.isSuccess = (curLevel < maxLevel);
                                 } else if (testIntensifyMode === "step_demo") {
-                                    st.isSuccess = (s > 0);
+                                    st.isSuccess = (s > 0 && curLevel < maxLevel);
+                                } else {
+                                    var roll = Math.random() * 100.0;
+                                    var info = getIntensifyPriceAndRate(curGrade, curLevel, st.material.grade, st.material.level);
+                                    st.isSuccess = (roll < info.rate) && (curLevel < maxLevel);
                                 }
+
+                                if (st.isSuccess && curLevel < maxLevel) {
+                                    curLevel++;
+                                }
+
+                                var stepAfterStats = getCardBaseStats(curGrade, curLevel, isPrism);
+                                st.before = {
+                                    cardId: tInit.cardId,
+                                    grade: curGrade,
+                                    level: stepBeforeLevel,
+                                    isPrism: isPrism,
+                                    score: stepBeforeStats.score,
+                                    energy: stepBeforeStats.energy
+                                };
+                                st.after = {
+                                    cardId: tInit.cardId,
+                                    grade: curGrade,
+                                    level: curLevel,
+                                    isPrism: isPrism,
+                                    score: stepAfterStats.score,
+                                    energy: stepAfterStats.energy
+                                };
+                                st.isMaxLevelReached = (curLevel >= maxLevel);
                                 boolArr.push(!!st.isSuccess);
                             }
+
+                            activePopupSession.finalTargetStats = {
+                                grade: curGrade,
+                                level: curLevel,
+                                score: getCardBaseStats(curGrade, curLevel, isPrism).score,
+                                energy: getCardBaseStats(curGrade, curLevel, isPrism).energy
+                            };
+
+                            // Commit consumption of materials, persist profile and update in-memory lists
+                            commitConsumedMaterials(activePopupSession);
                         } else {
                             boolArr = [false];
                         }
@@ -14123,10 +14279,13 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                                 log("[⚡ INTENSIFY CMD] Dispatching triggerSafeOnIntensify cleanly!");
                                 triggerSafeOnIntensify(curScene);
                             }
-                        } else if (cmdRaw === "recommend") {
+                        } else if (cmdRaw === "recommend" || cmdRaw === "rec" || cmdRaw.indexOf("recommend_") === 0 || cmdRaw.indexOf("rec_") === 0) {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
-                                log("[⚡ RECOMMEND CMD] Triggering executeRecommend!");
-                                executeRecommend(curScene);
+                                var recCount = 5;
+                                if (cmdRaw.indexOf("recommend_") === 0) recCount = parseInt(cmdRaw.split("_")[1], 10) || 5;
+                                else if (cmdRaw.indexOf("rec_") === 0) recCount = parseInt(cmdRaw.split("_")[1], 10) || 5;
+                                log("[⚡ RECOMMEND CMD] Triggering executeRecommend with " + recCount + " cards!");
+                                executeRecommend(curScene, recCount);
                             }
                         } else if (cmdRaw === "try") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {

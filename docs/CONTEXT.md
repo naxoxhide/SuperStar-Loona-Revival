@@ -2826,6 +2826,59 @@ En atención a la solicitud de refinamiento visual del usuario (Ignacio) sobre l
     - [val_5mat_step5_ok.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_5mat_step5_ok.png): Intento 5/5 SUCCEED (ViVi C1, +2 Score, +3 Energy) con botón final "OK".
     - [val_5mat_after_dismiss.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_5mat_after_dismiss.png): Modal cerrado y vista de pedestales restaurada limpiamente a cero cartas.
 
+---
+
+### Módulo: Descuento y Eliminación Persistente de Cartas Materiales en Modo Offline Standalone
+
+#### 1. Diagnóstico y Causa Raíz de Retención Previa
+* **Desconexión del Flujo de Consumo:**
+  - Originalmente, la rutina `handleOfflineIntensify` residía en el hook de red `OnTry`, el cual fue reemplazado por `triggerPopupIntensifyResult` para saltar de inmediato a la animación de `CardIntensifyPopup`.
+  - Como consecuencia, el perfil en disco ([player_profile.json](file:///storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/player_profile.json)) y la lista en memoria `loonaCardItems` nunca recibían la señal de deducción, provocando que al cerrar el modal las cartas continuaran existiendo y el contador `InvenCardView.count` (`cardView + 0x38`) se mantuviera estático.
+* **Permisos del Archivo de Perfil en Emulador Android:**
+  - El archivo `player_profile.json` en almacenamiento externo fue creado por el usuario `shell` con permisos de solo lectura (`-rw-r--r--`). La aplicación Unity corre bajo el UID `u0_a82`, impidiendo que `savePlayerProfile` sobrescribiera el archivo en `/storage/emulated/0/...`. Se corrigió aplicando permisos de lectura/escritura (`chmod 666`).
+
+#### 2. Arquitectura de Consumo en 4 Capas (`commitConsumedMaterials`)
+Se implementó la función centralizada `commitConsumedMaterials(session)` en [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L13044), invocada de manera atómica al presionar "Rating Up" con guardia de idempotencia (`consumedCommitted = true`):
+1. **Actualización de Estadísticas en Memoria de la Carta Objetivo:**
+   - Escribe en `rawObj` (`targetCard + 0x10`): nivel (`+0x1C`), grado (`+0x24`), energía (`+0x18`) y score (`+0x1A`), recalculando `IntensifyCode` en `+0x20`.
+2. **Filtrado en Memoria de `loonaCardItems`:**
+   - Descarta del arreglo global de JavaScript todos los punteros cuyo `objectID` coincida con los materiales consumidos en la sesión.
+3. **Persistencia Atómica en Disco ([player_profile.json](file:///storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/player_profile.json)):**
+   - Carga el JSON, filtra `inventoryCards` eliminando los `objectID` consumidos, sincroniza los nuevos stats de la carta base y guarda el archivo vía `writeTextFile`.
+4. **Desregistro Nativo en Diccionario C# (`InventoryControl.CardMap`):**
+   - Invoca por reflexión `Dictionary<long, CardItem>.Remove(objectID)` en la instancia devuelta por `InventoryControl.get_CardMap (0xF2751C)`, eliminando cualquier referencia residual en el motor Unity.
+
+#### 3. Sincronización Visual Dinámica del Carrusel y Contador (`EnhancedScroller`)
+* **Reajuste de Celdas Activas (`populateMaterialDisplayCardList`):**
+  - Al repoblar la lista de materiales elegibles (`eligible`), se sincroniza el índice de datos de cada celda activa en el scroller horizontal: `cCell.add(0x24).writeS32(dIdx)` con `dIdx = cIdx`. Esto erradica el problema de celdas "fantasma" o desplazamientos con cartas recicladas.
+* **Actualización en Tiempo Real del Contador de Cartas:**
+  - Se actualiza directamente el componente `Text` en `InvenCardView.count` (`cardView + 0x38`) mediante `setTextFn(cardCountText, createIl2CppString(eligible.length + " / 200"))`.
+
+#### 4. Batería de Pruebas y Validación Visual Multi-Escenario
+Se ejecutaron y capturaron pruebas visuales con diferentes volúmenes y tipos de cartas:
+* **Estado Inicial:**
+  - [val_step0_intensify_view.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_step0_intensify_view.png): Pedestales limpios, carrusel mostrando HeeJin C1 en slot 0. Contador: **`48 / 200`** (60 cartas totales - 11 equipadas - 1 carta base HeeJin R50 = 48 elegibles).
+* **Prueba 1 — Consumo de 1 Material (HeeJin C1):**
+  - [val_t1_1mat_pedestal.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t1_1mat_pedestal.png): HeeJin C1 asignada a pedestal 1 (RP 16644).
+  - [val_t1_modal_preview.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t1_modal_preview.png): Modal con HeeJin R50 y HeeJin C1.
+  - [val_t1_result_step.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t1_result_step.png): Resultado con botón "OK".
+  - [val_t1_after_dismiss.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t1_after_dismiss.png): Modal cerrado. Contador decrece exactamente a **`47 / 200`** ($48 - 1$). HeeJin C1 ha desaparecido del carrusel, cediendo su posición inicial a HyunJin C1. Total en disco: 59 cartas.
+* **Prueba 2 — Consumo de 2 Materiales (HyunJin C1 y HaSeul C1):**
+  - [val_t2_2mat_pedestals.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t2_2mat_pedestals.png): 2 pedestales ocupados (RP 33288).
+  - [val_t2_modal_preview.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t2_modal_preview.png): Modal con HyunJin C1.
+  - [val_t2_step1.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t2_step1.png): Intento 1 con botón "Next".
+  - [val_t2_step2.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t2_step2.png): Intento 2 con botón "OK".
+  - [val_t2_after_dismiss.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t2_after_dismiss.png): Modal cerrado. Contador decrece exactamente a **`45 / 200`** ($47 - 2$). HyunJin C1 y HaSeul C1 han desaparecido del carrusel. Primera carta visible: YeoJin C1. Total en disco: 57 cartas.
+* **Prueba 3 — Consumo de 5 Materiales (YeoJin, ViVi, Kim Lip, JinSoul y Choerry C1):**
+  - [val_t3_5mat_pedestals.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t3_5mat_pedestals.png): 5 pedestales ocupados (RP 83220).
+  - [val_t3_modal_preview.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t3_modal_preview.png): Modal con YeoJin C1.
+  - [val_t3_step1.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t3_step1.png) a [val_t3_step5.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t3_step5.png): Progresión de 5 pasos consecutivos con botones "Next" y "OK".
+  - [val_t3_after_dismiss.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t3_after_dismiss.png): Modal cerrado. Contador decrece exactamente a **`40 / 200`** ($45 - 5$). Las 5 cartas materiales han desaparecido por completo. Primera carta visible: Yves C1. Total en disco: 52 cartas.
+* **Prueba 4 — Validación de Cancelación (No Consumo):**
+  - [val_t4_cancel_modal.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t4_cancel_modal.png): Apertura de modal con 1 material.
+  - [val_t4_cancelled_screen2.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/val_t4_cancelled_screen2.png): Pulsación de botón "Cancel" en $(680, 950)$. El modal se cierra de inmediato. El contador permanece inalterado en **`40 / 200`**, Yves C1 permanece intacta en el carrusel y el perfil en disco mantiene sus 52 cartas.
+
+
 
 
 

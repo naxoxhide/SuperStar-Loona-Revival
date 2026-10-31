@@ -128,3 +128,31 @@ Para validar visualmente y certificar que la cantidad de intentos y las cartas d
    * En el intento final ($N$), verificar que el botón conmuta a **"OK"** (`(960, 890)`).
    * Pulsar "OK" y confirmar que el modal se cierra y la vista de pedestales queda limpia y lista sin bloqueos.
 
+---
+
+## 8. Protocolo de Verificación de Consumo Persistente de Materiales y Contador (`InvenCardView`)
+
+Para validar que las cartas usadas como material se descuentan exactamente del contador y desaparecen visualmente del carrusel e inventario:
+
+1. **Asegurar Permisos de Escritura en Almacenamiento Sandbox:**
+   ```bash
+   adb shell "chmod 666 /storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/*.json"
+   ```
+2. **Poblado Parametrizado de Pedestales:**
+   * `recommend_1`: Selecciona 1 carta de material.
+   * `recommend_2`: Selecciona 2 cartas de material.
+   * `recommend_5`: Selecciona 5 cartas de material.
+   ```bash
+   adb shell "echo recommend_1 > /storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt"
+   ```
+3. **Aserciones en Tiempo Real Post-Dismiss ("OK"):**
+   * **Contador (`cardView + 0x38`):** Decrece exactamente en $N$: $Count_{final} = Count_{inicial} - N$.
+   * **Carrusel (`EnhancedScroller`):** Las $N$ cartas de material desaparecen de los slots visibles y la siguiente carta no consumida avanza a la posición inicial.
+   * **Perfil en Disco (`player_profile.json`):**
+     ```bash
+     adb shell "cat /storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/player_profile.json" | python3 -c "import sys, json; data=json.load(sys.stdin); print('Total cards:', len(data.get('inventoryCards', [])))"
+     ```
+4. **Validación de Cancelación:**
+   * Al abrir modal y pulsar "Cancel" (`(680, 950)`), el contador y las cartas en inventario permanecen inalterados.
+
+
