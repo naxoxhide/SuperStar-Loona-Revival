@@ -4524,6 +4524,25 @@ function initIl2Cpp(module) {
                     log("[🛡️ INIT] Patched CardIntensifyPopup.OnClickOverride branch at 0x1384128 to NOP!");
                 } catch (ePopNop) {}
 
+                // Patch Popup.OnClick null btnX (0x114B8AC) and btnCancel (0x114B994) guards to bypass crash on popups without them
+                try {
+                    Memory.patchCode(baseAddr.add(0x114B8AC), 4, function (code) {
+                        code.writeByteArray([0xc8, 0x01, 0x00, 0xb4]); // cbz x8, #0x114b8e4
+                    });
+                    Memory.patchCode(baseAddr.add(0x114B994), 4, function (code) {
+                        code.writeByteArray([0x08, 0x08, 0x00, 0xb4]); // cbz x8, #0x114ba94
+                    });
+                    log("[🛡️ INIT] Patched Popup.OnClick null btnX and btnCancel guards at 0x114B8AC & 0x114B994!");
+                } catch (ePopClickNop) {}
+
+                // Patch GetLargeCardViewData (0xABE7D0) null CardSpritesControl.Instance dereference
+                try {
+                    Memory.patchCode(baseAddr.add(0xABE7D0), 4, function (code) {
+                        code.writeByteArray([0xd5, 0x00, 0x00, 0xb4]); // cbz x21, #0xabe7e8
+                    });
+                    log("[🛡️ INIT] Patched GetLargeCardViewData CardSpritesControl null guard at 0xABE7D0!");
+                } catch (eCscNop) {}
+
                 var cardGettersRetNull = [
                     0xE433C4, // CardControl.Data.get_PrismData -> NULL
                     0xBD90D8, // PrismControl.Data.get_Locale -> NULL
@@ -14511,21 +14530,31 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             }
                         } else if (cmdRaw === "next" || cmdRaw === "click_next") {
                             if (activeCardIntensifyPopup && !activeCardIntensifyPopup.isNull()) {
-                                log("[👉 CLICK NEXT] Invoking Popup.OnClick on btnOk for: " + activeCardIntensifyPopup);
-                                var btnOk = activeCardIntensifyPopup.add(0xC8).readPointer();
-                                var btnGo = (!btnOk.isNull()) ? btnOk.add(0x10).readPointer() : NULL;
-                                var popupOnClickFn = new NativeFunction(baseAddr.add(0x114B7A4), "void", ["pointer", "pointer"]);
-                                popupOnClickFn(activeCardIntensifyPopup, btnGo);
+                                log("[👉 CLICK NEXT] Invoking OnClickOverride directly for: " + activeCardIntensifyPopup);
+                                try {
+                                    var onClickOverrideFn = new NativeFunction(baseAddr.add(0x138407C), "bool", ["pointer", "pointer"]);
+                                    var ret = onClickOverrideFn(activeCardIntensifyPopup, NULL);
+                                    if (ret !== 0) {
+                                        var closeFn = new NativeFunction(baseAddr.add(0x114247C), "void", ["pointer"]);
+                                        closeFn(activeCardIntensifyPopup);
+                                    }
+                                } catch (eNext) {
+                                    log("[-] Error in click_next: " + eNext.message);
+                                }
                             } else {
                                 log("[-] CLICK NEXT: activeCardIntensifyPopup is null!");
                             }
                         } else if (cmdRaw === "ok" || cmdRaw === "click_ok" || cmdRaw === "close_popup" || cmdRaw === "dismiss_popup") {
                             if (activeCardIntensifyPopup && !activeCardIntensifyPopup.isNull()) {
-                                log("[👉 CLICK OK] Invoking Popup.OnClick on btnOk for: " + activeCardIntensifyPopup);
-                                var btnOk = activeCardIntensifyPopup.add(0xC8).readPointer();
-                                var btnGo = (!btnOk.isNull()) ? btnOk.add(0x10).readPointer() : NULL;
-                                var popupOnClickFn = new NativeFunction(baseAddr.add(0x114B7A4), "void", ["pointer", "pointer"]);
-                                popupOnClickFn(activeCardIntensifyPopup, btnGo);
+                                log("[👉 CLICK OK] Invoking OnClickOverride & Popup.Close for: " + activeCardIntensifyPopup);
+                                try {
+                                    var onClickOverrideFn = new NativeFunction(baseAddr.add(0x138407C), "bool", ["pointer", "pointer"]);
+                                    onClickOverrideFn(activeCardIntensifyPopup, NULL);
+                                } catch (eOkOv) {}
+                                try {
+                                    var closeFn = new NativeFunction(baseAddr.add(0x114247C), "void", ["pointer"]);
+                                    closeFn(activeCardIntensifyPopup);
+                                } catch (eClsPop) {}
                             } else {
                                 log("[-] CLOSE/OK POPUP CMD: activeCardIntensifyPopup is null!");
                             }
