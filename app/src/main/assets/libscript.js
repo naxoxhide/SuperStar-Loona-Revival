@@ -13975,7 +13975,13 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                         } else if (cmdRaw === "go_inven" || cmdRaw === "inven") {
                             try {
                                 log("[🚀 SCENE CMD] Opening InventoryScene (4)...");
-                                if (curScene && !curScene.isNull()) {
+                                if (curScene && !curScene.isNull() && sceneId === 4) {
+                                    log("[🚀 SCENE CMD] Already in InventoryScene, refreshing view!");
+                                    try { populateOfflineInventoryCards(); } catch (ePop2) {}
+                                    try { ensureInventoryLists(curScene); } catch (eEil2) {}
+                                    try { restoreDefaultDisplayCardList(curScene, true, true); } catch (eRdd) {}
+                                    try { safeSetStateMain(curScene, 0); } catch (eSsm) {}
+                                } else if (curScene && !curScene.isNull()) {
                                     var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
                                     setStateOpenSceneFn(curScene, 4, NULL, NULL, NULL);
                                 } else {
@@ -13989,6 +13995,11 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                             var cardArg = cmdRaw.substring(5).trim();
                             log("[🃏 CARD CMD] Triggering card select for arg: '" + cardArg + "' on scene: " + curScene);
                             if (curScene && !curScene.isNull() && sceneId === 4) {
+                                if (!loonaCardItems || loonaCardItems.length === 0) {
+                                    log("[🃏 CARD CMD] loonaCardItems empty, populating cards on demand...");
+                                    try { populateOfflineInventoryCards(); } catch (ePop) {}
+                                    try { ensureInventoryLists(curScene); } catch (eEil) {}
+                                }
                                 var targetCardItem = NULL;
                                 try {
                                     var cardIdx = parseInt(cardArg, 10);
