@@ -13002,6 +13002,108 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                 var popupTryCountdown = -1;
                 var popupResultWatchdogCountdown = -1;
 
+                function createIl2CppBoolList(boolArray) {
+                    try {
+                        var klassPtr = baseAddr.add(0x313CF88).readPointer();
+                        if (klassPtr.isNull()) {
+                            log("[-] createIl2CppBoolList: klassPtr is null");
+                            return NULL;
+                        }
+                        var klass = klassPtr.readPointer();
+                        if (klass.isNull()) {
+                            log("[-] createIl2CppBoolList: klass is null");
+                            return NULL;
+                        }
+                        var objNewFn = new NativeFunction(baseAddr.add(0xA43CB8), "pointer", ["pointer"]);
+                        var listObj = objNewFn(klass);
+                        if (listObj.isNull()) {
+                            log("[-] createIl2CppBoolList: listObj is null");
+                            return NULL;
+                        }
+                        var ctorFn = new NativeFunction(baseAddr.add(0x23BB330), "void", ["pointer", "pointer"]);
+                        ctorFn(listObj, NULL);
+                        var addFn = new NativeFunction(baseAddr.add(0x23BC040), "void", ["pointer", "bool", "pointer"]);
+                        for (var i = 0; i < boolArray.length; i++) {
+                            addFn(listObj, boolArray[i] ? 1 : 0, NULL);
+                        }
+                        log("[✨ BOOL_LIST] Created Il2Cpp List<bool> with " + boolArray.length + " items: " + JSON.stringify(boolArray));
+                        return listObj;
+                    } catch (eList) {
+                        log("[-] Error creating Il2CppBoolList: " + eList.message);
+                        return NULL;
+                    }
+                }
+
+                function triggerPopupIntensifyResult(pop) {
+                    try {
+                        if (!pop || pop.isNull()) {
+                            log("[-] triggerPopupIntensifyResult: pop is null");
+                            return;
+                        }
+                        if (!activePopupSession || !activePopupSession.steps || activePopupSession.steps.length === 0) {
+                            log("[✨ INTENSIFY RESULT] activePopupSession empty, capturing from scene...");
+                            capturePopupSessionFromScene(NULL, NULL);
+                        }
+
+                        // 1. Ensure this.result (+0x40) is not null
+                        var curResult = pop.add(0x40).readPointer();
+                        if (curResult.isNull()) {
+                            var allocResFn = new NativeFunction(baseAddr.add(0x1384590), "pointer", ["pointer"]);
+                            var newRes = allocResFn(pop);
+                            pop.add(0x40).writePointer(newRes);
+                            log("[✨ INTENSIFY RESULT] Allocated CardIntensifyPopup.Result: " + newRes);
+                        }
+
+                        // 2. Build boolArray from activePopupSession.steps
+                        var boolArr = [];
+                        if (activePopupSession && activePopupSession.steps && activePopupSession.steps.length > 0) {
+                            for (var s = 0; s < activePopupSession.steps.length; s++) {
+                                var st = activePopupSession.steps[s];
+                                if (testIntensifyMode === "force_fail") {
+                                    st.isSuccess = false;
+                                } else if (testIntensifyMode === "force_success") {
+                                    st.isSuccess = true;
+                                } else if (testIntensifyMode === "step_demo") {
+                                    st.isSuccess = (s > 0);
+                                }
+                                boolArr.push(!!st.isSuccess);
+                            }
+                        } else {
+                            boolArr = [false];
+                        }
+
+                        var ctxList = createIl2CppBoolList(boolArr);
+                        if (!ctxList || ctxList.isNull()) {
+                            log("[-] triggerPopupIntensifyResult: ctxList failed to create!");
+                            return;
+                        }
+
+                        // 3. Reset index to 0
+                        pop.add(0x158).writeS32(0);
+
+                        // 4. Ensure materialCard visuals for attempt 0 are set before playing anim
+                        var mCard = pop.add(0x140).readPointer();
+                        var sCard = pop.add(0x138).readPointer();
+                        var nCard = pop.add(0x118).readPointer();
+                        if (activePopupSession && activePopupSession.steps && activePopupSession.steps[0]) {
+                            var st0 = activePopupSession.steps[0];
+                            if (!mCard.isNull()) applyPopupCardLargeState(mCard, st0.material, "TryAnim.materialCard[0]");
+                            if (!sCard.isNull()) applyPopupCardLargeState(sCard, st0.before, "TryAnim.selectedCard[0]");
+                            if (!nCard.isNull()) applyPopupCardLargeState(nCard, st0.before, "TryAnim.newCard[0]");
+                        }
+
+                        // Schedule safety watchdog on Unity Main Thread in ~75 frames (~1250ms)
+                        popupResultWatchdogCountdown = 75;
+
+                        log("[✨ INTENSIFY RESULT] Calling CardIntensifyPopup.IntensifyResult (0x138467C) with " + boolArr.length + " attempts...");
+                        var intResFn = new NativeFunction(baseAddr.add(0x138467C), "void", ["pointer", "int", "pointer", "pointer"]);
+                        intResFn(pop, 0, ctxList, NULL);
+                        log("[✨ INTENSIFY RESULT] IntensifyResult returned cleanly! State=" + pop.add(0x10C).readS32());
+                    } catch (eTrigRes) {
+                        log("[-] Error triggering IntensifyResult: " + eTrigRes.message);
+                    }
+                }
+
                 function applyPopupCardLargeState(cardView, info, labelOpt) {
                     try {
                         if (!cardView || cardView.isNull() || !info) return;
@@ -13381,6 +13483,17 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                         log("[+] Interceptor.replace installed on CardIntensifyPopup.OnClickOverride (0x138407C)!");
                     } catch (eOcoErr) {
                         log("[-] Error replacing CardIntensifyPopup.OnClickOverride: " + eOcoErr.message);
+                    }
+
+                    // CardIntensifyPopup.OnTry (0x13847D0) -> Route Try button taps directly to triggerPopupIntensifyResult
+                    try {
+                        Interceptor.replace(baseAddr.add(0x13847D0), keepCb(new NativeCallback(function(pop) {
+                            log("[👉 ON_TRY] CardIntensifyPopup.OnTry intercepted on: " + pop);
+                            triggerPopupIntensifyResult(pop);
+                        }, "void", ["pointer"])));
+                        log("[+] Interceptor.replace installed on CardIntensifyPopup.OnTry (0x13847D0)!");
+                    } catch (eRepTry) {
+                        log("[-] Error replacing CardIntensifyPopup.OnTry: " + eRepTry.message);
                     }
 
                     // Popup.Close (0x114247C) -> Ensure root GameObject of any closed popup is deactivated cleanly
@@ -14021,11 +14134,10 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                                     log("[👁️ SHOW VIEW CMD] InventoryView.Show (0x10607AC) called!");
                                 }
                             }
-                        } else if (cmdRaw === "try_popup") {
+                        } else if (cmdRaw === "try_popup" || cmdRaw === "try_result") {
                             if (activeCardIntensifyPopup && !activeCardIntensifyPopup.isNull()) {
-                                log("[⚡ TRY POPUP CMD] Triggering CardIntensifyPopup.OnTry on: " + activeCardIntensifyPopup);
-                                var popupTryFn = new NativeFunction(baseAddr.add(0x13847D0), "void", ["pointer"]);
-                                popupTryFn(activeCardIntensifyPopup);
+                                log("[⚡ TRY POPUP CMD] Triggering triggerPopupIntensifyResult on: " + activeCardIntensifyPopup);
+                                triggerPopupIntensifyResult(activeCardIntensifyPopup);
                             } else {
                                 log("[-] TRY POPUP CMD: activeCardIntensifyPopup is null!");
                             }
@@ -15192,9 +15304,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                                         var state = pop.add(0x10C).readS32();
                                         log("[✨ INTENSIFY POPUP] MainThread State at frame 20: " + state);
                                         if (state === 0) {
-                                            log("[✨ INTENSIFY POPUP] Auto-triggering CardIntensifyPopup.OnTry (0x13847D0) on MainThread...");
-                                            var pTryFn = new NativeFunction(baseAddr.add(0x13847D0), "void", ["pointer", "pointer"]);
-                                            pTryFn(pop, NULL);
+                                            log("[✨ INTENSIFY POPUP] Auto-triggering triggerPopupIntensifyResult on MainThread...");
+                                            triggerPopupIntensifyResult(pop);
                                         }
                                     }
                                 } catch (eMtTry) {
