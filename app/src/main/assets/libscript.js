@@ -13526,18 +13526,25 @@ var handleUnregisterPedestalSlot = function(sceneThis, slotIdx) {
                         log("[-] Error attaching Popup.Close: " + ePopCls.message);
                     }
 
-                    // IntensifyAssist.OnResultSucceed (0xF1D078)
-                    Interceptor.attach(baseAddr.add(0xF1D078), {
-                        onEnter: function(args) {
-                            log("[✨ INTENSIFY RESULT] IntensifyAssist.OnResultSucceed called! popup=" + args[1] + ", isRCard=" + args[2]);
-                        }
-                    });
-                    // IntensifyAssist.OnResultFailed (0xF1D894)
-                    Interceptor.attach(baseAddr.add(0xF1D894), {
-                        onEnter: function(args) {
-                            log("[✨ INTENSIFY RESULT] IntensifyAssist.OnResultFailed called! popup=" + args[1]);
-                        }
-                    });
+                    // IntensifyAssist.OnResultSucceed (0xF1D078) -> Replace native implementation to prevent null derefs on unpopulated network DTOs
+                    try {
+                        Interceptor.replace(baseAddr.add(0xF1D078), keepCb(new NativeCallback(function(assist, popup, isRCard) {
+                            log("[✨ INTENSIFY RESULT] IntensifyAssist.OnResultSucceed bypassed safely (custom handled)!");
+                        }, "void", ["pointer", "pointer", "bool"])));
+                        log("[+] Interceptor.replace installed on IntensifyAssist.OnResultSucceed (0xF1D078)!");
+                    } catch (eRepSc) {
+                        log("[-] Error replacing IntensifyAssist.OnResultSucceed: " + eRepSc.message);
+                    }
+
+                    // IntensifyAssist.OnResultFailed (0xF1D894) -> Replace native implementation to prevent null derefs on unpopulated network DTOs
+                    try {
+                        Interceptor.replace(baseAddr.add(0xF1D894), keepCb(new NativeCallback(function(assist, popup) {
+                            log("[✨ INTENSIFY RESULT] IntensifyAssist.OnResultFailed bypassed safely (custom handled)!");
+                        }, "void", ["pointer", "pointer"])));
+                        log("[+] Interceptor.replace installed on IntensifyAssist.OnResultFailed (0xF1D894)!");
+                    } catch (eRepFa) {
+                        log("[-] Error replacing IntensifyAssist.OnResultFailed: " + eRepFa.message);
+                    }
                     // IntensifyAssist.Complete (0xF1D048) -> Refresh scene after popup closes
                     Interceptor.attach(baseAddr.add(0xF1D048), {
                         onEnter: function(args) {
