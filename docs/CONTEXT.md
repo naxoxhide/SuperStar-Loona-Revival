@@ -3020,3 +3020,27 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
 * **Fase 3 — Restauración y Carga Reactiva de Saldo:**
   - Saldo restaurado a **`500.000`** RP en [player_profile.json](file:///storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/player_profile.json).
   - Al iniciar el juego y acceder a `InventoryScene`, la barra superior (`TopView`) despliega reactivamente `(R) 500.000` con su icono nativo y formateo oficial ([qa_test3_restored_500k.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test3_restored_500k.png)).
+
+---
+
+### 12. Arquitectura de Cartas, Themes, Grupos y Metadatos de Dalcomsoft
+
+#### 1. Auditoría de Tablas Relacionales (Archivos en `app/src/files/asiudgasg/sdisgkdc/`)
+- `cdd.json` (**1.467 cartas**): 731 normales (type 0), 731 prismáticas (type 1) y 5 cartas de material Power Up (100%, 70%, 50%, 30%, 10%). Cada registro define `code`, `groupID`, `artistID`, `theme`, `type`, `material` y paths de imágenes (`wadceg/<id>_s|l.i.bytes`).
+- `tmd.json` (**99 themes**): 31 normales (`limitedType = 0`) y 68 de edición limitada (`limitedType = 1`). Contiene `code`, `localeName` (puntero a `lcd.json`), `nameImageSmall`, `nameImageLarge`, `themeTypeCode`, `limitedType` y `themePercentage`.
+- `ttd.json` (**69 theme types**): Define marcos de grado C, B, A, S, R (`gradeC`..`gradeR`), animaciones de fondo (`backgroundAnimation`, `animationTime`) y anclajes UI de nombres y emblemas.
+- `grd.json` (**86 grupos**, 21 jugables para LOONA):
+  * **6 Eras Discográficas Grupales:** 1001 `[+ +]` (11 slots), 2001 `[x x]` (11 slots), 3001 `[#]` (10 slots - Hiato de HaSeul), 4001 `[12:00]` (10 slots - Hiato de HaSeul), 5001 `[&]` (11 slots), 6001 `[Flip That]` (11 slots).
+  * **11 Grupos Solo (3 slots c/u: Vocal/Dance/Rhythm):** 7001 HeeJin, 8001 HyunJin, 9001 HaSeul, 10001 YeoJin, 11001 ViVi, 12001 Kim Lip, 13001 JinSoul, 14001 Choerry, 15001 Yves, 16001 Go Won, 17001 Olivia Hye.
+  * **4 Subunidades Oficiales:** 18001 `Love & Live` (LOONA 1/3 - 4 slots), 19001 `Love & Evil` (LOONA 1/3 - 4 slots), 20001 `Mix & Match` (ODD EYE CIRCLE - 3 slots), 21001 `Max & Match` (ODD EYE CIRCLE - 3 slots).
+- `atd.json` (**676 artistas**): Ranuras de miembros por grupo, siluetas (`artistEmpty_s|l.i.bytes`), cumpleaños y bonificaciones.
+- `lcd.json` (**11.618 cadenas en 9 idiomas**): Diccionario oficial multilenguaje (ES, EN, KO, JP, ZH, etc.) resolviendo títulos de temas, nombres de grupos, artistas y diálogos.
+
+#### 2. Discrepancias Detectadas vs Implementación Offline Actual
+1. **Hardcoding de 9 Temas vs 99 Temas Reales:** `libscript.js` solo incluye 9 temas de la era debut en `themeNamesMap`. Los restantes 90 temas están ausentes.
+2. **Generación Falsa de Metadatos en `getOrCreateThemeData`:** Se genera `localeName` con fórmula sintética `10010100 + (themeId % 100)` y placeholders vacíos para banners.
+3. **Fijación de Grupo Único (1001) en `CardControl.Data`:** Se fuerza `cd.add(0x70).writeS32(1001)` y `ccd.add(0x20).writeS32(1001)` para todas las cartas, ignorando que provienen de 21 grupos distintos.
+4. **Fórmula de Artistas Rota (`((cardId - 1001) % 11) + 1`):** Provoca fallos en eras de 10 miembros (`[#]`, `[12:00]`), solos (3 slots) y subunidades (4 y 3 slots).
+5. **Selector de Grupo Restringido (`DisplayGroupList` Count = 1):** Solo se expone el grupo 1001 (`< 1 / 1 >` en botón `Choose Group`).
+6. **Bypass de Tipos de Tema (`ttd.json`):** Se fuerza `themeTypeCode = 1`, perdiendo marcos dorados/especiales y animaciones de temas Limited.
+7. **`CardBookControl.RegistWithCardItemMap` Parcheado con `RET`:** Bloqueado temporalmente debido a la falta de población de `ThemeList` y `CardList` en `CardBookControl.GroupItem`.
