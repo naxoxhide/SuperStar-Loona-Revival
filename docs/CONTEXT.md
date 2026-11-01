@@ -6,6 +6,39 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ✅ CHECKPOINT 14 — Restauración del Inicio Standalone Offline, Bypass de Carga 9.9% y Pantalla Interactiva "TOUCH TO START" (TitleScene, SceneId: 2) (2026-11-02)
+
+**Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 2028:**
+
+1. **Diagnóstico y Resolución de la Causa Raíz del Atasco en 9.9% ("Please Wait..."):**
+   - **Causa Raíz:** En `TitleScene`, el motor Dalcom intenta descargar manifiestos de red a través de `AssetControl.Open` y `AssetDownloader`. Al ser el entorno 100% standalone offline, `ensureDownloadDone()` no avanzaba al estado `COMPLETED` (8), dejando activo permanentemente el panel modal de descarga `TitleView.loadingBase` (`0xA8`) con el indicador de progreso congelado en "Please Wait... 9,9%".
+   - **Solución Arquitectónica:**
+     - **Bypass de Términos:** Intercepción de `TitleScene.SetStateTermsAndPolicy` (RVA `0xB22514`) redirigiendo el flujo de ejecución directamente a `TitleScene.ExcuteLogin` (RVA `0xB23774`).
+     - **Bypass de Carga de Red:** Intercepción de `TitleScene.SetStateLoading` (RVA `0xB22D64`) para invocar de inmediato `TitleView.HideLoading` (RVA `0xB26988`) y saltar a `ExcuteLogin`.
+     - **Escudos Visuales Definitivos:** Neutralización con `Interceptor.replace` de `TitleView.ShowLoading` (RVA `0xB230EC`) y `TitleView.StartLoadingGauge` (RVA `0xB231A4`), impidiendo la aparición de modales bloqueantes.
+
+2. **Restauración Visual de la Pantalla "TOUCH TO START" en `TitleScene.SetStateMain` (RVA `0xB243BC`):**
+   - Ocultamiento forzado de `loadingBase` (`0xA8`) y `termsBase` (`0x58`) mediante `setActiveFn(base, 0, NULL)`.
+   - Activación de `mainBase` (`0x120`) conteniendo el botón interactivo "TOUCH TO START" y el logotipo oficial de LOONA.
+   - Implementación de `loadAndApplyTitleBackground()`: carga aleatoria y decodificación en memoria de los 8 fondos oficiales de Dalcom almacenados en `asiudgasg/asodhsg/kswoks/` (`bg0.i.bytes.png` a `bg7.i.bytes.png`), asignados a `BackgroundImage.Instance`.
+
+3. **Corrección de Detección Táctil y Manejador de Login:**
+   - **Detección Táctil:** Ajuste de la condición de detección en `Input.GetMouseButtonDown` (RVA `0x25A5624`) para validar `(globalSceneId === 2 || globalSceneId === 0 || isAtTouchToStart)`, permitiendo tanto clics de mouse como toques de pantalla táctil vía ADB / pantalla del dispositivo.
+   - **Mapeo Robusto de `setupUserControl`:** Corrección del error `[-] Error in setupUserControl: expected an integer` mediante saneamiento con `parseInt` en `userId`, `cardInvenMax`, `diamond`, `rhythmPoint`, `headphone`, `dalcomCoin`, y normalización de `leaderCard` cuando se define como entero en `player_profile.json`. Permite la correcta ejecución de `UserControl.Open(player)` (RVA `0xAAB0D4`) y `UserControl.NotifyUserData()` (RVA `0xAAC39C`).
+
+4. **Transición Standalone al Lobby (`LobbyScene`, SceneId: 3):**
+   - Al tocar la pantalla en "TOUCH TO START", `<SetStateMain>b__25_0` (RVA `0xB273C4`) invoca `TitleScene.SetStateNextScene` (RVA `0xB23F38`).
+   - `TitleScene.SetStateNextScene` comprueba que el usuario está autenticado (`LoginControl.get_IsLogin() == true`), despachando `SceneControl.OpenScene(3)` (`LobbyScene`).
+   - Transición autónoma y fluida hacia el Lobby con UI activa, fondo oficial (ID 1015 / video cíclico `main_24.webm`) y sincronización del perfil `Orbits`.
+
+5. **Evidencia Visual y Pruebas de QA:**
+   - [qa_touch_to_start.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_touch_to_start.png) — Pantalla inicial "TOUCH TO START" con fondo oficial Loossemble (`bg7.i.bytes.png`).
+   - [qa_test_touch_to_start.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test_touch_to_start.png) — Prueba de arranque en frío (*cold boot*) mostrando fondo alternativo rotativo oficial (`bg6.i.bytes.png`).
+   - [qa_lobby_from_touch.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_lobby_from_touch.png) — Transición validada al Lobby tras toque en pantalla.
+   - [qa_test_lobby.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test_lobby.png) — Lobby estable a 60 FPS verificado tras arranque en frío y toque.
+
+---
+
 ### ✅ CHECKPOINT 13 — Integración de los 99 Temas y 21 Grupos LOONA en CardBookScene (SceneId: 5), Cero Cartas Limited y Transición Canvases/UI Estable (2026-11-01)
 
 **Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 738:**
