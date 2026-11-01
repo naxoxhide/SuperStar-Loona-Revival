@@ -8821,10 +8821,11 @@ function initIl2Cpp(module) {
                 var loadedTextureCache = {};
 
                 function loadLocalTexture2D(relPath) {
+                    if (!relPath) return NULL;
                     if (loadedTextureCache[relPath]) {
                         var cached = loadedTextureCache[relPath];
                         try {
-                            if (!cached.isNull()) {
+                            if (cached && typeof cached.isNull === "function" && !cached.isNull()) {
                                 var m_CachedPtr = cached.add(0x10).readPointer();
                                 if (!m_CachedPtr.isNull()) {
                                     return cached;
@@ -10128,6 +10129,7 @@ function initIl2Cpp(module) {
                     0x11D0B64, // CardBookScene.RefreshAchieveNewMark -> ret
                     0x11D0C1C, // CardBookScene.RefreshGroupNewMark -> ret
                     0x11CFB80, // CardBookScene.RefreshOthers -> ret
+                    0x11CFE18, // CardBookScene.RefreshBestCardBook -> ret (decorative online rank only)
                     0x11CD560, // CardBookMainView.SetRefreshCardCollection -> ret (prevent ArgumentOutOfRangeException on empty CardAchievementList)
                     0x11CD6F8, // CardBookMainView.SetRefreshThemeCollection -> ret (prevent ArgumentOutOfRangeException on empty ThemeAchievementList)
                     0x11D446C, // CardBookView.RafreshTabMainNewMark -> ret
@@ -14445,25 +14447,50 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     isCardBookActivated = true;
                     try {
                         log("[📖 CARDBOOK] Deferred UI activation starting for instance: " + sceneThis);
-                        var refreshMainFn = new NativeFunction(baseAddr.add(0x11CFDD8), "void", ["pointer", "bool", "pointer"]);
-                        refreshMainFn(sceneThis, 1, NULL);
-                        log("[📖 CARDBOOK] Deferred RefreshSetMainView(true) cleanly executed!");
 
-                        var waitDoneFn = new NativeFunction(baseAddr.add(0x11CF1CC), "void", ["pointer", "pointer"]);
-                        waitDoneFn(sceneThis, NULL);
-                        log("[📖 CARDBOOK] Deferred SetStateWaitDone cleanly executed!");
+                        // 1. Refresh main collection & header view
+                        try {
+                            var refreshMainFn = new NativeFunction(baseAddr.add(0x11CFDD8), "void", ["pointer", "bool", "pointer"]);
+                            refreshMainFn(sceneThis, 1, NULL);
+                            log("[📖 CARDBOOK] Deferred RefreshSetMainView(true) cleanly executed!");
+                        } catch (eRm) {
+                            log("[-] Error in RefreshSetMainView: " + eRm.message);
+                        }
 
-                        var sceneView = sceneThis.add(0x48).readPointer();
-                        if (!sceneView.isNull()) {
-                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                            var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                            var svGo = getGoFn(sceneView, NULL);
-                            if (!svGo.isNull()) setActFn(svGo, 1, NULL);
-                            var mainView = sceneView.add(0xE0).readPointer();
-                            if (!mainView.isNull()) {
-                                var mvGo = getGoFn(mainView, NULL);
-                                if (!mvGo.isNull()) setActFn(mvGo, 1, NULL);
+                        // 2. Refresh group view page 0 (populates group slots with LOONA groups/themes)
+                        try {
+                            var refreshGroupFn = new NativeFunction(baseAddr.add(0x11CFB40), "void", ["pointer", "bool", "pointer"]);
+                            refreshGroupFn(sceneThis, 1, NULL);
+                            log("[📖 CARDBOOK] Deferred RefreshGroup(true) cleanly executed!");
+                        } catch (eRg) {
+                            log("[-] Error in RefreshGroup: " + eRg.message);
+                        }
+
+                        // 3. Mark state as WaitDone
+                        try {
+                            var waitDoneFn = new NativeFunction(baseAddr.add(0x11CF1CC), "void", ["pointer", "pointer"]);
+                            waitDoneFn(sceneThis, NULL);
+                            log("[📖 CARDBOOK] Deferred SetStateWaitDone cleanly executed!");
+                        } catch (eWd) {
+                            log("[-] Error in SetStateWaitDone: " + eWd.message);
+                        }
+
+                        // 4. Ensure sceneView GameObjects are active
+                        try {
+                            var sceneView = sceneThis.add(0x48).readPointer();
+                            if (!sceneView.isNull()) {
+                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                var svGo = getGoFn(sceneView, NULL);
+                                if (!svGo.isNull()) setActFn(svGo, 1, NULL);
+                                var mainView = sceneView.add(0xE0).readPointer();
+                                if (!mainView.isNull()) {
+                                    var mvGo = getGoFn(mainView, NULL);
+                                    if (!mvGo.isNull()) setActFn(mvGo, 1, NULL);
+                                }
                             }
+                        } catch (eAct) {
+                            log("[-] Error activating sceneView GameObjects: " + eAct.message);
                         }
                     } catch (eDef) {
                         log("[-] Error in deferred CardBook UI activation: " + eDef.message);
@@ -14705,6 +14732,53 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 openSceneFn(5, NULL, NULL, NULL);
                             } catch (eGcb) {
                                 log("[-] Error in go_cardbook: " + eGcb.message);
+                            }
+                        } else if (cmdRaw === "cb:main" || cmdRaw === "tab:main") {
+                            if (curScene && !curScene.isNull() && sceneId === 5) {
+                                try {
+                                    log("[📖 SCENE CMD] Switching CardBook tab to MAIN (0)...");
+                                    var onTabBtnFn = new NativeFunction(baseAddr.add(0x11D252C), "void", ["pointer", "int", "pointer"]);
+                                    onTabBtnFn(curScene, 0, NULL);
+                                } catch (eTm) {
+                                    log("[-] Error switching CardBook to main tab: " + eTm.message);
+                                }
+                            }
+                        } else if (cmdRaw === "cb:group" || cmdRaw === "tab:group") {
+                            if (curScene && !curScene.isNull() && sceneId === 5) {
+                                try {
+                                    log("[📖 SCENE CMD] Switching CardBook tab to GROUP_VIEW (1)...");
+                                    var onTabBtnFn = new NativeFunction(baseAddr.add(0x11D252C), "void", ["pointer", "int", "pointer"]);
+                                    onTabBtnFn(curScene, 1, NULL);
+                                } catch (eTg) {
+                                    log("[-] Error switching CardBook to group tab: " + eTg.message);
+                                }
+                            }
+                        } else if (cmdRaw.indexOf("cb:page:") === 0) {
+                            var cbPage = parseInt(cmdRaw.substring(8).trim(), 10);
+                            if (curScene && !curScene.isNull() && sceneId === 5) {
+                                try {
+                                    log("[📖 SCENE CMD] Switching CardBook Group page to " + cbPage + "...");
+                                    var refreshGroupPageFn = new NativeFunction(baseAddr.add(0x11CF768), "void", ["pointer", "int", "bool", "pointer"]);
+                                    refreshGroupPageFn(curScene, cbPage, 0, NULL);
+                                } catch (eCbp) {
+                                    log("[-] Error switching CardBook page: " + eCbp.message);
+                                }
+                            }
+                        } else if (cmdRaw.indexOf("cb:select:") === 0) {
+                            var gCodeSel = parseInt(cmdRaw.substring(10).trim(), 10);
+                            if (curScene && !curScene.isNull() && sceneId === 5) {
+                                try {
+                                    log("[📖 SCENE CMD] Opening CardBookDetailPopup for group: " + gCodeSel + "...");
+                                    var targetGroupItem = allCbGroupItemMap[gCodeSel] || cachedLoonaCbGroupItem || NULL;
+                                    if (targetGroupItem && !targetGroupItem.isNull()) {
+                                        var openDetailFn = new NativeFunction(baseAddr.add(0x11CF9C0), "void", ["pointer", "pointer", "bool", "pointer"]);
+                                        openDetailFn(curScene, targetGroupItem, 1, NULL);
+                                    } else {
+                                        log("[-] GroupItem not found for code: " + gCodeSel);
+                                    }
+                                } catch (eCbs) {
+                                    log("[-] Error opening CardBook detail popup: " + eCbs.message);
+                                }
                             }
                         } else if (cmdRaw === "group" || cmdRaw === "default") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
