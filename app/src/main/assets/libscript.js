@@ -10130,6 +10130,7 @@ function initIl2Cpp(module) {
                     0x11D0C1C, // CardBookScene.RefreshGroupNewMark -> ret
                     0x11CFB80, // CardBookScene.RefreshOthers -> ret
                     0x11CFE18, // CardBookScene.RefreshBestCardBook -> ret (decorative online rank only)
+                    0x11D0300, // CardBookScene.RefreshCollection -> ret (achievement progress points bar)
                     0x11CD560, // CardBookMainView.SetRefreshCardCollection -> ret (prevent ArgumentOutOfRangeException on empty CardAchievementList)
                     0x11CD6F8, // CardBookMainView.SetRefreshThemeCollection -> ret (prevent ArgumentOutOfRangeException on empty ThemeAchievementList)
                     0x11D446C, // CardBookView.RafreshTabMainNewMark -> ret
@@ -14475,10 +14476,14 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             log("[-] Error in SetStateWaitDone: " + eWd.message);
                         }
 
-                        // 4. Ensure sceneView GameObjects are active
+                        // 4. Ensure sceneView GameObjects and Canvases are active and visible
                         try {
                             var sceneView = sceneThis.add(0x48).readPointer();
                             if (!sceneView.isNull()) {
+                                var showCanvasesFn = new NativeFunction(baseAddr.add(0xD47D00), "void", ["pointer", "pointer"]);
+                                showCanvasesFn(sceneView, NULL);
+                                log("[📖 CARDBOOK] SceneView.ShowCanvases() executed on CardBookView!");
+
                                 var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                                 var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
                                 var svGo = getGoFn(sceneView, NULL);
@@ -14487,6 +14492,11 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 if (!mainView.isNull()) {
                                     var mvGo = getGoFn(mainView, NULL);
                                     if (!mvGo.isNull()) setActFn(mvGo, 1, NULL);
+                                }
+                                var groupView = sceneView.add(0x100).readPointer();
+                                if (!groupView.isNull()) {
+                                    var gvGo = getGoFn(groupView, NULL);
+                                    if (!gvGo.isNull()) setActFn(gvGo, 1, NULL);
                                 }
                             }
                         } catch (eAct) {
