@@ -6,6 +6,40 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ✅ CHECKPOINT 13 — Integración de los 99 Temas y 21 Grupos LOONA en CardBookScene (SceneId: 5), Cero Cartas Limited y Transición Canvases/UI Estable (2026-11-01)
+
+**Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 738:**
+
+1. **Cumplimiento Estricto de la Restricción de Usuario (Ignacio — Cartas Limited):**
+   - **Regla:** *"evita las cartas limited como las que aparezcan que se van a tener como obtenidas en la cuenta"*.
+   - **Inventario Activo (`player_profile.json`):** 0 cartas limited (`limitedType != 0`). Las 670 cartas corresponden exclusivamente a temas normales (`limitedType == 0`), manteniendo un 83.4% de cartas no equipadas (>80% requerido).
+   - **CardBook (`ensureCardBookControlData`):** Al procesar los temas de los 21 grupos jugables de LOONA, todos los temas con `tMeta.limitedType !== 0` se inicializan explícitamente con `themeGradePoint = 0` y `Count = 0`. Esto garantiza que los temas limitados figuren como no obtenidos en el álbum y no inflen artificialmente el puntaje del perfil.
+
+2. **Resolución de la Causa Raíz de Abortos y Cuelgues en `Scene.Open` y `RefreshSetMainView`:**
+   - **Causa Raíz 1 (Clobbering de registros callee-saved en ARM64):** El hook `Interceptor.attach` en `CardBookScene.OnOpen` (`0x11CDD64`) provocaba que el motor JS de Frida corrompiera el registro callee-saved `x19` en el callback `onLeave`, dejando punteros del heap de JS (`0x0000006de6830db0`). Al retornar a `Scene.Open`, la instrucción `0xD52E30: ldr x8, [x19]` cargaba basura y `0xD52E40: ldp x2, x1, [x8, #0x1a8]` desencadenaba un fallo de segmentación `SIGSEGV` al invocar `OnLayout`.
+     - *Solución:* Eliminación total del interceptor sobre `OnOpen` y reemplazo de `CardBookScene.SetStateWait` (`0x11CF378`) directamente por un `ret` nativo (`[0xc0, 0x03, 0x5f, 0xd6]`).
+   - **Causa Raíz 2 (Trampoline Liveness Boehm GC Shield en `0xF288E0`):** Se reforzó el trampoline ARM64 a 60 bytes en el espacio `.text` libre de `CardListCompare` con comprobaciones de alineación de 8 bytes (`tst x0, #7`, `tst x8, #7`) y validación de rango de espacio de usuario de 48 bits (`cmp x16, #0x50; b.lo; cmp x16, #0x80; b.hs`), neutralizando punteros corruptos como `b4000001430d0004`.
+   - **Causa Raíz 3 (Abort en `RefreshSetMainView` y callee methods):** En `CardBookScene.RefreshSetMainView` (`0x11CFDD8`), se invocaba `RefreshBestCardBook` (`0x11CFE18`) y `RefreshCollection` (`0x11D0300`). Ambos métodos intentaban acceder a clasificaciones mundiales y logros de colección de red inexistentes offline, provocando `abort was called`.
+     - *Solución:* Incorporación de `0x11CFE18` y `0x11D0300` a `cardBookSafetyRetRVAs` con `ret` nativo (`[0xc0, 0x03, 0x5f, 0xd6]`), permitiendo una ejecución 100% limpia sin abortos.
+   - **Causa Raíz 4 (Canvases Ocultos en `CardBookView`):** En el ciclo nativo de Dalcomsoft, `SceneView.HideCanvases()` (`0xD47BA4`) oculta los canvas al cargar la escena. Dado que `SetStateWait` fue parcheado a `ret`, `ShowCanvases()` nunca era ejecutado.
+     - *Solución:* Invocación explícita de `SceneView.ShowCanvases(sceneView)` (`0xD47D00`) dentro de `activateCardBookUI`, restaurando y renderizando inmediatamente los elementos visuales de la interfaz de CardBook.
+
+3. **Arquitectura de Navegación y Control de Escena:**
+   - Comandos interactivos implementados en `executeSceneCommand` (`scene_cmd.txt`):
+     - `cb:main` / `tab:main`: Transiciona a la pestaña Principal (`CardBookView.TABTYPE.MAIN` = 0).
+     - `cb:group` / `tab:group`: Transiciona a la pestaña de Grupos (`CardBookView.TABTYPE.GROUP_VIEW` = 1).
+     - `cb:page:<page>`: Cambia de página (0..2) en `CardBookGroupView` navegando por los 21 grupos LOONA y subunidades.
+     - `cb:select:<groupCode>`: Abre `CardBookDetailPopup` para el grupo especificado.
+     - `back`: Regreso limpio bidireccional a `LobbyScene` (Scene 3) sin fugas de memoria ni cuelgues.
+
+4. **Evidencia Visual y Pruebas de QA:**
+   - [qa_lobby_stable2.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_lobby_stable2.png) — Lobby estable en 60 FPS con video cíclico `main_24.webm` y menú lateral expandido.
+   - [qa_cardbook_rendered.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_rendered.png) — `CardBookScene` cargado al 100% con `ShowCanvases()`, barras superior e inferior y paneles de colección activos.
+   - [qa_cardbook_detail_open.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_detail_open.png) — Apertura y sincronización de `CardBookDetailPopup` con `EnhancedScroller`.
+   - Navegación bidireccional `LobbyScene (3)` ↔ `CardBookScene (5)` validada sin fugas ni cierres forzados.
+
+---
+
 ### ✅ CHECKPOINT 12 — Investigación Exhaustiva de la Escena de Power Up (Intensify), Gaps de UI/UX, Audio SFX y Sincronización TopView (2026-11-01)
 
 **Investigación y análisis de ingeniería inversa completado en IL2CPP Dalcom:**
