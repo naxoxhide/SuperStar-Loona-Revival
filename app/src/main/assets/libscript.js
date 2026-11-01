@@ -436,6 +436,15 @@ function initIl2Cpp(module) {
             log("[-] Error patching Storage.Add: " + eSt.message);
         }
 
+        // Neutralize CardListCompare (0xF288A4) -> ret to prevent crash on non-1001 groups & 670x redundant comparison
+        try {
+            Memory.protect(baseAddr.add(0xF288A4), 4, "rwx");
+            baseAddr.add(0xF288A4).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]); // ret
+            log("[🛡️ CARD SHIELD] Successfully neutralized CardListCompare with RET!");
+        } catch (eClc) {
+            log("[-] Error patching CardListCompare: " + eClc.message);
+        }
+
         // 0. Comprehensive exception tracers: capture root thrower (0x9F1AC8), null refs (0xA43CC0), __cxa_throw (0xA8A284 / 0x81EF40)
         // 0. Comprehensive exception tracers: capture root thrower (0x9F1AC8), null refs (0xA43CC0), __cxa_throw (0xA8A284), abort
         try {
@@ -3745,7 +3754,12 @@ function initIl2Cpp(module) {
                 function getCardMetadata(cardId) {
                     var meta = getGlobalMetadata();
                     if (meta && meta.cards && meta.cards[cardId]) {
-                        return meta.cards[cardId];
+                        var c = meta.cards[cardId];
+                        if (c.groupID && !c.group) c.group = c.groupID;
+                        if (c.group && !c.groupID) c.groupID = c.group;
+                        if (c.type === 1) c.isPrism = true;
+                        if (c.material === 1) c.isMaterial = true;
+                        return c;
                     }
                     if (!cddCache) {
                         try {
@@ -3902,10 +3916,15 @@ function initIl2Cpp(module) {
                                 return isEqA ? -1 : 1;
                             }
 
-                            // 2. Member order (1001..1011)
-                            var mA = ((cIdA - 1001) % 11);
-                            var mB = ((cIdB - 1001) % 11);
-                            if (mA !== mB) return mA - mB;
+                            // 2. Group & Artist order
+                            var metaA = getCardMetadata(cIdA);
+                            var metaB = getCardMetadata(cIdB);
+                            var gA = (metaA && (metaA.groupID || metaA.group)) ? (metaA.groupID || metaA.group) : 1001;
+                            var gB = (metaB && (metaB.groupID || metaB.group)) ? (metaB.groupID || metaB.group) : 1001;
+                            if (gA !== gB) return gA - gB;
+                            var aA = (metaA && metaA.artistID) ? metaA.artistID : cIdA;
+                            var aB = (metaB && metaB.artistID) ? metaB.artistID : cIdB;
+                            if (aA !== aB) return aA - aB;
 
                             // 3. Higher grade first
                             if (grA !== grB) return grB - grA;
@@ -4063,8 +4082,11 @@ function initIl2Cpp(module) {
                     }
                 }
 
+                var isLoonaMocksInitialized = false;
                 function ensureLoonaMocks() {
-                    log("[🔍 LOONA_MOCKS CALLER] " + (new Error()).stack);
+                    if (isLoonaMocksInitialized) return;
+                    isLoonaMocksInitialized = true;
+                    log("[🔍 LOONA_MOCKS] Initializing mock groups, artists and FastArrays (one-time execution)...");
                     try {
                         syncAccountOwnedCards();
                         var meta = getGlobalMetadata();
@@ -5351,17 +5373,22 @@ function initIl2Cpp(module) {
                             try {
                                 var profile = loadPlayerProfile();
                                 var cardSmallParamsList = [];
-                                for (var mi = 0; mi < 11; mi++) {
-                                    // Find best equipped card for this member, fallback to best unequipped
+                                var curArtistCodes = (gMeta && gMeta.artistCodes) ? gMeta.artistCodes : [];
+                                for (var mi = 0; mi < slotCount; mi++) {
+                                    var targetArtist = (mi < curArtistCodes.length) ? curArtistCodes[mi] : null;
                                     var memberCards = (profile && profile.inventoryCards) ?
-                                        profile.inventoryCards.filter(function(c) { return ((c.cardID - 1001) % 11) === mi; }) : [];
+                                        profile.inventoryCards.filter(function(c) {
+                                            var cm = getCardMetadata(c.cardID);
+                                            return cm && (cm.groupID || cm.group) === gCode && cm.artistID === targetArtist;
+                                        }) : [];
                                     var eqCard = memberCards.find(function(c) { return c.isEquip; });
                                     var bestCard = eqCard || (memberCards.length > 0 ? memberCards[0] : null);
-                                    var cIdMi = bestCard ? bestCard.cardID : (1001 + mi);
+                                    var cIdMi = bestCard ? bestCard.cardID : (targetArtist || (1001 + mi));
                                     var grMi = bestCard ? (bestCard.grade !== undefined ? bestCard.grade : 4) : 4;
                                     var lvlMi = bestCard ? (bestCard.level || 50) : 50;
                                     var isEqMi = bestCard ? !!bestCard.isEquip : false;
-                                    var smallParam = createMockSmallCardParams(cIdMi, grMi, lvlMi, isEqMi);
+                                    var isPrismMi = bestCard ? !!bestCard.isPrism : false;
+                                    var smallParam = createMockSmallCardParams(cIdMi, grMi, lvlMi, isEqMi, isPrismMi);
                                     cardSmallParamsList.push(smallParam || NULL);
                                 }
                                 // Build native List<CardSmallView.Params>
@@ -5500,118 +5527,75 @@ function initIl2Cpp(module) {
 
                                     var eqCards = (profile && profile.inventoryCards) ? profile.inventoryCards.filter(function(c) { return c.isEquip; }) : [];
                                     for (var i = 0; i < cardCount; i++) {
-                                        var cardSmallView = cardItemsPtr.add(0x20 + i * 8).readPointer();
-                                        if (!cardSmallView.isNull()) {
-                                            if (i >= curSlotCount) {
+                                        try {
+                                            var cardSmallView = cardItemsPtr.add(0x20 + i * 8).readPointer();
+                                            if (!cardSmallView.isNull()) {
+                                                if (i >= curSlotCount) {
+                                                    try {
+                                                        var go = getGameObjectFn(cardSmallView, NULL);
+                                                        if (!go.isNull()) {
+                                                            setActiveFn(go, 0, NULL);
+                                                        }
+                                                    } catch (eHide) {}
+                                                    continue;
+                                                }
                                                 try {
                                                     var go = getGameObjectFn(cardSmallView, NULL);
                                                     if (!go.isNull()) {
-                                                        setActiveFn(go, 0, NULL);
+                                                        setActiveFn(go, 1, NULL);
                                                     }
-                                                } catch (eHide) {}
-                                                continue;
-                                            }
-                                            try {
-                                                var go = getGameObjectFn(cardSmallView, NULL);
-                                                if (!go.isNull()) {
-                                                    setActiveFn(go, 1, NULL);
-                                                }
-                                            } catch (eShow) {}
+                                                } catch (eShow) {}
 
-                                            var targetArtistCode = (i < curArtistCodes.length) ? curArtistCodes[i] : null;
-                                            var targetCard = eqCards.find(function(c) {
-                                                var cm = getCardMetadata(c.cardID);
-                                                return cm && cm.group === curGroupCode && cm.artistID === targetArtistCode;
-                                            });
-                                            if (targetCard) {
-                                                // Slot IS EQUIPPED with active card
-                                                var cId = targetCard.cardID;
-                                                var gr = targetCard.grade;
-                                                var lvl = targetCard.level;
-                                                var isPrism = !!targetCard.isPrism;
-                                                var cardParam = createMockSmallCardParams(cId, gr, lvl, false, isPrism);
-                                                if (cardParam && !cardParam.isNull()) {
-                                                    cardRefreshFn(cardSmallView, cardParam, NULL);
-                                                }
-                                                try {
-                                                    setTierVis(cardSmallView, 1);
-                                                    if (gr === 4) {
+                                                var targetArtistCode = (i < curArtistCodes.length) ? curArtistCodes[i] : null;
+                                                var targetCard = eqCards.find(function(c) {
+                                                    var cm = getCardMetadata(c.cardID);
+                                                    return cm && (cm.groupID || cm.group) === curGroupCode && cm.artistID === targetArtistCode;
+                                                });
+                                                if (targetCard) {
+                                                    // Slot IS EQUIPPED with active card
+                                                    var cId = targetCard.cardID;
+                                                    var gr = targetCard.grade;
+                                                    var lvl = targetCard.level;
+                                                    var isPrism = !!targetCard.isPrism;
+                                                    var cardParam = createMockSmallCardParams(cId, gr, lvl, false, isPrism);
+                                                    if (cardParam && !cardParam.isNull()) {
+                                                        cardRefreshFn(cardSmallView, cardParam, NULL);
+                                                    }
+                                                    try {
+                                                        setTierVis(cardSmallView, 1);
+                                                        if (gr === 4) {
+                                                            setStarVis(cardSmallView, 0);
+                                                            setNumVis(cardSmallView, 1);
+                                                        } else {
+                                                            setStarVis(cardSmallView, 1);
+                                                            setNumVis(cardSmallView, 0);
+                                                        }
+                                                    } catch (eVisEq) {}
+
+                                                    // Deactivate ImageEfftect (horizontal gray line artifact)
+                                                    try {
+                                                        var imgEff = cardSmallView.add(0xC8).readPointer();
+                                                        if (!imgEff.isNull()) {
+                                                            var effGo = getGameObjectFn(imgEff, NULL);
+                                                            if (!effGo.isNull()) setActiveFn(effGo, 0, NULL);
+                                                        }
+                                                    } catch (eEff) {}
+                                                } else {
+                                                    // Slot IS UNEQUIPPED: show empty placeholder from sdhgauwehdnu
+                                                    var emptyCardId = (targetArtistCode || (1001 + i));
+                                                    var emptyParam = createMockEmptySmallCardParams(emptyCardId);
+                                                    if (emptyParam && !emptyParam.isNull()) {
+                                                        cardRefreshFn(cardSmallView, emptyParam, NULL);
+                                                    }
+                                                    try {
+                                                        setTierVis(cardSmallView, 0);
                                                         setStarVis(cardSmallView, 0);
-                                                        setNumVis(cardSmallView, 1);
-                                                    } else {
-                                                        setStarVis(cardSmallView, 1);
                                                         setNumVis(cardSmallView, 0);
-                                                    }
-                                                } catch (eVisEq) {}
-
-                                                // Deactivate ImageEfftect (horizontal gray line artifact)
-                                                try {
-                                                    var imgEff = cardSmallView.add(0xC8).readPointer();
-                                                    if (!imgEff.isNull()) {
-                                                        var effGo = getGameObjectFn(imgEff, NULL);
-                                                        if (!effGo.isNull()) setActiveFn(effGo, 0, NULL);
-                                                    }
-                                                } catch (eEff) {}
-
-                                                // Direct texture injection strictly from wadceg (unity garage pinned)
-                                                try {
-                                                    var photoRawImg = cardSmallView.add(0x58).readPointer();
-                                                    if (!photoRawImg.isNull()) {
-                                                        var photoTex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_l.i.bytes") ||
-                                                                       loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + cId + "_s.i.bytes");
-                                                        if (photoTex && !photoTex.isNull()) {
-                                                            var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
-                                                            setTextureFn(photoRawImg, photoTex, NULL);
-                                                            var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
-                                                            setEnabledFn(photoRawImg, 1, NULL);
-                                                            var pGo = getGameObjectFn(photoRawImg, NULL);
-                                                            if (!pGo.isNull()) setActiveFn(pGo, 1, NULL);
-
-                                                            // Calibrate photo dimensions to BasicSize (92, 130)
-                                                            try {
-                                                                var getRectTrFn = new NativeFunction(baseAddr.add(0x1614EF0), "pointer", ["pointer", "pointer"]);
-                                                                var setSizeDeltaFn = new NativeFunction(baseAddr.add(0x180DC18), "void", ["pointer", "float", "float", "pointer"]);
-                                                                var photoRectTr = getRectTrFn(photoRawImg, NULL);
-                                                                if (!photoRectTr.isNull()) {
-                                                                    setSizeDeltaFn(photoRectTr, 92.0, 130.0, NULL);
-                                                                }
-                                                            } catch (ePsz) {}
-                                                        }
-                                                    }
-
-                                                    var tierRawImg = cardSmallView.add(0x68).readPointer();
-                                                    if (!tierRawImg.isNull()) {
-                                                        var gLetter = (gr === 4) ? "r" : (gr === 3) ? "s" : (gr === 2) ? "a" : (gr === 1) ? "b" : "c";
-                                                        var tierTex = loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gLetter + "_s.i.bytes");
-                                                        if (tierTex && !tierTex.isNull()) {
-                                                            var setTextureFn2 = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
-                                                            setTextureFn2(tierRawImg, tierTex, NULL);
-                                                            var setEnabledFn2 = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
-                                                            setEnabledFn2(tierRawImg, 1, NULL);
-                                                            var tGo = getGameObjectFn(tierRawImg, NULL);
-                                                            if (!tGo.isNull()) setActiveFn(tGo, 1, NULL);
-
-                                                            // RawImage.SetNativeSize (0x194C1C8) to ensure 116x156 native dimensions
-                                                            try {
-                                                                var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
-                                                                setNativeSizeFn(tierRawImg, NULL);
-                                                            } catch (eSns) {}
-                                                        }
-                                                    }
-                                                } catch (ePhotoInj) {}
-                                            } else {
-                                                // Slot IS UNEQUIPPED: show empty placeholder from sdhgauwehdnu
-                                                var emptyCardId = 1001 + mIdx;
-                                                var emptyParam = createMockEmptySmallCardParams(emptyCardId);
-                                                if (emptyParam && !emptyParam.isNull()) {
-                                                    cardRefreshFn(cardSmallView, emptyParam, NULL);
+                                                    } catch (eVisEmpty) {}
                                                 }
-                                                try {
-                                                    setTierVis(cardSmallView, 0);
-                                                    setStarVis(cardSmallView, 0);
-                                                    setNumVis(cardSmallView, 0);
-                                                } catch (eVisEmpty) {}
                                             }
+                                        } catch (eSlot) {
+                                            log('[-] Slot ' + i + ' error: ' + eSlot.message);
                                         }
                                     }
                                 }
@@ -7405,11 +7389,16 @@ function initIl2Cpp(module) {
                                 return cIdA - cIdB;
                             }
 
-                            // If group is enabled, group by LOONA member order (1001..1011)
+                            // If group is enabled, group by group then artist order
                             if (offlineFilterGroup) {
-                                var mA = ((cIdA - 1001) % 11);
-                                var mB = ((cIdB - 1001) % 11);
-                                if (mA !== mB) return mA - mB;
+                                var metaA = getCardMetadata(cIdA);
+                                var metaB = getCardMetadata(cIdB);
+                                var gA = (metaA && (metaA.groupID || metaA.group)) ? (metaA.groupID || metaA.group) : 1001;
+                                var gB = (metaB && (metaB.groupID || metaB.group)) ? (metaB.groupID || metaB.group) : 1001;
+                                if (gA !== gB) return gA - gB;
+                                var aA = (metaA && metaA.artistID) ? metaA.artistID : cIdA;
+                                var aB = (metaB && metaB.artistID) ? metaB.artistID : cIdB;
+                                if (aA !== aB) return aA - aB;
                             }
 
                             if (offlineSortType === 0) {
@@ -10355,14 +10344,23 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing CardControl.Data identity getters: " + eCcdg.message);
                 }
 
-                // Replace InventoryControl.SetCurrentGroup (0xF2B810) to safely guard against ArgumentOutOfRangeException
+                // Replace InventoryControl.SetCurrentGroup (0xF2B810) to dynamically select playable group
                 try {
                     Interceptor.replace(baseAddr.add(0xF2B810), new NativeCallback(function (index, subIndex, methodInfo) {
                         log("[🃏 INVENTORY] SetCurrentGroup(index=" + index + ", subIndex=" + subIndex + ") called!");
                         try {
+                            var meta = getGlobalMetadata();
+                            var playables = (meta && meta.playableGroups) ? meta.playableGroups : PLAYABLE_GROUP_CODES;
+                            var targetGroup = (index >= 0 && index < playables.length) ? playables[index] : 1001;
+                            currentSelectedGroupCode = targetGroup;
                             var setSelectedGroupCodeFn = new NativeFunction(baseAddr.add(0xF26FBC), "void", ["int", "pointer"]);
-                            setSelectedGroupCodeFn(1001, NULL);
-                            log("[🃏 INVENTORY] SetCurrentGroup: set SelectedGroupCode to 1001!");
+                            setSelectedGroupCodeFn(targetGroup, NULL);
+                            log("[🃏 INVENTORY] SetCurrentGroup: set SelectedGroupCode to " + targetGroup + " (index=" + index + ")!");
+                            if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                try {
+                                    refreshDynamicInventorySlots(activeInventorySceneInstance, targetGroup);
+                                } catch (eRdis) {}
+                            }
                         } catch (eScgInner) {
                             log("[-] Error setting SelectedGroupCode: " + eScgInner.message);
                         }
@@ -10375,7 +10373,7 @@ function initIl2Cpp(module) {
                 // Proxy InventoryControl.get_selectedGroupCode (0xF26C40)
                 try {
                     Interceptor.replace(baseAddr.add(0xF26C40), new NativeCallback(function (methodInfo) {
-                        return 1001;
+                        return currentSelectedGroupCode;
                     }, "int", ["pointer"]));
                     log("[+] Interceptor.replace installed on InventoryControl.get_selectedGroupCode (0xF26C40)!");
                 } catch (eSgc2) {
@@ -10458,15 +10456,22 @@ function initIl2Cpp(module) {
                 // InventoryControl.GetMajorGroupItem (0xF27090) & GetCurrentGroup (0xF2B51C)
                 try {
                     Interceptor.replace(baseAddr.add(0xF27090), new NativeCallback(function (groupCode, methodInfo) {
+                        if (allInvenGroupItems[groupCode]) {
+                            return allInvenGroupItems[groupCode];
+                        }
                         if (loonaGroupItemObj && !loonaGroupItemObj.isNull()) {
                             return loonaGroupItemObj;
                         }
                         return NULL;
                     }, "pointer", ["int", "pointer"]));
                     Interceptor.replace(baseAddr.add(0xF2B51C), new NativeCallback(function (pIndex, pSubIndex, methodInfo) {
-                        if (pIndex && !pIndex.isNull()) pIndex.writeInt(0);
+                        var meta = getGlobalMetadata();
+                        var playables = (meta && meta.playableGroups) ? meta.playableGroups : PLAYABLE_GROUP_CODES;
+                        var idx = playables.indexOf(currentSelectedGroupCode);
+                        if (idx < 0) idx = 0;
+                        if (pIndex && !pIndex.isNull()) pIndex.writeInt(idx);
                         if (pSubIndex && !pSubIndex.isNull()) pSubIndex.writeInt(0);
-                        return 1001; // LOONA group code
+                        return currentSelectedGroupCode;
                     }, "int", ["pointer", "pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on GetMajorGroupItem (0xF27090) & GetCurrentGroup (0xF2B51C)!");
                 } catch (eGmg) {
@@ -10817,7 +10822,7 @@ function initIl2Cpp(module) {
                                 var meta = getCardMetadata(cId);
                                 var isMat = (cData.isMaterial || (meta && meta.isMaterial) || (cId >= 30001 && cId <= 30005));
                                 cardItemObj.add(0x2C).writeU8(isMat ? 1 : 0); // isMaterial
-                                var gCode = (meta && meta.group) ? meta.group : 1001;
+                                var gCode = (meta && (meta.groupID || meta.group)) ? (meta.groupID || meta.group) : 1001;
                                 var aId = (meta && meta.artistID) ? meta.artistID : 1001;
                                 var memberIdx = (aId >= 1000) ? (aId % 1000) : aId;
                                 cardItemObj.add(0x30).writeS32(gCode * 10000 + 1 * 100 + memberIdx); // sortCardIndex
@@ -10942,6 +10947,7 @@ function initIl2Cpp(module) {
                                 }
                                 log("[🃏 INVENTORY] Created GroupItems for all " + playables.length + " groups!");
                             }
+                            cachedDglInstance = NULL;
                             ensureDisplayGroupList();
                         } catch (eGme) {
                             log("[-] Error verifying GroupMap: " + eGme.message);
