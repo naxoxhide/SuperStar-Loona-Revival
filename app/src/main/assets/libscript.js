@@ -16270,8 +16270,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 } catch (eCmd) {}
                             }
 
-                            // Auto-Enlace / Activador Seguro de LobbyScene ONLY when isDone or already unloaded
-                            if (!isLobbyIntegrated && (isDone || (isChanging === 0 && sceneId === 3))) {
+                            // Auto-Enlace / Activador Seguro de LobbyScene ONLY when sceneId === 3 and (isDone or changing === 0)
+                            if (!isLobbyIntegrated && sceneId === 3 && (isDone || isChanging === 0)) {
                                 if (cachedLobbyStr.isNull()) {
                                     cachedLobbyStr = createIl2CppString("LobbyScene");
                                 }
@@ -16285,13 +16285,11 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                         // 1. Assign SceneObject
                                         staticFields.add(0x18).writePointer(foundGo);
 
-                                        // 2. Resolve MainView & SceneView via GetComponentInChildren (0x10B4898)
-                                        var p1 = baseAddr.add(0x314D5B8).readPointer();
-                                        var p2 = baseAddr.add(0x3123670).readPointer();
-                                        var minfoMain = p1.isNull() ? NULL : p1.readPointer();
-                                        var minfoScene = p2.isNull() ? NULL : p2.readPointer();
-                                        var mainView = minfoMain.isNull() ? NULL : getCompFn(foundGo, minfoMain);
-                                        var sceneView = minfoScene.isNull() ? NULL : getCompFn(foundGo, minfoScene);
+                                        // 2. Resolve MainView & SceneView via GetComponentInChildren
+                                        var minfoMain = resolveMetadataSlot(0x314D5B8);
+                                        var minfoScene = resolveMetadataSlot(0x3123670);
+                                        var mainView = (!minfoMain || minfoMain.isNull()) ? NULL : getCompFn(foundGo, minfoMain);
+                                        var sceneView = (!minfoScene || minfoScene.isNull()) ? NULL : getCompFn(foundGo, minfoScene);
                                         log("[🚀 AUTO-ENLACE] Extracted MainView: " + mainView + " | SceneView: " + sceneView);
 
                                         // 3. Instantiate LobbyScene via factory b__100_2 (0xBEC788)
@@ -16301,9 +16299,13 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                         // 4. Assign SceneInstance
                                         staticFields.add(0x20).writePointer(newLobbyScene);
 
-                                        // 5. Open Scene (0xD52B04)
-                                        openSceneFn(newLobbyScene, mainView, sceneView, NULL);
-                                        log("[🚀 AUTO-ENLACE] Scene.Open successfully called!");
+                                        // 5. Open Scene (0xD52B04) if views are valid
+                                        if (mainView && !mainView.isNull() && sceneView && !sceneView.isNull()) {
+                                            openSceneFn(newLobbyScene, mainView, sceneView, NULL);
+                                            log("[🚀 AUTO-ENLACE] Scene.Open successfully called!");
+                                        } else {
+                                            log("[-] AUTO-ENLACE: mainView or sceneView null, skipping openSceneFn");
+                                        }
 
                                         // 6. Complete LoadingIndicator (0xB3E230)
                                         try {
