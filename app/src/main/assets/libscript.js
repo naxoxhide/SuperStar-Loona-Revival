@@ -436,6 +436,15 @@ function initIl2Cpp(module) {
             log("[-] Error patching Storage.Add: " + eSt.message);
         }
 
+        // Neutralize DebugControl.LogCallback (0x124B5A4) -> ret so harmless Unity log warnings don't trigger IndexOutOfRangeException abort
+        try {
+            Memory.protect(baseAddr.add(0x124B5A4), 4, "rwx");
+            baseAddr.add(0x124B5A4).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]); // ret
+            log("[🛡️ LOG SHIELD] Successfully neutralized DebugControl.LogCallback (0x124B5A4) with RET!");
+        } catch (eLog) {
+            log("[-] Error patching DebugControl.LogCallback: " + eLog.message);
+        }
+
         // Neutralize CardListCompare (0xF288A4) -> ret to prevent crash on non-1001 groups & 670x redundant comparison
         try {
             Memory.protect(baseAddr.add(0xF288A4), 4, "rwx");
@@ -16270,61 +16279,10 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 } catch (eCmd) {}
                             }
 
-                            // Auto-Enlace / Activador Seguro de LobbyScene ONLY when sceneId === 3 and (isDone or changing === 0)
-                            if (!isLobbyIntegrated && sceneId === 3 && (isDone || isChanging === 0)) {
-                                if (cachedLobbyStr.isNull()) {
-                                    cachedLobbyStr = createIl2CppString("LobbyScene");
-                                }
-                                var foundGo = findGameObjectFn(cachedLobbyStr, NULL);
-                                if (!foundGo.isNull()) {
-                                    log("[🎉 LOBBY FOUND] GameObject.Find('LobbyScene') returned: " + foundGo);
-
-                                    if (sceneInstance.isNull() || sceneObj.isNull()) {
-                                        log("[🚀 AUTO-ENLACE] Linking and activating LobbyScene now!");
-
-                                        // 1. Assign SceneObject
-                                        staticFields.add(0x18).writePointer(foundGo);
-
-                                        // 2. Resolve MainView & SceneView via GetComponentInChildren
-                                        var minfoMain = resolveMetadataSlot(0x314D5B8);
-                                        var minfoScene = resolveMetadataSlot(0x3123670);
-                                        var mainView = (!minfoMain || minfoMain.isNull()) ? NULL : getCompFn(foundGo, minfoMain);
-                                        var sceneView = (!minfoScene || minfoScene.isNull()) ? NULL : getCompFn(foundGo, minfoScene);
-                                        log("[🚀 AUTO-ENLACE] Extracted MainView: " + mainView + " | SceneView: " + sceneView);
-
-                                        // 3. Instantiate LobbyScene via factory b__100_2 (0xBEC788)
-                                        var newLobbyScene = factoryLobbyFn(NULL, NULL);
-                                        log("[🚀 AUTO-ENLACE] Created LobbyScene instance: " + newLobbyScene);
-
-                                        // 4. Assign SceneInstance
-                                        staticFields.add(0x20).writePointer(newLobbyScene);
-
-                                        // 5. Open Scene (0xD52B04) if views are valid
-                                        if (mainView && !mainView.isNull() && sceneView && !sceneView.isNull()) {
-                                            openSceneFn(newLobbyScene, mainView, sceneView, NULL);
-                                            log("[🚀 AUTO-ENLACE] Scene.Open successfully called!");
-                                        } else {
-                                            log("[-] AUTO-ENLACE: mainView or sceneView null, skipping openSceneFn");
-                                        }
-
-                                        // 6. Complete LoadingIndicator (0xB3E230)
-                                        try {
-                                            completeLoadingFn(NULL);
-                                            log("[🚀 AUTO-ENLACE] LoadingIndicator.Complete() called!");
-                                        } catch (le) {
-                                            log("[-] Error calling LoadingIndicator.Complete(): " + le.message);
-                                        }
-
-                                        // 7. Clear AsyncManager & IsSceneChanging
-                                        staticFields.add(0x38).writePointer(NULL);
-                                        staticFields.add(0x48).writeU8(0);
-                                        isLobbyIntegrated = true;
-                                        log("[🎉 LOBBY READY] LobbyScene integration finished!");
-                                    } else {
-                                        isLobbyIntegrated = true;
-                                        log("[🎉 LOBBY READY] LobbyScene was already integrated by native SceneControl!");
-                                    }
-                                }
+                            // Native SceneControl handles scene integration cleanly.
+                            if (!isLobbyIntegrated && sceneId === 3 && !sceneInstance.isNull() && !sceneObj.isNull()) {
+                                isLobbyIntegrated = true;
+                                log("[🎉 LOBBY READY] LobbyScene integrated by native SceneControl!");
                             }
 
                             // Periodic safety: if sceneId === 3 and LobbyScene is active, ensure UI and Video are activated
