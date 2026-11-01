@@ -3942,53 +3942,60 @@ function initIl2Cpp(module) {
                     }
                 };
 
+                var initMetaFnNative = null;
+                function resolveMetadataSlot(slotRva) {
+                    try {
+                        if (!initMetaFnNative) {
+                            initMetaFnNative = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
+                        }
+                        var slot = baseAddr.add(slotRva);
+                        initMetaFnNative(slot);
+                        return slot.readPointer();
+                    } catch (eRms) {
+                        log("[-] Error in resolveMetadataSlot(0x" + slotRva.toString(16) + "): " + eRms.message);
+                        return NULL;
+                    }
+                }
+
                 function createFastArray(items, type) {
                     try {
-                        var klassTablePtr = NULL;
-                        var methodInfoTablePtr = NULL;
+                        var klassSlotRva = 0;
+                        var methodSlotRva = 0;
                         if (type === 'artist') {
-                            klassTablePtr = baseAddr.add(0x30F5BD0);
-                            methodInfoTablePtr = baseAddr.add(0x31154D8);
+                            klassSlotRva = 0x31E1800;  // Ext.Collection.AntiGC.FastArray<ArtistControl.Data>_TypeInfo
+                            methodSlotRva = 0x32035E0; // Method$Ext.Collection.AntiGC.FastArray<ArtistControl.Data>..ctor()
+                        } else if (type === 'cardbook_card') {
+                            klassSlotRva = 0x31E1810;  // Ext.Collection.AntiGC.FastArray<CardBookControl.CardItem>_TypeInfo
+                            methodSlotRva = 0x3203628; // Method$Ext.Collection.AntiGC.FastArray<CardBookControl.CardItem>..ctor()
                         } else {
-                            klassTablePtr = baseAddr.add(0x3129040);
-                            methodInfoTablePtr = baseAddr.add(0x31080E8);
+                            // 'card' -> InventoryControl.CardItem
+                            klassSlotRva = 0x31E1848;  // Ext.Collection.AntiGC.FastArray<InventoryControl.CardItem>_TypeInfo
+                            methodSlotRva = 0x3203738; // Method$Ext.Collection.AntiGC.FastArray<InventoryControl.CardItem>..ctor()
                         }
 
-                        var initMetaFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
-
-                        var klass = NULL;
-                        try {
-                            var ptr1 = klassTablePtr.readPointer();
-                            if (!ptr1.isNull()) {
-                                initMetaFn(ptr1);
-                                klass = ptr1.readPointer();
-                            }
-                        } catch (eKp) {}
+                        var klass = resolveMetadataSlot(klassSlotRva);
+                        var methodInfo = resolveMetadataSlot(methodSlotRva);
 
                         if (klass && !klass.isNull()) {
                             var fa = il2cpp_object_new(klass);
                             if (fa && !fa.isNull()) {
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(fa, 2);
                                 var len = items ? items.length : 0;
-                                var methodInfo = NULL;
-                                try {
-                                    var miPtr1 = methodInfoTablePtr.readPointer();
-                                    if (!miPtr1.isNull()) {
-                                        initMetaFn(miPtr1);
-                                        methodInfo = miPtr1.readPointer();
-                                    }
-                                } catch (eMip) {}
+                                var cap = Math.max(len, 4);
 
                                 var ctorFn = new NativeFunction(baseAddr.add(0x1C48A4C), "void", ["pointer", "int", "int", "pointer"]);
-                                ctorFn(fa, len, len, methodInfo);
+                                ctorFn(fa, cap, len, methodInfo);
 
                                 var pool = fa.add(0x10).readPointer();
                                 if (!pool.isNull()) {
+                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(pool, 2);
                                     for (var i = 0; i < len; i++) {
                                         pool.add(0x20 + i * 8).writePointer(items[i] || NULL);
                                     }
                                 }
                                 fa.add(0x1C).writeS32(len);
-                                log("[✅ FAST_ARRAY] Created genuine FastArray<" + type + "> at: " + fa + " (len: " + len + ")");
+                                log("[ALLOC FA] " + type + " fa=" + fa + " (klass=" + fa.readPointer() + ") pool=" + pool + " (pool_klass=" + (pool.isNull() ? "null" : pool.readPointer()) + ") len=" + len);
+                                log("[✅ FAST_ARRAY] Created genuine FastArray<" + type + "> at: " + fa + " (len: " + len + ", cap: " + cap + ")");
                                 return fa;
                             }
                         }
@@ -4000,52 +4007,44 @@ function initIl2Cpp(module) {
 
                 function createManagedList(items, type) {
                     try {
-                        var klassTablePtr = NULL;
-                        var methodInfoTablePtr = NULL;
+                        var klassSlotRva = 0;
+                        var methodSlotRva = 0;
                         if (type === 'group') {
-                            klassTablePtr = baseAddr.add(0x30EE228);
-                            methodInfoTablePtr = baseAddr.add(0x3122270);
-                        } else if (type === 'theme') {
-                            klassTablePtr = baseAddr.add(0x30D6870);
-                            methodInfoTablePtr = baseAddr.add(0x31120D0);
+                            klassSlotRva = 0x31E3588;  // System.Collections.Generic.List<InventoryControl.GroupItem>_TypeInfo
+                            methodSlotRva = 0x320AF90; // Method$System.Collections.Generic.List<InventoryControl.GroupItem>..ctor()
+                        } else if (type === 'card') {
+                            klassSlotRva = 0x31E3580;  // System.Collections.Generic.List<InventoryControl.CardItem>_TypeInfo
+                            methodSlotRva = 0x320AF28; // Method$System.Collections.Generic.List<InventoryControl.CardItem>..ctor()
+                        } else if (type === 'cardbook_group') {
+                            klassSlotRva = 0x31E3440;  // System.Collections.Generic.List<CardBookControl.GroupItem>_TypeInfo
+                            methodSlotRva = 0x320A908; // Method$System.Collections.Generic.List<CardBookControl.GroupItem>..ctor()
+                        } else if (type === 'cardbook_theme' || type === 'theme') {
+                            klassSlotRva = 0x31E3448;  // System.Collections.Generic.List<CardBookControl.ThemeItem>_TypeInfo
+                            methodSlotRva = 0x320A948; // Method$System.Collections.Generic.List<CardBookControl.ThemeItem>..ctor()
                         }
 
-                        var initMetaFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
-
-                        var klass = NULL;
-                        try {
-                            var ptr1 = klassTablePtr.readPointer();
-                            if (!ptr1.isNull()) {
-                                initMetaFn(ptr1);
-                                klass = ptr1.readPointer();
-                            }
-                        } catch (eKp) {}
+                        var klass = resolveMetadataSlot(klassSlotRva);
+                        var methodInfo = resolveMetadataSlot(methodSlotRva);
 
                         if (klass && !klass.isNull()) {
                             var listObj = il2cpp_object_new(klass);
                             if (listObj && !listObj.isNull()) {
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(listObj, 2);
                                 var len = items ? items.length : 0;
                                 var cap = Math.max(len + 4, 16);
-                                var methodInfo = NULL;
-                                try {
-                                    var miPtr1 = methodInfoTablePtr.readPointer();
-                                    if (!miPtr1.isNull()) {
-                                        initMetaFn(miPtr1);
-                                        methodInfo = miPtr1.readPointer();
-                                    }
-                                } catch (eMip) {}
 
                                 var ctorFn = new NativeFunction(baseAddr.add(0x23CD880), "void", ["pointer", "int", "pointer"]);
                                 ctorFn(listObj, cap, methodInfo);
 
                                 var pool = listObj.add(0x10).readPointer();
                                 if (!pool.isNull()) {
+                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(pool, 2);
                                     for (var i = 0; i < len; i++) {
                                         pool.add(0x20 + i * 8).writePointer(items[i] || NULL);
                                     }
                                 }
                                 listObj.add(0x18).writeS32(len);
-                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(listObj, 2);
+                                log("[ALLOC LIST] " + type + " list=" + listObj + " (klass=" + listObj.readPointer() + ") pool=" + pool + " (pool_klass=" + (pool.isNull() ? "null" : pool.readPointer()) + ") len=" + len);
                                 log("[✅ MANAGED_LIST] Created genuine List<" + type + "> at: " + listObj + " (len: " + len + ", cap: " + cap + ")");
                                 return listObj;
                             }
@@ -7186,7 +7185,7 @@ function initIl2Cpp(module) {
                         var curCap = (!itemsPtr.isNull()) ? itemsPtr.add(0x18).readS32() : 0;
                         if (itemsPtr.isNull() || curCap < minCap) {
                             if (!cachedCardItemKlass || cachedCardItemKlass.isNull()) {
-                                cachedCardItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "InventoryControl/CardItem");
+                                cachedCardItemKlass = resolveMetadataSlot(0x31F3060);
                             }
                             if (il2cpp_array_new && cachedCardItemKlass && !cachedCardItemKlass.isNull()) {
                                 var allocCap = Math.max(minCap, 64);
@@ -7248,13 +7247,10 @@ function initIl2Cpp(module) {
                         if (!scene || scene.isNull() || scene.compare(ptr(0x10000)) <= 0) return;
                         if (Process.arch === "arm64" && scene.compare(ptr("0x8000000000")) >= 0) return;
 
-                        var klass = NULL;
-                        var dcl = scene.add(0x58).readPointer();
-                        if (!dcl.isNull()) {
-                            klass = dcl.readPointer();
-                            cachedListCardItemKlass = klass;
-                        } else if (cachedListCardItemKlass && !cachedListCardItemKlass.isNull()) {
-                            klass = cachedListCardItemKlass;
+                        var klass = resolveMetadataSlot(0x31E3580);
+                        if (!klass || klass.isNull()) {
+                            var dcl = scene.add(0x58).readPointer();
+                            if (!dcl.isNull()) klass = dcl.readPointer();
                         }
                         if (!klass || klass.isNull()) return;
 
@@ -10685,7 +10681,7 @@ function initIl2Cpp(module) {
                             cardKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.account", "Card");
                         }
 
-                        var cardItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "InventoryControl/CardItem");
+                        var cardItemKlass = resolveMetadataSlot(0x31F3060);
 
                         if (!cardKlass || cardKlass.isNull() || !cardItemKlass || cardItemKlass.isNull()) {
                             log("[-] Could not resolve Card or CardItem class! cardKlass: " + cardKlass + ", cardItemKlass: " + cardItemKlass);
@@ -10861,6 +10857,7 @@ function initIl2Cpp(module) {
                                     groupItemObj.add(0x58).writeS32(0);
                                     groupItemObj.add(0x5C).writeS32(0);
 
+                                    log("[ALLOC GROUP_ITEM] gCode=" + gCode + " item=" + groupItemObj + " (klass=" + groupItemObj.readPointer() + ") fastArray=" + groupCardFastArray);
                                     allInvenGroupItems[gCode] = groupItemObj;
                                     if (gCode === 1001) loonaGroupItemObj = groupItemObj;
                                 }
@@ -14383,17 +14380,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 themeItems.push(tItem);
                             }
 
-                            var themeListManaged = createManagedList(themeItems, 'theme');
-                            if (!themeListManaged || themeListManaged.isNull()) {
-                                themeListManaged = Memory.alloc(64);
-                                var themeArr = il2cpp_array_new(cbThemeItemKlass, Math.max(themeItems.length + 4, 16));
-                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(themeArr, 2);
-                                for (var ti = 0; ti < themeItems.length; ti++) {
-                                    themeArr.add(0x20 + ti * 8).writePointer(themeItems[ti]);
-                                }
-                                themeListManaged.add(0x10).writePointer(themeArr);
-                                themeListManaged.add(0x18).writeS32(themeItems.length);
-                            }
+                            var themeListManaged = createManagedList(themeItems, 'cardbook_theme');
 
                             var cbGroupGradeInfo = NULL;
                             if (cbGradeInfoKlass && !cbGradeInfoKlass.isNull()) {
@@ -14438,19 +14425,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             }
                         }
 
-                        // 5. Wrap GroupList in managed list structure
-                        var groupListManaged = createManagedList(allCbGroupItemList, 'group');
-                        if (!groupListManaged || groupListManaged.isNull()) {
-                            log("[⚠️ CARDBOOK] createManagedList('group') returned NULL, using fallback");
-                            groupListManaged = Memory.alloc(64);
-                            var groupArr = il2cpp_array_new(cbGroupItemKlass, allCbGroupItemList.length + 8);
-                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(groupArr, 2);
-                            for (var gi = 0; gi < allCbGroupItemList.length; gi++) {
-                                groupArr.add(0x20 + gi * 8).writePointer(allCbGroupItemList[gi]);
-                            }
-                            groupListManaged.add(0x10).writePointer(groupArr);
-                            groupListManaged.add(0x18).writeS32(allCbGroupItemList.length);
-                        }
+                        // 5. Wrap GroupList in genuine managed list structure
+                        var groupListManaged = createManagedList(allCbGroupItemList, 'cardbook_group');
 
                         // 6. Populate CardBookControl.Info fields
                         info.add(0x10).writePointer(cachedLoonaCbGroupItem || allCbGroupItemList[0]);
@@ -16450,6 +16426,16 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 if (args[0].isNull()) {
                                     log("[🛡️ UNITY SAFEGUARD] 0x28b3ac called with NULL x0, redirecting to safe pointer");
                                     args[0] = unityMod.base.add(0x106b000);
+                                }
+                            }
+                        });
+
+                        // Safeguard 0x667508 (string assignment) against invalid/low pointer (< 0x1000)
+                        var emptyStrSafe = Memory.allocUtf8String("");
+                        Interceptor.attach(unityMod.base.add(0x667508), {
+                            onEnter: function (args) {
+                                if (args[1].isNull() || args[1].compare(ptr(0x1000)) < 0) {
+                                    args[1] = emptyStrSafe;
                                 }
                             }
                         });
