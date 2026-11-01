@@ -3702,9 +3702,29 @@ function initIl2Cpp(module) {
                     return defaultSellPrices[gr] || 200;
                 }
 
+                var globalMetadataMap = null;
+                function getGlobalMetadata() {
+                    if (globalMetadataMap) return globalMetadataMap;
+                    try {
+                        var raw = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/card_metadata_map.json");
+                        if (raw) {
+                            globalMetadataMap = JSON.parse(raw);
+                            log("[📦 METADATA] Loaded card_metadata_map.json! Playable groups: " + (globalMetadataMap.playableGroups ? globalMetadataMap.playableGroups.length : 0));
+                            return globalMetadataMap;
+                        }
+                    } catch (eMeta) {
+                        log("[-] Error reading card_metadata_map.json: " + eMeta.message);
+                    }
+                    return null;
+                }
+
                 var cddCache = null;
                 var urlToCardMap = {};
                 function getCardMetadata(cardId) {
+                    var meta = getGlobalMetadata();
+                    if (meta && meta.cards && meta.cards[cardId]) {
+                        return meta.cards[cardId];
+                    }
                     if (!cddCache) {
                         try {
                             var raw = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/cdd.json");
@@ -3724,12 +3744,10 @@ function initIl2Cpp(module) {
                                         urlToCardMap[lUrl] = { cId: item.code, type: "l" };
                                     }
                                 }
-                                log("[📦 CDD] Loaded cdd.json: " + arr.length + " card metadata entries cached, " + Object.keys(urlToCardMap).length + " URLs mapped!");
-                            } else {
-                                log("[-] readTextFile returned null for cdd.json!");
+                                log("[📦 CDD] Loaded fallback cdd.json: " + arr.length + " card metadata entries cached");
                             }
                         } catch (e) {
-                            log("[-] Error parsing cdd.json: " + e.message);
+                            log("[-] Error parsing fallback cdd.json: " + e.message);
                         }
                     }
                     if (cddCache && cddCache[cardId]) {
@@ -3738,9 +3756,53 @@ function initIl2Cpp(module) {
                     var mIdx = ((cardId - 1001) % 11) + 1;
                     return {
                         code: cardId,
+                        groupID: 1001,
                         artistID: 1000 + mIdx,
                         theme: 1001,
-                        type: 0
+                        type: 0,
+                        smallImagePath: "asiudgasg/asodhsg/wadceg/" + cardId + "_s.i.bytes",
+                        largeImagePath: "asiudgasg/asodhsg/wadceg/" + cardId + "_l.i.bytes"
+                    };
+                }
+
+                function getThemeMetadata(themeId) {
+                    var meta = getGlobalMetadata();
+                    if (meta && meta.themes && meta.themes[themeId]) {
+                        return meta.themes[themeId];
+                    }
+                    return {
+                        code: themeId,
+                        name: "Theme " + themeId,
+                        limitedType: 0,
+                        themeTypeCode: 0,
+                        themePercentage: 20,
+                        smallImagePath: "asiudgasg/asodhsg/agewfcbxhaa/" + themeId + "_s.i.bytes",
+                        largeImagePath: "asiudgasg/asodhsg/agewfcbxhaa/" + themeId + "_l.i.bytes"
+                    };
+                }
+
+                function getGroupMetadata(groupId) {
+                    var meta = getGlobalMetadata();
+                    if (meta && meta.groups && meta.groups[groupId]) {
+                        return meta.groups[groupId];
+                    }
+                    return {
+                        code: groupId,
+                        name: "LOONA",
+                        equipableSlot: 11,
+                        emblemPath: "asiudgasg/asodhsg/aweoijs/1001.i.bytes"
+                    };
+                }
+
+                function getArtistMetadata(artistId) {
+                    var meta = getGlobalMetadata();
+                    if (meta && meta.artists && meta.artists[artistId]) {
+                        return meta.artists[artistId];
+                    }
+                    return {
+                        code: artistId,
+                        name: "Artist " + artistId,
+                        group: 1001
                     };
                 }
 
@@ -3769,6 +3831,12 @@ function initIl2Cpp(module) {
                     1008: "Only you love",
                     1009: "Make you mine"
                 };
+
+                var PLAYABLE_GROUP_CODES = [
+                    1001, 2001, 3001, 4001, 5001, 6001,
+                    7001, 8001, 9001, 10001, 11001, 12001, 13001, 14001, 15001, 16001, 17001,
+                    18001, 19001, 20001, 21001
+                ];
 
                 var loonaGroupData = NULL;
                 var loonaThemeData = NULL;
@@ -3942,100 +4010,122 @@ function initIl2Cpp(module) {
                     return NULL;
                 }
 
+                var allGroupDataMap = {};
+                var allArtistDataMap = {};
+                var allThemeTypeDataMap = {};
+
+                function getOrCreateThemeTypeData(themeTypeCode) {
+                    themeTypeCode = parseInt(themeTypeCode, 10) || 0;
+                    if (allThemeTypeDataMap[themeTypeCode]) return allThemeTypeDataMap[themeTypeCode];
+                    try {
+                        var ttKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "ThemeTypeControl/Data");
+                        if (!ttKlass || ttKlass.isNull()) return loonaThemeTypeData;
+                        var ttObj = il2cpp_object_new(ttKlass);
+                        if (il2cpp_gchandle_new && !ttObj.isNull()) il2cpp_gchandle_new(ttObj, 2);
+                        var ttdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "ThemeTypeData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "ThemeTypeData");
+                        if (ttdKlass && !ttdKlass.isNull()) {
+                            var ttd = il2cpp_object_new(ttdKlass);
+                            if (il2cpp_gchandle_new && !ttd.isNull()) il2cpp_gchandle_new(ttd, 2);
+                            ttd.add(0x10).writeS16(themeTypeCode);
+                            ttObj.add(0x10).writePointer(ttd);
+                        }
+                        allThemeTypeDataMap[themeTypeCode] = ttObj;
+                        return ttObj;
+                    } catch (e) {
+                        return loonaThemeTypeData;
+                    }
+                }
+
                 function ensureLoonaMocks() {
                     try {
                         syncAccountOwnedCards();
-                        if (!loonaGroupData || loonaGroupData.isNull()) {
-                            var grpKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "GroupControl/Data");
-                            if (grpKlass && !grpKlass.isNull()) {
-                                loonaGroupData = il2cpp_object_new(grpKlass);
-                                if (il2cpp_gchandle_new && !loonaGroupData.isNull()) il2cpp_gchandle_new(loonaGroupData, 2);
-                                loonaGroupData.add(0x18).writePointer(createDownloadPath("asiudgasg/asodhsg/aweoijs/1001.i.bytes"));
-                                loonaGroupData.add(0x28).writePointer(createDownloadPath("asiudgasg/asodhsg/aweoijs/1001.i.bytes"));
-                                try {
-                                    var gdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "GroupData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "GroupData");
-                                    if (gdKlass && !gdKlass.isNull()) {
-                                        var gd = il2cpp_object_new(gdKlass);
-                                        if (il2cpp_gchandle_new && !gd.isNull()) il2cpp_gchandle_new(gd, 2);
-                                        gd.add(0x10).writeS32(1001); // code = 1001
-                                        gd.add(0x14).writeS16(1001); // majorGroupCode = 1001
-                                        gd.add(0x18).writeS16(11);   // memberCount = 11 (equipableSlot: 11)
-                                        gd.add(0x80).writeS16(1);    // index = 1
-                                        gd.add(0x82).writeS16(1);    // index2 = 1
-                                        loonaGroupData.add(0x10).writePointer(gd);
-                                        log("[+] Instantiated GroupData model for LOONA: " + gd);
-                                    } else {
-                                        log("[-] Failed to resolve GroupData class!");
-                                    }
-                                } catch (gdErr) {}
-                            }
-                        }
-                        if (!loonaThemeData || loonaThemeData.isNull()) {
-                            var thmKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "ThemeControl/Data");
-                            if (thmKlass && !thmKlass.isNull()) {
-                                loonaThemeData = il2cpp_object_new(thmKlass);
-                                if (il2cpp_gchandle_new && !loonaThemeData.isNull()) il2cpp_gchandle_new(loonaThemeData, 2);
-                                loonaThemeData.add(0x30).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes"));
-                                loonaThemeData.add(0x38).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
-                                loonaThemeData.add(0x40).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
-                                try {
-                                    var tdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "ThemeData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "ThemeData");
-                                    if (tdKlass && !tdKlass.isNull()) {
-                                        var td = il2cpp_object_new(tdKlass);
-                                        if (il2cpp_gchandle_new && !td.isNull()) il2cpp_gchandle_new(td, 2);
-                                        td.add(0x10).writeS32(1001);
-                                        td.add(0x18).writePointer(createIl2CppString("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes"));
-                                        td.add(0x20).writePointer(createIl2CppString("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
-                                        td.add(0x48).writePointer(createIl2CppString("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
-                                        loonaThemeData.add(0x10).writePointer(td);
-                                    }
-                                } catch (tdErr) {}
-                            }
-                        }
-                        if (!loonaThemeTypeData || loonaThemeTypeData.isNull()) {
-                            var ttKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "ThemeTypeControl/Data");
-                            if (ttKlass && !ttKlass.isNull()) {
-                                loonaThemeTypeData = il2cpp_object_new(ttKlass);
-                                if (il2cpp_gchandle_new && !loonaThemeTypeData.isNull()) il2cpp_gchandle_new(loonaThemeTypeData, 2);
-                                try {
-                                    var ttdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "ThemeTypeData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "ThemeTypeData");
-                                    if (ttdKlass && !ttdKlass.isNull()) {
-                                        var ttd = il2cpp_object_new(ttdKlass);
-                                        if (il2cpp_gchandle_new && !ttd.isNull()) il2cpp_gchandle_new(ttd, 2);
-                                        ttd.add(0x10).writeS16(1); // code = 1
-                                        loonaThemeTypeData.add(0x10).writePointer(ttd);
-                                    }
-                                } catch (ttdErr) {}
-                                log("[+] Instantiated loonaThemeTypeData: " + loonaThemeTypeData);
-                            } else {
-                                log("[-] Failed to resolve ThemeTypeControl/Data class!");
-                            }
-                        }
+                        var meta = getGlobalMetadata();
+                        var grpKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "GroupControl/Data");
+                        var gdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "GroupData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "GroupData");
                         var artKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "ArtistControl/Data");
-                        if (artKlass && !artKlass.isNull()) {
-                            var adKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "ArtistData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "ArtistData");
-                            for (var i = 0; i < LOONA_MEMBERS.length; i++) {
-                                var m = LOONA_MEMBERS[i];
-                                if (!loonaArtistDataMap[m.index]) {
-                                    var aObj = il2cpp_object_new(artKlass);
-                                    if (il2cpp_gchandle_new && !aObj.isNull()) il2cpp_gchandle_new(aObj, 2);
-                                    aObj.add(0x20).writePointer(createIl2CppString("LOONA"));
-                                    aObj.add(0x38).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes"));
-                                    aObj.add(0x40).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
-                                    try {
-                                        if (adKlass && !adKlass.isNull()) {
-                                            var ad = il2cpp_object_new(adKlass);
-                                            if (il2cpp_gchandle_new && !ad.isNull()) il2cpp_gchandle_new(ad, 2);
-                                            ad.add(0x10).writeS32(m.index);
-                                            ad.add(0x18).writeS32(1001);
-                                            ad.add(0x88).writePointer(createIl2CppString(m.name));
-                                            ad.add(0x98).writeS16(m.index);
-                                            aObj.add(0x10).writePointer(ad);
-                                        }
-                                    } catch (adErr) {}
-                                    loonaArtistDataMap[m.index] = aObj;
+                        var adKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "ArtistData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "ArtistData");
+
+                        // 1. Instantiate all 21 Groups
+                        if (grpKlass && !grpKlass.isNull() && gdKlass && !gdKlass.isNull()) {
+                            var playables = (meta && meta.playableGroups) ? meta.playableGroups : PLAYABLE_GROUP_CODES;
+                            for (var gi = 0; gi < playables.length; gi++) {
+                                var gCode = playables[gi];
+                                if (!allGroupDataMap[gCode]) {
+                                    var gMeta = (meta && meta.groups) ? meta.groups[gCode] : null;
+                                    var gName = gMeta ? gMeta.name : ("Group " + gCode);
+                                    var slots = gMeta ? gMeta.equipableSlot : 11;
+                                    var embPath = gMeta ? gMeta.emblemPath : ("asiudgasg/asodhsg/aweoijs/" + gCode + ".i.bytes");
+
+                                    var gObj = il2cpp_object_new(grpKlass);
+                                    if (il2cpp_gchandle_new && !gObj.isNull()) il2cpp_gchandle_new(gObj, 2);
+                                    gObj.add(0x18).writePointer(createDownloadPath(embPath));
+                                    gObj.add(0x28).writePointer(createDownloadPath(embPath));
+
+                                    var gd = il2cpp_object_new(gdKlass);
+                                    if (il2cpp_gchandle_new && !gd.isNull()) il2cpp_gchandle_new(gd, 2);
+                                    gd.add(0x10).writeS32(gCode);
+                                    gd.add(0x14).writeS16(gCode);
+                                    gd.add(0x18).writeS16(slots);
+                                    gd.add(0x80).writeS16(gi + 1);
+                                    gd.add(0x82).writeS16(gi + 1);
+                                    gObj.add(0x10).writePointer(gd);
+
+                                    allGroupDataMap[gCode] = gObj;
+                                    if (gCode === 1001) loonaGroupData = gObj;
                                 }
                             }
+                        }
+
+                        // 2. Instantiate all Artists
+                        if (artKlass && !artKlass.isNull() && adKlass && !adKlass.isNull()) {
+                            if (meta && meta.artists) {
+                                for (var aCodeStr in meta.artists) {
+                                    var aCode = parseInt(aCodeStr, 10);
+                                    if (!allArtistDataMap[aCode]) {
+                                        var aMeta = meta.artists[aCodeStr];
+                                        var aObj = il2cpp_object_new(artKlass);
+                                        if (il2cpp_gchandle_new && !aObj.isNull()) il2cpp_gchandle_new(aObj, 2);
+                                        aObj.add(0x20).writePointer(createIl2CppString(aMeta.name || "Artist"));
+                                        aObj.add(0x38).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes"));
+                                        aObj.add(0x40).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
+
+                                        var ad = il2cpp_object_new(adKlass);
+                                        if (il2cpp_gchandle_new && !ad.isNull()) il2cpp_gchandle_new(ad, 2);
+                                        ad.add(0x10).writeS32(aCode);
+                                        ad.add(0x18).writeS32(aMeta.group || 1001);
+                                        ad.add(0x88).writePointer(createIl2CppString(aMeta.name || "Artist"));
+                                        ad.add(0x98).writeS16(aMeta.orderIndex || 0);
+                                        aObj.add(0x10).writePointer(ad);
+
+                                        allArtistDataMap[aCode] = aObj;
+                                        if (aCode >= 1001 && aCode <= 1011) {
+                                            loonaArtistDataMap[aCode - 1000] = aObj;
+                                        }
+                                    }
+                                }
+                            } else {
+                                for (var i = 0; i < LOONA_MEMBERS.length; i++) {
+                                    var m = LOONA_MEMBERS[i];
+                                    if (!loonaArtistDataMap[m.index]) {
+                                        var aObj = il2cpp_object_new(artKlass);
+                                        if (il2cpp_gchandle_new && !aObj.isNull()) il2cpp_gchandle_new(aObj, 2);
+                                        aObj.add(0x20).writePointer(createIl2CppString("LOONA"));
+                                        aObj.add(0x38).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes"));
+                                        aObj.add(0x40).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
+                                        var ad = il2cpp_object_new(adKlass);
+                                        if (il2cpp_gchandle_new && !ad.isNull()) il2cpp_gchandle_new(ad, 2);
+                                        ad.add(0x10).writeS32(m.index);
+                                        ad.add(0x18).writeS32(1001);
+                                        ad.add(0x88).writePointer(createIl2CppString(m.name));
+                                        ad.add(0x98).writeS16(m.index);
+                                        aObj.add(0x10).writePointer(ad);
+                                        loonaArtistDataMap[m.index] = aObj;
+                                        allArtistDataMap[1000 + m.index] = aObj;
+                                    }
+                                }
+                            }
+
+                            // Build FastArray for LOONA 1001
                             var artistItems = [];
                             for (var ai = 1; ai <= 11; ai++) {
                                 artistItems.push(loonaArtistDataMap[ai] || NULL);
@@ -4047,6 +4137,14 @@ function initIl2Cpp(module) {
                             if (loonaGroupData && !loonaGroupData.isNull()) {
                                 loonaGroupData.add(0x30).writePointer(loonaArtistListFastArray);
                             }
+                        }
+
+                        // 3. Fallback theme data & theme type data
+                        if (!loonaThemeData || loonaThemeData.isNull()) {
+                            loonaThemeData = getOrCreateThemeData(1001);
+                        }
+                        if (!loonaThemeTypeData || loonaThemeTypeData.isNull()) {
+                            loonaThemeTypeData = getOrCreateThemeTypeData(0);
                         }
                     } catch (eMocks) {
                         log("[-] Error ensuring LOONA mocks: " + eMocks.message);
@@ -4062,18 +4160,31 @@ function initIl2Cpp(module) {
                         if (!thmKlass || thmKlass.isNull()) return loonaThemeData;
                         var tObj = il2cpp_object_new(thmKlass);
                         if (il2cpp_gchandle_new && !tObj.isNull()) il2cpp_gchandle_new(tObj, 2);
-                        tObj.add(0x30).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes"));
-                        tObj.add(0x38).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
-                        tObj.add(0x40).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
+
+                        var meta = getGlobalMetadata();
+                        var tMeta = (meta && meta.themes) ? meta.themes[themeId] : null;
+                        var sPath = tMeta ? tMeta.smallImagePath : ("asiudgasg/asodhsg/agewfcbxhaa/" + themeId + "_s.i.bytes");
+                        var lPath = tMeta ? tMeta.largeImagePath : ("asiudgasg/asodhsg/agewfcbxhaa/" + themeId + "_l.i.bytes");
+                        var tName = tMeta ? tMeta.name : ("Theme " + themeId);
+                        var ttCode = tMeta ? tMeta.themeTypeCode : 0;
+                        var lType = tMeta ? tMeta.limitedType : 0;
+
+                        tObj.add(0x20).writePointer(createIl2CppString(tName));
+                        tObj.add(0x30).writePointer(createDownloadPath(sPath));
+                        tObj.add(0x38).writePointer(createDownloadPath(lPath));
+                        tObj.add(0x40).writePointer(createDownloadPath(lPath));
+
                         var tdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "ThemeData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "ThemeData");
                         if (tdKlass && !tdKlass.isNull()) {
                             var td = il2cpp_object_new(tdKlass);
                             if (il2cpp_gchandle_new && !td.isNull()) il2cpp_gchandle_new(td, 2);
                             td.add(0x10).writeS32(themeId);
-                            td.add(0x14).writeS32(10010100 + (themeId % 100)); // localeName
-                            td.add(0x18).writePointer(createIl2CppString("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes"));
-                            td.add(0x20).writePointer(createIl2CppString("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
-                            td.add(0x48).writePointer(createIl2CppString("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
+                            td.add(0x14).writeS32(themeId);
+                            td.add(0x18).writePointer(createIl2CppString(sPath));
+                            td.add(0x20).writePointer(createIl2CppString(lPath));
+                            td.add(0x48).writePointer(createIl2CppString(lPath));
+                            td.add(0x70).writeS16(ttCode);
+                            td.add(0x74).writeS16(lType);
                             tObj.add(0x10).writePointer(td);
                         }
                         loonaThemeDataMap[themeId] = tObj;
@@ -4093,39 +4204,56 @@ function initIl2Cpp(module) {
                         if (!ccdKlass || ccdKlass.isNull()) return NULL;
                         var ccd = il2cpp_object_new(ccdKlass);
                         if (il2cpp_gchandle_new && !ccd.isNull()) il2cpp_gchandle_new(ccd, 2);
+
                         var meta = getCardMetadata(cardId);
-                        var memberIdx = (meta.artistID >= 1000) ? (meta.artistID - 1000) : meta.artistID;
-                        if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cardId - 1001) % 11) + 1;
+                        var groupId = meta.groupID || 1001;
+                        var artistId = meta.artistID || 1001;
                         var themeId = meta.theme || 1001;
                         var isPrism = (meta.type === 1);
+                        var isMat = (meta.material === 1);
 
-                        ccd.add(0x18).writePointer(createIl2CppString("LOONA"));
-                        ccd.add(0x20).writeS32(1001);
-                        ccd.add(0x28).writePointer(loonaGroupData || NULL);
-                        ccd.add(0x30).writePointer(loonaArtistDataMap[memberIdx] || NULL);
-                        ccd.add(0x38).writePointer(getOrCreateThemeData(themeId) || loonaThemeData || NULL);
-                        ccd.add(0x40).writePointer(loonaThemeTypeData || NULL);
+                        var metaAll = getGlobalMetadata();
+                        var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[groupId] : null;
+                        var gName = gMeta ? gMeta.name : "LOONA";
+                        var tObj = getOrCreateThemeData(themeId);
+                        var tMeta = (metaAll && metaAll.themes) ? metaAll.themes[themeId] : null;
+                        var ttCode = tMeta ? tMeta.themeTypeCode : 0;
+                        var ttObj = getOrCreateThemeTypeData(ttCode);
+                        var aObj = allArtistDataMap[artistId] || loonaArtistDataMap[((cardId - 1001) % 11) + 1] || NULL;
+                        var gObj = allGroupDataMap[groupId] || loonaGroupData || NULL;
+
+                        ccd.add(0x18).writePointer(createIl2CppString(gName));
+                        ccd.add(0x20).writeS32(groupId);
+                        ccd.add(0x28).writePointer(gObj);
+                        ccd.add(0x30).writePointer(aObj);
+                        ccd.add(0x38).writePointer(tObj || loonaThemeData || NULL);
+                        ccd.add(0x40).writePointer(ttObj || loonaThemeTypeData || NULL);
                         ccd.add(0x48).writePointer(NULL);
                         ccd.add(0x50).writeU8(1);
                         ccd.add(0x51).writeU8(1);
-                        var cardFolder = "wadceg";
-                        ccd.add(0x58).writePointer(createDownloadPath("asiudgasg/asodhsg/" + cardFolder + "/" + cardId + "_s.i.bytes"));
-                        ccd.add(0x60).writePointer(createDownloadPath("asiudgasg/asodhsg/" + cardFolder + "/" + cardId + "_l.i.bytes"));
+
+                        var sPath = meta.smallImagePath || ("asiudgasg/asodhsg/wadceg/" + cardId + "_s.i.bytes");
+                        var lPath = meta.largeImagePath || ("asiudgasg/asodhsg/wadceg/" + cardId + "_l.i.bytes");
+                        ccd.add(0x58).writePointer(createDownloadPath(sPath));
+                        ccd.add(0x60).writePointer(createDownloadPath(lPath));
+
                         try {
                             var cdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "CardData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "CardData");
                             if (cdKlass && !cdKlass.isNull()) {
                                 var cd = il2cpp_object_new(cdKlass);
                                 if (il2cpp_gchandle_new && !cd.isNull()) il2cpp_gchandle_new(cd, 2);
                                 cd.add(0x10).writeS32(cardId);
-                                cd.add(0x14).writeS32(isPrism ? 1 : 0); // type = 1 for prism
-                                cd.add(0x20).writePointer(createIl2CppString("asiudgasg/asodhsg/" + cardFolder + "/" + cardId + "_s.i.bytes")); // cardImageSmall
-                                cd.add(0x28).writePointer(createIl2CppString("asiudgasg/asodhsg/" + cardFolder + "/" + cardId + "_l.i.bytes")); // cardImageLarge
-                                cd.add(0x30).writeS32(themeId); // theme = themeId
-                                cd.add(0x70).writeS32(1001); // group = 1001
-                                cd.add(0x74).writeS32(memberIdx); // artist = memberIdx
+                                cd.add(0x14).writeS32(isPrism ? 1 : 0);
+                                cd.add(0x20).writePointer(createIl2CppString(sPath));
+                                cd.add(0x28).writePointer(createIl2CppString(lPath));
+                                cd.add(0x30).writeS32(themeId);
+                                cd.add(0x70).writeS32(groupId);
+                                cd.add(0x74).writeS32(artistId);
+                                cd.add(0x78).writeU8(isMat ? 1 : 0);
                                 ccd.add(0x10).writePointer(cd);
                             }
                         } catch (cdErr) {}
+
                         loonaCardControlDataMap[cardId] = ccd;
                         return ccd;
                     } catch (eCcd) {
@@ -4188,7 +4316,7 @@ function initIl2Cpp(module) {
                 // Proxy CardControl.Find (0x11D66F4)
                 try {
                     Interceptor.replace(baseAddr.add(0x11D66F4), keepCb(new NativeCallback(function (code, methodInfo) {
-                        if (code >= 1001 && code <= 1022) {
+                        if (code >= 1001 && code <= 30005) {
                             return getOrCreateCardControlData(code);
                         }
                         return NULL;
