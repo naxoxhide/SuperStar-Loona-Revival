@@ -514,33 +514,41 @@ function initIl2Cpp(module) {
             var livenessTrampAddr = baseAddr.add(0xF288E0);
 
             // 1. Write native trampoline into unused .text of CardListCompare (0xF288E0):
-            // 0xF288E0: cbz x0, #0xf28908                  (0xb4000140)
-            // 0xF288E4: ubfx x16, x0, #32, #16             (0xd360bc10)
-            // 0xF288E8: cbz x16, #0xf28908                 (0xb4000110)
-            // 0xF288EC: ldr x8, [x0]                       (0xf9400008)
-            // 0xF288F0: mov x19, x0                        (0xaa0003f3)
-            // 0xF288F4: tbnz w8, #0, #0xf28908             (0x370000a8)
-            // 0xF288F8: and x8, x8, #0xfffffffffffffffe    (0x927ff908)
-            // 0xF288FC: ubfx x16, x8, #32, #16             (0xd360bd10)
-            // 0xF28900: cbz x16, #0xf28908                 (0xb4000050)
-            // 0xF28904: b #0x9f8de0                        (0x17eb4137)
-            // 0xF28908: b #0x9f8e88                        (0x17eb4160)
-            Memory.protect(livenessTrampAddr, 48, "rwx");
+            // 0xF288E0: cbz x0, #0xf28918                  (if null -> return 0)
+            // 0xF288E4: tst x0, #7                          (if unaligned -> return 0)
+            // 0xF288E8: b.ne #0xf28918
+            // 0xF288EC: ldr x8, [x0]
+            // 0xF288F0: mov x19, x0
+            // 0xF288F4: tbnz w8, #0, #0xf28918             (if bit 0 set -> return 0)
+            // 0xF288F8: tst x8, #7                          (if class unaligned -> return 0)
+            // 0xF288FC: b.ne #0xf28918
+            // 0xF28900: ubfx x16, x8, #32, #16             (extract bits 32-47)
+            // 0xF28904: cmp x16, #0x50                     (if < 0x50 -> return 0)
+            // 0xF28908: b.lo #0xf28918
+            // 0xF2890C: cmp x16, #0x80                     (if >= 0x80 -> return 0)
+            // 0xF28910: b.hs #0xf28918
+            // 0xF28914: b #0x9f8de0                        (continue liveness check)
+            // 0xF28918: b #0x9f8e88                        (safe ret 0)
+            Memory.protect(livenessTrampAddr, 64, "rwx");
             var livenessTrampBytes = [
-                0x40, 0x01, 0x00, 0xb4, // 0xF288E0: cbz x0, #0xf28908
-                0x10, 0xbc, 0x60, 0xd3, // 0xF288E4: ubfx x16, x0, #32, #16
-                0x10, 0x01, 0x00, 0xb4, // 0xF288E8: cbz x16, #0xf28908
+                0xc0, 0x01, 0x00, 0xb4, // 0xF288E0: cbz x0, #0xf28918
+                0x1f, 0x08, 0x40, 0xf2, // 0xF288E4: tst x0, #7
+                0x81, 0x01, 0x00, 0x54, // 0xF288E8: b.ne #0xf28918
                 0x08, 0x00, 0x40, 0xf9, // 0xF288EC: ldr x8, [x0]
                 0xf3, 0x03, 0x00, 0xaa, // 0xF288F0: mov x19, x0
-                0xa8, 0x00, 0x00, 0x37, // 0xF288F4: tbnz w8, #0, #0xf28908
-                0x08, 0xf9, 0x7f, 0x92, // 0xF288F8: and x8, x8, #0xfffffffffffffffe
-                0x10, 0xbd, 0x60, 0xd3, // 0xF288FC: ubfx x16, x8, #32, #16
-                0x50, 0x00, 0x00, 0xb4, // 0xF28900: cbz x16, #0xf28908
-                0x37, 0x41, 0xeb, 0x17, // 0xF28904: b #0x9f8de0
-                0x60, 0x41, 0xeb, 0x17  // 0xF28908: b #0x9f8e88
+                0x28, 0x01, 0x00, 0x37, // 0xF288F4: tbnz w8, #0, #0xf28918
+                0x1f, 0x09, 0x40, 0xf2, // 0xF288F8: tst x8, #7
+                0xe1, 0x00, 0x00, 0x54, // 0xF288FC: b.ne #0xf28918
+                0x10, 0xbd, 0x60, 0xd3, // 0xF28900: ubfx x16, x8, #32, #16
+                0x1f, 0x42, 0x01, 0xf1, // 0xF28904: cmp x16, #0x50
+                0x83, 0x00, 0x00, 0x54, // 0xF28908: b.lo #0xf28918
+                0x1f, 0x02, 0x02, 0xf1, // 0xF2890C: cmp x16, #0x80
+                0x42, 0x00, 0x00, 0x54, // 0xF28910: b.hs #0xf28918
+                0x33, 0x41, 0xeb, 0x17, // 0xF28914: b #0x9f8de0
+                0x5c, 0x41, 0xeb, 0x17  // 0xF28918: b #0x9f8e88
             ];
             livenessTrampAddr.writeByteArray(livenessTrampBytes);
-            Memory.protect(livenessTrampAddr, 48, "r-x");
+            Memory.protect(livenessTrampAddr, 64, "r-x");
 
             // 2. Direct branch from 0x9F8DCC to 0xF288E0 (b #0xf288e0 = 0x1414bec5):
             Memory.protect(livenessPatchAddr, 20, "rwx");
@@ -8721,6 +8729,8 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.replace(baseAddr.add(0xACC8B8), new NativeCallback(function (callback, openCallBack, methodInfo) {
                         log("[📖 CARDBOOK] Intercepted ViewControl.OpenMyCollectionPopupOrCardBookScene -> Direct SceneControl.OpenScene(5)!");
+                        try { ensureCardBookControlData(); } catch (eCbd) {}
+                        isCardBookActivated = false;
                         var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
                         openSceneFn(5, NULL, NULL, NULL);
                     }, "void", ["pointer", "pointer", "pointer"]));
@@ -8732,6 +8742,8 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.replace(baseAddr.add(0x105DE08), new NativeCallback(function (sceneThis, methodInfo) {
                         log("[📖 CARDBOOK] Intercepted InventoryScene.OnMyCollection -> Direct SceneControl.OpenScene(5)!");
+                        try { ensureCardBookControlData(); } catch (eCbd) {}
+                        isCardBookActivated = false;
                         var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
                         openSceneFn(5, NULL, NULL, NULL);
                     }, "void", ["pointer", "pointer"]));
@@ -8743,6 +8755,8 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.replace(baseAddr.add(0xB4C628), new NativeCallback(function (sceneThis, methodInfo) {
                         log("[📖 CARDBOOK] Intercepted LobbyScene.OnMyCollection -> Direct SceneControl.OpenScene(5)!");
+                        try { ensureCardBookControlData(); } catch (eCbd) {}
+                        isCardBookActivated = false;
                         var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
                         openSceneFn(5, NULL, NULL, NULL);
                     }, "void", ["pointer", "pointer"]));
@@ -10023,49 +10037,14 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing InitTabObjectSetting: " + eItos.message);
                 }
 
-                // 3. CardBookScene.SetStateWait (0x11CF378) -> Immediately populate CardBook, refresh MainView, and finish wait
+                // 3. CardBookScene.SetStateWait (0x11CF378) -> Native ret patch
+                // Preserves callee-saved x19 register across the tail-call chain (OnOpen -> SetStateLoadingData -> SetStateWait)
                 try {
-                    Interceptor.replace(baseAddr.add(0x11CF378), new NativeCallback(function (sceneThis, methodInfo) {
-                        log("[📖 CARDBOOK] SetStateWait intercepted -> instantly populating CardBook and activating UI!");
-                        try {
-                            ensureCardBookControlData();
-                        } catch (eEd) {
-                            log("[-] Error in ensureCardBookControlData: " + eEd.message);
-                        }
-                        try {
-                            var refreshMainFn = new NativeFunction(baseAddr.add(0x11CFDD8), "void", ["pointer", "bool", "pointer"]);
-                            refreshMainFn(sceneThis, 1, NULL);
-                            log("[📖 CARDBOOK] RefreshSetMainView(true) cleanly executed!");
-                        } catch (eRm) {
-                            log("[-] Error in RefreshSetMainView: " + eRm.message);
-                        }
-                        try {
-                            var waitDoneFn = new NativeFunction(baseAddr.add(0x11CF1CC), "void", ["pointer", "pointer"]);
-                            waitDoneFn(sceneThis, NULL);
-                            log("[📖 CARDBOOK] SetStateWaitDone cleanly executed!");
-                        } catch (eWd) {
-                            log("[-] Error in SetStateWaitDone: " + eWd.message);
-                        }
-                        try {
-                            var sceneView = sceneThis.add(0x48).readPointer();
-                            if (!sceneView.isNull()) {
-                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                                var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                                var svGo = getGoFn(sceneView, NULL);
-                                if (!svGo.isNull()) setActFn(svGo, 1, NULL);
-                                var mainView = sceneView.add(0xE0).readPointer();
-                                if (!mainView.isNull()) {
-                                    var mvGo = getGoFn(mainView, NULL);
-                                    if (!mvGo.isNull()) setActFn(mvGo, 1, NULL);
-                                }
-                            }
-                        } catch (eAct) {
-                            log("[-] Error activating CardBook sceneView/mainView: " + eAct.message);
-                        }
-                    }, "void", ["pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on CardBookScene.SetStateWait (0x11CF378)!");
+                    Memory.protect(baseAddr.add(0x11CF378), 4, "rwx");
+                    baseAddr.add(0x11CF378).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
+                    log("[+] Byte patch on CardBookScene.SetStateWait (0x11CF378): ret (callee-saved x19 preserved)");
                 } catch (eSsw) {
-                    log("[-] Error replacing SetStateWait: " + eSsw.message);
+                    log("[-] Error patching SetStateWait: " + eSsw.message);
                 }
 
                 // 3b. CardBookControl.Info.Sort (0xB98720) -> Safe no-op
@@ -14459,25 +14438,37 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     }
                 }
 
-                // --- Hook CardBookScene.OnOpen (0x11CDD64) ---
-                try {
-                    Interceptor.attach(baseAddr.add(0x11CDD64), {
-                        onEnter: function (args) {
-                            log("[📖 CARDBOOK SCENE] CardBookScene.OnOpen entered! instance: " + args[0]);
-                            try {
-                                ensureCardBookControlData();
-                            } catch (ePop) {
-                                log("[-] Error populating offline cards in CardBook: " + ePop.message);
+                var isCardBookActivated = false;
+                var activateCardBookUI = function (sceneThis) {
+                    if (!sceneThis || sceneThis.isNull()) return;
+                    if (isCardBookActivated) return;
+                    isCardBookActivated = true;
+                    try {
+                        log("[📖 CARDBOOK] Deferred UI activation starting for instance: " + sceneThis);
+                        var refreshMainFn = new NativeFunction(baseAddr.add(0x11CFDD8), "void", ["pointer", "bool", "pointer"]);
+                        refreshMainFn(sceneThis, 1, NULL);
+                        log("[📖 CARDBOOK] Deferred RefreshSetMainView(true) cleanly executed!");
+
+                        var waitDoneFn = new NativeFunction(baseAddr.add(0x11CF1CC), "void", ["pointer", "pointer"]);
+                        waitDoneFn(sceneThis, NULL);
+                        log("[📖 CARDBOOK] Deferred SetStateWaitDone cleanly executed!");
+
+                        var sceneView = sceneThis.add(0x48).readPointer();
+                        if (!sceneView.isNull()) {
+                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                            var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                            var svGo = getGoFn(sceneView, NULL);
+                            if (!svGo.isNull()) setActFn(svGo, 1, NULL);
+                            var mainView = sceneView.add(0xE0).readPointer();
+                            if (!mainView.isNull()) {
+                                var mvGo = getGoFn(mainView, NULL);
+                                if (!mvGo.isNull()) setActFn(mvGo, 1, NULL);
                             }
-                        },
-                        onLeave: function (retval) {
-                            log("[📖 CARDBOOK SCENE] CardBookScene.OnOpen completed!");
                         }
-                    });
-                    log("[+] Hooked CardBookScene.OnOpen (0x11CDD64) successfully!");
-                } catch (eCb) {
-                    log("[-] Error hooking CardBookScene.OnOpen: " + eCb.message);
-                }
+                    } catch (eDef) {
+                        log("[-] Error in deferred CardBook UI activation: " + eDef.message);
+                    }
+                };
 
                 // Hook CardBookScene.OnBack (0x11CEDE8)
                 try {
@@ -14708,6 +14699,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         } else if (cmdRaw === "go_cardbook" || cmdRaw === "cardbook" || cmdRaw === "cb") {
                             try {
                                 log("[🚀 SCENE CMD] Opening CardBookScene (5)...");
+                                try { ensureCardBookControlData(); } catch (eCbd) {}
+                                isCardBookActivated = false;
                                 var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
                                 openSceneFn(5, NULL, NULL, NULL);
                             } catch (eGcb) {
@@ -16256,6 +16249,15 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                         log("[-] Error inspecting lock: " + te.message);
                                     }
                                 }
+                            }
+
+                            // CardBook UI activation monitor
+                            if (sceneId === 5 && sceneInstance && !sceneInstance.isNull() && !isChanging) {
+                                if (!isCardBookActivated) {
+                                    activateCardBookUI(sceneInstance);
+                                }
+                            } else if (sceneId !== 5) {
+                                isCardBookActivated = false;
                             }
 
                             // Check scene navigation command file every 30 frames (fallback)
