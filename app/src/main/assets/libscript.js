@@ -507,6 +507,58 @@ function initIl2Cpp(module) {
             log("[-] Error installing Boehm GC shield: " + eGcs.message);
         }
 
+        // IL2CPP Liveness Check Shield: native direct branch trampoline in libil2cpp .text (at 0xF288E0)
+        // Prevents SIGSEGV at 0x9F8DE0 (GetLivenessCheck) when Unity engine GC traverses non-Il2CppObject pointers or float values
+        try {
+            var livenessPatchAddr = baseAddr.add(0x9F8DCC);
+            var livenessTrampAddr = baseAddr.add(0xF288E0);
+
+            // 1. Write native trampoline into unused .text of CardListCompare (0xF288E0):
+            // 0xF288E0: cbz x0, #0xf28908                  (0xb4000140)
+            // 0xF288E4: ubfx x16, x0, #32, #16             (0xd360bc10)
+            // 0xF288E8: cbz x16, #0xf28908                 (0xb4000110)
+            // 0xF288EC: ldr x8, [x0]                       (0xf9400008)
+            // 0xF288F0: mov x19, x0                        (0xaa0003f3)
+            // 0xF288F4: tbnz w8, #0, #0xf28908             (0x370000a8)
+            // 0xF288F8: and x8, x8, #0xfffffffffffffffe    (0x927ff908)
+            // 0xF288FC: ubfx x16, x8, #32, #16             (0xd360bd10)
+            // 0xF28900: cbz x16, #0xf28908                 (0xb4000050)
+            // 0xF28904: b #0x9f8de0                        (0x17eb4137)
+            // 0xF28908: b #0x9f8e88                        (0x17eb4160)
+            Memory.protect(livenessTrampAddr, 48, "rwx");
+            var livenessTrampBytes = [
+                0x40, 0x01, 0x00, 0xb4, // 0xF288E0: cbz x0, #0xf28908
+                0x10, 0xbc, 0x60, 0xd3, // 0xF288E4: ubfx x16, x0, #32, #16
+                0x10, 0x01, 0x00, 0xb4, // 0xF288E8: cbz x16, #0xf28908
+                0x08, 0x00, 0x40, 0xf9, // 0xF288EC: ldr x8, [x0]
+                0xf3, 0x03, 0x00, 0xaa, // 0xF288F0: mov x19, x0
+                0xa8, 0x00, 0x00, 0x37, // 0xF288F4: tbnz w8, #0, #0xf28908
+                0x08, 0xf9, 0x7f, 0x92, // 0xF288F8: and x8, x8, #0xfffffffffffffffe
+                0x10, 0xbd, 0x60, 0xd3, // 0xF288FC: ubfx x16, x8, #32, #16
+                0x50, 0x00, 0x00, 0xb4, // 0xF28900: cbz x16, #0xf28908
+                0x37, 0x41, 0xeb, 0x17, // 0xF28904: b #0x9f8de0
+                0x60, 0x41, 0xeb, 0x17  // 0xF28908: b #0x9f8e88
+            ];
+            livenessTrampAddr.writeByteArray(livenessTrampBytes);
+            Memory.protect(livenessTrampAddr, 48, "r-x");
+
+            // 2. Direct branch from 0x9F8DCC to 0xF288E0 (b #0xf288e0 = 0x1414bec5):
+            Memory.protect(livenessPatchAddr, 20, "rwx");
+            var livenessPatchBytes = [
+                0xc5, 0xbe, 0x14, 0x14, // 0x9F8DCC: b #0xf288e0
+                0x1f, 0x20, 0x03, 0xd5, // 0x9F8DD0: nop
+                0x1f, 0x20, 0x03, 0xd5, // 0x9F8DD4: nop
+                0x1f, 0x20, 0x03, 0xd5, // 0x9F8DD8: nop
+                0x1f, 0x20, 0x03, 0xd5  // 0x9F8DDC: nop
+            ];
+            livenessPatchAddr.writeByteArray(livenessPatchBytes);
+            Memory.protect(livenessPatchAddr, 20, "r-x");
+
+            log("[🛡️ LIVENESS GC SHIELD] Successfully installed direct .text trampoline at 0xF288E0 from 0x9F8DCC!");
+        } catch (eLiv) {
+            log("[-] Error installing Liveness GC shield: " + eLiv.message);
+        }
+
         // 0. Comprehensive exception tracers: capture root thrower (0x9F1AC8), null refs (0xA43CC0), __cxa_throw (0xA8A284 / 0x81EF40)
         // 0. Comprehensive exception tracers: capture root thrower (0x9F1AC8), null refs (0xA43CC0), __cxa_throw (0xA8A284), abort
         try {
