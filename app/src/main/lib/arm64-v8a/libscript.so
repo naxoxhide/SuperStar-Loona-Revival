@@ -2621,8 +2621,14 @@ function initIl2Cpp(module) {
                     }
                 }
 
-                function ensureBackgroundHierarchyActive(rawImage, bgInstance) {
+                function ensureBackgroundHierarchyActive(rawImage, bgInstance, isTitleBg) {
                     try {
+                        if (isTitleBg === undefined) {
+                            isTitleBg = (globalSceneId === 2 || globalSceneId === 0);
+                        }
+                        var targetW = 1280.0;
+                        var targetH = isTitleBg ? 1280.0 : 640.0;
+
                         var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                         var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
                         var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
@@ -2682,10 +2688,10 @@ function initIl2Cpp(module) {
 
                         var tr = getTransformFn(rawImage, NULL);
 
-                        // Apply full centered cover (1280x640 for 2:1 video over 1138x640 canvas) to rawImage
-                        applyCenterCoverTransform(tr, 1280.0, 640.0);
+                        // Apply centered cover: 1280x1280 (1:1 Aspect Fill for title) or 1280x640 (2:1 for video)
+                        applyCenterCoverTransform(tr, targetW, targetH);
 
-                        // Traverse ancestors: ensure Background and Layout are centered and full-size (1280x640 / 1138x640)
+                        // Traverse ancestors: ensure Background and Layout are centered and full-size
                         var pTr = tr;
                         var maxDepth = 5;
                         while (pTr && !pTr.isNull() && maxDepth-- > 0) {
@@ -2696,7 +2702,7 @@ function initIl2Cpp(module) {
                                 setActiveFn(pGo, 1, NULL);
                                 var pName = readIl2CppString(getNameFn(pGo, NULL));
                                 if (pName === "Background" || pName === "Layout") {
-                                    applyCenterCoverTransform(parent, 1280.0, 640.0);
+                                    applyCenterCoverTransform(parent, targetW, targetH);
                                 }
                             }
                             pTr = parent;
@@ -2716,7 +2722,10 @@ function initIl2Cpp(module) {
                     }
                 }
 
-                function loadAndApplySceneBackground(forceMain) {
+                var cachedTitleTexObj = null;
+                var cachedTitleFileName = "";
+
+                function loadAndApplySceneBackground(forceMain, preserveTitleTexture) {
                     try {
                         var domain = il2cpp_domain_get ? il2cpp_domain_get() : NULL;
                         if (domain && !domain.isNull() && il2cpp_thread_attach) {
@@ -2741,44 +2750,55 @@ function initIl2Cpp(module) {
                             return;
                         }
 
-                        ensureBackgroundHierarchyActive(rawImage, bgInstance);
+                        ensureBackgroundHierarchyActive(rawImage, bgInstance, isTitle);
 
                         var texObj = NULL;
                         var selectedFileName = "";
 
                         if (isTitle) {
                             bgVideoActive = false;
-                            var randIdx = Math.floor(Math.random() * officialBgFiles.length);
-                            selectedFileName = officialBgFiles[randIdx];
-                            var primaryPath = "/sdcard/kswoks/" + selectedFileName;
-                            var altPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/kswoks/" + selectedFileName;
-                            log("[🎲 RANDOM TITLE BACKGROUND] Selected index " + randIdx + ": " + selectedFileName);
+                            if (preserveTitleTexture && cachedTitleTexObj && !cachedTitleTexObj.isNull()) {
+                                texObj = cachedTitleTexObj;
+                                selectedFileName = cachedTitleFileName;
+                                log("[🎨 TITLE BACKGROUND] Reusing cached background: " + selectedFileName);
+                            } else {
+                                var randIdx = Math.floor(Math.random() * officialBgFiles.length);
+                                selectedFileName = officialBgFiles[randIdx];
+                                var primaryPath = "/sdcard/kswoks/" + selectedFileName;
+                                var altPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/kswoks/" + selectedFileName;
+                                log("[🎲 RANDOM TITLE BACKGROUND] Selected index " + randIdx + ": " + selectedFileName);
 
-                            var readAllBytesMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllBytes", 1);
-                            var pathStr = createIl2CppString(primaryPath);
-                            var args1 = Memory.alloc(Process.pointerSize);
-                            args1.writePointer(pathStr);
-                            var exc = Memory.alloc(Process.pointerSize);
-                            exc.writePointer(NULL);
-                            var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
-                            if (!bytesObj || bytesObj.isNull()) {
-                                pathStr = createIl2CppString(altPath);
+                                var readAllBytesMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllBytes", 1);
+                                var pathStr = createIl2CppString(primaryPath);
+                                var args1 = Memory.alloc(Process.pointerSize);
                                 args1.writePointer(pathStr);
-                                bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
-                            }
+                                var exc = Memory.alloc(Process.pointerSize);
+                                exc.writePointer(NULL);
+                                var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
+                                if (!bytesObj || bytesObj.isNull()) {
+                                    pathStr = createIl2CppString(altPath);
+                                    args1.writePointer(pathStr);
+                                    bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
+                                }
 
-                            if (bytesObj && !bytesObj.isNull()) {
-                                var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
-                                texObj = il2cpp_object_new(tex2dClass);
-                                var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
-                                texCtorFn(texObj, 2, 2, NULL);
+                                if (bytesObj && !bytesObj.isNull()) {
+                                    var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
+                                    texObj = il2cpp_object_new(tex2dClass);
+                                    var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
+                                    texCtorFn(texObj, 2, 2, NULL);
 
-                                var loadImagePtr = baseAddr.add(0x25B3E90);
-                                var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
-                                loadImageFn(texObj, bytesObj);
-                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(texObj, 2);
+                                    var loadImagePtr = baseAddr.add(0x25B3E90);
+                                    var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
+                                    loadImageFn(texObj, bytesObj);
+                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(texObj, 2);
+                                    cachedTitleTexObj = texObj;
+                                    cachedTitleFileName = selectedFileName;
+                                }
                             }
                         } else {
+                            // Non-title scene: clear title cache so next visit gets new random
+                            cachedTitleTexObj = null;
+                            cachedTitleFileName = "";
                             // Active card or menu scene: activate authentic video playback
                             bgVideoActive = true;
                             if (!bgVideoLoaded && !bgVideoLoading) {
@@ -2866,11 +2886,11 @@ function initIl2Cpp(module) {
                                 if (sceneView && !sceneView.isNull()) {
                                     var introBase = sceneView.add(0x40).readPointer();
                                     if (introBase && !introBase.isNull()) {
-                                        setActiveFn(introBase, 1, NULL);
+                                        setActiveFn(introBase, isAtTouchToStart ? 0 : 1, NULL);
                                     }
                                     var mainBase = sceneView.add(0x120).readPointer();
                                     if (mainBase && !mainBase.isNull()) {
-                                        setActiveFn(mainBase, 1, NULL);
+                                        setActiveFn(mainBase, isAtTouchToStart ? 1 : 0, NULL);
                                     }
                                     var loadingBase = sceneView.add(0xA8).readPointer();
                                     if (loadingBase && !loadingBase.isNull()) {
@@ -2890,9 +2910,9 @@ function initIl2Cpp(module) {
                     }
                 }
 
-                var loadAndApplyTitleBackground = function () {
-                    loadAndApplySceneBackground(false);
-                };
+                function loadAndApplyTitleBackground() {
+                    loadAndApplySceneBackground(false, true);
+                }
 
                 // Hook TopViewControl.UpdateScene (0xB2ECE4) to ensure background is applied on scene switches
                 try {
@@ -2957,6 +2977,8 @@ function initIl2Cpp(module) {
                                 hideLoadingFn(sceneView);
                                 var hideTermsFn = new NativeFunction(baseAddr.add(0xB25F1C), "void", ["pointer"]);
                                 hideTermsFn(sceneView);
+                                var hideIntroFn = new NativeFunction(baseAddr.add(0xB2A03C), "void", ["pointer"]);
+                                hideIntroFn(sceneView);
                                 var showMainFn = new NativeFunction(baseAddr.add(0xB24534), "void", ["pointer"]);
                                 showMainFn(sceneView);
                             }
@@ -3026,6 +3048,40 @@ function initIl2Cpp(module) {
                         triggerLobbyTransition("TitleView.OnLogin");
                     }, "void", ["pointer"]));
                 } catch (eTvOl) {}
+
+                // TitleScene.OnOpen (0xB21290) - Early background loading so intro logos appear over background
+                try {
+                    Interceptor.attach(baseAddr.add(0xB21290), {
+                        onEnter: function (args) {
+                            log("[🌟 TITLE] TitleScene.OnOpen entered! Initializing early background...");
+                            globalTitleScene = args[0];
+                            globalSceneId = 2;
+                            isAtTouchToStart = false;
+                            dismissFade();
+                            loadAndApplyTitleBackground();
+                        }
+                    });
+                    log("[+] Hooked TitleScene.OnOpen (0xB21290) for early background loading!");
+                } catch (eOnOpen) {
+                    log("[-] Error hooking TitleScene.OnOpen: " + eOnOpen.message);
+                }
+
+                // TitleScene.SetStateIntro (0xB22034)
+                try {
+                    Interceptor.attach(baseAddr.add(0xB22034), {
+                        onEnter: function (args) {
+                            log("[🎬 TITLE] TitleScene.SetStateIntro entered! Showing intro logos over background...");
+                            globalTitleScene = args[0];
+                            globalSceneId = 2;
+                            isAtTouchToStart = false;
+                            dismissFade();
+                            loadAndApplyTitleBackground();
+                        }
+                    });
+                    log("[+] Hooked TitleScene.SetStateIntro (0xB22034)!");
+                } catch (eIntro) {
+                    log("[-] Error hooking TitleScene.SetStateIntro: " + eIntro.message);
+                }
 
                 // TitleScene.SetStateTermsAndPolicy (0xB22514) -> directly advance to ExcuteLogin (0xB23774)
                 try {
@@ -3099,6 +3155,8 @@ function initIl2Cpp(module) {
                         if (targetSid !== 2) {
                             isAtTouchToStart = false;
                             hasTriggeredLobbyTransition = true;
+                            cachedTitleTexObj = null;
+                            cachedTitleFileName = "";
                         }
                     }
                 });
@@ -17719,7 +17777,15 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
             Interceptor.attach(onOpenPtr, {
                 onEnter: function (args) {
                     globalTitleScene = args[0];
+                    globalSceneId = 2;
+                    isAtTouchToStart = false;
                     log("[🌟 TITLE SCENE ONOPEN] Captured Instance: " + globalTitleScene);
+                    dismissFade();
+                    try {
+                        loadAndApplyTitleBackground();
+                    } catch (eOnOpenBg) {
+                        log("[-] Error in loadAndApplyTitleBackground on OnOpen: " + eOnOpenBg.message);
+                    }
                 }
             });
 
@@ -17728,7 +17794,16 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
             Interceptor.attach(setIntroPtr, {
                 onEnter: function (args) {
+                    globalTitleScene = args[0];
+                    globalSceneId = 2;
+                    isAtTouchToStart = false;
                     log("[🎬 TITLE SCENE] SetStateIntro -> Intro title screen active.");
+                    dismissFade();
+                    try {
+                        loadAndApplyTitleBackground();
+                    } catch (eIntroBg) {
+                        log("[-] Error in loadAndApplyTitleBackground on SetStateIntro: " + eIntroBg.message);
+                    }
                 }
             });
 

@@ -6,6 +6,33 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ✅ CHECKPOINT 15 — Eliminación del Fondo Negro en Intro y Corrección del Dimensionamiento 1:1 (Aspect Fill) en TitleScene (2026-11-02)
+
+**Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 2493:**
+
+1. **Resolución de la Pantalla Negra en la Fase de Intro (`TitleView.introBase`):**
+   - **Causa Raíz:** `loadAndApplyTitleBackground()` se invocaba exclusivamente en `TitleScene.SetStateMain` (RVA `0xB243BC`). Durante los 2-3 segundos previos en que `TitleScene.OnOpen` y `TitleScene.SetStateIntro` desplegaban los logos corporativos (BlockBerry Creative, DALCOM SOFT, SUPERSTAR LOONA), `BackgroundImage.Instance` no tenía textura cargada, mostrando un fondo completamente negro.
+   - **Solución:**
+     - Intercepción temprana de `TitleScene.OnOpen` (RVA `0xB21290`) y `TitleScene.SetStateIntro` (RVA `0xB22034`), cargando de inmediato la textura oficial.
+     - Caché de textura en memoria (`cachedTitleTexObj` y `cachedTitleFileName`), permitiendo que la misma imagen se mantenga fija desde la intro hasta "TOUCH TO START" sin recargas ni parpadeos.
+     - Activación de `introBase` en la intro y ocultamiento automático al pasar a `SetStateMain` mediante `TitleView.HideIntro` (RVA `0xB2A03C`).
+
+2. **Corrección del Dimensionamiento Deformado (Aspect Ratio 1:1 Centrado):**
+   - **Causa Raíz:** Las imágenes oficiales de Dalcom (`bg0` a `bg7`) son cuadradas ($1024 \times 1024$), pero `ensureBackgroundHierarchyActive` les aplicaba hardcoded `sizeDelta = (1280.0, 640.0)` (formato 2:1 del video del Lobby), duplicando el ancho y estirando a las integrantes horizontalmente.
+   - **Solución:**
+     - En `ensureBackgroundHierarchyActive(rawImage, bgInstance, isTitleBg)`:
+       - Si `isTitleBg === true`: Aplica `sizeDelta = (1280.0, 1280.0)` con `pivot = (0.5, 0.5)`, `anchors = (0.5, 0.5)` y `anchoredPosition = (0, 0)`.
+       - La relación de aspecto resultante es $\frac{1280}{1280} = 1.0$, eliminando el estiramiento horizontal y restaurando las proporciones anatómicas reales y naturales de las integrantes de LOONA.
+       - Los degradados difuminados superior e inferior se recortan suavemente fuera del canvas ($1136 \times 640$).
+       - Si `isTitleBg === false`: Preserva `sizeDelta = (1280.0, 640.0)` para el video loop panorámico del Lobby.
+
+3. **Evidencia Visual y Pruebas de QA:**
+   - [qa_intro_11_5.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_intro_11_5.png) — Fase de intro con logotipos corporativos renderizados sobre el fondo oficial de LOONA (cero fondo negro).
+   - [qa_touch_ready.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_touch_ready.png) — Pantalla "TOUCH TO START" con el grupo LOONA en proporciones naturales perfectas (Aspect Fill 1:1 centrado).
+   - [qa_lobby_from_touch3.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_lobby_from_touch3.png) — Transición estable y sin regresiones al Lobby tras toque de pantalla.
+
+---
+
 ### ✅ CHECKPOINT 14 — Restauración del Inicio Standalone Offline, Bypass de Carga 9.9% y Pantalla Interactiva "TOUCH TO START" (TitleScene, SceneId: 2) (2026-11-02)
 
 **Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 2028:**
