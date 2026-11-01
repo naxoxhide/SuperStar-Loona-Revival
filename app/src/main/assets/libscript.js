@@ -454,6 +454,52 @@ function initIl2Cpp(module) {
             log("[-] Error patching CardListCompare: " + eClc.message);
         }
 
+        // Boehm GC Mark Procedure Shield (0xA28D38): prevent crash when conservative scanning finds false object pointer
+        try {
+            var patchAddr = baseAddr.add(0xA28D38);
+            var returnAddr = baseAddr.add(0xA28D50);
+            var skipAddr = baseAddr.add(0xA28C70);
+
+            var tramp = Memory.alloc(80);
+            Memory.protect(tramp, 80, "rwx");
+
+            var trampBytes = [
+                0xea, 0x02, 0x40, 0xf9, // ldr x10, [x23]
+                0x8a, 0x01, 0x00, 0xb4, // cbz x10, #0x34
+                0x4b, 0xdd, 0x40, 0x92, // and x11, x10, #0x00ffffffffffffff
+                0x6b, 0xfd, 0x64, 0xd3, // lsr x11, x11, #36
+                0x2b, 0x01, 0x00, 0xb4, // cbz x11, #0x34
+                0x8b, 0x01, 0x80, 0x92, // mov x11, #-0xd
+                0x68, 0x01, 0x08, 0xcb, // sub x8, x11, x8
+                0x48, 0x01, 0x08, 0x8b, // add x8, x10, x8
+                0x08, 0x01, 0x40, 0xf9, // ldr x8, [x8]
+                0x4b, 0x00, 0x00, 0x58, // ldr x11, #8 (PC+8 = 0x2c)
+                0x60, 0x01, 0x1f, 0xd6  // br x11
+            ];
+            tramp.writeByteArray(trampBytes);
+            tramp.add(0x2c).writePointer(returnAddr);
+
+            var skipBytes = [
+                0x4b, 0x00, 0x00, 0x58, // ldr x11, #8 (PC+8 = 0x3c)
+                0x60, 0x01, 0x1f, 0xd6  // br x11
+            ];
+            tramp.add(0x34).writeByteArray(skipBytes);
+            tramp.add(0x3c).writePointer(skipAddr);
+
+            Memory.protect(patchAddr, 24, "rwx");
+            var patchBytes = [
+                0x4b, 0x00, 0x00, 0x58, // ldr x11, #8 (PC+8 = 0x08)
+                0x60, 0x01, 0x1f, 0xd6  // br x11
+            ];
+            patchAddr.writeByteArray(patchBytes);
+            patchAddr.add(0x08).writePointer(tramp);
+            patchAddr.add(0x10).writeByteArray([0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5]); // 2x nop
+
+            log("[🛡️ BOEHM GC SHIELD] Successfully installed custom procedure guard at 0xA28D38 -> tramp: " + tramp);
+        } catch (eGcs) {
+            log("[-] Error installing Boehm GC shield: " + eGcs.message);
+        }
+
         // 0. Comprehensive exception tracers: capture root thrower (0x9F1AC8), null refs (0xA43CC0), __cxa_throw (0xA8A284 / 0x81EF40)
         // 0. Comprehensive exception tracers: capture root thrower (0x9F1AC8), null refs (0xA43CC0), __cxa_throw (0xA8A284), abort
         try {
