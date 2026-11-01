@@ -3044,3 +3044,14 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
 5. **Selector de Grupo Restringido (`DisplayGroupList` Count = 1):** Solo se expone el grupo 1001 (`< 1 / 1 >` en botón `Choose Group`).
 6. **Bypass de Tipos de Tema (`ttd.json`):** Se fuerza `themeTypeCode = 1`, perdiendo marcos dorados/especiales y animaciones de temas Limited.
 7. **`CardBookControl.RegistWithCardItemMap` Parcheado con `RET`:** Bloqueado temporalmente debido a la falta de población de `ThemeList` y `CardList` en `CardBookControl.GroupItem`.
+
+#### 3. Hallazgos de Assets Visuales y Efectos de UI (`url_shared_map.json`)
+- **Piedra Rosetta de Assets (`url_shared_map.json` - 8.318 entradas):** Asocia cada URL de CloudFront con su subcarpeta y nombre de archivo binario exacto en `asiudgasg/asodhsg/`.
+- **Efecto Visual Prismático Holográfico (`pis.json` & `uhg/`):**
+  * Small Prism Overlay: `asodhsg/uhg/1_s.i.bytes` (21 KB).
+  * Large Prism Overlay: `asodhsg/uhg/1_l.i.bytes` (114 KB).
+  * En `libscript.js` se habían aplicado parches `RET NULL` en `PrismControl.Data` y saltos forzados `B` en `GetSmallCardViewData` (0xABECAC) y `GetLargeCardViewData` (0xABE744) para silenciar la falta del archivo en runtime. Al desplegar `uhg/` en el dispositivo y restaurar los getters, el efecto holográfico queda completamente funcional.
+- **Colección Completa de Marcos de Bordes Limited (`aoeiwhslc/uhex/`):**
+  * Contiene los marcos C, B, A, S y R para los 69 `ThemeTypeData` (códigos 0 al 68) en tres variantes: `_s` (Small), `_l` (Large) y `_c` (Collection).
+- **Plan de Integración Registrado:**
+  * Documento formal de diseño interactivo creado en [card_theme_integration_plan.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/card_theme_integration_plan.md). Mantiene 111 cartas equipadas (mazo titular por grupo) y 1.351 no equipadas (92.4%), cumpliendo la restricción de mantener >80% sin equipar.
