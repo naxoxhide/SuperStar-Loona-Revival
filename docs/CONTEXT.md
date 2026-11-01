@@ -2960,3 +2960,63 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
   - **Verificación en Disco ([player_profile.json](file:///storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/player_profile.json)):**
     - `rhythmPoint`: 357,371 RP (exactamente $432,924 - 75,553$).
     - `inventoryCards`: 44 elementos (exactamente $48 - 4$).
+
+---
+
+### 11. Deducción Dinámica de RP en UI Superior (`TopView`) y Manejo de Fondos Insuficientes (0 RP)
+
+#### 1. Diagnóstico y Causa Raíz de Saldo Estático en `TopView`
+* **Getter Fijo / Hardcoded en `UserControl`:**
+  - Históricamente, en [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js), `UserControl.get_RhythmPoint()` (RVA `0xAB127C`) estaba interceptado con `return 1000000;`.
+  - Cada vez que el motor Unity refrescaba la barra superior mediante `TopViewControl.UpdateScene` (RVA `0xB2ECE4`) o `TopViewControl.OnRefreshRhythmPoint` (RVA `0xB2E0C8`), sobreescribía cualquier descuento con el valor estático `1.000.000`.
+
+#### 2. Arquitectura Reactiva de Rhythm Points en Modo Standalone Offline
+1. **Sincronización Bidireccional de Getters / Setters en `UserControl`:**
+   - `UserControl.get_FreeRhythmPoint` (RVA `0xAB1094`): Retorna dinámicamente el valor actual desde `loadPlayerProfile().rhythmPoint`.
+   - `UserControl.get_PaidRhythmPoint` (RVA `0xAB0EAC`): Retorna `0`.
+   - `UserControl.get_RhythmPoint` (RVA `0xAB127C`): Retorna dinámicamente `getPlayerRP()`.
+   - `UserControl.DecreaseRhythmPoint` (RVA `0xAB139C`): Resta atómica en disco ([player_profile.json](file:///storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/player_profile.json)), sincronización en memoria y notificación a `refreshTopViewRhythmPoint(rp)`.
+2. **Rutina de Refresco Visual `refreshTopViewRhythmPoint(rp)`:**
+   - Resuelve la instancia singleton de `TopViewControl` llamando a `0xB13204`.
+   - Si `globalPlayerObj` está instanciado, actualiza el campo nativo `+0x54` (`rhythmPoint`) en la estructura del jugador.
+   - Obtiene el puntero a `TopView` (`+0x20`) y ejecuta `TopView.RefreshRhythmPoint` (RVA `0xB2BE9C`) pasando `(topView, rp, 999999999, NULL)`, refrescando inmediatamente los números en pantalla.
+   - Se conectó en:
+     * `commitConsumedMaterials` (durante Power Up).
+     * Rutinas de venta de cartas (`newRpTotal`).
+     * `TopViewControl.UpdateScene` onLeave (para persistencia reactiva en cualquier cambio de escena).
+
+#### 3. Control Nativo ante Saldo Insuficiente / 0 RP (Modal Oficial Dalcomsoft)
+1. **Flujo de Evaluación en `IntensifyAssist.Start` (RVA `0xF1CD34`):**
+   - Dalcomsoft evalúa:
+     - `0xF1CDE8: ldr w20, [x19, #0x34]` (precio requerido de RP).
+     - `0xF1CE08: bl 0xAB127C` (`UserControl.get_RhythmPoint()`).
+     - `0xF1CE0C: cmp w20, w0`
+   - Si `price <= RP`: bifurca a `0xF1CEA0` y abre `CardIntensifyPopup`.
+   - Si `price > RP`: bifurca a `0xAC1FD0` (`UIHelper.OpenRhythmPointShortagePopup`).
+2. **Despliegue del Modal Oficial `Popup_Notice_1Btn`:**
+   - El juego instancia de forma nativa `System/Popup_Notice_1Btn`.
+   - Códigos de localización Dalcomsoft registrados en `offlineLocaleStrings`:
+     * `0x399A569`: *"Notice"* (Título).
+     * `0x399A951`: *"Notice"* (Encabezado).
+     * `0x399AD3A`: *"Rhythm Points are insufficient."* (Cuerpo del mensaje).
+     * `0x399B121`: *"OK"* (Etiqueta de botón).
+   - En `ViewControl.OpenPopup` (RVA `0xAAA0D0`), se inyectó una capa de respaldo que garantiza `useBlind = 1` (fondo atenuado), `useBtnX = 1`, y `hideScene = 0`.
+3. **Neutralización del Crash / Abort al pulsar "OK" (`StorePopup.Open` RVA `0xB6EE4C`):**
+   - En el diseño online original, al pulsar "OK" en el popup de escasez, el callback `InventoryScene.<OnIntensifyTry>b__1` (RVA `0xB5B3E8`) ejecuta `StorePopup.Open(105)` (`PaymentCategory.RhythmPoint`) para invocar el catálogo comercial de Dalcomsoft.
+   - En modo offline, esto provocaba `[🚨 LIBC ABORT TRIGGERED]`.
+   - **Solución Binaria / Interceptor:** Se instaló un stub en `StorePopup.Open` (RVA `0xB6EE4C`) que absorbe la apertura comercial en offline, ejecuta de forma segura el callback de retorno si existe y permanece limpiamente en `InventoryScene` con el modal cerrado e inventario intacto.
+
+#### 4. Batería de Validación Visual de Tres Fases (QA Sign-off)
+* **Fase 1 — Deducción Dinámica en Vivo con Saldo Válido:**
+  - Saldo inicial en `TopView`: **`355.316`** RP ([qa_test1_topview_initial.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test1_topview_initial.png)).
+  - Ejecución de Power Up consumiendo **`19.298`** RP.
+  - Saldo en `TopView` descontado en vivo a **`336.018`** RP ([qa_test1_screen_after_ok.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test1_screen_after_ok.png)).
+  - Saldo confirmado en **`336.018`** RP en cuadrícula general de inventario ([qa_test1_topview_inven_verified.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test1_topview_inven_verified.png)).
+* **Fase 2 — Bloqueo de Power Up con 0 RP y Despliegue de Modal de Escasez:**
+  - Saldo inicial en `TopView`: **`0`** RP ([qa_test2_mounted_zero.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test2_mounted_zero.png)), JinSoul R50 con 5 cartas montadas y costo TRY de `98.245` RP.
+  - Al presionar `TRY`: `IntensifyAssist.Start` detecta `98.245 > 0` e invoca `UIHelper.OpenRhythmPointShortagePopup` (RVA `0xAC1FD0`).
+  - Modal oficial `Popup_Notice_1Btn` renderizado a la perfección mostrando *"Notice"*, *"Rhythm Points are insufficient."*, botón *"OK"* y fondo de escena ensombrecido ([qa_test2_shortage_popup_verified.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test2_shortage_popup_verified.png)).
+  - Ningún material es consumido ni descontado del inventario.
+* **Fase 3 — Restauración y Carga Reactiva de Saldo:**
+  - Saldo restaurado a **`500.000`** RP en [player_profile.json](file:///storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/player_profile.json).
+  - Al iniciar el juego y acceder a `InventoryScene`, la barra superior (`TopView`) despliega reactivamente `(R) 500.000` con su icono nativo y formateo oficial ([qa_test3_restored_500k.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_test3_restored_500k.png)).

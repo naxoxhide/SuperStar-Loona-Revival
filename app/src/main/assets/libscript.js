@@ -1045,12 +1045,15 @@ function initIl2Cpp(module) {
 
             function refreshTopViewRhythmPoint(rp) {
                 try {
+                    var valToSet = (rp !== undefined && rp !== null) ? rp : getPlayerRP();
+                    if (globalPlayerObj && !globalPlayerObj.isNull()) {
+                        try { globalPlayerObj.add(0x54).writeInt(valToSet); } catch (ePl) {}
+                    }
                     var getTopCtrlFn = new NativeFunction(baseAddr.add(0xB13204), "pointer", ["pointer"]);
                     var topCtrlInst = getTopCtrlFn(NULL);
                     if (!topCtrlInst.isNull()) {
                         var topView = topCtrlInst.add(0x20).readPointer();
                         if (!topView.isNull()) {
-                            var valToSet = (rp !== undefined && rp !== null) ? rp : getPlayerRP();
                             var refreshRpFn = new NativeFunction(baseAddr.add(0xB2BE9C), "void", ["pointer", "int", "int", "pointer"]);
                             refreshRpFn(topView, valToSet, 999999999, NULL);
                             log("[💰 TOPVIEW RP REFRESHED] TopView RP updated in real-time to: " + valToSet);
@@ -1274,11 +1277,30 @@ function initIl2Cpp(module) {
                     Interceptor.replace(baseAddr.add(0xAB1470), keepCb(new NativeCallback(function (methodInfo) { return 100000; }, "int", ["pointer"])));
                     Interceptor.replace(baseAddr.add(0xAB1840), keepCb(new NativeCallback(function (methodInfo) { return 200000; }, "int", ["pointer"])));
                     Interceptor.replace(baseAddr.add(0xAB1960), keepCb(new NativeCallback(function (amount, methodInfo) { return 1; }, "int", ["int", "pointer"])));
-                    // Rhythm Points (RP)
-                    Interceptor.replace(baseAddr.add(0xAB1094), keepCb(new NativeCallback(function (methodInfo) { return 500000; }, "int", ["pointer"])));
-                    Interceptor.replace(baseAddr.add(0xAB0EAC), keepCb(new NativeCallback(function (methodInfo) { return 500000; }, "int", ["pointer"])));
-                    Interceptor.replace(baseAddr.add(0xAB127C), keepCb(new NativeCallback(function (methodInfo) { return 1000000; }, "int", ["pointer"])));
-                    Interceptor.replace(baseAddr.add(0xAB139C), keepCb(new NativeCallback(function (amount, methodInfo) { return 1; }, "int", ["int", "pointer"])));
+                    // Rhythm Points (RP) - Dynamic standalone offline balance
+                    Interceptor.replace(baseAddr.add(0xAB1094), keepCb(new NativeCallback(function (methodInfo) { 
+                        return getPlayerRP(); 
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB0EAC), keepCb(new NativeCallback(function (methodInfo) { 
+                        return 0; 
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB127C), keepCb(new NativeCallback(function (methodInfo) { 
+                        return getPlayerRP(); 
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB139C), keepCb(new NativeCallback(function (amount, methodInfo) { 
+                        try {
+                            var p = loadPlayerProfile();
+                            if (!p) return 0;
+                            var cur = p.rhythmPoint || 0;
+                            if (cur < amount) return 0;
+                            p.rhythmPoint = cur - amount;
+                            savePlayerProfile(p);
+                            refreshTopViewRhythmPoint(p.rhythmPoint);
+                            return 1;
+                        } catch (eDec) {
+                            return 0;
+                        }
+                    }, "int", ["int", "pointer"])));
                     // Headphones
                     Interceptor.replace(baseAddr.add(0xAB0C5C), keepCb(new NativeCallback(function (methodInfo) { return 20; }, "int", ["pointer"])));
                     Interceptor.replace(baseAddr.add(0xAB0D7C), keepCb(new NativeCallback(function (amount, methodInfo) { return 1; }, "int", ["int", "pointer"])));
@@ -1549,6 +1571,19 @@ function initIl2Cpp(module) {
                                 log("[✨ INTENSIFY PARAMS] Injected title='Power Up', okText='OK', nextText='Next', powerupText='Power Up', soundSucceed='powerupsuccess', soundFailed='powerupfail' into CardIntensifyPopup.Params!");
                             } catch (eIntParam) {
                                 log("[-] Error injecting CardIntensifyPopup.Params: " + eIntParam.message);
+                            }
+                        } else if ((this.pName === "System/Popup_Notice_1Btn" || this.pName === "System/Popup_Notice_2Btn") && !args[1].isNull()) {
+                            var pParams = args[1];
+                            try {
+                                pParams.add(0x18).writePointer(createIl2CppString("Notice"));
+                                pParams.add(0x20).writePointer(createIl2CppString("Rhythm Points are insufficient."));
+                                pParams.add(0x48).writePointer(createIl2CppString("OK"));
+                                pParams.add(0x58).writeU8(1); // useBlind = true
+                                pParams.add(0x59).writeU8(1); // useBtnX = true
+                                pParams.add(0x5A).writeU8(0); // hideScene = false (keeps background scene visible)
+                                log("[✨ NOTICE PARAMS] Successfully configured " + this.pName + " with Title, Message, and OK button!");
+                            } catch (eParamN) {
+                                log("[-] Error injecting Popup_Notice params: " + eParamN.message);
                             }
                         }
                     }
@@ -2699,6 +2734,9 @@ function initIl2Cpp(module) {
                                 globalSceneId = this.scId;
                                 loadAndApplySceneBackground(true);
                             }
+                            try {
+                                refreshTopViewRhythmPoint(getPlayerRP());
+                            } catch (eTrp) {}
                         }
                     });
                     log("[+] Hooked TopViewControl.UpdateScene (0xB2ECE4) for seamless background continuity");
@@ -10663,7 +10701,12 @@ function initIl2Cpp(module) {
                         0x302A143: "Rating Up",
                         0x72A2AE4: "Power Up",
                         0x72A2AE5: "Upgrade",
-                        0x72A2AE3: "Next"
+                        0x72A2AE3: "Next",
+                        0x399A569: "Notice",
+                        0x399A951: "Notice",
+                        0x399AD3A: "Rhythm Points are insufficient.",
+                        0x399B121: "OK",
+                        0x399B509: "Cancel"
                     };
 
                     Interceptor.attach(baseAddr.add(0xCF1064), {
@@ -12284,13 +12327,11 @@ function initIl2Cpp(module) {
                         }
 
                         // 56-byte IntensifyAssist.Params struct
-                        // Pass price = 0 in Params so IntensifyAssist.Start (0xF1CE0C) never opens the "Insufficient RhythmPoint" popup;
-                        // actual RP cost is calculated & deducted from player_profile.json in handleOfflineIntensify!
                         var paramsBuf = Memory.alloc(56);
                         paramsBuf.writePointer(tCardItem);                         // 0x00: selectedCardItem
                         paramsBuf.add(0x08).writePointer(matList);                 // 0x08: materialCardItemList
                         paramsBuf.add(0x10).writeU8(0);                            // 0x10: isEvent = false
-                        paramsBuf.add(0x14).writeS32(0);                           // 0x14: price = 0 (bypass RP check in IntensifyAssist.Start)
+                        paramsBuf.add(0x14).writeS32(price);                       // 0x14: price (enables native RP check in IntensifyAssist.Start)
                         paramsBuf.add(0x18).writeDouble(1.0);                      // 0x18: probabilityRate = 1.0
                         paramsBuf.add(0x20).writeDouble(1.0);                      // 0x20: priceRate = 1.0
                         paramsBuf.add(0x28).writePointer(ratingupSprite);          // 0x28: ratingupSprite
@@ -12377,6 +12418,33 @@ function initIl2Cpp(module) {
                     });
                 } catch (eIasAttach) {
                     log("[-] Error attaching to IntensifyAssist.Start: " + eIasAttach.message);
+                }
+
+                // Native UIHelper.OpenRhythmPointShortagePopup (0xAC1FD0) tracer
+                try {
+                    Interceptor.attach(baseAddr.add(0xAC1FD0), {
+                        onEnter: function (args) {
+                            log("[⚠️ SHORTAGE POPUP] UIHelper.OpenRhythmPointShortagePopup triggered! User has insufficient RP for Power Up.");
+                        }
+                    });
+                } catch (eShortage) {
+                    log("[-] Error attaching to OpenRhythmPointShortagePopup: " + eShortage.message);
+                }
+
+                // Safe stub for StorePopup.Open (0xB6EE4C) to prevent crash when clicking OK on shortage modals offline
+                try {
+                    Interceptor.replace(baseAddr.add(0xB6EE4C), keepCb(new NativeCallback(function (type, callback, loadedCallback, category, code, methodInfo) {
+                        log("[🛒 STORE POPUP] StorePopup.Open suppressed in offline mode (type=" + type + ", category=" + category + ")");
+                        if (callback && !callback.isNull()) {
+                            try {
+                                var actionInvoke = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer", "pointer"]);
+                                actionInvoke(callback, NULL);
+                            } catch (eCb) {}
+                        }
+                    }, "void", ["int", "pointer", "pointer", "int", "short", "pointer"])));
+                    log("[+] Interceptor.replace installed on StorePopup.Open (0xB6EE4C)!");
+                } catch (eStore) {
+                    log("[-] Error replacing StorePopup.Open: " + eStore.message);
                 }
 
                 // Attach monitor to native InventoryScene.OnIntensifyTry (0x105BA9C)
@@ -12644,6 +12712,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 }
                                 savePlayerProfile(profile);
                                 setupUserControl(profile);
+                                refreshTopViewRhythmPoint(newRpTotal);
                             }
                         } catch (ePf) {
                             log("[-] Error saving leaderCard to profile: " + ePf.message);
@@ -12725,6 +12794,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 }
                                 savePlayerProfile(profile);
                                 setupUserControl(profile);
+                                refreshTopViewRhythmPoint(newRpTotal);
                             }
                         } catch (ePf) {
                             log("[-] Error updating profile on sell: " + ePf.message);
@@ -12848,6 +12918,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 }
                                 savePlayerProfile(profile);
                                 setupUserControl(profile);
+                                refreshTopViewRhythmPoint(newRpTotal);
                             }
                         } catch (ePfB) {}
 
@@ -13273,16 +13344,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                                 // Live UI update on TopView (Rhythm Points counter)
                                 try {
-                                    var getTopCtrlFn = new NativeFunction(baseAddr.add(0xB13204), "pointer", ["pointer"]);
-                                    var topCtrlInst = getTopCtrlFn(NULL);
-                                    if (!topCtrlInst.isNull()) {
-                                        var topView = topCtrlInst.add(0x20).readPointer();
-                                        if (!topView.isNull()) {
-                                            var refreshRpFn = new NativeFunction(baseAddr.add(0xB2BE9C), "void", ["pointer", "int", "int", "pointer"]);
-                                            refreshRpFn(topView, profile.rhythmPoint, -1, NULL);
-                                            log("[💰 TOPVIEW RP REFRESHED] TopView RP updated in real-time to: " + profile.rhythmPoint);
-                                        }
-                                    }
+                                    refreshTopViewRhythmPoint(profile.rhythmPoint);
                                 } catch (eTopRp) {
                                     log("[-] Error updating TopView RP: " + eTopRp.message);
                                 }
@@ -14291,6 +14353,11 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                         if (cmdRaw === "dismiss" || cmdRaw === "close_popups" || cmdRaw === "dismiss_popups") {
                             log("[🛡️ POPUP CMD] Popups dismissed cleanly via Popup.CloseAll(0)!");
+                        } else if (cmdRaw === "refresh_rp") {
+                            try {
+                                refreshTopViewRhythmPoint(getPlayerRP());
+                                log("[💰 RP CMD] Refreshed TopView RP from player_profile.json! New RP=" + getPlayerRP());
+                            } catch (eRcmd) {}
                         } else if (cmdRaw === "hide_loading" || cmdRaw === "clear_loading") {
                             try {
                                 var lcFn = new NativeFunction(baseAddr.add(0xB3E230), "void", ["pointer"]);
@@ -14532,7 +14599,12 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             }
                         } else if (cmdRaw === "try") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
-                                log("[⚡ TRY CMD] Executing direct intensify try with animated popup modal!");
+                                log("[⚡ TRY CMD] Executing native intensify try with animated popup modal!");
+                                triggerNativeIntensifyTry(curScene);
+                            }
+                        } else if (cmdRaw === "try_direct") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                log("[⚡ TRY DIRECT CMD] Executing direct intensify try with animated popup modal!");
                                 triggerDirectPopup(curScene);
                             }
                         } else if (cmdRaw === "try_native") {

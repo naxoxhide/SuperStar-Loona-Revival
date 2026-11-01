@@ -145,3 +145,14 @@ Esta skill define los pasos estándar y flujos de trabajo para analizar, desensa
 * **Interacción Táctil y Smart Recommendation:**
   * **Smart Recommend (`0x105B4F4`):** Accesible físicamente en `(x=1200, y=690)`. Monta las cartas de menor grado disponibles.
   * **Desregistro Táctil de Pedestales (`InvenMaterialView`, `0xF226A4`):** Al tocar cualquier pedestal con material montado, la carta se libera inmediatamente (`+`), el badge del carrusel se revierte a `N` y el costo de RP en el botón TRY se recalcula en tiempo real.
+
+### 11. Deducción Dinámica de RP y Gestión de Fondos Insuficientes (Shortage Popup)
+* **Arquitectura Reactiva de UI Superior (`TopViewControl`):**
+  - Los getters de `UserControl` (`get_RhythmPoint` `0xAB127C`, `get_FreeRhythmPoint` `0xAB1094`, `get_PaidRhythmPoint` `0xAB0EAC`) deben consultar dinámicamente el perfil local (`loadPlayerProfile()`) para evitar revertir el saldo a valores estáticos (`1.000.000`).
+  - La sincronización en vivo se efectúa resolviendo la instancia singleton `TopViewControl.Instance` (RVA `0xB13204`), actualizando la estructura de memoria nativa `globalPlayerObj + 0x54`, y llamando a `TopView.RefreshRhythmPoint` (RVA `0xB2BE9C`) con `(topView, rp, 999999999, NULL)`.
+  - Esta rutina debe ser invocada atómicamente en `commitConsumedMaterials`, ventas de inventario y al salir de escenas en `TopViewControl.UpdateScene` (RVA `0xB2ECE4`).
+* **Manejo Nativo de 0 RP y Bloqueo de Power Up:**
+  - En `IntensifyAssist.Start` (RVA `0xF1CD34`), si `price > RP`, el motor invoca `UIHelper.OpenRhythmPointShortagePopup` (RVA `0xAC1FD0`).
+  - El modal oficial `System/Popup_Notice_1Btn` requiere los códigos de localización Dalcomsoft: `0x399A569` (*"Notice"*), `0x399AD3A` (*"Rhythm Points are insufficient."*), y `0x399B121` (*"OK"*).
+  - Al pulsar "OK", el callback `InventoryScene.<OnIntensifyTry>b__1` (RVA `0xB5B3E8`) intenta abrir la tienda en línea llamando a `StorePopup.Open` (RVA `0xB6EE4C`).
+  - **Interceptor de Seguridad:** Reemplazar `StorePopup.Open` (RVA `0xB6EE4C`) con un stub que absorbe la apertura en modo offline y llama al callback de retorno de forma segura, evitando el crash por falta de conexión y preservando la integridad del inventario.
