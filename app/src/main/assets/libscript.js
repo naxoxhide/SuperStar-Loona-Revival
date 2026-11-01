@@ -14684,13 +14684,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         } else if (cmdRaw === "go_lobby" || cmdRaw === "lobby") {
                             try {
                                 log("[🚀 SCENE CMD] Opening LobbyScene (3)...");
-                                if (curScene && !curScene.isNull()) {
-                                    var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
-                                    setStateOpenSceneFn(curScene, 3, NULL, NULL, NULL);
-                                } else {
-                                    var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
-                                    openSceneFn(3, NULL, NULL, NULL);
-                                }
+                                var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                                openSceneFn(3, NULL, NULL, NULL);
                             } catch (eGl) {
                                 log("[-] Error in go_lobby: " + eGl.message);
                             }
@@ -14703,9 +14698,6 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     try { ensureInventoryLists(curScene); } catch (eEil2) {}
                                     try { restoreDefaultDisplayCardList(curScene, true, true); } catch (eRdd) {}
                                     try { safeSetStateMain(curScene, 0); } catch (eSsm) {}
-                                } else if (curScene && !curScene.isNull()) {
-                                    var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
-                                    setStateOpenSceneFn(curScene, 4, NULL, NULL, NULL);
                                 } else {
                                     var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
                                     openSceneFn(4, NULL, NULL, NULL);
@@ -14716,13 +14708,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         } else if (cmdRaw === "go_cardbook" || cmdRaw === "cardbook" || cmdRaw === "cb") {
                             try {
                                 log("[🚀 SCENE CMD] Opening CardBookScene (5)...");
-                                if (curScene && !curScene.isNull()) {
-                                    var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
-                                    setStateOpenSceneFn(curScene, 5, NULL, NULL, NULL);
-                                } else {
-                                    var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
-                                    openSceneFn(5, NULL, NULL, NULL);
-                                }
+                                var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                                openSceneFn(5, NULL, NULL, NULL);
                             } catch (eGcb) {
                                 log("[-] Error in go_cardbook: " + eGcb.message);
                             }
