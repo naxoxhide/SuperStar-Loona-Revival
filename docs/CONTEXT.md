@@ -3149,3 +3149,41 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
   * Contiene los marcos C, B, A, S y R para los 69 `ThemeTypeData` (códigos 0 al 68) en tres variantes: `_s` (Small), `_l` (Large) y `_c` (Collection).
 - **Plan de Integración Registrado:**
   * Documento formal de diseño interactivo creado en [card_theme_integration_plan.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/card_theme_integration_plan.md). Mantiene 111 cartas equipadas (mazo titular por grupo) y 1.351 no equipadas (92.4%), cumpliendo la restricción de mantener >80% sin equipar.
+
+---
+
+### 13. Auditoría de Arquitectura de `LobbyScene` (SceneId 3) y Diagnóstico de `TopView`
+
+#### 1. Imagen de Especificación Oficial de Dalcomsoft
+- Descubierta la hoja de especificación técnica oficial con anotaciones y diseño en: [app/src/files/asiudgasg/asodhsg/rtrttyyuuio/261060011.i.bytes.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/rtrttyyuuio/261060011.i.bytes.png) (versión EN) y `261060010.i.bytes.png` (versión KO).
+- Muestra la disposición y nomenclatura canónica de:
+  * **Top Bar (`TopView`):** Profile Avatar, Nickname ("DalcomStar" -> "Orbits"), League Tier ("BRONZE II"), Headphones + Count/Max, Rhythm Points (RP), Diamonds, Message Button `✉`, Miscellaneous Menu `☰`.
+  * **Submenú bajo `☰`:** Help `(?)`, Attendance (calendario), Notice `(i)`, Settings (engranaje).
+  * **Panel Izquierdo:** News banner ("BG SHOP UPDATE"), Missions (rombo con check), Event Banners (rombo con fiesta), flecha colapsable `《`.
+  * **Panel Derecho / Submenú:** Botones de rombo Shop (carrito), Card Book (medalla), Weekly League (rombo central), Inventory (libro de cartas), flecha `》`.
+  * **Botón Inferior Derecho:** "Ready" hexagonal animado -> navegación a selección musical (`SelectMusicScene`).
+  * **Centro:** Imagen/video de integrantes (`memberImage`, `memberView`) con respuesta táctil y globos de diálogo (`Bubble()`).
+
+#### 2. Causa Raíz de la Ausencia de `TopView` en el Lobby en Vivo
+- **Desensamblado de `TopViewControl.UpdateScene(3)` (RVA `0xB2ECE4`):**
+  * Al ingresar a la escena 3 (`LobbyScene`), se ejecuta un condicional sobre `IngameView.IsLogin` (static bool en RVA `0x3107000 + 0xc08`, offset `0xb8`, byte `0x29`):
+    ```assembly
+    0xB2EF0C: ldr x0, [x20]          ; IngameView class pointer
+    0xB2EF10: ldr x8, [x0, #0xb8]    ; static fields
+    0xB2EF14: ldrb w8, [x8, #0x29]   ; IngameView.IsLogin
+    0xB2EF18: cbz w8, #0xb2f0ec      ; if (IsLogin == 0) -> salta y omite topView.Show()!!
+    ```
+  * En modo offline revival, al haberse saltado el login por red de Dalcomsoft, `IngameView.IsLogin` permanece en `0`.
+  * Consecuencia: El motor ejecuta `topView.Hide()` al inicio de `UpdateScene`, pero omite la llamada a `topView.Show()` (RVA `0xB2BBB8`), `topView.RefreshMoreButton(true)` (RVA `0xB2BCAC`) y `topView.RefreshMessageButton(true)` (RVA `0xB2D318`).
+- **Estrategia de Solución:**
+  * Forzar `IngameView.IsLogin = 1` en el inicio del usuario y en `activateLobbyUIAndVideo`.
+  * Invocar explícitamente `TopViewControl.ShowSceneLayout()` (RVA `0xB2F2AC`) y `topView.Show()` (RVA `0xB2BBB8`) asegurando la activación de sus GameObjects (`nickNameInfo`, `leagueClass`, `rhythmPoint`, `diamond`, `headphoneObj`, `moreButton`, `messageButton`).
+
+#### 3. Auditoría de Métodos de Navegación de `LobbyView` y `LobbyScene`
+- `LobbyView.OnReady` (RVA `0xCEED20`) -> `LobbyScene.OnReady` (RVA `0xB4D4A4`): Navega a `SceneControl.SCENE_TYPE.SelectMusic` (SceneId 7) o `SelectMusicStar` (SceneId 8).
+- `LobbyView.OnInventory` (RVA `0xCEED80`) -> `LobbyScene.OnInventory` (RVA `0xB4C418`): Navega a `SceneControl.SCENE_TYPE.Inventory` (SceneId 4).
+- `LobbyView.OnClickMyCollection` (RVA `0xCEF0E4`) / `OnMyCollection` (RVA `0xCEF548`) -> `LobbyScene.OnMyCollection` (RVA `0xB4C628`): Navega a `SceneControl.SCENE_TYPE.CardBook` (SceneId 5).
+- `LobbyView.OnStore` (RVA `0xCEEE40`) -> `LobbyScene.OnStore` (RVA `0xB4C7F0`): Abre popup de tienda (`StorePopup.Open`).
+- `LobbyView.OnMemberTouch` (RVA `0xCEF264`) -> `LobbyView.Bubble` (RVA `0xCEF364`): Despliega bocadillo de diálogo de integrante central (`voiceText`).
+- `LobbyView.OnClickLeftMenu` (RVA `0xCEF1A4`) / `OnClickRightMenu` (RVA `0xCEF204`): Expande/colapsa paneles laterales con animación.
+
