@@ -1249,7 +1249,9 @@ function initIl2Cpp(module) {
 
                     // Populate fields
                     // objectID: long at 0x10
-                    playerObj.add(0x10).writeInt(profile.userId || 10001);
+                    var parsedUid = parseInt(profile.userId);
+                    if (isNaN(parsedUid)) parsedUid = 10001;
+                    playerObj.add(0x10).writeInt(parsedUid);
                     playerObj.add(0x14).writeInt(0);
 
                     // nickname: string at 0x18
@@ -1263,7 +1265,9 @@ function initIl2Cpp(module) {
                     playerObj.add(0x24).writeInt(0);
 
                     // profileCode: Nullable<int> at 0x28 (value at 0x28, hasValue at 0x2C)
-                    playerObj.add(0x28).writeInt(profile.profileCode || 1001);
+                    var parsedPCode = parseInt(profile.profileCode);
+                    if (isNaN(parsedPCode)) parsedPCode = 1001;
+                    playerObj.add(0x28).writeInt(parsedPCode);
                     playerObj.add(0x2C).writeU8(1);
 
                     // leaderCard: LeaderCard at 0x30
@@ -1279,10 +1283,13 @@ function initIl2Cpp(module) {
                                 leaderObj.writePointer(leaderClass);
                             }
                         }
-                        var lInfo = profile.leaderCard || { cardID: 10001, grade: 4, level: 50 };
-                        leaderObj.add(0x10).writeInt(lInfo.cardID || 10001);
-                        leaderObj.add(0x14).writeInt(lInfo.grade !== undefined ? lInfo.grade : 4);
-                        leaderObj.add(0x18).writeShort(lInfo.level || 50);
+                        var lInfo = profile.leaderCard;
+                        if (typeof lInfo !== "object" || lInfo === null) {
+                            lInfo = { cardID: typeof lInfo === "number" ? lInfo : 10001, grade: 4, level: 50 };
+                        }
+                        leaderObj.add(0x10).writeInt(parseInt(lInfo.cardID) || 10001);
+                        leaderObj.add(0x14).writeInt(lInfo.grade !== undefined ? (parseInt(lInfo.grade) || 4) : 4);
+                        leaderObj.add(0x18).writeShort(parseInt(lInfo.level) || 50);
                         playerObj.add(0x30).writePointer(leaderObj);
                     } catch (e) {
                         log("[-] Error initializing LeaderCard: " + e.message);
@@ -1291,25 +1298,25 @@ function initIl2Cpp(module) {
                     // cardInvenExpandCount: int at 0x44
                     playerObj.add(0x44).writeInt(0);
                     // maxCardInvenCount: int at 0x48
-                    playerObj.add(0x48).writeInt(profile.cardInvenMax || 200);
+                    playerObj.add(0x48).writeInt(parseInt(profile.cardInvenMax) || 200);
 
                     // diamond: int at 0x4C, freeDiamond: int at 0x50
-                    playerObj.add(0x4C).writeInt(profile.diamond !== undefined ? profile.diamond : 10000);
+                    playerObj.add(0x4C).writeInt(profile.diamond !== undefined ? (parseInt(profile.diamond) || 10000) : 10000);
                     playerObj.add(0x50).writeInt(0);
 
                     // rhythmPoint: int at 0x54, freeRhythmPoint: int at 0x58
-                    playerObj.add(0x54).writeInt(profile.rhythmPoint !== undefined ? profile.rhythmPoint : 100000);
+                    playerObj.add(0x54).writeInt(profile.rhythmPoint !== undefined ? (parseInt(profile.rhythmPoint) || 100000) : 100000);
                     playerObj.add(0x58).writeInt(0);
 
                     // headphone: int at 0x5C, freeHeadphone: int at 0x60
-                    playerObj.add(0x5C).writeInt(profile.headphone !== undefined ? profile.headphone : 50);
+                    playerObj.add(0x5C).writeInt(profile.headphone !== undefined ? (parseInt(profile.headphone) || 50) : 50);
                     playerObj.add(0x60).writeInt(0);
 
                     // nicknameChanger: int at 0x64
                     playerObj.add(0x64).writeInt(0);
 
                     // dalcomCoin: int at 0x70, freeDalcomCoin: int at 0x74
-                    playerObj.add(0x70).writeInt(profile.dalcomCoin !== undefined ? profile.dalcomCoin : 5000);
+                    playerObj.add(0x70).writeInt(profile.dalcomCoin !== undefined ? (parseInt(profile.dalcomCoin) || 5000) : 5000);
                     playerObj.add(0x74).writeInt(0);
 
                     // Pin playerObj so Unity GC never collects it
@@ -2861,6 +2868,18 @@ function initIl2Cpp(module) {
                                     if (introBase && !introBase.isNull()) {
                                         setActiveFn(introBase, 1, NULL);
                                     }
+                                    var mainBase = sceneView.add(0x120).readPointer();
+                                    if (mainBase && !mainBase.isNull()) {
+                                        setActiveFn(mainBase, 1, NULL);
+                                    }
+                                    var loadingBase = sceneView.add(0xA8).readPointer();
+                                    if (loadingBase && !loadingBase.isNull()) {
+                                        setActiveFn(loadingBase, 0, NULL);
+                                    }
+                                    var termsBase = sceneView.add(0x58).readPointer();
+                                    if (termsBase && !termsBase.isNull()) {
+                                        setActiveFn(termsBase, 0, NULL);
+                                    }
                                 }
                             }
                         } catch (eIntro) {}
@@ -2927,9 +2946,23 @@ function initIl2Cpp(module) {
                     onEnter: function (args) {
                         log("[🚀 TITLE] TitleScene.SetStateMain entered! Loading background image...");
                         globalTitleScene = args[0];
+                        globalSceneId = 2;
                         isAtTouchToStart = true;
                         hasTriggeredLobbyTransition = false;
                         dismissFade();
+                        try {
+                            var sceneView = args[0].add(0x48).readPointer();
+                            if (!sceneView.isNull()) {
+                                var hideLoadingFn = new NativeFunction(baseAddr.add(0xB26988), "void", ["pointer"]);
+                                hideLoadingFn(sceneView);
+                                var hideTermsFn = new NativeFunction(baseAddr.add(0xB25F1C), "void", ["pointer"]);
+                                hideTermsFn(sceneView);
+                                var showMainFn = new NativeFunction(baseAddr.add(0xB24534), "void", ["pointer"]);
+                                showMainFn(sceneView);
+                            }
+                        } catch (eHlMain) {
+                            log("[-] Error ensuring mainBase active in SetStateMain: " + eHlMain.message);
+                        }
                         loadAndApplyTitleBackground();
                     }
                 });
@@ -2994,15 +3027,47 @@ function initIl2Cpp(module) {
                     }, "void", ["pointer"]));
                 } catch (eTvOl) {}
 
-                // TitleScene.SetStateTermsAndPolicy (0xB22514) -> auto bypass to SetStateLoading (0xB22D64)
+                // TitleScene.SetStateTermsAndPolicy (0xB22514) -> directly advance to ExcuteLogin (0xB23774)
                 try {
                     Interceptor.replace(baseAddr.add(0xB22514), new NativeCallback(function (thiz) {
-                        log("[📜 TERMS] SetStateTermsAndPolicy intercepted -> directly advancing to SetStateLoading!");
-                        var setStateLoadingFn = new NativeFunction(baseAddr.add(0xB22D64), "void", ["pointer"]);
-                        setStateLoadingFn(thiz);
+                        log("[📜 TERMS] SetStateTermsAndPolicy intercepted -> directly advancing to ExcuteLogin!");
+                        globalTitleScene = thiz;
+                        globalSceneId = 2;
+                        var excuteLoginFn = new NativeFunction(baseAddr.add(0xB23774), "void", ["pointer"]);
+                        excuteLoginFn(thiz);
                     }, "void", ["pointer"]));
-                    log("[+] Hooked TitleScene.SetStateTermsAndPolicy (0xB22514) to auto-advance!");
+                    log("[+] Hooked TitleScene.SetStateTermsAndPolicy (0xB22514) to auto-advance to ExcuteLogin!");
                 } catch (eTerms) {}
+
+                // TitleScene.SetStateLoading (0xB22D64) -> auto bypass loading screen to ExcuteLogin (0xB23774)
+                try {
+                    Interceptor.replace(baseAddr.add(0xB22D64), new NativeCallback(function (thiz) {
+                        log("[🚀 TITLE SCENE] SetStateLoading intercepted -> hiding loadingBase and advancing to ExcuteLogin!");
+                        globalTitleScene = thiz;
+                        globalSceneId = 2;
+                        try {
+                            var sceneView = thiz.add(0x48).readPointer();
+                            if (!sceneView.isNull()) {
+                                var hideLoadingFn = new NativeFunction(baseAddr.add(0xB26988), "void", ["pointer"]);
+                                hideLoadingFn(sceneView);
+                            }
+                        } catch (eHl) {}
+                        var excuteLoginFn = new NativeFunction(baseAddr.add(0xB23774), "void", ["pointer"]);
+                        excuteLoginFn(thiz);
+                    }, "void", ["pointer"]));
+                    log("[+] Hooked TitleScene.SetStateLoading (0xB22D64) to auto-advance to ExcuteLogin!");
+                } catch (eLoading) {}
+
+                // Safety shields against loading screen overlay (9.9%)
+                try {
+                    Interceptor.replace(baseAddr.add(0xB230EC), new NativeCallback(function (thiz, loadingType, methodInfo) {
+                        log("[🛡️ LOADING SHIELD] TitleView.ShowLoading blocked for standalone offline mode!");
+                    }, "void", ["pointer", "int", "pointer"]));
+                    Interceptor.replace(baseAddr.add(0xB231A4), new NativeCallback(function (thiz, methodInfo) {
+                        log("[🛡️ LOADING SHIELD] TitleView.StartLoadingGauge blocked!");
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Hooked TitleView.ShowLoading (0xB230EC) & StartLoadingGauge (0xB231A4)!");
+                } catch (eLs) {}
 
                 // TitleScene.SetStateSelectLogin (0xB245AC)
                 try {
@@ -3017,7 +3082,7 @@ function initIl2Cpp(module) {
                 // Input.GetMouseButtonDown (0x25A5624) para detectar toques en pantalla durante TitleScene
                 Interceptor.attach(baseAddr.add(0x25A5624), {
                     onLeave: function (retval) {
-                        if (retval.toInt32() === 1 && !hasTriggeredLobbyTransition && isAtTouchToStart && sceneId === 2) {
+                        if (retval.toInt32() === 1 && !hasTriggeredLobbyTransition && isAtTouchToStart && (globalSceneId === 2 || globalSceneId === 0)) {
                             if (globalTitleScene && !globalTitleScene.isNull()) {
                                 log("[👆 INPUT TAP] Touch/Click detected on screen during TitleScene TOUCH TO START!");
                                 triggerLobbyTransition("Input.GetMouseButtonDown");
@@ -3030,6 +3095,7 @@ function initIl2Cpp(module) {
                     onEnter: function (args) {
                         var targetSid = args[0].toInt32();
                         log("[🎬 SCENE] SceneControl.OpenScene -> sceneId: " + targetSid);
+                        globalSceneId = targetSid;
                         if (targetSid !== 2) {
                             isAtTouchToStart = false;
                             hasTriggeredLobbyTransition = true;
