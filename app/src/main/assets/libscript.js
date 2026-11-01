@@ -1033,6 +1033,34 @@ function initIl2Cpp(module) {
             try { actionBoolInvokeFn = new NativeFunction(actionBoolInvokePtr, "void", ["pointer", "bool"]); } catch (e) {}
             try { actionIntInvokeFn = new NativeFunction(actionIntInvokePtr, "void", ["pointer", "int"]); } catch (e) {}
 
+            function getPlayerRP() {
+                try {
+                    var profile = loadPlayerProfile();
+                    if (profile && profile.rhythmPoint !== undefined) {
+                        return profile.rhythmPoint;
+                    }
+                } catch (e) {}
+                return 0;
+            }
+
+            function refreshTopViewRhythmPoint(rp) {
+                try {
+                    var getTopCtrlFn = new NativeFunction(baseAddr.add(0xB13204), "pointer", ["pointer"]);
+                    var topCtrlInst = getTopCtrlFn(NULL);
+                    if (!topCtrlInst.isNull()) {
+                        var topView = topCtrlInst.add(0x20).readPointer();
+                        if (!topView.isNull()) {
+                            var valToSet = (rp !== undefined && rp !== null) ? rp : getPlayerRP();
+                            var refreshRpFn = new NativeFunction(baseAddr.add(0xB2BE9C), "void", ["pointer", "int", "int", "pointer"]);
+                            refreshRpFn(topView, valToSet, 999999999, NULL);
+                            log("[💰 TOPVIEW RP REFRESHED] TopView RP updated in real-time to: " + valToSet);
+                        }
+                    }
+                } catch (e) {
+                    log("[-] Error refreshing TopView RP: " + e.message);
+                }
+            }
+
             function setupUserControl(profile) {
                 if (!profile) return;
                 try {
