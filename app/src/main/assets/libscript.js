@@ -5120,6 +5120,8 @@ function initIl2Cpp(module) {
                                 var csvParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardSmallView/Params");
                                 if (csvParamsKlass && !csvParamsKlass.isNull()) {
                                     p = il2cpp_object_new(csvParamsKlass);
+                                    var csvCtorFn = new NativeFunction(baseAddr.add(0xE49E98), "void", ["pointer", "pointer"]);
+                                    csvCtorFn(p, NULL);
                                 }
                             } catch (eCsvK) {}
                         }
@@ -5175,6 +5177,8 @@ function initIl2Cpp(module) {
                                 var csvParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardSmallView/Params");
                                 if (csvParamsKlass && !csvParamsKlass.isNull()) {
                                     p = il2cpp_object_new(csvParamsKlass);
+                                    var csvCtorFn = new NativeFunction(baseAddr.add(0xE49E98), "void", ["pointer", "pointer"]);
+                                    csvCtorFn(p, NULL);
                                 }
                             } catch (eCsvK) {}
                         }
@@ -5589,6 +5593,10 @@ function initIl2Cpp(module) {
                         if (!invenCardMainParamsKlass || invenCardMainParamsKlass.isNull()) return NULL;
                         var p = il2cpp_object_new(invenCardMainParamsKlass);
                         if (!p || p.isNull()) return NULL;
+                        try {
+                            var mainParamsCtor = new NativeFunction(baseAddr.add(0xB531A8), "void", ["pointer", "pointer"]);
+                            mainParamsCtor(p, NULL);
+                        } catch (eMpc) {}
                         if (il2cpp_gchandle_new) il2cpp_gchandle_new(p, 2);
 
                         var isR = false;
@@ -7138,16 +7146,12 @@ function initIl2Cpp(module) {
                             var off = listOffsets[i];
                             var curPtr = scene.add(off).readPointer();
                             if (curPtr.isNull()) {
-                                var newObj = il2cpp_object_new(klass);
-                                if (!newObj.isNull()) {
-                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(newObj, 2);
+                                var newObj = createManagedList([], 'card');
+                                if (newObj && !newObj.isNull()) {
                                     scene.add(off).writePointer(newObj);
                                     curPtr = newObj;
                                     log("[🗃️ INVENTORY] ensureInventoryLists: initialized offset 0x" + off.toString(16) + " -> " + newObj);
                                 }
-                            }
-                            if (!curPtr.isNull()) {
-                                ensureListBuffer(curPtr, 64);
                             }
                         }
                     } catch (eLists) {
@@ -10722,14 +10726,33 @@ function initIl2Cpp(module) {
                                     if (il2cpp_gchandle_new && !groupItemObj.isNull()) {
                                         il2cpp_gchandle_new(groupItemObj, 2);
                                     }
-                                    groupItemObj.add(0x10).writePointer(allGroupDataMap[gCode] || loonaGroupData || NULL);
-                                    groupItemObj.add(0x18).writePointer(NULL);
-                                    groupItemObj.add(0x20).writePointer(NULL);
-                                    groupItemObj.add(0x28).writePointer(groupCardFastArray || NULL);
-                                    groupItemObj.add(0x30).writePointer(NULL);
-                                    groupItemObj.add(0x38).writeS16(-1);
-                                    groupItemObj.add(0x40).writePointer(NULL);
-                                    groupItemObj.add(0x48).writeS16(-1);
+                                    try {
+                                        var groupItemCtorFn = new NativeFunction(baseAddr.add(0xB56EF4), "void", ["pointer", "int", "pointer", "pointer"]);
+                                        groupItemCtorFn(groupItemObj, gCode, cardMap || NULL, NULL);
+                                    } catch (eGiCtor) {
+                                        log("[-] Warning calling GroupItem..ctor for gCode=" + gCode + ": " + eGiCtor.message);
+                                    }
+
+                                    if (allGroupDataMap[gCode]) {
+                                        groupItemObj.add(0x10).writePointer(allGroupDataMap[gCode]);
+                                    } else if (gCode === 1001 && loonaGroupData) {
+                                        groupItemObj.add(0x10).writePointer(loonaGroupData);
+                                    }
+
+                                    var curFastArr = groupItemObj.add(0x28).readPointer();
+                                    if (curFastArr.isNull() || curFastArr.compare(ptr(0x10000)) <= 0) {
+                                        groupItemObj.add(0x28).writePointer(groupCardFastArray || NULL);
+                                    } else {
+                                        try {
+                                            var curLen = curFastArr.add(0x18).readS32();
+                                            if (curLen === 0 && groupCardFastArray && !groupCardFastArray.isNull()) {
+                                                groupItemObj.add(0x28).writePointer(groupCardFastArray);
+                                            }
+                                        } catch (eFaLen) {
+                                            groupItemObj.add(0x28).writePointer(groupCardFastArray || NULL);
+                                        }
+                                    }
+
                                     groupItemObj.add(0x4A).writeS16(4);
                                     groupItemObj.add(0x4C).writeS32(0);
                                     groupItemObj.add(0x50).writeS32(gCode);
