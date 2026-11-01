@@ -454,48 +454,55 @@ function initIl2Cpp(module) {
             log("[-] Error patching CardListCompare: " + eClc.message);
         }
 
-        // Boehm GC Mark Procedure Shield (0xA28D38): prevent crash when conservative scanning finds false object pointer
+        // Boehm GC Mark Procedure Shield: native direct branch trampoline in libil2cpp .text (at 0xF288B0)
+        // Prevents SIGSEGV when conservative scanning encounters non-pointer/32-bit values with GC_DS_PROC tag
         try {
             var patchAddr = baseAddr.add(0xA28D38);
-            var returnAddr = baseAddr.add(0xA28D50);
-            var skipAddr = baseAddr.add(0xA28C70);
+            var trampAddr = baseAddr.add(0xF288B0);
 
-            var tramp = Memory.alloc(80);
-            Memory.protect(tramp, 80, "rwx");
-
+            // 1. Write native trampoline into unused .text of CardListCompare (0xF288B0):
+            // 0xF288B0: ldr x10, [x23]               (0xf94002ea)
+            // 0xF288B4: cbz x10, #0xf288d8           (0xb400012a)
+            // 0xF288B8: and x11, x10, #0xffffffffffff (0x9240dd4b)
+            // 0xF288BC: lsr x11, x11, #36            (0xd364fd6b)
+            // 0xF288C0: cbz x11, #0xf288d8           (0xb40000cb)
+            // 0xF288C4: mov x11, #-0xd               (0x9280018b)
+            // 0xF288C8: sub x8, x11, x8              (0xcb080168)
+            // 0xF288CC: add x8, x10, x8              (0x8b080148)
+            // 0xF288D0: ldr x8, [x8]                 (0xf9400108)
+            // 0xF288D4: b #0xa28d50                  (0x17ec011f)
+            // 0xF288D8: b #0xa28c70                  (0x17ec00e6)
+            Memory.protect(trampAddr, 48, "rwx");
             var trampBytes = [
-                0xea, 0x02, 0x40, 0xf9, // ldr x10, [x23]
-                0x8a, 0x01, 0x00, 0xb4, // cbz x10, #0x34
-                0x4b, 0xdd, 0x40, 0x92, // and x11, x10, #0x00ffffffffffffff
-                0x6b, 0xfd, 0x64, 0xd3, // lsr x11, x11, #36
-                0x2b, 0x01, 0x00, 0xb4, // cbz x11, #0x34
-                0x8b, 0x01, 0x80, 0x92, // mov x11, #-0xd
-                0x68, 0x01, 0x08, 0xcb, // sub x8, x11, x8
-                0x48, 0x01, 0x08, 0x8b, // add x8, x10, x8
-                0x08, 0x01, 0x40, 0xf9, // ldr x8, [x8]
-                0x4b, 0x00, 0x00, 0x58, // ldr x11, #8 (PC+8 = 0x2c)
-                0x60, 0x01, 0x1f, 0xd6  // br x11
+                0xea, 0x02, 0x40, 0xf9, // 0xF288B0: ldr x10, [x23]
+                0x2a, 0x01, 0x00, 0xb4, // 0xF288B4: cbz x10, #0xf288d8
+                0x4b, 0xdd, 0x40, 0x92, // 0xF288B8: and x11, x10, #0x00ffffffffffffff
+                0x6b, 0xfd, 0x64, 0xd3, // 0xF288BC: lsr x11, x11, #36
+                0xcb, 0x00, 0x00, 0xb4, // 0xF288C0: cbz x11, #0xf288d8
+                0x8b, 0x01, 0x80, 0x92, // 0xF288C4: mov x11, #-0xd
+                0x68, 0x01, 0x08, 0xcb, // 0xF288C8: sub x8, x11, x8
+                0x48, 0x01, 0x08, 0x8b, // 0xF288CC: add x8, x10, x8
+                0x08, 0x01, 0x40, 0xf9, // 0xF288D0: ldr x8, [x8]
+                0x1f, 0x01, 0xec, 0x17, // 0xF288D4: b #0xa28d50
+                0xe6, 0x00, 0xec, 0x17  // 0xF288D8: b #0xa28c70
             ];
-            tramp.writeByteArray(trampBytes);
-            tramp.add(0x2c).writePointer(returnAddr);
+            trampAddr.writeByteArray(trampBytes);
+            Memory.protect(trampAddr, 48, "r-x");
 
-            var skipBytes = [
-                0x4b, 0x00, 0x00, 0x58, // ldr x11, #8 (PC+8 = 0x3c)
-                0x60, 0x01, 0x1f, 0xd6  // br x11
-            ];
-            tramp.add(0x34).writeByteArray(skipBytes);
-            tramp.add(0x3c).writePointer(skipAddr);
-
+            // 2. Direct branch from 0xA28D38 to 0xF288B0 (b #0xf288b0 = 0x1413fede):
             Memory.protect(patchAddr, 24, "rwx");
             var patchBytes = [
-                0x4b, 0x00, 0x00, 0x58, // ldr x11, #8 (PC+8 = 0x08)
-                0x60, 0x01, 0x1f, 0xd6  // br x11
+                0xde, 0xfe, 0x13, 0x14, // 0xA28D38: b #0xf288b0
+                0x1f, 0x20, 0x03, 0xd5, // 0xA28D3C: nop
+                0x1f, 0x20, 0x03, 0xd5, // 0xA28D40: nop
+                0x1f, 0x20, 0x03, 0xd5, // 0xA28D44: nop
+                0x1f, 0x20, 0x03, 0xd5, // 0xA28D48: nop
+                0x1f, 0x20, 0x03, 0xd5  // 0xA28D4C: nop
             ];
             patchAddr.writeByteArray(patchBytes);
-            patchAddr.add(0x08).writePointer(tramp);
-            patchAddr.add(0x10).writeByteArray([0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5]); // 2x nop
+            Memory.protect(patchAddr, 24, "r-x");
 
-            log("[🛡️ BOEHM GC SHIELD] Successfully installed custom procedure guard at 0xA28D38 -> tramp: " + tramp);
+            log("[🛡️ BOEHM GC SHIELD] Successfully installed direct .text trampoline at 0xF288B0 from 0xA28D38!");
         } catch (eGcs) {
             log("[-] Error installing Boehm GC shield: " + eGcs.message);
         }
