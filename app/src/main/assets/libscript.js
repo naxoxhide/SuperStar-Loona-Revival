@@ -5403,22 +5403,6 @@ function initIl2Cpp(module) {
                                     // Find List<CardSmallView.Params> TypeInfo via slot
                                     var listTypeInfo = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "InvenGroupItemView");
                                     if (listTypeInfo && !listTypeInfo.isNull()) {
-                                        // Try direct il2cpp_object_new for a generic list klass via metadata
-                                        // Fallback: build a raw array-based list structure in native memory
-                                        var listMem = Memory.alloc(0x30);
-                                        listMem.add(0x00).writePointer(NULL); // vtable placeholder (null ok for Frida-controlled read)
-                                        listMem.add(0x10).writePointer(NULL); // _items inner array
-                                        listMem.add(0x18).writeS32(cardSmallParamsList.length); // _size
-                                        listMem.add(0x1C).writeS32(cardSmallParamsList.length); // _version
-
-                                        // Build inner object[] array: header (vtable + m_maxLength + m_size) + items
-                                        var arrMem = Memory.alloc(0x20 + cardSmallParamsList.length * 8);
-                                        arrMem.add(0x18).writeS32(cardSmallParamsList.length); // array length
-                                        for (var ai = 0; ai < cardSmallParamsList.length; ai++) {
-                                            arrMem.add(0x20 + ai * 8).writePointer(cardSmallParamsList[ai] || NULL);
-                                        }
-                                        listMem.add(0x10).writePointer(arrMem);
-                                        smallCardParamListObj = listMem;
                                         log("[✅ GROUP_VIEW] Built cardParams List<CardSmallView.Params> with " + cardSmallParamsList.length + " items");
                                     }
                                 } catch (eCpl) {
@@ -7202,11 +7186,7 @@ function initIl2Cpp(module) {
                         var curCap = (!itemsPtr.isNull()) ? itemsPtr.add(0x18).readS32() : 0;
                         if (itemsPtr.isNull() || curCap < minCap) {
                             if (!cachedCardItemKlass || cachedCardItemKlass.isNull()) {
-                                var itemSlot = baseAddr.add(0x31F3060).readPointer();
-                                if (!itemSlot.isNull()) cachedCardItemKlass = itemSlot;
-                                if (!cachedCardItemKlass || cachedCardItemKlass.isNull()) {
-                                    cachedCardItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "InventoryControl/CardItem");
-                                }
+                                cachedCardItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "InventoryControl/CardItem");
                             }
                             if (il2cpp_array_new && cachedCardItemKlass && !cachedCardItemKlass.isNull()) {
                                 var allocCap = Math.max(minCap, 64);
@@ -10443,34 +10423,23 @@ function initIl2Cpp(module) {
                             return cachedDglInstance;
                         }
                         ensureLoonaMocks();
-                        var listKlass = getClass("mscorlib", "System.Collections.Generic", "List`1");
-                        if (listKlass && !listKlass.isNull()) {
-                            var newDgl = il2cpp_object_new(listKlass);
-                            if (!newDgl.isNull()) {
-                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(newDgl, 2);
-                                var meta = getGlobalMetadata();
-                                var playables = (meta && meta.playableGroups) ? meta.playableGroups : PLAYABLE_GROUP_CODES;
-                                var totalGroups = playables.length;
-                                var arrKlass = (loonaGroupItemObj && !loonaGroupItemObj.isNull()) ? loonaGroupItemObj.readPointer() : listKlass;
-                                var arr = il2cpp_array_new(arrKlass, totalGroups + 8);
-                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(arr, 2);
-                                newDgl.add(0x10).writePointer(arr);
-                                var actualCount = 0;
-                                for (var pi = 0; pi < totalGroups; pi++) {
-                                    var gCode = playables[pi];
-                                    var gi = allInvenGroupItems[gCode] || (gCode === 1001 ? loonaGroupItemObj : NULL);
-                                    if (gi && !gi.isNull()) {
-                                        arr.add(0x20 + actualCount * 8).writePointer(gi);
-                                        actualCount++;
-                                    }
-                                }
-                                newDgl.add(0x18).writeS32(actualCount);
-                                var setDglFn = new NativeFunction(baseAddr.add(0xF27770), "void", ["pointer", "pointer"]);
-                                setDglFn(newDgl, NULL);
-                                cachedDglInstance = newDgl;
-                                log("[🃏 INVENTORY] Created authentic IL2CPP List<GroupItem> for DisplayGroupList: " + newDgl + " (count=" + actualCount + ")");
-                                return newDgl;
+                        var meta = getGlobalMetadata();
+                        var playables = (meta && meta.playableGroups) ? meta.playableGroups : PLAYABLE_GROUP_CODES;
+                        var groupItems = [];
+                        for (var pi = 0; pi < playables.length; pi++) {
+                            var gCode = playables[pi];
+                            var gi = allInvenGroupItems[gCode] || (gCode === 1001 ? loonaGroupItemObj : NULL);
+                            if (gi && !gi.isNull()) {
+                                groupItems.push(gi);
                             }
+                        }
+                        var newDgl = createManagedList(groupItems, 'group');
+                        if (newDgl && !newDgl.isNull()) {
+                            var setDglFn = new NativeFunction(baseAddr.add(0xF27770), "void", ["pointer", "pointer"]);
+                            setDglFn(newDgl, NULL);
+                            cachedDglInstance = newDgl;
+                            log("[🃏 INVENTORY] Created authentic IL2CPP List<GroupItem> for DisplayGroupList: " + newDgl + " (count=" + groupItems.length + ")");
+                            return newDgl;
                         }
                     } catch (eEdgl) {
                         log("[-] Error in ensureDisplayGroupList: " + eEdgl.message);
@@ -10716,14 +10685,7 @@ function initIl2Cpp(module) {
                             cardKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.account", "Card");
                         }
 
-                        var cardItemKlass = NULL;
-                        try {
-                            var itemSlot = baseAddr.add(0x31F3060).readPointer();
-                            if (!itemSlot.isNull()) cardItemKlass = itemSlot;
-                        } catch (e2) {}
-                        if (!cardItemKlass || cardItemKlass.isNull()) {
-                            cardItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "InventoryControl/CardItem");
-                        }
+                        var cardItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "InventoryControl/CardItem");
 
                         if (!cardKlass || cardKlass.isNull() || !cardItemKlass || cardItemKlass.isNull()) {
                             log("[-] Could not resolve Card or CardItem class! cardKlass: " + cardKlass + ", cardItemKlass: " + cardItemKlass);
