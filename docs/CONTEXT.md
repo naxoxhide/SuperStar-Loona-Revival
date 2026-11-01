@@ -3205,3 +3205,48 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
     8. Disposición idéntica a la especificación oficial [261060011.i.bytes.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/rtrttyyuuio/261060011.i.bytes.png).
 
 
+
+---
+
+### 14. Hardening y Validación Interactiva de `LobbyScene` (Fases 3 y 4 Completadas)
+
+#### 1. Fase 3: Desbloqueo Táctil, Menús Laterales y Navegación Ready
+- **Neutralización del Bloqueo Táctil en `TopView` (`touchLock` RVA `0xB2B864`):**
+  * Dalcomsoft activa `touchLock` (`TopView` offset `0x158`) durante transiciones de escena y espera una respuesta de red del servidor antes de liberarlo. Al operar en offline standalone, este bloqueo permanecía activo, impidiendo cualquier interacción táctil con el menú `☰` o `Message`.
+  * Solución: Parche en prólogo de `TopView.set_TouchLockEnable` (RVA `0xB2B864`) con instrucción `RET` (`0xC0, 0x03, 0x5F, 0xD6`), garantizando que la barra superior siempre sea interactiva.
+- **Apertura Canónica de Paneles Laterales:**
+  * En `activateLobbyUIAndVideo`, se reemplazó la llamada a `InitMenus(0, 1)` por `InitMenus(1, 1)` (RVA `0xCEF608`), desplegando simultáneamente el panel izquierdo (misiones, asistencia, eventos) y el panel derecho (tienda, card book, inventario) idéntico a la especificación oficial [261060011.i.bytes.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/rtrttyyuuio/261060011.i.bytes.png).
+- **Verificación Interactiva del Menú Misceláneo (`☰`):**
+  * Tocar el botón `☰` en coordenadas `(1860, 45)` abre de inmediato el menú emergente vertical con:
+    1. **Help** `(?)`
+    2. **Attendance** (Calendario)
+    3. **Notice** `(!)`
+    4. **Settings** (Engranaje)
+  * Evidencia visual capturada en [qa_phase3_more_menu.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_phase3_more_menu.png).
+- **Protección Defensiva de Transición "Ready" hacia `SelectMusicScene`:**
+  * Al pulsar el botón "Ready" en el Lobby, el flujo transiciona a `SelectMusicScene` (SceneId 7).
+  * Se neutralizaron dos puntos críticos de caída en offline:
+    1. `GroupControl.InitFavoriteLocalData` (RVA `0xB9FF50`): Parcheado con `RET` para prevenir `NullReferenceException` debido a ausencia de datos de favoritos remotos.
+    2. `MusicControl.UpdateDisplayList` (RVA `0xAFD6E4`, `0xAFD70C`, `0xAFD794`): Parcheadas las ramas condicionales `cbz` para bifurcar a `b #0xafd6d0` (omitiendo de forma segura cualquier tema sin grupo en vez de abortar el proceso).
+
+#### 2. Fase 4: Interacción y Bocadillo de Voz de Integrantes LOONA (`memberView` / `Bubble`)
+- **Arquitectura de Diálogo de Integrantes:**
+  * La clase `LobbyMemberView` gestiona los componentes:
+    - `0x38`: `voiceBubbleAnim` (`Animation`)
+    - `0x40`: `voiceBubbleTouchArea` (`Button`)
+    - `0x48`: `voiceBubble` (`RectTransform`)
+    - `0x50`: `memberImage` (`RawImage`)
+    - `0x58`: `voiceText` (`Text`)
+- **Implementación de Detección Táctil y Ciclo de Frases:**
+  * En `Input.GetMouseButtonDown` (RVA `0x25A5624`), al encontrarse en escena 3 (`LobbyScene`), se evalúan las coordenadas del toque mediante `get_mousePosition_Injected` (RVA `0x25A58F0`).
+  * Los toques sobre la zona de integrantes (X entre 350 y 1500, Y entre 150 y 850) activan `LobbyMemberView.OnMemberTouch` (RVA `0xB42B48`) con frases célebres de LOONA rotadas secuencialmente:
+    - *"Orbit, 오늘도 좋은 하루 보내요! 🌙"*
+    - *"이달의 소녀와 함께 달려볼까요? ✨"*
+    - *"우리의 특별한 이야기, 지금 시작해요! 💫"*
+    - *"오빛을 위해 항상 노래할게요 💖"*
+    - *"SuperStar LOONA에 오신 것을 환영해요! 🌟"*
+    - *"Hi High! 오늘도 힘차게 출발해 볼까요? 🚀"*
+    - *"달콤한 음악과 함께 행복한 하루 되세요! 🎶"*
+- **Evidencia Visual de Verificación:**
+  * Captura [qa_phase4_bubble_live.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_phase4_bubble_live.png) confirma el despliegue del saludo inicial al ingresar al Lobby.
+  * Captura [qa_phase4_bubble_second.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_phase4_bubble_second.png) confirma el cambio dinámico de frase al tocar a las integrantes en el centro de la pantalla.

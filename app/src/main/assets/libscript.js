@@ -3118,6 +3118,44 @@ function initIl2Cpp(module) {
                     log("[-] Error patching VideoControl Show/ShowDisplay with RET: " + eRet.message);
                 }
 
+                // Patch GroupControl.InitFavoriteLocalData (0xB9FF50) with RET to prevent NullReferenceException on Ready
+                try {
+                    Memory.protect(baseAddr.add(0xB9FF50), 4, 'rwx');
+                    baseAddr.add(0xB9FF50).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]); // RET
+                    Memory.protect(baseAddr.add(0xB9FF50), 4, 'r-x');
+                    log("[🛡️ GROUP FAVORITE] Successfully patched GroupControl.InitFavoriteLocalData (0xB9FF50) with RET!");
+                } catch (eGfl) {
+                    log("[-] Error patching 0xB9FF50 with RET: " + eGfl.message);
+                }
+
+                // Patch TopView.set_TouchLockEnable (0xB2B864) with RET so TopView is always interactive in offline mode
+                try {
+                    Memory.protect(baseAddr.add(0xB2B864), 4, 'rwx');
+                    baseAddr.add(0xB2B864).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]); // RET
+                    Memory.protect(baseAddr.add(0xB2B864), 4, 'r-x');
+                    log("[👑 TOPVIEW UNLOCK] Successfully patched TopView.set_TouchLockEnable (0xB2B864) with RET!");
+                } catch (eUlock) {
+                    log("[-] Error patching 0xB2B864 with RET: " + eUlock.message);
+                }
+
+                // Patch MusicControl.UpdateDisplayList (0xAFD6E4, 0xAFD70C, 0xAFD794) to skip missing entries instead of throwing NRE
+                try {
+                    Memory.protect(baseAddr.add(0xAFD6E4), 4, 'rwx');
+                    baseAddr.add(0xAFD6E4).writeByteArray([0x78, 0xff, 0xff, 0xb4]); // cbz x24, #0xafd6d0
+                    Memory.protect(baseAddr.add(0xAFD6E4), 4, 'r-x');
+
+                    Memory.protect(baseAddr.add(0xAFD70C), 4, 'rwx');
+                    baseAddr.add(0xAFD70C).writeByteArray([0x20, 0xfe, 0xff, 0xb4]); // cbz x0, #0xafd6d0
+                    Memory.protect(baseAddr.add(0xAFD70C), 4, 'r-x');
+
+                    Memory.protect(baseAddr.add(0xAFD794), 4, 'rwx');
+                    baseAddr.add(0xAFD794).writeByteArray([0xe0, 0xf9, 0xff, 0xb4]); // cbz x0, #0xafd6d0
+                    Memory.protect(baseAddr.add(0xAFD794), 4, 'r-x');
+                    log("[🛡️ MUSIC DISPLAY] Successfully patched MusicControl.UpdateDisplayList NRE branches (0xAFD6E4, 0xAFD70C, 0xAFD794)!");
+                } catch (eMdl) {
+                    log("[-] Error patching MusicControl.UpdateDisplayList: " + eMdl.message);
+                }
+
                 var isAtTouchToStart = false;
                 Interceptor.attach(baseAddr.add(0xB243BC), {
                     onEnter: function (args) {
@@ -3292,13 +3330,95 @@ function initIl2Cpp(module) {
                     log("[+] Hooked TitleScene.SetStateSelectLogin (0xB245AC)!");
                 } catch (eSsl) {}
 
-                // Input.GetMouseButtonDown (0x25A5624) para detectar toques en pantalla durante TitleScene
+                var globalMemberView = NULL;
+                var globalLobbyView = NULL;
+                var loonaQuotes = [
+                    "Orbit, 오늘도 좋은 하루 보내요! 🌙",
+                    "이달의 소녀와 함께 달려볼까요? ✨",
+                    "우리의 특별한 이야기, 지금 시작해요! 💫",
+                    "오빛을 위해 항상 노래할게요 💖",
+                    "SuperStar LOONA에 오신 것을 환영해요! 🌟",
+                    "Hi High! 오늘도 힘차게 출발해 볼까요? 🚀",
+                    "달콤한 음악과 함께 행복한 하루 되세요! 🎶"
+                ];
+                var quoteIndex = 0;
+                function triggerMemberBubble() {
+                    if (globalMemberView && !globalMemberView.isNull()) {
+                        try {
+                            var vbAnim = globalMemberView.add(0x38).readPointer();
+                            var vbTouch = globalMemberView.add(0x40).readPointer();
+                            var vbRt = globalMemberView.add(0x48).readPointer();
+                            var vbImg = globalMemberView.add(0x50).readPointer();
+                            var vbText = globalMemberView.add(0x58).readPointer();
+                            log("[💬 BUBBLE DEBUG] anim=" + vbAnim + " touch=" + vbTouch + " rt=" + vbRt + " img=" + vbImg + " text=" + vbText);
+
+                            if (globalLobbyView && !globalLobbyView.isNull()) {
+                                var lvAnim = globalLobbyView.add(0xc8).readPointer();
+                                var lvTouch = globalLobbyView.add(0xd0).readPointer();
+                                var lvRight = globalLobbyView.add(0xd8).readPointer();
+                                log("[💬 LOBBY BUBBLE DEBUG] anim=" + lvAnim + " touch=" + lvTouch + " right=" + lvRight);
+                            }
+
+                            // If vbRt is present, ensure its gameObject is active and brought to front
+                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer"]);
+                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int"]);
+                            if (!vbRt.isNull()) {
+                                var vbGo = getGoFn(vbRt);
+                                if (!vbGo.isNull()) {
+                                    setActiveFn(vbGo, 1);
+                                    log("[💬 BUBBLE DEBUG] Activated vbRt GameObject: " + vbGo);
+                                }
+                            }
+                            if (!vbText.isNull()) {
+                                var txtGo = getGoFn(vbText);
+                                if (!txtGo.isNull()) {
+                                    setActiveFn(txtGo, 1);
+                                    log("[💬 BUBBLE DEBUG] Activated voiceText GameObject: " + txtGo);
+                                }
+                            }
+
+                            var onMemberTouchFn = new NativeFunction(baseAddr.add(0xB42B48), "void", ["pointer", "pointer", "pointer"]);
+                            var qText = loonaQuotes[quoteIndex % loonaQuotes.length];
+                            quoteIndex++;
+                            var msgStr = createIl2CppString(qText);
+                            onMemberTouchFn(globalMemberView, msgStr, NULL);
+                            log("[💬 BUBBLE] Voice bubble displayed with quote: " + qText);
+                        } catch (eMb) {
+                            log("[-] Error displaying member bubble: " + eMb.message);
+                        }
+                    }
+                }
+
+                // Input.GetMouseButtonDown (0x25A5624) para detectar toques en pantalla durante TitleScene y LobbyScene
+                var lastBubbleTapTime = 0;
                 Interceptor.attach(baseAddr.add(0x25A5624), {
                     onLeave: function (retval) {
-                        if (retval.toInt32() === 1 && !hasTriggeredLobbyTransition && isAtTouchToStart && (globalSceneId === 2 || globalSceneId === 0)) {
-                            if (globalTitleScene && !globalTitleScene.isNull()) {
-                                log("[👆 INPUT TAP] Touch/Click detected on screen during TitleScene TOUCH TO START!");
-                                triggerLobbyTransition("Input.GetMouseButtonDown");
+                        if (retval.toInt32() === 1) {
+                            if (!hasTriggeredLobbyTransition && isAtTouchToStart && (globalSceneId === 2 || globalSceneId === 0)) {
+                                if (globalTitleScene && !globalTitleScene.isNull()) {
+                                    log("[👆 INPUT TAP] Touch/Click detected on screen during TitleScene TOUCH TO START!");
+                                    triggerLobbyTransition("Input.GetMouseButtonDown");
+                                }
+                            } else if (globalSceneId === 3 && globalMemberView && !globalMemberView.isNull()) {
+                                var nowMs = Date.now();
+                                if (nowMs - lastBubbleTapTime > 1200) {
+                                    try {
+                                        var getMousePosFn = new NativeFunction(baseAddr.add(0x25A58F0), "void", ["pointer"]);
+                                        var posBuf = Memory.alloc(12);
+                                        getMousePosFn(posBuf);
+                                        var mx = posBuf.readFloat();
+                                        var my = posBuf.add(4).readFloat();
+                                        // Screen coordinates: center area (mx between 350 and 1500, my between 150 and 850)
+                                        if (mx >= 350 && mx <= 1500 && my >= 150 && my <= 850) {
+                                            lastBubbleTapTime = nowMs;
+                                            log("[👆 IDOL TAP] Tap in center idol area (" + Math.round(mx) + ", " + Math.round(my) + ") -> Triggering Voice Bubble!");
+                                            triggerMemberBubble();
+                                        }
+                                    } catch (pe) {
+                                        lastBubbleTapTime = nowMs;
+                                        triggerMemberBubble();
+                                    }
+                                }
                             }
                         }
                     }
@@ -3673,13 +3793,23 @@ function initIl2Cpp(module) {
                                     }
                                 }
 
-                                // Initialize side menus with right menu open to display Submenu actions (InitMenus at RVA 0xCEF608)
+                                // Initialize side menus with left and right menus open (InitMenus at RVA 0xCEF608)
                                 try {
                                     var initMenusFn = new NativeFunction(baseAddr.add(0xCEF608), "void", ["pointer", "int", "int", "pointer"]);
-                                    initMenusFn(lobbyView, 0, 1, NULL); // (isLeftOpen=0, isRightOpen=1)
-                                    log("[🎨 LOBBY] InitMenus(0, 1) called -> Right submenu expanded with navigation ready!");
+                                    initMenusFn(lobbyView, 1, 1, NULL); // (isLeftOpen=1, isRightOpen=1)
+                                    log("[🎨 LOBBY] InitMenus(1, 1) called -> Both left and right submenus expanded with navigation ready!");
                                 } catch (ime) {
                                     log("[-] Error in InitMenus: " + ime.message);
+                                }
+
+                                // Store references and trigger initial LOONA Voice Bubble
+                                globalLobbyView = lobbyView;
+                                globalMemberView = memberView;
+                                try {
+                                    triggerMemberBubble();
+                                    log("[🎨 LOBBY] Initial LOONA Member Voice Bubble triggered!");
+                                } catch (eBtrig) {
+                                    log("[-] Error triggering initial member bubble: " + eBtrig.message);
                                 }
 
                                 // Adjust Camera clearFlags to avoid solid color blocking
@@ -4928,7 +5058,7 @@ function initIl2Cpp(module) {
                         if (code <= 0) return NULL;
                         ensureLoonaMocks();
                         if (allGroupDataMap[code]) return allGroupDataMap[code];
-                        if (code === 1001) return loonaGroupData || NULL;
+                        if (loonaGroupData && !loonaGroupData.isNull()) return loonaGroupData;
                         return NULL;
                     }, "pointer", ["int", "pointer"]));
                     log("[+] Interceptor.replace installed on GroupControl.Find (0xB9EF94)!");
