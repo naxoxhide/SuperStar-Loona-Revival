@@ -3187,3 +3187,21 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
 - `LobbyView.OnMemberTouch` (RVA `0xCEF264`) -> `LobbyView.Bubble` (RVA `0xCEF364`): Despliega bocadillo de diálogo de integrante central (`voiceText`).
 - `LobbyView.OnClickLeftMenu` (RVA `0xCEF1A4`) / `OnClickRightMenu` (RVA `0xCEF204`): Expande/colapsa paneles laterales con animación.
 
+#### 4. Fase 2 Completada: Restauración Exitosa de `TopView` en el Lobby (QA Sign-off)
+- **Implementación:**
+  * Parche NOP en RVA `0xB2EF18` (`cbz w8, #0xb2f0ec` -> NOP) para neutralizar de raíz el salto condicional sobre `IngameView.IsLogin`.
+  * Inyección forzada de `IngameView.IsLogin = 1` en `setIngameLoginState(true)`.
+  * Función `activateTopView(3)` que invoca `TopView.Show()` (RVA `0xB2BBB8`), `TopViewControl.UpdateScene(3)` (RVA `0xB2ECE4`), `TopViewControl.ShowSceneLayout()` (RVA `0xB2F2AC`) y `TopViewControl.OnRefreshAll()` (RVA `0xB2DE38`).
+  * Activación explícita de `moreButton` (`☰`), `messageButton` (`✉`) y `headphoneObj`.
+- **Verificación Visual:**
+  * Captura en vivo [qa_phase2_lobby.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_phase2_lobby.png) confirma:
+    1. Avatar circular renderizado correctamente en la esquina superior izquierda.
+    2. Nickname "Orbits" con insignias de liga "BRONZE II".
+    3. Audífonos con etiqueta "MAX 20".
+    4. Balance de Rhythm Points: `(R) 500.000`.
+    5. Balance de Diamantes: `💎 9.999`.
+    6. Botón de Mensajes `✉ Message`.
+    7. Botón de Menú Misceláneo `☰`.
+    8. Disposición idéntica a la especificación oficial [261060011.i.bytes.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/rtrttyyuuio/261060011.i.bytes.png).
+
+

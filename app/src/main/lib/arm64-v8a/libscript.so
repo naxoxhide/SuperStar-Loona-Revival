@@ -1196,6 +1196,24 @@ function initIl2Cpp(module) {
                 return 0;
             }
 
+            function setIngameLoginState(isLogin) {
+                try {
+                    var klassPtr = baseAddr.add(0x3107000 + 0xc08);
+                    var ingameKlass = klassPtr.readPointer();
+                    if (!ingameKlass.isNull()) {
+                        var staticFields = ingameKlass.add(0xb8).readPointer();
+                        if (!staticFields.isNull()) {
+                            staticFields.add(0x29).writeU8(isLogin ? 1 : 0);
+                            log("[🔑 LOGIN STATE] IngameView.IsLogin set to: " + (isLogin ? 1 : 0));
+                            return true;
+                        }
+                    }
+                } catch (e) {
+                    log("[-] Error in setIngameLoginState: " + e.message);
+                }
+                return false;
+            }
+
             function refreshTopViewRhythmPoint(rp) {
                 try {
                     var valToSet = (rp !== undefined && rp !== null) ? rp : getPlayerRP();
@@ -1214,6 +1232,126 @@ function initIl2Cpp(module) {
                     }
                 } catch (e) {
                     log("[-] Error refreshing TopView RP: " + e.message);
+                }
+            }
+
+            function refreshTopViewAll() {
+                try {
+                    var getTopCtrlFn = new NativeFunction(baseAddr.add(0xB13204), "pointer", ["pointer"]);
+                    var topCtrl = getTopCtrlFn(NULL);
+                    if (topCtrl.isNull()) return;
+
+                    // OnRefreshAll at 0xB2DE38
+                    try {
+                        var refreshAllFn = new NativeFunction(baseAddr.add(0xB2DE38), "void", ["pointer", "int", "pointer"]);
+                        refreshAllFn(topCtrl, 0, NULL);
+                    } catch (eAll) {}
+
+                    var topView = topCtrl.add(0x20).readPointer();
+                    if (topView.isNull()) return;
+
+                    var p = loadPlayerProfile();
+                    if (p) {
+                        var rpVal = (p.rhythmPoint !== undefined) ? parseInt(p.rhythmPoint) : 500000;
+                        var diaVal = (p.diamond !== undefined) ? parseInt(p.diamond) : 10000;
+                        var hpVal = (p.headphone !== undefined) ? parseInt(p.headphone) : 50;
+
+                        try {
+                            var refreshRpFn = new NativeFunction(baseAddr.add(0xB2BE9C), "void", ["pointer", "int", "int", "pointer"]);
+                            refreshRpFn(topView, rpVal, 999999999, NULL);
+                        } catch (e1) {}
+
+                        try {
+                            var refreshDiaFn = new NativeFunction(baseAddr.add(0xB2BDD8), "void", ["pointer", "int", "int", "pointer"]);
+                            refreshDiaFn(topView, diaVal, 999999999, NULL);
+                        } catch (e2) {}
+
+                        try {
+                            var refreshHpFn = new NativeFunction(baseAddr.add(0xB2BF60), "void", ["pointer", "int", "int", "pointer"]);
+                            refreshHpFn(topView, hpVal, 20, NULL);
+                        } catch (e3) {}
+
+                        try {
+                            var refreshLeagueFn = new NativeFunction(baseAddr.add(0xB2BD44), "void", ["pointer", "int", "pointer", "pointer"]);
+                            var strLeague = createIl2CppString("BRONZE II");
+                            refreshLeagueFn(topView, 1, strLeague, NULL);
+                        } catch (e4) {}
+                    }
+                } catch (e) {
+                    log("[-] Error in refreshTopViewAll: " + e.message);
+                }
+            }
+
+            function activateTopView(sceneId) {
+                var scId = sceneId || 3;
+                try {
+                    setIngameLoginState(true);
+                    var getTopCtrlFn = new NativeFunction(baseAddr.add(0xB13204), "pointer", ["pointer"]);
+                    var topCtrl = getTopCtrlFn(NULL);
+                    if (!topCtrl.isNull()) {
+                        topCtrl.add(0x18).writeU8(1); // IsOpened = true
+                        topCtrl.add(0x2C).writeInt(0); // ScreenLockFlags = 0
+
+                        var topView = topCtrl.add(0x20).readPointer();
+                        if (!topView.isNull()) {
+                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer"]);
+                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int"]);
+
+                            var topGo = getGoFn(topView);
+                            if (!topGo.isNull()) {
+                                setActiveFn(topGo, 1);
+                                log("[👑 TOPVIEW] Activated topView.gameObject: " + topGo);
+                            }
+
+                            try {
+                                var actFn = new NativeFunction(baseAddr.add(0xD02334), "void", ["pointer"]);
+                                actFn(topView);
+                            } catch (ae) {}
+
+                            try {
+                                var showCanvasesFn = new NativeFunction(baseAddr.add(0xD47D00), "void", ["pointer"]);
+                                showCanvasesFn(topView);
+                            } catch (ce) {}
+
+                            try {
+                                var tvShowFn = new NativeFunction(baseAddr.add(0xB2BBB8), "void", ["pointer"]);
+                                tvShowFn(topView);
+                                log("[👑 TOPVIEW] TopView.Show() called!");
+                            } catch (se) {}
+
+                            try {
+                                var updateSceneFn = new NativeFunction(baseAddr.add(0xB2ECE4), "void", ["pointer", "int"]);
+                                updateSceneFn(topCtrl, scId);
+                                log("[👑 TOPVIEW] TopViewControl.UpdateScene(" + scId + ") called!");
+                            } catch (ue) {}
+
+                            try {
+                                var showLayoutFn = new NativeFunction(baseAddr.add(0xB2F2AC), "void", ["pointer"]);
+                                showLayoutFn(topCtrl);
+                                log("[👑 TOPVIEW] TopViewControl.ShowSceneLayout() called!");
+                            } catch (sle) {}
+
+                            var moreBtn = topView.add(0x160).readPointer();
+                            if (!moreBtn.isNull()) {
+                                setActiveFn(moreBtn, 1);
+                                log("[👑 TOPVIEW] Activated moreButton (☰): " + moreBtn);
+                            }
+                            var msgBtn = topView.add(0x1B0).readPointer();
+                            if (!msgBtn.isNull()) {
+                                setActiveFn(msgBtn, 1);
+                                log("[👑 TOPVIEW] Activated messageButton (✉): " + msgBtn);
+                            }
+                            var hpObj = topView.add(0xD0).readPointer();
+                            if (!hpObj.isNull()) {
+                                setActiveFn(hpObj, 1);
+                                log("[👑 TOPVIEW] Activated headphoneObj: " + hpObj);
+                            }
+
+                            refreshTopViewAll();
+                        }
+                    }
+                } catch (e) {
+                    log("[-] Error in activateTopView: " + e.message);
                 }
             }
 
@@ -2914,12 +3052,15 @@ function initIl2Cpp(module) {
                     loadAndApplySceneBackground(false, true);
                 }
 
-                // Hook TopViewControl.UpdateScene (0xB2ECE4) to ensure background is applied on scene switches
+                // Hook TopViewControl.UpdateScene (0xB2ECE4) to ensure background is applied on scene switches and TopView stays active
                 try {
                     Interceptor.attach(baseAddr.add(0xB2ECE4), {
                         onEnter: function (args) {
                             this.scId = args[1].toInt32();
                             log("[🎨 UPDATE SCENE] TopViewControl.UpdateScene called for sceneId=" + this.scId);
+                            try {
+                                setIngameLoginState(true);
+                            } catch (eLog) {}
                         },
                         onLeave: function (retval) {
                             if (this.scId === 3 || this.scId === 4 || this.scId === 5 || this.scId === 6 || this.scId === 7) {
@@ -2927,11 +3068,16 @@ function initIl2Cpp(module) {
                                 loadAndApplySceneBackground(true);
                             }
                             try {
-                                refreshTopViewRhythmPoint(getPlayerRP());
+                                refreshTopViewAll();
                             } catch (eTrp) {}
+                            if (this.scId === 3) {
+                                try {
+                                    activateTopView(3);
+                                } catch (eTv3) {}
+                            }
                         }
                     });
-                    log("[+] Hooked TopViewControl.UpdateScene (0xB2ECE4) for seamless background continuity");
+                    log("[+] Hooked TopViewControl.UpdateScene (0xB2ECE4) for seamless background & TopView continuity");
                 } catch (eUsc) {
                     log("[-] Error hooking UpdateScene: " + eUsc.message);
                 }
@@ -2944,6 +3090,17 @@ function initIl2Cpp(module) {
                     log("[🛡️ BACKGROUND SHIELD] Successfully patched TopViewControl.UpdateScene bl HideBackgroundImage with NOP!");
                 } catch (eNop) {
                     log("[-] Error patching 0xB2ED70 with NOP: " + eNop.message);
+                }
+
+                // NOP out the cbz w8, #0xb2f0ec at TopViewControl.UpdateScene (0xB2EF18)
+                // This permanently bypasses the online IngameView.IsLogin gatekeeper and ensures TopView is ALWAYS shown in LobbyScene!
+                try {
+                    Memory.protect(baseAddr.add(0xB2EF18), 4, 'rwx');
+                    baseAddr.add(0xB2EF18).writeByteArray([0x1f, 0x20, 0x03, 0xd5]); // NOP
+                    Memory.protect(baseAddr.add(0xB2EF18), 4, 'r-x');
+                    log("[👑 TOPVIEW SHIELD] Successfully patched TopViewControl.UpdateScene cbz IsLogin at 0xB2EF18 with NOP!");
+                } catch (eNopTv) {
+                    log("[-] Error patching 0xB2EF18 with NOP: " + eNopTv.message);
                 }
 
                 // Neutralize VideoControl.Show (0xABBDA8) and VideoControl.ShowDisplay (0xABCEC8) with RET
@@ -3704,6 +3861,14 @@ function initIl2Cpp(module) {
                             populateOfflineInventoryCards();
                         } catch (eInv) {
                             log("[-] Error calling InventoryControl.Open on Lobby init: " + eInv.message);
+                        }
+
+                        // --- Restore and Activate TopView in LobbyScene ---
+                        try {
+                            activateTopView(3);
+                            log("[👑 LOBBY ACTIVATOR] activateTopView(3) executed on Lobby init!");
+                        } catch (eTopAct) {
+                            log("[-] Error calling activateTopView on Lobby init: " + eTopAct.message);
                         }
 
                         lobbyUIActivated = true;
