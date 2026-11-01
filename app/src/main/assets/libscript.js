@@ -4043,6 +4043,10 @@ function initIl2Cpp(module) {
                             klassSlotRva = 0x31E2F30;  // System.Collections.Generic.List<int>_TypeInfo
                             ctorSlotRva = 0x32090B0;   // Method$System.Collections.Generic.List<int>..ctor()
                             addSlotRva = 0x32090C8;    // Method$System.Collections.Generic.List<int>.Add()
+                        } else if (type === 'string') {
+                            klassSlotRva = 0x31E3228;  // System.Collections.Generic.List<string>_TypeInfo
+                            ctorSlotRva = 0x3209ED0;   // Method$System.Collections.Generic.List<string>..ctor()
+                            addSlotRva = 0x3209EE8;    // Method$System.Collections.Generic.List<string>.Add()
                         }
 
                         var klass = resolveMetadataSlot(klassSlotRva);
@@ -5445,8 +5449,9 @@ function initIl2Cpp(module) {
                             var cardParamsListObj = createManagedList(cardSmallParamsList, 'card_small_param');
                             p.add(0x28).writePointer(cardParamsListObj || NULL);
 
-                            // 3. summary (0x30): NULL (native AllocateSummary disables summaries when NULL)
-                            p.add(0x30).writePointer(NULL);
+                            // 3. summary (0x30): List<string> (empty list so native AllocateSummary safely exits at 0xF24564 without NRE)
+                            var emptySummaryList = createManagedList([], 'string');
+                            p.add(0x30).writePointer(emptySummaryList || NULL);
 
                             // Dynamic Grade & Theme Calculations for current group
                             var eqCards = (profile && profile.inventoryCards) ? profile.inventoryCards.filter(function(c) { return c.isEquip; }) : [];
