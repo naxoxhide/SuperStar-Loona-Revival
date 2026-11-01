@@ -14713,6 +14713,40 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             } catch (eGi) {
                                 log("[-] Error in go_inven: " + eGi.message);
                             }
+                        } else if (cmdRaw === "go_cardbook" || cmdRaw === "cardbook" || cmdRaw === "cb") {
+                            try {
+                                log("[🚀 SCENE CMD] Opening CardBookScene (5)...");
+                                if (curScene && !curScene.isNull()) {
+                                    var setStateOpenSceneFn = new NativeFunction(baseAddr.add(0xD5338C), 'void', ['pointer', 'int', 'pointer', 'pointer', 'pointer']);
+                                    setStateOpenSceneFn(curScene, 5, NULL, NULL, NULL);
+                                } else {
+                                    var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                                    openSceneFn(5, NULL, NULL, NULL);
+                                }
+                            } catch (eGcb) {
+                                log("[-] Error in go_cardbook: " + eGcb.message);
+                            }
+                        } else if (cmdRaw === "group" || cmdRaw === "default") {
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                try {
+                                    log("[🚀 SCENE CMD] Switching to group overview (SetStateDefault)...");
+                                    var setStateDefaultFn = new NativeFunction(baseAddr.add(0x1053B88), "void", ["pointer", "bool", "bool"]);
+                                    setStateDefaultFn(curScene, 0, 0);
+                                } catch (eDef) {
+                                    log("[-] Error in default cmd: " + eDef.message);
+                                }
+                            }
+                        } else if (cmdRaw.indexOf("group:") === 0) {
+                            var gPage = parseInt(cmdRaw.substring(6).trim(), 10);
+                            if (curScene && !curScene.isNull() && sceneId === 4) {
+                                try {
+                                    log("[🚀 SCENE CMD] Switching group page to " + gPage + "...");
+                                    var onUpdateGroupCountFn = new NativeFunction(baseAddr.add(0x1055090), "void", ["pointer", "int"]);
+                                    onUpdateGroupCountFn(curScene, gPage);
+                                } catch (eUg) {
+                                    log("[-] Error in group:page cmd: " + eUg.message);
+                                }
+                            }
                         } else if (cmdRaw.indexOf("card:") === 0) {
                             var cardArg = cmdRaw.substring(5).trim();
                             log("[🃏 CARD CMD] Triggering card select for arg: '" + cardArg + "' on scene: " + curScene);
