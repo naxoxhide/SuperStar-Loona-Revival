@@ -6,6 +6,43 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ✅ CHECKPOINT 16 — Calibración Dimensional 1:1 en MainScreen (`LobbyScene`), Fondo JinSoul 1007 y Supresión del Video Loop (2026-11-02)
+
+**Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 4347:**
+
+1. **Investigación de la Arquitectura de Fondos en MainScreen (`LobbyScene`, SceneId: 3):**
+   - **Jerarquía de Componentes IL2CPP:**
+     * `LobbyScene` (RVA `0xB45508` `OnOpen`).
+     * `LobbyView` (`SceneView`, campo `memberView` en offset `0x58`).
+     * `LobbyMemberView` (`View`, RVA `0xB42ACC` `Refresh`, campo `memberImage` en offset `0x50` de tipo `RawImage`).
+   - **Mapeo de Assets Ofuscados:**
+     * Catálogo maestro [app/src/files/asiudgasg/sdisgkdc/lbg.json](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/sdisgkdc/lbg.json): El código `1007` corresponde a `[Free] JinSoul Wallpaper` (`mylobby_bg_l_jinsoul.png`).
+     * Archivo ofuscado de alta resolución: [app/src/files/asiudgasg/asodhsg/weoihxd/1007_l.i.bytes.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/weoihxd/1007_l.i.bytes.png) ($1024 \times 1024$ píxeles, formato cuadrado 1:1).
+   - **Canalización en Runtime (`libscript.js`):**
+     * En `activateLobbyUIAndVideo()`, el archivo binario se lee vía `System.IO.File.ReadAllBytes`, se decodifica en un `Texture2D` mediante `ImageConversion.LoadImage` (RVA `0x25B3E90`) y se asigna al componente `memberImg` mediante `RawImage.set_texture` (RVA `0x194C074`).
+     * Se configuró `chosenBgId = 1007` por defecto y se sincronizó con el archivo de configuración en disco `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/chosen_bg.txt`.
+
+2. **Corrección Dimensional y Preservación de Aspect Ratio 1:1:**
+   - **Causa Raíz de Distorsión:** El código previo forzaba `setSizeDeltaFn(memberRt, 1920.0, 1080.0)`, estirando horizontalmente una imagen cuadrada ($1024 \times 1024$) a formato panorámico 16:9 ($1.777$), ensanchando a las integrantes en un 77.7%.
+   - **Solución Matemática Implementada:**
+     * Dado que el canvas de referencia tiene una altura de $1080$ px, se fijó `sizeDelta = (1080.0, 1080.0)` con `anchoredPosition = (0.0, 0.0)`.
+     * Coordenadas resultantes en pantalla: JinSoul se renderiza exactamente de $X = 420$ a $X = 1500$, con márgenes simétricos de $420$ px a cada lado ($(1920 - 1080) / 2 = 420$), preservando una relación de aspecto 1:1 pura sin ninguna deformación.
+     * Coincidencia visual y geométrica exacta con la especificación de referencia oficial de Dalcomsoft ([lobby_reference_official_en.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/lobby_reference_official_en.png)).
+
+3. **Supresión Definitiva del Video de Fondo (`main_24.webm` / `bgVideoActive`):**
+   - **Causa Raíz de Sobrecarga:** `updateBackgroundVideoFrame()` no excluía `globalSceneId === 3`, ejecutando más de 18,000 ciclos de intercambio de texturas JPEG a 30 FPS en el hilo principal durante el Lobby.
+   - **Solución:**
+     * En `updateBackgroundVideoFrame()`: Incorporada guarda temprana `if (globalSceneId === 0 || globalSceneId === 1 || globalSceneId === 2 || globalSceneId === 3) return;`.
+     * En `applyBackgroundTexture()`: Rama específica para `globalSceneId === 3` que desactiva `bgVideoActive = false`, omite la inicialización de `initBackgroundVideoPlayer()` y asigna estáticamente el fondo base oficial [app/src/files/asiudgasg/background_main.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/background_main.png) ($1920 \times 1080$).
+     * En `activateLobbyUIAndVideo()`: Forzado explícito `bgVideoActive = false`.
+     * Verificación en logcat: Cero emisiones de `[🎬 BG FRAME TICK]` en `LobbyScene` tras el arranque.
+
+4. **Validación Visual de QA (Screencap & Interacción Táctil):**
+   - [qa_mainscreen_1007.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_mainscreen_1007.png) — JinSoul renderizada en MainScreen con proporciones 1:1 perfectas y centrada.
+   - [qa_mainscreen_1007_bubble.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_mainscreen_1007_bubble.png) — Interacción táctil en la zona central ($X: 960, Y: 540$) desplegando el bocadillo de diálogo de voz LOONA sin interferencias.
+
+---
+
 ### ✅ CHECKPOINT 15 — Eliminación del Fondo Negro en Intro y Corrección del Dimensionamiento 1:1 (Aspect Fill) en TitleScene (2026-11-02)
 
 **Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 2493:**

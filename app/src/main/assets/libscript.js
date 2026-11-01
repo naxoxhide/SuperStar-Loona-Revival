@@ -2667,7 +2667,7 @@ function initIl2Cpp(module) {
                 function updateBackgroundVideoFrame() {
                     try {
                         if (!bgVideoActive || !bgVideoLoaded || bgVideoTextures.length === 0) return;
-                        if (globalSceneId === 0 || globalSceneId === 1 || globalSceneId === 2) return;
+                        if (globalSceneId === 0 || globalSceneId === 1 || globalSceneId === 2 || globalSceneId === 3) return;
                         if (globalIsChanging !== 0) return;
                         var now = Date.now();
                         var frameIdx = Math.floor((now % BG_VIDEO_LOOP_DURATION_MS) / BG_VIDEO_FRAME_INTERVAL_MS);
@@ -2932,6 +2932,30 @@ function initIl2Cpp(module) {
                                     cachedTitleTexObj = texObj;
                                     cachedTitleFileName = selectedFileName;
                                 }
+                            }
+                        } else if (globalSceneId === 3) {
+                            // MainScreen / LobbyScene: Video playback is completely removed (not used in Lobby)
+                            cachedTitleTexObj = null;
+                            cachedTitleFileName = "";
+                            bgVideoActive = false;
+                            selectedFileName = "background_main.png (static lobby background)";
+                            var primaryPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/background_main.png";
+                            var readAllBytesMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllBytes", 1);
+                            var pathStr = createIl2CppString(primaryPath);
+                            var args1 = Memory.alloc(Process.pointerSize);
+                            args1.writePointer(pathStr);
+                            var exc = Memory.alloc(Process.pointerSize);
+                            exc.writePointer(NULL);
+                            var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
+                            if (bytesObj && !bytesObj.isNull()) {
+                                var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
+                                texObj = il2cpp_object_new(tex2dClass);
+                                var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
+                                texCtorFn(texObj, 2, 2, NULL);
+
+                                var loadImagePtr = baseAddr.add(0x25B3E90);
+                                var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
+                                loadImageFn(texObj, bytesObj);
                             }
                         } else {
                             // Non-title scene: clear title cache so next visit gets new random
@@ -3546,7 +3570,8 @@ function initIl2Cpp(module) {
                 function activateLobbyUIAndVideo(lobbySceneInstance) {
                     if (!lobbySceneInstance || lobbySceneInstance.isNull()) return;
                     try {
-                        log("[🎨 LOBBY ACTIVATOR] Starting comprehensive Lobby UI & Video activation...");
+                        bgVideoActive = false;
+                        log("[🎨 LOBBY ACTIVATOR] Starting comprehensive Lobby UI & Background activation (video OFF)...");
                         var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer"]);
                         var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int"]);
 
@@ -3682,8 +3707,8 @@ function initIl2Cpp(module) {
                                         var memberImg = memberView.add(0x50).readPointer();
                                         if (!memberImg.isNull()) {
                                             var weoihxdDir = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/weoihxd/";
-                                            // Default: Canonical Flip That group background (1015)
-                                            var chosenBgId = 1015;
+                                            // Default: JinSoul Wallpaper (1007)
+                                            var chosenBgId = 1007;
                                             try {
                                                 var bgCfgPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/chosen_bg.txt";
                                                 var readAllTextMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllText", 1);
@@ -3761,7 +3786,7 @@ function initIl2Cpp(module) {
                                                         log("[🎨 LOBBY BG] Disabled raycastTarget on memberImg!");
                                                     } catch (re) {}
 
-                                                    // Adjust RectTransform dimensions for optimal full-screen 16:9 display
+                                                    // Adjust RectTransform dimensions for optimal 1:1 aspect ratio display (1080x1080 centered)
                                                     try {
                                                         var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6B10), "pointer", ["pointer"]);
                                                         var setSizeDeltaFn = new NativeFunction(baseAddr.add(0x180DC18), "void", ["pointer", "float", "float"]);
@@ -3775,7 +3800,7 @@ function initIl2Cpp(module) {
 
                                                         var memberRt = getTransformFn(memberImg);
                                                         if (!memberRt.isNull()) {
-                                                            setSizeDeltaFn(memberRt, 1920.0, 1080.0);
+                                                            setSizeDeltaFn(memberRt, 1080.0, 1080.0);
                                                             setAnchoredPosFn(memberRt, 0.0, 0.0);
                                                         }
                                                     } catch (re) {}
