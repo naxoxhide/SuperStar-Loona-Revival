@@ -6,6 +6,31 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ✅ CHECKPOINT 17 — Cobertura Total de Fondos en MainScreen (`LobbyScene`), Aspect Fill (1920x1920) y Corrección de `Component.get_transform` (2026-11-02)
+
+**Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 7250:**
+
+1. **Resolución Definitiva de los Espacios en Blanco a los Costados:**
+   - **Diagnóstico de Causa Raíz:**
+     * En el canvas de Unity de $1920 \times 1080$, el dimensionamiento previo a `1080.0, 1080.0` dejaba márgenes laterales vacíos de $420$ px a cada lado ($(1920 - 1080)/2 = 420$), dejando al descubierto el fondo claro por detrás de los botones de misiones y tienda.
+     * Además, `getTransformFn` en `libscript.js` utilizaba la dirección RVA errónea `0x1DB6B10` (`br x1`), provocando que la asignación de dimensiones fallara de forma silenciosa dentro de `catch (re) {}`.
+   - **Solución de Ingeniería Inversa:**
+     * **RVA Corregido de Unity IL2CPP:** Se sustituyó `0x1DB6B10` por la función canónica oficial **`0x1DB6A94` (`Component.get_transform()`)**.
+     * **Aspect Fill Proporcional (1920x1920):** Se asignó `sizeDelta = (1920.0, 1920.0)` centrado en `(0.0, 0.0)` sobre `memberRt` (`memberImg`), junto con `sizeDelta = (1920.0, 1080.0)` en `memberViewRt`.
+   - **Efecto Visual y Métrico:**
+     * **100% Cobertura de Pantalla:** La textura de JinSoul (`1007_l.i.bytes.png`) abarca sin interrupciones desde $X = 0$ hasta $X = 1920$ y de $Y = 0$ hasta $Y = 1080$. Franjas blancas laterales reducidas a **$0$ píxeles**.
+     * **Preservación Anatómica 1:1:** $\frac{1920}{1920} = 1.0$, eliminando el estiramiento horizontal o deformación. El rostro de JinSoul permanece elegantemente encuadrado en $Y \approx 400$ sin solaparse con la TopBar ($Y \le 80$) ni con el botón *Ready* ($Y \ge 880$).
+
+2. **Evidencia y Aserciones Automatizadas de Calidad:**
+   - [qa_mainscreen_fullscreen_final.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_mainscreen_fullscreen_final.png) — Captura de pantalla de MainScreen con el fondo de JinSoul cubriendo de borde a borde toda la pantalla.
+   - [qa_mainscreen_fullscreen_bubble.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_mainscreen_fullscreen_bubble.png) — Interacción táctil en la integrante con bocadillo de voz LOONA funcionando sobre el fondo full-screen.
+   - **Aserciones en Python (PIL):**
+     * Píxel lateral izquierdo ($X: 50, Y: 540$): `(49, 77, 140)` $\rightarrow$ Telón azul ($B > R$).
+     * Píxel lateral derecho ($X: 1900, Y: 540$): `(82, 113, 165)` $\rightarrow$ Telón azul ($B > R$).
+     * Píxel central rostro ($X: 1000, Y: 400$): `(239, 227, 214)` $\rightarrow$ Tono de piel de JinSoul ($R > 180, G > 140$).
+
+---
+
 ### ✅ CHECKPOINT 16 — Calibración Dimensional 1:1 en MainScreen (`LobbyScene`), Fondo JinSoul 1007 y Supresión del Video Loop (2026-11-02)
 
 **Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 4347:**

@@ -3786,9 +3786,9 @@ function initIl2Cpp(module) {
                                                         log("[🎨 LOBBY BG] Disabled raycastTarget on memberImg!");
                                                     } catch (re) {}
 
-                                                    // Adjust RectTransform dimensions for optimal 1:1 aspect ratio display (1080x1080 centered)
+                                                    // Adjust RectTransform dimensions for full-screen Aspect Fill (1920x1920, 0 side gaps)
                                                     try {
-                                                        var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6B10), "pointer", ["pointer"]);
+                                                        var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer"]);
                                                         var setSizeDeltaFn = new NativeFunction(baseAddr.add(0x180DC18), "void", ["pointer", "float", "float"]);
                                                         var setAnchoredPosFn = new NativeFunction(baseAddr.add(0x180DACC), "void", ["pointer", "float", "float"]);
 
@@ -3800,10 +3800,13 @@ function initIl2Cpp(module) {
 
                                                         var memberRt = getTransformFn(memberImg);
                                                         if (!memberRt.isNull()) {
-                                                            setSizeDeltaFn(memberRt, 1080.0, 1080.0);
+                                                            setSizeDeltaFn(memberRt, 1920.0, 1920.0);
                                                             setAnchoredPosFn(memberRt, 0.0, 0.0);
                                                         }
-                                                    } catch (re) {}
+                                                        log("[🎨 LOBBY BG] memberRt sized to 1920x1920 (Aspect Fill - zero side margins)!");
+                                                    } catch (re) {
+                                                        log("[-] Error sizing memberRt: " + re.message);
+                                                    }
 
                                                     var memberImgGo = getGoFn(memberImg);
                                                     if (!memberImgGo.isNull()) {
