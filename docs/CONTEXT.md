@@ -3341,3 +3341,31 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
 - **Evidencia Visual de Verificación:**
   * Captura [qa_phase4_bubble_live.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_phase4_bubble_live.png) confirma el despliegue del saludo inicial al ingresar al Lobby.
   * Captura [qa_phase4_bubble_second.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_phase4_bubble_second.png) confirma el cambio dinámico de frase al tocar a las integrantes en el centro de la pantalla.
+
+---
+
+### 🏛️ CHECKPOINT 16 — Investigación e Ingeniería Inversa: Integración de Empty Cards (`sdhgauwehdnu`) y Estabilización del Collect Book (`CardBookScene` / `CardBookDetailPopup`) (2026-11-02)
+
+#### 1. Diagnóstico de Arquitectura de Empty Cards y Slots en Dalcomsoft Engine
+- **Directorio de Assets (`sdhgauwehdnu`):**
+  * Contiene los retratos y siluetas oficiales de los artistas en escala de grises con logo de grupo y nombre tipográfico.
+  * Tamaños nativos verificados:
+    - Cartas grandes (`_l`): **$226 \times 318$ píxeles** (aspect ratio $1.407$).
+    - Cartas pequeñas (`_s`): **$85 \times 120$ píxeles** (aspect ratio $1.411$).
+  * Enlace con `atd.json` y `url_shared_map.json`: Cada artista (código 1001 a 1012 para LOONA) define `emptyImageSmall` y `emptyImageLarge` apuntando a `asodhsg/sdhgauwehdnu/<artistCode>_s.i.bytes` y `<artistCode>_l.i.bytes`.
+- **Causa de Slots Invisibles en `CardBookDetailPopup`:**
+  * En `ensureCardBookControlData` ([libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js)), las listas `CardList` y `PrismCardList` dentro de cada `ThemeItem` se creaban con referencias nulas porque `CardBookControl.RegistWithCardItemMap` (RVA `0x11C9A9C`) fue parcheado con `RET`.
+  * En el delegado `CardBookScene.<OpenDetailPopup>b__1` (RVA `0xE411F8`), ante `CardItem == null`, se inserta `NULL` en `cardParam`.
+  * En `CardBookDetailCellView.RefreshCellView` (RVA `0x11C9E44`), la presencia de un parámetro nulo dispara la instrucción `GameObject.SetActive(false)` sobre el componente `CardCollectionView`, ocultando completamente las cartas en el popup.
+  * En `ArtistControl.Data`, los punteros `smallEmptyImagePath` (offset `0x38`) y `largeEmptyImagePath` (offset `0x40`) se encontraban seteados hacia nombres de archivo ficticios (`artistEmpty_s.i.bytes`).
+
+#### 2. Causa Raíz de Cuelgues y Freezes al Cambiar de Tema
+- **Excepciones de Puntero Nulo No Capturadas en ARM64:**
+  * `0xE414D8: ldr x8, [x0, #0x18]; cbz x8, #0xe415c4` y `0xE41568: ldr x8, [x1, #0x18]; cbz x8, #0xe415c4`: Si un `CardItem.Data` es nulo, el flujo bifurca a `0xE415C4`, ejecutando `il2cpp_codegen_raise_null_reference_exception` y cerrando de inmediato el juego.
+- **Saturación Crítica de Memoria por Texturas en `SetCdnTexture`:**
+  * `loadLocalTexture2D` instancia un nuevo objeto `Texture2D` de Unity por cada petición, anclándolo con `gchandle_new(texObj, 2)` y `DontDestroyOnLoad`. Al desplazarse rápidamente entre 99 temas con 12 a 24 cartas cada uno, se alocan cientos de texturas no recolectadas por el GC, desembocando en agotamiento de RAM y muerte del proceso por OOM (`SIGKILL`).
+- **Solución Arquitectónica Planificada:**
+  * Población limpia de `CardItem` con `IsValid = false`, `Grade = None` y `IsViewCard = true`.
+  * Precarga de un conjunto inmutable de 24 texturas fijas para las 12 Empty Cards de LOONA (`_s` y `_l`), reutilizándolas en los 99 temas en lugar de instanciar miles de texturas duplicadas.
+  * Configuración de calidad con `FilterMode.Bilinear`, `anisoLevel = 8` y preservación de aspect ratio exacto.
+
