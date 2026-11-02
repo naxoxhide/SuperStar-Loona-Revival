@@ -3407,3 +3407,34 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
   * Precarga de un conjunto inmutable de 24 texturas fijas para las 12 Empty Cards de LOONA (`_s` y `_l`), reutilizándolas en los 99 temas en lugar de instanciar miles de texturas duplicadas.
   * Configuración de calidad con `FilterMode.Bilinear`, `anisoLevel = 8` y preservación de aspect ratio exacto.
 
+---
+
+### 🏛️ CHECKPOINT 17 — Investigación Integral de UI, Assets y Funcionalidades Standalone Offline para CardBookScene (2026-11-02)
+
+#### 1. Identificación y Mapeo Completo de Assets Gráficos
+- **Emblemas de Grupos (`aweoijs`):**
+  * Localizados en [app/src/files/asiudgasg/asodhsg/aweoijs/](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/aweoijs/).
+  * Mapeo confirmado: Cada grupo principal (1001 a 21001) y sus variantes de evento comparten el emblema de su grupo base en disco (`<groupCode>.i.bytes.png`).
+  * Invocación: `Emblem.UpdateEmblem` (RVA `0x125AEFC`) $\rightarrow$ `URLsControl.SetCdnTexture` (RVA `0x163A9E8`).
+- **Fondos de CardBook ("BEST CARD BOOK" / `foewghkc`):**
+  * Localizados en [app/src/files/asiudgasg/asodhsg/foewghkc/](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/foewghkc/).
+  * Mapeo verificado por tamaño de bytes exacto con `url.json`: `cardbook_mybg_double_plus.png` (231,978 bytes) $\rightarrow$ `foewghkc/1001.i.bytes.png`. Cubre todos los 21 fondos oficiales de LOONA y subunidades.
+- **Logos Tipográficos de Temas (`agewfcbxhaa`):**
+  * Localizados en [app/src/files/asiudgasg/asodhsg/agewfcbxhaa/](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/agewfcbxhaa/).
+  * Causa del banner en blanco en `CardBookDetailCellView`: El hook de `ThemeControl.Data.get_LargeNameImagePath` (RVA `0xC89CA4`) devolvía la empty card de 1001 en vez de la ruta oficial del logo tipográfico `<themeCode>_l.i.bytes`.
+- **Insignias de Tema (`badge` / `bhfbfhbf`):**
+  * Definidas en `tmd.json` en `cardbookMarkCode`: `[901]` (Limited), `[902]` (Event) y `[903]` (Original).
+  * Localizadas en [app/src/files/asiudgasg/asodhsg/bhfbfhbf/](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/bhfbfhbf/) (`901.i.bytes.png`, `902.i.bytes.png`, `903.i.bytes.png`).
+
+#### 2. Protocolos de Red Standalone Offline
+- **Reclamo de Recompensas ("GET" buttons):**
+  * Llamado desde `CardBookScene.OnCardCollectionReward` (RVA `0x11D29CC`) y `OnThemeCollectionReward` (RVA `0x11D2A9C`).
+  * Protocolo IL2CPP: `com.dalcomsoft.project.client.command.CardBook.getReward` (RVA `0xE9EFB4`).
+  * Estrategia offline: Mock local del callback `Action<Client.NetworkHandler, List<RecentProvide>>` con código HTTP 200 y objetos de recompensa válidos para desplegar el modal sin red.
+- **Gestión de Favoritos (`MY FAVORITE`):**
+  * Protocolo IL2CPP: `com.dalcomsoft.project.client.command.CardBook.setFavoriteGroup` (RVA `0xE9F2A4`) y `getFavoriteGroup` (RVA `0xE9F564`).
+  * Estrategia offline: Persistencia local en memoria de la lista de 5 `groupCode`.
+- **Navegación de Páginas en `CardBookGroupView`:**
+  * 21 grupos distribuidos en 3 páginas (`GROUP_SLOT_MAX = 8`). `OnLeft` (RVA `0x11CD0C8`) y `OnRight` (RVA `0x11CD150`) conmutan las ranuras sin excepciones.
+
+
