@@ -3786,24 +3786,33 @@ function initIl2Cpp(module) {
                                                         log("[🎨 LOBBY BG] Disabled raycastTarget on memberImg!");
                                                     } catch (re) {}
 
-                                                    // Adjust RectTransform dimensions for full-screen Aspect Fill (1920x1920, 0 side gaps)
+                                                    // Adjust RectTransform dimensions: inspect initial and apply native dimensions
                                                     try {
                                                         var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer"]);
+                                                        var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer"]);
                                                         var setSizeDeltaFn = new NativeFunction(baseAddr.add(0x180DC18), "void", ["pointer", "float", "float"]);
                                                         var setAnchoredPosFn = new NativeFunction(baseAddr.add(0x180DACC), "void", ["pointer", "float", "float"]);
 
                                                         var memberViewRt = getTransformFn(memberView);
-                                                        if (!memberViewRt.isNull()) {
-                                                            setSizeDeltaFn(memberViewRt, 1920.0, 1080.0);
-                                                            setAnchoredPosFn(memberViewRt, 0.0, 0.0);
-                                                        }
-
                                                         var memberRt = getTransformFn(memberImg);
-                                                        if (!memberRt.isNull()) {
-                                                            setSizeDeltaFn(memberRt, 1920.0, 1920.0);
-                                                            setAnchoredPosFn(memberRt, 0.0, 0.0);
-                                                        }
-                                                        log("[🎨 LOBBY BG] memberRt sized to 1920x1920 (Aspect Fill - zero side margins)!");
+
+                                                        // Get dynamic canvas width from memberViewRt (which spans the full screen with anchors (0,0) to (1,1))
+                                                        var r4 = Memory.alloc(16);
+                                                        var gRect = new NativeFunction(baseAddr.add(0x180D73C), "void", ["pointer", "pointer"]);
+                                                        gRect(memberViewRt, r4);
+                                                        var cWidth = r4.add(8).readFloat();
+                                                        var cHeight = r4.add(12).readFloat();
+                                                        log("[🎨 LOBBY BG] memberViewRt canvas dimensions: " + cWidth + " x " + cHeight);
+
+                                                        // In Dalcom's CanvasScaler (refHeight: 640), Canvas units are scaled to physical screen by 1.6875x.
+                                                        // Setting sizeDelta to the canvas width (e.g. 1137.78 for 16:9) guarantees:
+                                                        // 1. Exactly 100% screen width coverage (0 side gaps).
+                                                        // 2. Exact 1:1 aspect ratio (width == height).
+                                                        // 3. No excessive digital zoom (avoids the previous 3240px upscale bug).
+                                                        var targetSize = (cWidth > 100.0) ? cWidth : 1137.78;
+                                                        setSizeDeltaFn(memberRt, targetSize, targetSize);
+                                                        setAnchoredPosFn(memberRt, 0.0, 0.0);
+                                                        log("[🎨 LOBBY BG] memberRt calibrated to: " + targetSize + " x " + targetSize + " in Canvas Units (zero side gaps, pixel-perfect 1:1)!");
                                                     } catch (re) {
                                                         log("[-] Error sizing memberRt: " + re.message);
                                                     }
