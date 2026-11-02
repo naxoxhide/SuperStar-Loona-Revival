@@ -4742,13 +4742,17 @@ function initIl2Cpp(module) {
                                         var aObj = il2cpp_object_new(artKlass);
                                         if (il2cpp_gchandle_new && !aObj.isNull()) il2cpp_gchandle_new(aObj, 2);
                                         aObj.add(0x20).writePointer(createIl2CppString(aMeta.name || "Artist"));
-                                        aObj.add(0x38).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes"));
-                                        aObj.add(0x40).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
+                                        var sEmptyPath = (aMeta && aMeta.emptyImageSmall) ? aMeta.emptyImageSmall : ("asiudgasg/asodhsg/sdhgauwehdnu/" + aCode + "_s.i.bytes");
+                                        var lEmptyPath = (aMeta && aMeta.emptyImageLarge) ? aMeta.emptyImageLarge : ("asiudgasg/asodhsg/sdhgauwehdnu/" + aCode + "_l.i.bytes");
+                                        aObj.add(0x38).writePointer(createDownloadPath(sEmptyPath));
+                                        aObj.add(0x40).writePointer(createDownloadPath(lEmptyPath));
 
                                         var ad = il2cpp_object_new(adKlass);
                                         if (il2cpp_gchandle_new && !ad.isNull()) il2cpp_gchandle_new(ad, 2);
                                         ad.add(0x10).writeS32(aCode);
                                         ad.add(0x18).writeS32(aMeta.group || 1001);
+                                        ad.add(0x38).writePointer(createIl2CppString(sEmptyPath));
+                                        ad.add(0x40).writePointer(createIl2CppString(lEmptyPath));
                                         ad.add(0x88).writePointer(createIl2CppString(aMeta.name || "Artist"));
                                         ad.add(0x98).writeS16(aMeta.orderIndex || 0);
                                         aObj.add(0x10).writePointer(ad);
@@ -4766,12 +4770,16 @@ function initIl2Cpp(module) {
                                         var aObj = il2cpp_object_new(artKlass);
                                         if (il2cpp_gchandle_new && !aObj.isNull()) il2cpp_gchandle_new(aObj, 2);
                                         aObj.add(0x20).writePointer(createIl2CppString("LOONA"));
-                                        aObj.add(0x38).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes"));
-                                        aObj.add(0x40).writePointer(createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes"));
+                                        var sEmptyPathLoona = "asiudgasg/asodhsg/sdhgauwehdnu/" + (1000 + m.index) + "_s.i.bytes";
+                                        var lEmptyPathLoona = "asiudgasg/asodhsg/sdhgauwehdnu/" + (1000 + m.index) + "_l.i.bytes";
+                                        aObj.add(0x38).writePointer(createDownloadPath(sEmptyPathLoona));
+                                        aObj.add(0x40).writePointer(createDownloadPath(lEmptyPathLoona));
                                         var ad = il2cpp_object_new(adKlass);
                                         if (il2cpp_gchandle_new && !ad.isNull()) il2cpp_gchandle_new(ad, 2);
                                         ad.add(0x10).writeS32(m.index);
                                         ad.add(0x18).writeS32(1001);
+                                        ad.add(0x38).writePointer(createIl2CppString(sEmptyPathLoona));
+                                        ad.add(0x40).writePointer(createIl2CppString(lEmptyPathLoona));
                                         ad.add(0x88).writePointer(createIl2CppString(m.name));
                                         ad.add(0x98).writeS16(m.index);
                                         aObj.add(0x10).writePointer(ad);
@@ -4942,6 +4950,91 @@ function initIl2Cpp(module) {
                     } catch (eCcd) {
                         log("[-] Error creating CardControl.Data for " + cardId + ": " + eCcd.message);
                         return NULL;
+                    }
+                }
+
+                // Empty CardControl.Data map and factory for CardBook slots
+                var emptyCardControlDataMap = {};
+                function getOrCreateEmptyCardControlData(groupId, artistId, themeId, cardId) {
+                    ensureLoonaMocks();
+                    var key = groupId + "_" + artistId + "_" + themeId;
+                    if (emptyCardControlDataMap[key]) {
+                        return emptyCardControlDataMap[key];
+                    }
+                    try {
+                        var ccdKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardControl/Data");
+                        if (!ccdKlass || ccdKlass.isNull()) return NULL;
+                        var ccd = il2cpp_object_new(ccdKlass);
+                        if (il2cpp_gchandle_new && !ccd.isNull()) il2cpp_gchandle_new(ccd, 2);
+
+                        var aObj = allArtistDataMap[artistId] || loonaArtistDataMap[((artistId - 1001) % 11) + 1] || NULL;
+                        var tObj = getOrCreateThemeData(themeId);
+                        var gObj = allGroupDataMap[groupId] || loonaGroupData || NULL;
+                        var ttObj = getOrCreateThemeTypeData(0);
+
+                        var metaAll = getGlobalMetadata();
+                        var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[groupId] : null;
+                        var gName = gMeta ? gMeta.name : "LOONA";
+
+                        ccd.add(0x18).writePointer(createIl2CppString(gName));
+                        ccd.add(0x20).writeS32(groupId);
+                        ccd.add(0x28).writePointer(gObj);
+                        ccd.add(0x30).writePointer(aObj);
+                        ccd.add(0x38).writePointer(tObj || loonaThemeData || NULL);
+                        ccd.add(0x40).writePointer(ttObj || loonaThemeTypeData || NULL);
+                        ccd.add(0x48).writePointer(NULL);
+                        ccd.add(0x50).writeU8(1); // IsViewCard = true (mandatory for CardBookScene)
+                        ccd.add(0x51).writeU8(0); // IsGetCard = false
+
+                        var sPath = "asiudgasg/asodhsg/sdhgauwehdnu/" + artistId + "_s.i.bytes";
+                        var lPath = "asiudgasg/asodhsg/sdhgauwehdnu/" + artistId + "_l.i.bytes";
+                        ccd.add(0x58).writePointer(createDownloadPath(sPath));
+                        ccd.add(0x60).writePointer(createDownloadPath(lPath));
+
+                        try {
+                            var cdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "CardData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "CardData");
+                            if (cdKlass && !cdKlass.isNull()) {
+                                var cd = il2cpp_object_new(cdKlass);
+                                if (il2cpp_gchandle_new && !cd.isNull()) il2cpp_gchandle_new(cd, 2);
+                                cd.add(0x10).writeS32(cardId || artistId);
+                                cd.add(0x14).writeS32(0); // isPrism = 0
+                                cd.add(0x20).writePointer(createIl2CppString(sPath));
+                                cd.add(0x28).writePointer(createIl2CppString(lPath));
+                                cd.add(0x30).writeS32(themeId);
+                                cd.add(0x70).writeS32(groupId);
+                                cd.add(0x74).writeS32(artistId);
+                                cd.add(0x78).writeU8(0);
+                                ccd.add(0x10).writePointer(cd);
+                            }
+                        } catch (cdErr) {}
+
+                        emptyCardControlDataMap[key] = ccd;
+                        return ccd;
+                    } catch (eEcc) {
+                        log("[-] Error creating empty CardControl.Data: " + eEcc.message);
+                        return NULL;
+                    }
+                }
+
+                // Global theme + artist -> cardCode mapping cache
+                var themeArtistCardMap = {};
+                var themeArtistCardMapInitialized = false;
+                function ensureThemeArtistCardMap() {
+                    if (themeArtistCardMapInitialized) return;
+                    try {
+                        var meta = getGlobalMetadata();
+                        if (meta && meta.cards) {
+                            for (var cStr in meta.cards) {
+                                var c = meta.cards[cStr];
+                                var key = c.theme + "_" + c.artistID;
+                                if (!themeArtistCardMap[key] || c.type === 0) {
+                                    themeArtistCardMap[key] = c.code;
+                                }
+                            }
+                        }
+                        themeArtistCardMapInitialized = true;
+                    } catch (eTac) {
+                        log("[-] Error initializing themeArtistCardMap: " + eTac.message);
                     }
                 }
 
@@ -9276,6 +9369,30 @@ function initIl2Cpp(module) {
                 // Native Texture2D loader with disk cache (available to cell views and SetCdnTexture)
                 var loadedTextureCache = {};
 
+                // Dedicated pool for Empty Card textures (sdhgauwehdnu) - shared across all themes to prevent OOM
+                var emptyCardTexturePool = {};
+                function getOrCreateEmptyCardTexture(artistCode, isLarge) {
+                    var key = artistCode + (isLarge ? "_l" : "_s");
+                    if (emptyCardTexturePool[key]) {
+                        var cached = emptyCardTexturePool[key];
+                        try {
+                            if (cached && typeof cached.isNull === "function" && !cached.isNull()) {
+                                var m_CachedPtr = cached.add(0x10).readPointer();
+                                if (!m_CachedPtr.isNull()) {
+                                    return cached;
+                                }
+                            }
+                        } catch (eCheck) {}
+                        delete emptyCardTexturePool[key];
+                    }
+                    var relPath = "asiudgasg/asodhsg/sdhgauwehdnu/" + artistCode + (isLarge ? "_l.i.bytes" : "_s.i.bytes");
+                    var tex = loadLocalTexture2D(relPath);
+                    if (tex && !tex.isNull()) {
+                        emptyCardTexturePool[key] = tex;
+                    }
+                    return tex;
+                }
+
                 function loadLocalTexture2D(relPath) {
                     if (!relPath) return NULL;
                     if (loadedTextureCache[relPath]) {
@@ -9343,9 +9460,11 @@ function initIl2Cpp(module) {
                             step = "filterMode";
                             try {
                                 var setFilterModeFn = new NativeFunction(baseAddr.add(0x181A580), "void", ["pointer", "int", "pointer"]);
-                                setFilterModeFn(texObj, 2, NULL);
+                                setFilterModeFn(texObj, 1, NULL); // Bilinear = 1
+                                var setWrapModeFn = new NativeFunction(baseAddr.add(0x181A340), "void", ["pointer", "int", "pointer"]);
+                                setWrapModeFn(texObj, 1, NULL); // Clamp = 1
                                 var setAnisoFn = new NativeFunction(baseAddr.add(0x181A610), "void", ["pointer", "int", "pointer"]);
-                                setAnisoFn(texObj, 8, NULL);
+                                setAnisoFn(texObj, 8, NULL); // Aniso = 8
                             } catch (eFm) {}
 
                             step = "pin";
@@ -10332,18 +10451,33 @@ function initIl2Cpp(module) {
 
                             if (!relPath || relPath.length === 0) return NULL;
 
-                            // Ownership Check: wadceg vs sdhgauwehdnu
-                            if (relPath.indexOf("wadceg/") !== -1 || relPath.indexOf("weoihxd/") !== -1 || relPath.indexOf("sdhgauwehdnu/") !== -1) {
-                                var match = relPath.match(/(\d+)_([sl])\.i\.bytes/);
-                                if (match) {
-                                    var cId = parseInt(match[1]);
-                                    var folder = (accountOwnedCards[cId] || relPath.indexOf("sdhgauwehdnu/") === -1) ? "wadceg" : "sdhgauwehdnu";
-                                    relPath = "asiudgasg/asodhsg/" + folder + "/" + cId + "_" + match[2] + ".i.bytes";
+                            // Accurate asset resolution: sdhgauwehdnu (artist empty card) vs wadceg (playable card)
+                            var tex = NULL;
+                            if (relPath.indexOf("sdhgauwehdnu/") !== -1) {
+                                var matchEmpty = relPath.match(/(\d+)_([sl])\.i\.bytes/);
+                                if (matchEmpty) {
+                                    var aCode = parseInt(matchEmpty[1], 10);
+                                    tex = getOrCreateEmptyCardTexture(aCode, matchEmpty[2] === "l");
+                                }
+                            } else if (relPath.indexOf("wadceg/") !== -1) {
+                                var matchWad = relPath.match(/(\d+)_([sl])\.i\.bytes/);
+                                if (matchWad) {
+                                    var cId = parseInt(matchWad[1], 10);
+                                    if (!accountOwnedCards[cId]) {
+                                        // Unowned card in inventory or preview: redirect to artist empty card
+                                        var metaAll = getGlobalMetadata();
+                                        if (metaAll && metaAll.cards && metaAll.cards[cId]) {
+                                            var aCode2 = metaAll.cards[cId].artistID || 1001;
+                                            tex = getOrCreateEmptyCardTexture(aCode2, matchWad[2] === "l");
+                                        }
+                                    }
                                 }
                             }
 
-                            // Load texture from disk or cache
-                            var tex = loadLocalTexture2D(relPath);
+                            // Load texture from disk or cache if not already resolved from pool
+                            if (!tex || tex.isNull()) {
+                                tex = loadLocalTexture2D(relPath);
+                            }
                             if (!tex || tex.isNull()) {
                                 if (!emptyTexture.isNull()) tex = emptyTexture;
                             }
@@ -10743,7 +10877,11 @@ function initIl2Cpp(module) {
                 // Proxy ThemeControl.Data.get_SmallNameImagePath (0xC89BCC)
                 try {
                     Interceptor.replace(baseAddr.add(0xC89BCC), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
-                        return createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes");
+                        if (!thisPtr.isNull()) {
+                            var dp = thisPtr.add(0x30).readPointer();
+                            if (!dp.isNull()) return dp;
+                        }
+                        return createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/1001_s.i.bytes");
                     }, "pointer", ["pointer", "pointer"])));
                     log("[+] Interceptor.replace installed on ThemeControl.Data.get_SmallNameImagePath (0xC89BCC)!");
                 } catch (eTip) {
@@ -10753,7 +10891,11 @@ function initIl2Cpp(module) {
                 // Proxy ThemeControl.Data.get_LargeNameImagePath (0xC89CA4)
                 try {
                     Interceptor.replace(baseAddr.add(0xC89CA4), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
-                        return createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes");
+                        if (!thisPtr.isNull()) {
+                            var dp = thisPtr.add(0x38).readPointer();
+                            if (!dp.isNull()) return dp;
+                        }
+                        return createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/1001_l.i.bytes");
                     }, "pointer", ["pointer", "pointer"])));
                     log("[+] Interceptor.replace installed on ThemeControl.Data.get_LargeNameImagePath (0xC89CA4)!");
                 } catch (eLnip) {
@@ -10763,7 +10905,11 @@ function initIl2Cpp(module) {
                 // Proxy ThemeControl.Data.get_ZoomNameImagePath (0xC89D7C)
                 try {
                     Interceptor.replace(baseAddr.add(0xC89D7C), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
-                        return createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes");
+                        if (!thisPtr.isNull()) {
+                            var dp = thisPtr.add(0x40).readPointer();
+                            if (!dp.isNull()) return dp;
+                        }
+                        return createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/1001_l.i.bytes");
                     }, "pointer", ["pointer", "pointer"])));
                     log("[+] Interceptor.replace installed on ThemeControl.Data.get_ZoomNameImagePath (0xC89D7C)!");
                 } catch (eZnip) {
@@ -10916,7 +11062,11 @@ function initIl2Cpp(module) {
                 // Proxy ArtistControl.Data.get_ArtistLargeImagePath (0xEBB874)
                 try {
                     Interceptor.replace(baseAddr.add(0xEBB874), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
-                        return createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes");
+                        if (!thisPtr.isNull()) {
+                            var dp = thisPtr.add(0x40).readPointer();
+                            if (!dp.isNull()) return dp;
+                        }
+                        return createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/1001_l.i.bytes");
                     }, "pointer", ["pointer", "pointer"])));
                     log("[+] Interceptor.replace installed on ArtistControl.Data.get_ArtistLargeImagePath (0xEBB874)!");
                 } catch (eAlip) {
@@ -14788,6 +14938,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         var metaAll = getGlobalMetadata();
                         var playables = (metaAll && metaAll.playableGroups) ? metaAll.playableGroups : PLAYABLE_GROUP_CODES;
                         var themeCtorFn = new NativeFunction(baseAddr.add(0xB9766C), "void", ["pointer", "pointer", "int", "pointer"]);
+                        var cbCardItemCtor = new NativeFunction(baseAddr.add(0xB964C4), "void", ["pointer", "pointer", "pointer"]);
+                        ensureThemeArtistCardMap();
 
                         allCbGroupItemMap = {};
                         allCbGroupItemList = [];
@@ -14798,6 +14950,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gCode] : null;
                             var slotCount = gMeta ? gMeta.equipableSlot : 11;
                             var themeCodes = (gMeta && gMeta.themeCodes) ? gMeta.themeCodes : [];
+                            var pArtistCodes = (gMeta && gMeta.artistCodes) ? gMeta.artistCodes : [];
 
                             var themeItems = [];
                             var groupObtainedCards = 0;
@@ -14812,6 +14965,39 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 var tItem = il2cpp_object_new(cbThemeItemKlass);
                                 if (il2cpp_gchandle_new) il2cpp_gchandle_new(tItem, 2);
                                 themeCtorFn(tItem, tData, slotCount, NULL);
+
+                                // Populate CardList FastArray with genuine CardItem for each slot
+                                var cardListFa = tItem.add(0x18).readPointer();
+                                if (!cardListFa.isNull()) {
+                                    var pool = cardListFa.add(0x10).readPointer();
+                                    if (!pool.isNull()) {
+                                        for (var s = 0; s < slotCount; s++) {
+                                            var aCode = (s < pArtistCodes.length) ? pArtistCodes[s] : (1001 + s);
+                                            var cardId = themeArtistCardMap[tCode + "_" + aCode] || 0;
+                                            var isOwned = (cardId > 0 && accountOwnedCards[cardId] && !isLimited);
+
+                                            var cItem = il2cpp_object_new(cbCardItemKlass);
+                                            if (il2cpp_gchandle_new && !cItem.isNull()) il2cpp_gchandle_new(cItem, 2);
+
+                                            if (isOwned) {
+                                                var ccd = getOrCreateCardControlData(cardId);
+                                                cbCardItemCtor(cItem, ccd, NULL);
+
+                                                var cbData = il2cpp_object_new(cbCardDataKlass);
+                                                if (il2cpp_gchandle_new && !cbData.isNull()) il2cpp_gchandle_new(cbData, 2);
+                                                cbData.add(0x10).writeS32(cardId);
+                                                cbData.add(0x14).writeS32(accountOwnedCards[cardId].grade || 4);
+                                                cbData.add(0x18).writeS32(1);
+                                                cItem.add(0x10).writePointer(cbData);
+                                            } else {
+                                                var emptyCcd = getOrCreateEmptyCardControlData(gCode, aCode, tCode, cardId);
+                                                cbCardItemCtor(cItem, emptyCcd, NULL);
+                                                cItem.add(0x10).writePointer(NULL); // model = NULL -> IsValid = false, Grade = None (5)
+                                            }
+                                            pool.add(0x20 + s * 8).writePointer(cItem);
+                                        }
+                                    }
+                                }
 
                                 if (isLimited) {
                                     // USER CONSTRAINT: "evita las cartas limited como las que aparezcan que se van a tener como obtenidas en la cuenta"

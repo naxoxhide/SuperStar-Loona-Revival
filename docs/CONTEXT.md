@@ -6,6 +6,44 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ✅ CHECKPOINT 19 — Integración de Empty Cards (`sdhgauwehdnu`) de Alta Fidelidad en Collect Book (`CardBookDetailPopup`) y Eliminación Definitiva de Cuelgues en Scroll de Temas (2026-11-02)
+
+**Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 11756:**
+
+1. **Investigación e Integración de Empty Cards en Collect Book:**
+   - **Mapeo de Assets Ofuscados (`sdhgauwehdnu`):**
+     * Los 111 artistas del juego y las integrantes de LOONA cuentan con sus siluetas y retratos oficiales en escala de grises con tipografía y logo del grupo en [app/src/files/asiudgasg/asodhsg/sdhgauwehdnu/](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/sdhgauwehdnu/).
+     * Miniaturas (`_s`): **$85 \times 120$ px** (aspect ratio $1.411$).
+     * Cartas grandes (`_l`): **$226 \times 318$ px** (aspect ratio $1.407$).
+     * Se actualizaron en [app/src/main/assets/data/card_metadata_map.json](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/data/card_metadata_map.json) los 111 artistas con sus rutas oficiales (`emptyImageSmall` y `emptyImageLarge`).
+   - **Población Limpia de Slots en `CardBookControl.ThemeItem`:**
+     * En `ensureCardBookControlData` ([libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js)), tras instanciar `ThemeItem..ctor(tData, slotCount)` (RVA `0xB9766C`), se pobla el `pool` nativo del array interno `CardList` (`FastArray<CardItem>`):
+       - **Cartas Obtenidas:** Se asocia `CardControl.Data` legítimo y `CardBookCardData` (`model != NULL`, `Grade = 4` R), renderizando la carta en color desde `wadceg/`.
+       - **Cartas No Obtenidas / Slots Vacíos:** Se instancia `CardBookControl.CardItem` mediante constructor nativo (RVA `0xB964C4`) con `model = NULL` (`IsValid = false`, `Grade = 5` / None) y un `CardControl.Data` que define `IsViewCard = true` (0x50), `IsGetCard = false` (0x51), y rutas `smallImagePath` (0x58) y `largeImagePath` (0x60) apuntando a `sdhgauwehdnu/<artistCode>_<s|l>.i.bytes`.
+       - **Modelo `CardData` de Respaldo:** Se vinculó un objeto `CardData` con `isPrism = 0` en `emptyCcd.add(0x10)` para blindar contra desreferencias nulas en `CardControl.Data.get_IsPrism()` (RVA `0xE43344`).
+
+2. **Resolución de la Causa Raíz de Freezes y Cierres en el Desplazamiento de Temas:**
+   - **Pool Estático de 24 Texturas Reutilizables:**
+     * Se implementó `emptyCardTexturePool` en `libscript.js` para precargar y reutilizar de forma compartida las 24 texturas de Empty Cards de los artistas, evitando la creación y desbordamiento de cientos de objetos `Texture2D` que saturaban el recolector de basura (GC) y provocaban `SIGKILL` por OOM del kernel.
+   - **Corrección de Redirección Errónea en `URLsControl.SetCdnTexture` (RVA `0x163A9E8`):**
+     * La lógica previa evaluaba el código numérico de la ruta como si fuera siempre un ID de carta de usuario, convirtiendo por error `sdhgauwehdnu/1001_s.i.bytes` a `wadceg/` si el usuario poseía la carta 1001. Se separó estrictamente la resolución para que cualquier petición a `sdhgauwehdnu/` devuelva directamente la Empty Card del artista sin alterar su carpeta.
+   - **Calidad Gráfica y Preservación de Formato Nativo:**
+     * En `loadLocalTexture2D`: se aplicó `FilterMode.Bilinear` (`1`, RVA `0x181A580`), `TextureWrapMode.Clamp` (`1`, RVA `0x181A340`) y `anisoLevel = 8` (RVA `0x181A610`), suprimiendo artefactos en los bordes y entregando la máxima definición nativa.
+
+3. **Evidencia y Aserciones Automatizadas de Calidad (Quality Gate):**
+   - [qa_cardbook_detail_live.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_detail_live.png) — Captura de pantalla de `CardBookDetailPopup` con las 11 cartas equipadas de LOONA en grado R nítidas y activas.
+   - [qa_cardbook_empty_cards_centered.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_empty_cards_centered.png) — Captura de pantalla con las **Empty Cards oficiales de las 11 integrantes de LOONA** desplegadas en los 11 slots del tema no obtenido (HeeJin, HyunJin, HaSeul, YeoJin, ViVi, Kim Lip, JinSoul, Choerry, Yves, Go Won, Olivia Hye).
+   - [qa_cardbook_after_close_live.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_after_close_live.png) — Retorno fluido a la vista de grupos de `CardBookScene` al tocar el botón de cierre `X`.
+   - [qa_cardbook_reopened.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_reopened.png) — Reapertura inmediata y estable del popup.
+   - **Stress Test de Navegación de Temas (Python):**
+     * Se ejecutaron 30 scrolls rápidos continuos (swipes arriba y abajo) en `EnhancedScroller`.
+     * **Resultado:** **30/30 swipes exitosos**. 0 congelamientos, 0 crashes, PID 11756 se mantuvo 100% activo y estable sin caídas de framerate ni excepciones en logcat.
+   - **Aserciones Cuantitativas de Imagen (PIL):**
+     * HeeJin Empty Card ($X: 610, Y: 600$): `(173, 170, 181, 255)`, $|R-G| = 3$, $|G-B| = 11$ $\rightarrow$ Retrato en escala de grises auténtico.
+     * ViVi Empty Card ($X: 1360, Y: 600$): `(181, 186, 197, 255)`, $|R-G| = 5$, $|G-B| = 11$ $\rightarrow$ Retrato en escala de grises auténtico.
+
+---
+
 ### ✅ CHECKPOINT 18 — Resolución Pixel-Perfect, Cobertura Total y Relación de Aspecto Canónica en MainScreen (2026-11-02)
 
 **Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 10371:**
