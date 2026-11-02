@@ -6,6 +6,37 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### 🔬 INVESTIGACIÓN TÉCNICA (CHECKPOINT 18) — Análisis de Relación de Aspecto Nativa, Nitidez y Resolución en MainScreen (2026-11-02)
+
+**Diagnóstico e Investigación Reversa en sesión activa tras solicitud de Ignacio:**
+
+1. **Análisis de Dimensiones de los Assets Originales (`weoihxd`):**
+   - Todos los fondos oficiales en [app/src/files/asiudgasg/asodhsg/weoihxd/](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/weoihxd/) (`1001` a `1076`) vienen configurados de fábrica en resolución nativa de **$1024 \times 1024$ píxeles** (RGB/RGBA).
+   - Los artistas de Dalcomsoft diseñaron la composición completa (sujeto, utilería y viñeteado) para ser desplegada en esta resolución base:
+     * El sujeto está centrado horizontalmente en $X \in [232, 716]$ (~484 px de ancho, 47% de la textura).
+     * El viñeteado y degradados superior e inferior están concebidos para acoplarse con la TopBar y el menú inferior de botones.
+
+2. **Lógica Nativa de Dalcomsoft (`dump.cs` / `libil2cpp.so`):**
+   - En el código de Dalcomsoft:
+     * `LobbyMemberView` (RVA `0xB42ACC`) solo conmuta `GameObject.SetActive(false)` en `Refresh()`.
+     * `LobbyMyLobbyView.Refresh()` (RVA `0xB43154`) asigna la textura al componente `RawImage` vía `RawImage.set_texture` (RVA `0x194C074`).
+     * **En ningún lugar del código IL2CPP de Dalcomsoft se modifica `sizeDelta` a `1920x1920` ni `1920x1080`**.
+     * La arquitectura nativa respeta el tamaño preconfigurado en el prefab de Unity o ejecuta `RawImage.SetNativeSize()` (RVA `0x194C1C8`), conservando la escala 1:1 real del asset.
+
+3. **Causa Raíz del Pixelado y Relación de Aspecto Errónea:**
+   - Forzar `setSizeDeltaFn(memberRt, 1920.0, 1920.0)` en `libscript.js` obligó a Unity a escalar una textura de $1024 \times 1024$ un **$+87.5\%$ ($1.875\times$ zoom digital)**.
+   - Consecuencias visuales:
+     * **Pixelado severo:** Los texeles se ampliaron casi al doble de su tamaño real, perdiendo definición de cabello, joyas y rasgos faciales bajo interpolación bilineal.
+     * **Encuadre / Spec Ratio amputado:** En una pantalla de 1080p, una altura forzada de 1920 px deja el **$43.75\%$ del contenido fuera de pantalla** ($840$ px recortados verticalmente). JinSoul sufrió el corte de su frente y de todo su cuerpo desde el pecho hacia abajo.
+
+4. **Comparativa Cuantitativa con la Referencia Oficial (`media_1793604635513_c729edc5.png`):**
+   - Mediante correlación 2D y template matching en Python/OpenCV con el asset de Olivia Hye (`1011_l.i.bytes.png`):
+     * Escala horizontal en la referencia oficial: **$f_x = 1.0000$ (100% nativa)**.
+     * Escala vertical en la referencia oficial: **$f_y \approx 1.0000$ (100% nativa)**.
+     * Coordenadas de ajuste: $X_{ref} = X_{asset}$, $Y_{ref} = Y_{asset} - 252$, confirmando que la imagen oficial se muestra a escala real $1:1$ centrada verticalmente sin zoom ni pixelado, manteniendo visibles la cabeza, torso, ambos brazos y el perro de utilería.
+
+---
+
 ### ✅ CHECKPOINT 17 — Cobertura Total de Fondos en MainScreen (`LobbyScene`), Aspect Fill (1920x1920) y Corrección de `Component.get_transform` (2026-11-02)
 
 **Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 7250:**
