@@ -10817,13 +10817,9 @@ function initIl2Cpp(module) {
 
                 // 3d. CardBookControl.GroupItem.GetGrade (0xB96694) -> Always return Grade R (4)
                 try {
-                    Interceptor.replace(baseAddr.add(0xB96694), new NativeCallback(function (thisPtr, isMe, methodInfo) {
-                        if (!thisPtr.isNull()) {
-                            var g = thisPtr.add(0x38).readS32();
-                            if (g >= 0) return g;
-                        }
+                    Interceptor.replace(baseAddr.add(0xB96694), keepCb(new NativeCallback(function (thisPtr, isMe, methodInfo) {
                         return 4; // CardGrade.R (4)
-                    }, "int", ["pointer", "bool", "pointer"]));
+                    }, "int", ["pointer", "bool", "pointer"])));
                     log("[+] Interceptor.replace installed on CardBookControl.GroupItem.GetGrade (0xB96694)!");
                 } catch (eGrd) {
                     log("[-] Error replacing GroupItem.GetGrade: " + eGrd.message);
@@ -10889,6 +10885,11 @@ function initIl2Cpp(module) {
                         var setBestFn = new NativeFunction(baseAddr.add(0x11D0A24), "void", ["pointer", "pointer", "pointer", "pointer", "pointer", "pointer", "pointer"]);
                         setBestFn(sceneView, headerStr, groupNameStr, emblemDp, imageDp, spObj, NULL);
 
+                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                        var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                        var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+
                         // Direct guarantee of bestImage texture (foewghkc/1001.i.bytes)
                         try {
                             var bestImg = sceneView.add(0xA8).readPointer();
@@ -10902,9 +10903,10 @@ function initIl2Cpp(module) {
                                         setNativeSizeFn(bestImg, NULL);
                                     } catch (eNs) {}
                                     try {
-                                        var rt = bestImg.add(0x48).readPointer();
+                                        var getRtFn = new NativeFunction(baseAddr.add(0x1614EF0), "pointer", ["pointer", "pointer"]);
+                                        var rt = getRtFn(bestImg, NULL);
                                         if (!rt.isNull()) {
-                                            var setSdFn = new NativeFunction(baseAddr.add(0x1DC75EC), "void", ["pointer", "pointer", "pointer"]);
+                                            var setSdFn = new NativeFunction(baseAddr.add(0x180DC6C), "void", ["pointer", "pointer", "pointer"]);
                                             var buf = Memory.alloc(16);
                                             buf.writeFloat(480.0);
                                             buf.add(4).writeFloat(264.0);
@@ -10915,14 +10917,33 @@ function initIl2Cpp(module) {
                                     bestImg.add(0x24).writeFloat(1.0);
                                     bestImg.add(0x28).writeFloat(1.0);
                                     bestImg.add(0x2C).writeFloat(1.0);
-                                    var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                                    var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
                                     var biGo = getGoFn(bestImg, NULL);
                                     if (!biGo.isNull()) setActFn(biGo, 1, NULL);
+
                                     log("[📖 CARDBOOK] Directly applied bestImage LOONA background texture (480x264)!");
                                 }
                             }
                         } catch (eBi) {}
+
+                        // Deactivate bestBase child 1 (+bg) gray placeholder quad to reveal LOONA banner
+                        try {
+                            var bestBase = sceneView.add(0x88).readPointer(); // UICache
+                            if (!bestBase.isNull()) {
+                                var bbTf = bestBase.add(0x18).readPointer(); // Transform
+                                if (!bbTf.isNull()) {
+                                    var plusBgTf = getChildFn(bbTf, 1, NULL); // Child 1: "+bg" (gray placeholder)
+                                    if (!plusBgTf.isNull()) {
+                                        var plusBgGo = getGoFn(plusBgTf, NULL);
+                                        if (!plusBgGo.isNull()) {
+                                            setActFn(plusBgGo, 0, NULL);
+                                            log("[📖 CARDBOOK] Deactivated bestBase child 1 (+bg) gray placeholder!");
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (ePb) {
+                            log("[-] Error deactivating +bg: " + ePb.message);
+                        }
 
                         // Direct guarantee of bestEmblem texture (aweoijs/1001.i.bytes)
                         try {
@@ -11156,13 +11177,12 @@ function initIl2Cpp(module) {
                         var mainView = sceneView.add(0xE0).readPointer();
                         if (mainView.isNull()) return;
 
-                        // 0. Hide othersBase
+                        // 0. Hide othersBase (UICache at sceneView + 0x48)
                         try {
                             var othersBase = sceneView.add(0x48).readPointer();
                             if (!othersBase.isNull()) {
-                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                                 var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                                var oGo = getGoFn(othersBase, NULL);
+                                var oGo = othersBase.add(0x10).readPointer();
                                 if (!oGo.isNull()) setActFn(oGo, 0, NULL);
                             }
                         } catch (eOb) {}
@@ -11244,6 +11264,7 @@ function initIl2Cpp(module) {
                 } catch (eGgi) {
                     log("[-] Error replacing GetGroupItem: " + eGgi.message);
                 }
+
 
                 // 3g. CardBookScene.GetGroupItemOfIndex (0x11D1D60) -> Return group item by index
                 try {
@@ -11348,6 +11369,27 @@ function initIl2Cpp(module) {
                                             if (!bgGo.isNull()) setActFn(bgGo, 0, NULL);
                                         }
                                     }
+
+                                    // Ensure Grade and Gauge Sprites (grade_R & graph_R) and MaxLevel
+                                    try {
+                                        var gaugeSpComp = st.add(0x40).readPointer();
+                                        var gradeSpComp = st.add(0x60).readPointer();
+                                        var gauge = st.add(0x48).readPointer();
+                                        var grade = st.add(0x70).readPointer();
+                                        if (!gaugeSpComp.isNull() && !gradeSpComp.isNull() && !gauge.isNull() && !grade.isNull()) {
+                                            var getSpFn = new NativeFunction(baseAddr.add(0xD0CAB8), "pointer", ["pointer", "int", "pointer"]);
+                                            var setSpFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
+                                            var spGradeR = getSpFn(gradeSpComp, 4, NULL);
+                                            var spGraphR = getSpFn(gaugeSpComp, 4, NULL);
+                                            if (!spGradeR.isNull()) setSpFn(grade, spGradeR, NULL);
+                                            if (!spGraphR.isNull()) setSpFn(gauge, spGraphR, NULL);
+                                        }
+                                        var maxLvl = st.add(0x80).readPointer();
+                                        if (!maxLvl.isNull()) {
+                                            var mlGo = getGoFn(maxLvl, NULL);
+                                            if (!mlGo.isNull()) setActFn(mlGo, 1, NULL);
+                                        }
+                                    } catch (eGgs) {}
                                 }
 
                                 // 3. Ensure emblem component is active and load official LOONA emblem
