@@ -10902,17 +10902,7 @@ function initIl2Cpp(module) {
                                         var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
                                         setNativeSizeFn(bestImg, NULL);
                                     } catch (eNs) {}
-                                    try {
-                                        var getRtFn = new NativeFunction(baseAddr.add(0x1614EF0), "pointer", ["pointer", "pointer"]);
-                                        var rt = getRtFn(bestImg, NULL);
-                                        if (!rt.isNull()) {
-                                            var setSdFn = new NativeFunction(baseAddr.add(0x180DC6C), "void", ["pointer", "pointer", "pointer"]);
-                                            var buf = Memory.alloc(16);
-                                            buf.writeFloat(480.0);
-                                            buf.add(4).writeFloat(264.0);
-                                            setSdFn(rt, buf, NULL);
-                                        }
-                                    } catch (eSd) {}
+                                    // Native size safely applied via setNativeSizeFn without calling low-level injected icalls
                                     bestImg.add(0x20).writeFloat(1.0);
                                     bestImg.add(0x24).writeFloat(1.0);
                                     bestImg.add(0x28).writeFloat(1.0);
@@ -10931,12 +10921,15 @@ function initIl2Cpp(module) {
                             if (!bestBase.isNull()) {
                                 var bbTf = bestBase.add(0x18).readPointer(); // Transform
                                 if (!bbTf.isNull()) {
-                                    var plusBgTf = getChildFn(bbTf, 1, NULL); // Child 1: "+bg" (gray placeholder)
-                                    if (!plusBgTf.isNull()) {
-                                        var plusBgGo = getGoFn(plusBgTf, NULL);
-                                        if (!plusBgGo.isNull()) {
-                                            setActFn(plusBgGo, 0, NULL);
-                                            log("[📖 CARDBOOK] Deactivated bestBase child 1 (+bg) gray placeholder!");
+                                    var getChildCountFn = new NativeFunction(baseAddr.add(0x181F1A0), "int", ["pointer", "pointer"]);
+                                    if (getChildCountFn(bbTf, NULL) > 1) {
+                                        var plusBgTf = getChildFn(bbTf, 1, NULL); // Child 1: "+bg" (gray placeholder)
+                                        if (!plusBgTf.isNull()) {
+                                            var plusBgGo = getGoFn(plusBgTf, NULL);
+                                            if (!plusBgGo.isNull()) {
+                                                setActFn(plusBgGo, 0, NULL);
+                                                log("[📖 CARDBOOK] Deactivated bestBase child 1 (+bg) gray placeholder!");
+                                            }
                                         }
                                     }
                                 }
@@ -11217,6 +11210,149 @@ function initIl2Cpp(module) {
                     }
                 };
 
+                // --- CARDBOOK GROUPVIEW OFFLINE RESTORATION HELPERS ---
+                var populateCardBookGroupViewOffline = function (sceneThis, page) {
+                    try {
+                        if (!sceneThis || sceneThis.isNull()) return;
+                        var sceneView = sceneThis.add(0x48).readPointer();
+                        if (sceneView.isNull()) return;
+                        var groupView = sceneView.add(0x100).readPointer();
+                        if (groupView.isNull()) return;
+
+                        if (typeof page !== "number" || page < 0) page = 0;
+                        if (page > 2) page = 2;
+                        groupView.add(0x58).writeS32(page); // nowPage = page
+
+                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                        var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                        var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                        var getChildCountFn = new NativeFunction(baseAddr.add(0x181F1A0), "int", ["pointer", "pointer"]);
+                        var setTextFn = new NativeFunction(baseAddr.add(0x1ED197C), "void", ["pointer", "pointer", "pointer"]);
+                        var setTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                        var setSpFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
+                        var getSpFn = new NativeFunction(baseAddr.add(0xD0CAB8), "pointer", ["pointer", "int", "pointer"]);
+
+                        // 0. Update page text ("1 / 3", "2 / 3", "3 / 3")
+                        var pageTextObj = groupView.add(0x48).readPointer();
+                        if (!pageTextObj.isNull()) {
+                            setTextFn(pageTextObj, createIl2CppString((page + 1) + " / 3"), NULL);
+                        }
+
+                        // 1. Update Left/Right Arrow button GameObjects
+                        var leftArrow = groupView.add(0x40).readPointer();
+                        if (!leftArrow.isNull()) {
+                            setActFn(leftArrow, page > 0 ? 1 : 0, NULL);
+                        }
+                        var rightArrow = groupView.add(0x38).readPointer();
+                        if (!rightArrow.isNull()) {
+                            setActFn(rightArrow, page < 2 ? 1 : 0, NULL);
+                        }
+
+                        // 2. Populate 8 Cell Slots
+                        var slots = groupView.add(0x50).readPointer();
+                        if (slots.isNull()) return;
+                        var slotCount = slots.add(0x18).readS32();
+
+                        var metaAll = getGlobalMetadata();
+                        var playables = (metaAll && metaAll.playableGroups) ? metaAll.playableGroups : PLAYABLE_GROUP_CODES;
+                        var startIdx = page * 8;
+
+                        for (var i = 0; i < slotCount && i < 8; i++) {
+                            var cell = slots.add(0x20 + i * 8).readPointer();
+                            if (cell.isNull()) continue;
+                            var cellGo = getGoFn(cell, NULL);
+
+                            var itemIdx = startIdx + i;
+                            if (itemIdx >= playables.length) {
+                                // Deactivate slot beyond LOONA group count (page 2 slots 5, 6, 7)
+                                if (!cellGo.isNull()) setActFn(cellGo, 0, NULL);
+                                continue;
+                            }
+
+                            if (!cellGo.isNull()) setActFn(cellGo, 1, NULL);
+
+                            var gCode = playables[itemIdx];
+                            var baseGc = getBaseGroupCode(gCode);
+                            var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gCode] : null;
+                            var gName = (gMeta && gMeta.name) ? gMeta.name : ("Group " + gCode);
+                            var embPath = "asiudgasg/asodhsg/aweoijs/" + baseGc + ".i.bytes";
+
+                            // Deactivate majorFrame and majorEmblem (Dalcom envelopes)
+                            var mf = cell.add(0x60).readPointer();
+                            if (!mf.isNull()) setActFn(mf, 0, NULL);
+                            var me = cell.add(0x68).readPointer();
+                            if (!me.isNull()) {
+                                var meGo = getGoFn(me, NULL);
+                                if (!meGo.isNull()) setActFn(meGo, 0, NULL);
+                            }
+
+                            // Setup status (CardBookStatusView)
+                            var st = cell.add(0x50).readPointer();
+                            if (!st.isNull()) {
+                                var stGo = getGoFn(st, NULL);
+                                if (!stGo.isNull()) setActFn(stGo, 1, NULL);
+
+                                // Deactivate child 0 "bg" placeholder quad
+                                var stTf = getTfFn(st, NULL);
+                                if (!stTf.isNull() && getChildCountFn(stTf, NULL) > 0) {
+                                    var bgTf = getChildFn(stTf, 0, NULL);
+                                    if (!bgTf.isNull()) {
+                                        var bgGo = getGoFn(bgTf, NULL);
+                                        if (!bgGo.isNull()) setActFn(bgGo, 0, NULL);
+                                    }
+                                }
+
+                                // Apply Grade R & Gauge R sprites
+                                var gaugeSpComp = st.add(0x40).readPointer();
+                                var gradeSpComp = st.add(0x60).readPointer();
+                                var gauge = st.add(0x48).readPointer();
+                                var grade = st.add(0x70).readPointer();
+                                if (!gaugeSpComp.isNull() && !gradeSpComp.isNull() && !gauge.isNull() && !grade.isNull()) {
+                                    var spGradeR = getSpFn(gradeSpComp, 4, NULL);
+                                    var spGraphR = getSpFn(gaugeSpComp, 4, NULL);
+                                    if (!spGradeR.isNull()) setSpFn(grade, spGradeR, NULL);
+                                    if (!spGraphR.isNull()) setSpFn(gauge, spGraphR, NULL);
+                                }
+
+                                // Activate MAX badge
+                                var maxLvl = st.add(0x80).readPointer();
+                                if (!maxLvl.isNull()) {
+                                    var mlGo = getGoFn(maxLvl, NULL);
+                                    if (!mlGo.isNull()) setActFn(mlGo, 1, NULL);
+                                }
+                            }
+
+                            // Setup Emblem
+                            var emb = cell.add(0x58).readPointer();
+                            if (!emb.isNull()) {
+                                var embGo = getGoFn(emb, NULL);
+                                if (!embGo.isNull()) setActFn(embGo, 1, NULL);
+                                var rawImg = emb.add(0x40).readPointer();
+                                if (!rawImg.isNull()) {
+                                    var tex = loadLocalTexture2D(embPath);
+                                    if (tex && !tex.isNull()) {
+                                        setTexFn(rawImg, tex, NULL);
+                                        try {
+                                            var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
+                                            setNativeSizeFn(rawImg, NULL);
+                                        } catch (eSns) {}
+                                    }
+                                }
+                            }
+
+                            // Setup Group Name Text
+                            var gn = cell.add(0x70).readPointer();
+                            if (!gn.isNull()) {
+                                setTextFn(gn, createIl2CppString(gName), NULL);
+                            }
+                        }
+                        log("[📖 CARDBOOK] Fully populated GroupView page " + page + " offline (" + playables.length + " total LOONA groups)!");
+                    } catch (ePgv) {
+                        log("[-] Error in populateCardBookGroupViewOffline: " + ePgv.message);
+                    }
+                };
+
                 // Interceptors for CardBookScene MainView functions
                 try {
                     // Safe no-op on RefreshOthers (0x11CFB80) to avoid SharedInfo.Person NullRef
@@ -11244,6 +11380,12 @@ function initIl2Cpp(module) {
                         log("[📖 CARDBOOK] RefreshSetMainView intercepted -> populating complete offline UI!");
                         populateCardBookMainViewOffline(sceneThis);
                     }, "void", ["pointer", "int", "pointer"])));
+
+                    // RefreshSetGroupViewPage (0x11CF768) -> Dedicated offline GroupView renderer
+                    Interceptor.replace(baseAddr.add(0x11CF768), keepCb(new NativeCallback(function (sceneThis, page, isReload, methodInfo) {
+                        log("[📖 CARDBOOK] RefreshSetGroupViewPage intercepted for page=" + page);
+                        populateCardBookGroupViewOffline(sceneThis, page);
+                    }, "void", ["pointer", "int", "bool", "pointer"])));
 
                     log("[+] Interceptor.replace installed on CardBookScene main view functions!");
                 } catch (eCbMainHooks) {
@@ -11453,8 +11595,7 @@ function initIl2Cpp(module) {
                             if (tabType === 0) {
                                 populateCardBookMainViewOffline(sceneThis);
                             } else if (tabType === 1) {
-                                var refreshGroupPageFn = new NativeFunction(baseAddr.add(0x11CF768), "void", ["pointer", "int", "bool", "pointer"]);
-                                refreshGroupPageFn(sceneThis, 0, 0, NULL);
+                                populateCardBookGroupViewOffline(sceneThis, 0);
                             }
                         } catch (eTab) {
                             log("[-] Error in OnTabButton hook: " + eTab.message);
@@ -16199,8 +16340,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                         var setTabFn = new NativeFunction(baseAddr.add(0x11CF5BC), "bool", ["pointer", "int", "pointer"]);
                                         setTabFn(sceneView, 1, NULL);
                                     }
-                                    var refreshGroupPageFn = new NativeFunction(baseAddr.add(0x11CF768), "void", ["pointer", "int", "bool", "pointer"]);
-                                    refreshGroupPageFn(targetScene, 0, 0, NULL);
+                                    populateCardBookGroupViewOffline(targetScene, 0);
                                 } catch (eTg) {
                                     log("[-] Error switching CardBook to group tab: " + eTg.message);
                                 }
@@ -16211,8 +16351,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             if (targetScene && !targetScene.isNull()) {
                                 try {
                                     log("[📖 SCENE CMD] Switching CardBook Group page to " + cbPage + "...");
-                                    var refreshGroupPageFn = new NativeFunction(baseAddr.add(0x11CF768), "void", ["pointer", "int", "bool", "pointer"]);
-                                    refreshGroupPageFn(targetScene, cbPage, 0, NULL);
+                                    populateCardBookGroupViewOffline(targetScene, cbPage);
                                 } catch (eCbp) {
                                     log("[-] Error switching CardBook page: " + eCbp.message);
                                 }
@@ -17580,7 +17719,10 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             } catch (eF) {}
                             if (unlinkFn) unlinkFn(cmdPathCStr);
                             if (content) {
-                                var cmdTrim = content.replace(/['"]/g, '').trim();
+                                var cmdTrim = content.trim();
+                                if (cmdTrim.indexOf("eval:") !== 0) {
+                                    cmdTrim = cmdTrim.replace(/['"]/g, '').trim();
+                                }
                                 if (cmdTrim.length > 0) {
                                     pendingSceneCommand = cmdTrim;
                                     log("[🚀 SCENE CMD QUEUED] Queued for Unity Main Thread: '" + cmdTrim + "'");
