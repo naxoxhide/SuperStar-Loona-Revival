@@ -514,41 +514,45 @@ function initIl2Cpp(module) {
             var livenessTrampAddr = baseAddr.add(0xF288E0);
 
             // 1. Write native trampoline into unused .text of CardListCompare (0xF288E0):
-            // 0xF288E0: cbz x0, #0xf28918                  (if null -> return 0)
+            // 0xF288E0: cbz x0, #0xf28920                  (if null -> return 0)
             // 0xF288E4: tst x0, #7                          (if unaligned -> return 0)
-            // 0xF288E8: b.ne #0xf28918
-            // 0xF288EC: ldr x8, [x0]
-            // 0xF288F0: mov x19, x0
-            // 0xF288F4: tbnz w8, #0, #0xf28918             (if bit 0 set -> return 0)
-            // 0xF288F8: tst x8, #7                          (if class unaligned -> return 0)
-            // 0xF288FC: b.ne #0xf28918
-            // 0xF28900: ubfx x16, x8, #32, #16             (extract bits 32-47)
-            // 0xF28904: cmp x16, #0x50                     (if < 0x50 -> return 0)
-            // 0xF28908: b.lo #0xf28918
-            // 0xF2890C: cmp x16, #0x80                     (if >= 0x80 -> return 0)
-            // 0xF28910: b.hs #0xf28918
-            // 0xF28914: b #0x9f8de0                        (continue liveness check)
-            // 0xF28918: b #0x9f8e88                        (safe ret 0)
-            Memory.protect(livenessTrampAddr, 64, "rwx");
+            // 0xF288E8: b.ne #0xf28920
+            // 0xF288EC: lsr x16, x0, #48                    (if top 16 bits != 0 non-canonical -> return 0)
+            // 0xF288F0: cbnz x16, #0xf28920
+            // 0xF288F4: ldr x8, [x0]
+            // 0xF288F8: mov x19, x0
+            // 0xF288FC: tbnz w8, #0, #0xf28920             (if bit 0 set -> return 0)
+            // 0xF28900: tst x8, #7                          (if class unaligned -> return 0)
+            // 0xF28904: b.ne #0xf28920
+            // 0xF28908: ubfx x16, x8, #32, #16             (extract bits 32-47)
+            // 0xF2890C: cmp x16, #0x50                     (if < 0x50 -> return 0)
+            // 0xF28910: b.lo #0xf28920
+            // 0xF28914: cmp x16, #0x80                     (if >= 0x80 -> return 0)
+            // 0xF28918: b.hs #0xf28920
+            // 0xF2891C: b #0x9f8de0                        (continue liveness check)
+            // 0xF28920: b #0x9f8e88                        (safe ret 0)
+            Memory.protect(livenessTrampAddr, 80, "rwx");
             var livenessTrampBytes = [
-                0xc0, 0x01, 0x00, 0xb4, // 0xF288E0: cbz x0, #0xf28918
+                0x00, 0x02, 0x00, 0xb4, // 0xF288E0: cbz x0, #0xf28920
                 0x1f, 0x08, 0x40, 0xf2, // 0xF288E4: tst x0, #7
-                0x81, 0x01, 0x00, 0x54, // 0xF288E8: b.ne #0xf28918
-                0x08, 0x00, 0x40, 0xf9, // 0xF288EC: ldr x8, [x0]
-                0xf3, 0x03, 0x00, 0xaa, // 0xF288F0: mov x19, x0
-                0x28, 0x01, 0x00, 0x37, // 0xF288F4: tbnz w8, #0, #0xf28918
-                0x1f, 0x09, 0x40, 0xf2, // 0xF288F8: tst x8, #7
-                0xe1, 0x00, 0x00, 0x54, // 0xF288FC: b.ne #0xf28918
-                0x10, 0xbd, 0x60, 0xd3, // 0xF28900: ubfx x16, x8, #32, #16
-                0x1f, 0x42, 0x01, 0xf1, // 0xF28904: cmp x16, #0x50
-                0x83, 0x00, 0x00, 0x54, // 0xF28908: b.lo #0xf28918
-                0x1f, 0x02, 0x02, 0xf1, // 0xF2890C: cmp x16, #0x80
-                0x42, 0x00, 0x00, 0x54, // 0xF28910: b.hs #0xf28918
-                0x33, 0x41, 0xeb, 0x17, // 0xF28914: b #0x9f8de0
-                0x5c, 0x41, 0xeb, 0x17  // 0xF28918: b #0x9f8e88
+                0xc1, 0x01, 0x00, 0x54, // 0xF288E8: b.ne #0xf28920
+                0x10, 0xfc, 0x70, 0xd3, // 0xF288EC: lsr x16, x0, #48
+                0x90, 0x01, 0x00, 0xb5, // 0xF288F0: cbnz x16, #0xf28920
+                0x08, 0x00, 0x40, 0xf9, // 0xF288F4: ldr x8, [x0]
+                0xf3, 0x03, 0x00, 0xaa, // 0xF288F8: mov x19, x0
+                0x28, 0x01, 0x00, 0x37, // 0xF288FC: tbnz w8, #0, #0xf28920
+                0x1f, 0x09, 0x40, 0xf2, // 0xF28900: tst x8, #7
+                0xe1, 0x00, 0x00, 0x54, // 0xF28904: b.ne #0xf28920
+                0x10, 0xbd, 0x60, 0xd3, // 0xF28908: ubfx x16, x8, #32, #16
+                0x1f, 0x42, 0x01, 0xf1, // 0xF2890C: cmp x16, #0x50
+                0x83, 0x00, 0x00, 0x54, // 0xF28910: b.lo #0xf28920
+                0x1f, 0x02, 0x02, 0xf1, // 0xF28914: cmp x16, #0x80
+                0x42, 0x00, 0x00, 0x54, // 0xF28918: b.hs #0xf28920
+                0x31, 0x41, 0xeb, 0x17, // 0xF2891C: b #0x9f8de0
+                0x5a, 0x41, 0xeb, 0x17  // 0xF28920: b #0x9f8e88
             ];
             livenessTrampAddr.writeByteArray(livenessTrampBytes);
-            Memory.protect(livenessTrampAddr, 64, "r-x");
+            Memory.protect(livenessTrampAddr, 80, "r-x");
 
             // 2. Direct branch from 0x9F8DCC to 0xF288E0 (b #0xf288e0 = 0x1414bec5):
             Memory.protect(livenessPatchAddr, 20, "rwx");
@@ -10840,204 +10844,264 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing GroupItem getters: " + eGiGetters.message);
                 }
 
-                // 3d2. CardBookScene.RefreshBestCardBook (0x11CFE18) -> Native SetBest with authentic LOONA R50 banner
-                try {
-                    Interceptor.replace(baseAddr.add(0x11CFE18), keepCb(new NativeCallback(function (sceneThis, isReload, methodInfo) {
-                        try {
-                            if (sceneThis.isNull()) return;
-                            var sceneView = sceneThis.add(0x48).readPointer();
-                            if (sceneView.isNull()) return;
+                // --- CARDBOOK MAINVIEW OFFLINE RESTORATION HELPERS ---
+                var populateBestCardBookBanner = function (sceneThis) {
+                    try {
+                        if (!sceneThis || sceneThis.isNull()) return;
+                        var sceneView = sceneThis.add(0x48).readPointer();
+                        if (sceneView.isNull()) return;
 
-                            var statusParamKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardBookStatusView/Param")
-                                || getClass("Assembly-CSharp", "", "CardBookStatusView/Param");
-                            if (!statusParamKlass || statusParamKlass.isNull()) return;
+                        var statusParamKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardBookStatusView/Param")
+                            || getClass("Assembly-CSharp", "", "CardBookStatusView/Param");
+                        if (!statusParamKlass || statusParamKlass.isNull()) return;
 
-                            var spObj = il2cpp_object_new(statusParamKlass);
-                            if (il2cpp_gchandle_new && !spObj.isNull()) il2cpp_gchandle_new(spObj, 2);
-                            spObj.add(0x10).writeS32(4);     // grade = R (4)
-                            spObj.add(0x14).writeU8(1);      // isRGrade = true
-                            spObj.add(0x15).writeU8(1);      // isMaxLevel = true
-                            spObj.add(0x18).writeS32(50);    // level = 50
-                            spObj.add(0x1C).writeU8(0);      // useEffect = false
-                            spObj.add(0x20).writeFloat(1.0); // gauge = 1.0
+                        var spObj = il2cpp_object_new(statusParamKlass);
+                        if (il2cpp_gchandle_new && !spObj.isNull()) il2cpp_gchandle_new(spObj, 2);
+                        spObj.add(0x10).writeS32(4);     // grade = R (4)
+                        spObj.add(0x14).writeU8(1);      // isRGrade = true
+                        spObj.add(0x15).writeU8(1);      // isMaxLevel = true
+                        spObj.add(0x18).writeS32(50);    // level = 50
+                        spObj.add(0x1C).writeU8(0);      // useEffect = false
+                        spObj.add(0x20).writeFloat(1.0); // gauge = 1.0
 
-                            var headerStr = createIl2CppString("BEST CARD BOOK");
-                            var groupNameStr = createIl2CppString("[+ +]");
-                            var emblemDp = createDownloadPath("asiudgasg/asodhsg/aweoijs/1001.i.bytes");
-                            var imageDp = createDownloadPath("asiudgasg/asodhsg/foewghkc/1001.i.bytes");
+                        var headerStr = createIl2CppString("BEST CARD BOOK");
+                        var groupNameStr = createIl2CppString("[+ +]");
+                        var emblemDp = createDownloadPath("asiudgasg/asodhsg/aweoijs/1001.i.bytes");
+                        var imageDp = createDownloadPath("asiudgasg/asodhsg/foewghkc/1001.i.bytes");
 
-                            var setBestFn = new NativeFunction(baseAddr.add(0x11D0A24), "void", ["pointer", "pointer", "pointer", "pointer", "pointer", "pointer", "pointer"]);
-                            setBestFn(sceneView, headerStr, groupNameStr, emblemDp, imageDp, spObj, NULL);
-                            log("[📖 CARDBOOK] SetBest cleanly invoked offline with LOONA R50 banner!");
-                        } catch (eSb) {
-                            log("[-] Error in RefreshBestCardBook offline: " + eSb.message);
-                        }
-                    }, "void", ["pointer", "bool", "pointer"])));
-                    log("[+] Interceptor.replace installed on CardBookScene.RefreshBestCardBook (0x11CFE18)!");
-                } catch (eRbcb) {
-                    log("[-] Error replacing RefreshBestCardBook: " + eRbcb.message);
-                }
+                        var setBestFn = new NativeFunction(baseAddr.add(0x11D0A24), "void", ["pointer", "pointer", "pointer", "pointer", "pointer", "pointer", "pointer"]);
+                        setBestFn(sceneView, headerStr, groupNameStr, emblemDp, imageDp, spObj, NULL);
+                        log("[📖 CARDBOOK] SetBest cleanly invoked offline with LOONA R50 banner!");
+                    } catch (eSb) {
+                        log("[-] Error in SetBest: " + eSb.message);
+                    }
+                };
 
-                // 3e. CardBookScene.RefreshFavoriteGroupFive (0x11D0048) -> Populate 5 favorite group slots in CardBookMainView
-                try {
-                    Interceptor.replace(baseAddr.add(0x11D0048), keepCb(new NativeCallback(function (sceneThis, isReload, methodInfo) {
-                        log("[📖 CARDBOOK] RefreshFavoriteGroupFive entered for scene: " + sceneThis);
-                        try {
-                            if (!sceneThis || sceneThis.isNull()) return;
-                            var sceneView = sceneThis.add(0x48).readPointer();
-                            if (sceneView.isNull()) return;
-                            var mainView = sceneView.add(0xE0).readPointer();
-                            if (mainView.isNull()) return;
+                var populateFavoriteGroupsOffline = function (sceneThis) {
+                    try {
+                        if (!sceneThis || sceneThis.isNull()) return;
+                        var sceneView = sceneThis.add(0x48).readPointer();
+                        if (sceneView.isNull()) return;
+                        var mainView = sceneView.add(0xE0).readPointer();
+                        if (mainView.isNull()) return;
 
-                            var favItemList = mainView.add(0x58).readPointer(); // CardBookFavoriteGroupItemView[] (len 5)
-                            var favEmptyList = mainView.add(0x60).readPointer(); // GameObject[] (len 5)
-                            if (favItemList.isNull()) return;
+                        var favItemList = mainView.add(0x58).readPointer(); // CardBookFavoriteGroupItemView[] (len 5)
+                        var favEmptyList = mainView.add(0x60).readPointer(); // GameObject[] (len 5)
+                        if (favItemList.isNull()) return;
 
-                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                            var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                            var getFavSetDataFn = new NativeFunction(baseAddr.add(0x11CDB7C), "pointer", ["pointer", "int", "pointer"]);
-                            var setFavViewFn = new NativeFunction(baseAddr.add(0x11CD330), "void", ["pointer", "pointer", "pointer"]);
+                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                        var setFavCellFn = new NativeFunction(baseAddr.add(0x11CD330), "void", ["pointer", "pointer", "pointer"]);
 
-                            var metaAll = getGlobalMetadata();
-                            var favCodes = (typeof offlineFavoriteGroups !== "undefined" && offlineFavoriteGroups && offlineFavoriteGroups.length > 0)
-                                ? offlineFavoriteGroups
-                                : [1001, 2001, 3001, 4001, 5001];
+                        var favParamKlass = getClass("Assembly-CSharp", "", "CardBookMainFavoriteGroupCellView/Param")
+                            || getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardBookMainFavoriteGroupCellView/Param");
 
-                            var arrLen = favItemList.add(0x18).readS32();
-                            for (var i = 0; i < arrLen && i < 5; i++) {
-                                var favView = favItemList.add(0x20 + i * 8).readPointer();
-                                var emptyGo = (!favEmptyList.isNull() && i < favEmptyList.add(0x18).readS32())
-                                    ? favEmptyList.add(0x20 + i * 8).readPointer()
-                                    : NULL;
+                        var metaAll = getGlobalMetadata();
+                        var favCodes = (typeof offlineFavoriteGroups !== "undefined" && offlineFavoriteGroups && offlineFavoriteGroups.length > 0)
+                            ? offlineFavoriteGroups
+                            : [1001, 2001, 3001, 4001, 5001];
 
-                                if (i < favCodes.length) {
-                                    var gCode = favCodes[i];
-                                    var baseGc = getBaseGroupCode(gCode);
-                                    var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gCode] : null;
-                                    var gName = (gMeta && gMeta.name) ? gMeta.name : ("Group " + gCode);
-                                    var embPath = "asiudgasg/asodhsg/aweoijs/" + baseGc + ".i.bytes";
+                        var arrLen = favItemList.add(0x18).readS32();
+                        for (var i = 0; i < arrLen && i < 5; i++) {
+                            var favCell = favItemList.add(0x20 + i * 8).readPointer();
+                            var emptyGo = (!favEmptyList.isNull() && i < favEmptyList.add(0x18).readS32())
+                                ? favEmptyList.add(0x20 + i * 8).readPointer()
+                                : NULL;
 
-                                    if (!favView.isNull()) {
-                                        var fvGo = getGoFn(favView, NULL);
-                                        if (!fvGo.isNull()) setActFn(fvGo, 1, NULL);
+                            if (i < favCodes.length && favParamKlass && !favParamKlass.isNull()) {
+                                var gCode = favCodes[i];
+                                var baseGc = getBaseGroupCode(gCode);
+                                var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gCode] : null;
+                                var gName = (gMeta && gMeta.name) ? gMeta.name : ("Group " + gCode);
+                                var embPath = "asiudgasg/asodhsg/aweoijs/" + baseGc + ".i.bytes";
 
-                                        var setData = getFavSetDataFn(mainView, i, NULL);
-                                        if (!setData.isNull()) {
-                                            setData.add(0x10).writePointer(createIl2CppString(gName));
-                                            setData.add(0x18).writePointer(createDownloadPath(embPath));
-                                            setData.add(0x20).writeU8(0); // isNew = false
-                                            setFavViewFn(favView, setData, NULL);
-                                        }
-                                    }
-                                    if (!emptyGo.isNull()) {
-                                        setActFn(emptyGo, 0, NULL);
-                                    }
-                                } else {
-                                    if (!favView.isNull()) {
-                                        var fvGo2 = getGoFn(favView, NULL);
-                                        if (!fvGo2.isNull()) setActFn(fvGo2, 0, NULL);
-                                    }
-                                    if (!emptyGo.isNull()) {
-                                        setActFn(emptyGo, 1, NULL);
-                                    }
+                                if (!favCell.isNull()) {
+                                    var fvGo = getGoFn(favCell, NULL);
+                                    if (!fvGo.isNull()) setActFn(fvGo, 1, NULL);
+
+                                    var fParam = il2cpp_object_new(favParamKlass);
+                                    if (il2cpp_gchandle_new && !fParam.isNull()) il2cpp_gchandle_new(fParam, 2);
+                                    fParam.add(0x10).writePointer(createIl2CppString(gName));
+                                    fParam.add(0x18).writePointer(createDownloadPath(embPath));
+                                    fParam.add(0x20).writeU8(0); // newmark = false
+                                    setFavCellFn(favCell, fParam, NULL);
+                                }
+                                if (!emptyGo.isNull()) {
+                                    setActFn(emptyGo, 0, NULL);
+                                }
+                            } else {
+                                if (!favCell.isNull()) {
+                                    var fvGo2 = getGoFn(favCell, NULL);
+                                    if (!fvGo2.isNull()) setActFn(fvGo2, 0, NULL);
+                                }
+                                if (!emptyGo.isNull()) {
+                                    setActFn(emptyGo, 1, NULL);
                                 }
                             }
-                            log("[📖 CARDBOOK] Populated " + Math.min(arrLen, favCodes.length) + " favorite groups in CardBookMainView!");
-                        } catch (eFav) {
-                            log("[-] Error in RefreshFavoriteGroupFive: " + eFav.message);
                         }
-                    }, "void", ["pointer", "bool", "pointer"])));
-                    log("[+] Interceptor.replace installed on CardBookScene.RefreshFavoriteGroupFive (0x11D0048)!");
-                } catch (eRfgf) {
-                    log("[-] Error replacing RefreshFavoriteGroupFive: " + eRfgf.message);
-                }
+                        log("[📖 CARDBOOK] Populated " + Math.min(arrLen, favCodes.length) + " favorite groups in CardBookMainView!");
+                    } catch (eFav) {
+                        log("[-] Error in favorite groups population: " + eFav.message);
+                    }
+                };
 
-                // 3e2. CardBookMainView.SetRefreshCardCollection (0x11CD560) & SetRefreshThemeCollection (0x11CD6F8) -> Safe offline collection bars
+                var buildCollectionRewardData = function (currentPts, nextPts) {
+                    var cellParamKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardBookCollectionPointCellView/Param")
+                        || getClass("Assembly-CSharp", "", "CardBookCollectionPointCellView/Param");
+                    var rewardParamKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "MyRecordRewardInfoItemView/Params")
+                        || getClass("Assembly-CSharp", "", "MyRecordRewardInfoItemView/Params");
+                    if (!cellParamKlass || cellParamKlass.isNull()) return NULL;
+
+                    var cpObj = il2cpp_object_new(cellParamKlass);
+                    if (il2cpp_gchandle_new && !cpObj.isNull()) il2cpp_gchandle_new(cpObj, 2);
+
+                    var ptStr = createIl2CppString(currentPts.toLocaleString() + " POINT 를\n달성하세요.");
+                    cpObj.add(0x10).writePointer(ptStr);
+
+                    if (rewardParamKlass && !rewardParamKlass.isNull()) {
+                        var rpObj = il2cpp_object_new(rewardParamKlass);
+                        if (il2cpp_gchandle_new && !rpObj.isNull()) il2cpp_gchandle_new(rpObj, 2);
+                        var diaDp = createDownloadPath("asiudgasg/asodhsg/bhfbfhbf/317.i.bytes");
+                        rpObj.add(0x10).writePointer(diaDp);
+                        rpObj.add(0x18).writePointer(createIl2CppString("50"));
+                        rpObj.add(0x20).writeU8(1); // autoSize = true
+                        cpObj.add(0x18).writePointer(rpObj);
+                    }
+
+                    cpObj.add(0x20).writePointer(createIl2CppString("GET"));
+                    cpObj.add(0x28).writePointer(createIl2CppString("COMPLETED"));
+                    cpObj.add(0x30).writeS32(2); // type = 2 (Completed)
+                    return cpObj;
+                };
+
+                var createCollectionPointViewParam = function (title, subNotice, notice, curPts, maxPts, buffScore, cellParam) {
+                    var paramKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardBookCollectionPointView/Params")
+                        || getClass("Assembly-CSharp", "", "CardBookCollectionPointView/Params");
+                    if (!paramKlass || paramKlass.isNull()) return NULL;
+
+                    var pObj = il2cpp_object_new(paramKlass);
+                    if (il2cpp_gchandle_new && !pObj.isNull()) il2cpp_gchandle_new(pObj, 2);
+
+                    pObj.add(0x10).writePointer(createIl2CppString(title));
+                    pObj.add(0x18).writePointer(createIl2CppString(subNotice));
+                    pObj.add(0x20).writePointer(createIl2CppString(notice));
+                    pObj.add(0x28).writePointer(createIl2CppString("{0} / {1}"));
+                    pObj.add(0x30).writeS32(curPts);
+                    pObj.add(0x34).writeS32(maxPts);
+                    pObj.add(0x38).writePointer(createIl2CppString("BUFF"));
+                    pObj.add(0x40).writeS32(buffScore);
+                    if (cellParam && !cellParam.isNull()) {
+                        pObj.add(0x48).writePointer(cellParam);
+                    }
+                    return pObj;
+                };
+
+                var populateCollectionPointsOffline = function (sceneThis) {
+                    try {
+                        if (!sceneThis || sceneThis.isNull()) return;
+                        var sceneView = sceneThis.add(0x48).readPointer();
+                        if (sceneView.isNull()) return;
+                        var mainView = sceneView.add(0xE0).readPointer();
+                        if (mainView.isNull()) return;
+
+                        var cardColPoint = mainView.add(0x68).readPointer();
+                        var themeColPoint = mainView.add(0x70).readPointer();
+                        var setColFn = new NativeFunction(baseAddr.add(0x11C5184), "void", ["pointer", "pointer", "pointer"]);
+
+                        if (!cardColPoint.isNull()) {
+                            var cpCell = buildCollectionRewardData(50400, 50400);
+                            var cpParam = createCollectionPointViewParam("ALL CARDS COLLECTION", "모든 테마가 포함 됩니다.", "새로운 카드를 수집하고 보상을 획득하세요!", 50400, 50400, 50, cpCell);
+                            if (cpParam && !cpParam.isNull()) {
+                                setColFn(cardColPoint, cpParam, NULL);
+                            }
+                        }
+                        if (!themeColPoint.isNull()) {
+                            var tpCell = buildCollectionRewardData(2400, 2400);
+                            var tpParam = createCollectionPointViewParam("ALL THEMES COLLECTION", "모든 테마가 포함 됩니다.", "등급별로 테마를 맞추고 곡 점수를 올려보세요!", 2400, 2400, 50, tpCell);
+                            if (tpParam && !tpParam.isNull()) {
+                                setColFn(themeColPoint, tpParam, NULL);
+                            }
+                        }
+                        log("[📖 CARDBOOK] Populated collection points in CardBookMainView!");
+                    } catch (eCol) {
+                        log("[-] Error in collection points population: " + eCol.message);
+                    }
+                };
+
+                var populateCardBookMainViewOffline = function (sceneThis) {
+                    try {
+                        if (!sceneThis || sceneThis.isNull()) return;
+                        var sceneView = sceneThis.add(0x48).readPointer();
+                        if (sceneView.isNull()) return;
+                        var mainView = sceneView.add(0xE0).readPointer();
+                        if (mainView.isNull()) return;
+
+                        // 0. Hide othersBase
+                        try {
+                            var othersBase = sceneView.add(0x48).readPointer();
+                            if (!othersBase.isNull()) {
+                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                var oGo = getGoFn(othersBase, NULL);
+                                if (!oGo.isNull()) setActFn(oGo, 0, NULL);
+                            }
+                        } catch (eOb) {}
+
+                        // 1. BEST CARD BOOK Banner
+                        populateBestCardBookBanner(sceneThis);
+
+                        // 2. Favorite Groups Title ("MY FAVORITE GROUP 5")
+                        try {
+                            var titleTxtObj = mainView.add(0x50).readPointer();
+                            if (!titleTxtObj.isNull()) {
+                                var setTextFn = new NativeFunction(titleTxtObj.readPointer().add(0x5E8).readPointer(), "void", ["pointer", "pointer", "pointer"]);
+                                setTextFn(titleTxtObj, createIl2CppString("MY FAVORITE GROUP 5"), NULL);
+                            }
+                        } catch (eTt) {}
+
+                        // 3. 5 Favorite Groups
+                        populateFavoriteGroupsOffline(sceneThis);
+
+                        // 4. Collection Points
+                        populateCollectionPointsOffline(sceneThis);
+
+                        log("[📖 CARDBOOK] populateCardBookMainViewOffline completed successfully!");
+                    } catch (eMvo) {
+                        log("[-] Error in populateCardBookMainViewOffline: " + eMvo.message);
+                    }
+                };
+
+                // Interceptors for CardBookScene MainView functions
                 try {
-                    var buildCollectionRewardData = function (currentPts, nextPts) {
-                        var cellParamKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardBookCollectionPointCellView/Param")
-                            || getClass("Assembly-CSharp", "", "CardBookCollectionPointCellView/Param");
-                        var rewardParamKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "MyRecordRewardInfoItemView/Params")
-                            || getClass("Assembly-CSharp", "", "MyRecordRewardInfoItemView/Params");
-                        if (!cellParamKlass || cellParamKlass.isNull()) return NULL;
+                    // Safe no-op on RefreshOthers (0x11CFB80) to avoid SharedInfo.Person NullRef
+                    Interceptor.replace(baseAddr.add(0x11CFB80), keepCb(new NativeCallback(function (sceneThis, methodInfo) {
+                        // no-op offline
+                    }, "void", ["pointer", "pointer"])));
 
-                        var cpObj = il2cpp_object_new(cellParamKlass);
-                        if (il2cpp_gchandle_new && !cpObj.isNull()) il2cpp_gchandle_new(cpObj, 2);
+                    // RefreshBestCardBook (0x11CFE18)
+                    Interceptor.replace(baseAddr.add(0x11CFE18), keepCb(new NativeCallback(function (sceneThis, isReload, methodInfo) {
+                        populateBestCardBookBanner(sceneThis);
+                    }, "void", ["pointer", "int", "pointer"])));
 
-                        var ptStr = createIl2CppString(currentPts.toLocaleString() + " POINT 를\n달성하세요.");
-                        cpObj.add(0x10).writePointer(ptStr);
+                    // RefreshFavoriteGroupFive (0x11D0048)
+                    Interceptor.replace(baseAddr.add(0x11D0048), keepCb(new NativeCallback(function (sceneThis, isReload, methodInfo) {
+                        populateFavoriteGroupsOffline(sceneThis);
+                    }, "void", ["pointer", "int", "pointer"])));
 
-                        if (rewardParamKlass && !rewardParamKlass.isNull()) {
-                            var rpObj = il2cpp_object_new(rewardParamKlass);
-                            if (il2cpp_gchandle_new && !rpObj.isNull()) il2cpp_gchandle_new(rpObj, 2);
-                            var diaDp = createDownloadPath("asiudgasg/asodhsg/bhfbfhbf/317.i.bytes");
-                            rpObj.add(0x10).writePointer(diaDp);
-                            rpObj.add(0x18).writePointer(createIl2CppString("50"));
-                            rpObj.add(0x20).writeU8(1); // autoSize = true
-                            cpObj.add(0x18).writePointer(rpObj);
-                        }
+                    // RefreshCollection (0x11D0300)
+                    Interceptor.replace(baseAddr.add(0x11D0300), keepCb(new NativeCallback(function (sceneThis, isReload, methodInfo) {
+                        populateCollectionPointsOffline(sceneThis);
+                    }, "void", ["pointer", "int", "pointer"])));
 
-                        cpObj.add(0x20).writePointer(createIl2CppString("GET"));
-                        cpObj.add(0x28).writePointer(createIl2CppString("COMPLETED"));
-                        cpObj.add(0x30).writeS32(2); // type = 2 (Completed)
-                        return cpObj;
-                    };
+                    // RefreshSetMainView (0x11CFDD8)
+                    Interceptor.replace(baseAddr.add(0x11CFDD8), keepCb(new NativeCallback(function (sceneThis, isReload, methodInfo) {
+                        log("[📖 CARDBOOK] RefreshSetMainView intercepted -> populating complete offline UI!");
+                        populateCardBookMainViewOffline(sceneThis);
+                    }, "void", ["pointer", "int", "pointer"])));
 
-                    Interceptor.replace(baseAddr.add(0x11CD560), keepCb(new NativeCallback(function (mainViewPtr, itemDataPtr, methodInfo) {
-                        try {
-                            if (mainViewPtr.isNull() || itemDataPtr.isNull()) return;
-                            itemDataPtr.add(0x10).writePointer(createIl2CppString("ALL CARDS COLLECTION"));
-                            itemDataPtr.add(0x18).writePointer(createIl2CppString("보유한 카드의 등급에 따라 포인트가 획득됩니다."));
-                            itemDataPtr.add(0x20).writePointer(createIl2CppString("모든 카드를 수집해 보세요!"));
-                            itemDataPtr.add(0x28).writePointer(createIl2CppString("{0} / {1}"));
-                            itemDataPtr.add(0x30).writeS32(50400); // curPts
-                            itemDataPtr.add(0x34).writeS32(50400); // maxPts
-                            itemDataPtr.add(0x38).writePointer(createIl2CppString("BUFF"));
-                            itemDataPtr.add(0x40).writeS32(50); // buffScore = +50
-
-                            var rObj = buildCollectionRewardData(50400, 50400);
-                            if (rObj && !rObj.isNull()) {
-                                itemDataPtr.add(0x48).writePointer(rObj);
-                            }
-                            var cardColView = mainViewPtr.add(0x68).readPointer();
-                            if (!cardColView.isNull()) {
-                                var setColViewFn = new NativeFunction(baseAddr.add(0x11C5184), "void", ["pointer", "pointer", "pointer"]);
-                                setColViewFn(cardColView, itemDataPtr, NULL);
-                            }
-                        } catch (eSrcc) {
-                            log("[-] Error in SetRefreshCardCollection: " + eSrcc.message);
-                        }
-                    }, "void", ["pointer", "pointer", "pointer"])));
-
-                    Interceptor.replace(baseAddr.add(0x11CD6F8), keepCb(new NativeCallback(function (mainViewPtr, itemDataPtr, methodInfo) {
-                        try {
-                            if (mainViewPtr.isNull() || itemDataPtr.isNull()) return;
-                            itemDataPtr.add(0x40).writeS32(50); // total bonus score
-                            itemDataPtr.add(0x10).writePointer(createIl2CppString("ALL THEMES COLLECTION"));
-                            itemDataPtr.add(0x18).writePointer(createIl2CppString("테마를 완성하면 보너스 점수가 부여됩니다."));
-                            itemDataPtr.add(0x20).writePointer(createIl2CppString("모든 테마를 수집해 보세요!"));
-                            itemDataPtr.add(0x28).writePointer(createIl2CppString("{0} / {1}"));
-                            itemDataPtr.add(0x30).writeS32(2400); // curPts
-                            itemDataPtr.add(0x34).writeS32(2400); // maxPts
-                            itemDataPtr.add(0x38).writePointer(createIl2CppString("BUFF"));
-                            itemDataPtr.add(0x40).writeS32(50); // buffScore = +50
-
-                            var rObj = buildCollectionRewardData(2400, 2400);
-                            if (rObj && !rObj.isNull()) {
-                                itemDataPtr.add(0x48).writePointer(rObj);
-                            }
-                            var themeColView = mainViewPtr.add(0x70).readPointer();
-                            if (!themeColView.isNull()) {
-                                var setColViewFn = new NativeFunction(baseAddr.add(0x11C5184), "void", ["pointer", "pointer", "pointer"]);
-                                setColViewFn(themeColView, itemDataPtr, NULL);
-                            }
-                        } catch (eSrtc) {
-                            log("[-] Error in SetRefreshThemeCollection: " + eSrtc.message);
-                        }
-                    }, "void", ["pointer", "pointer", "pointer"])));
-                    log("[+] Interceptor.replace installed on SetRefreshCardCollection (0x11CD560) & SetRefreshThemeCollection (0x11CD6F8)!");
-                } catch (eColHooks) {
-                    log("[-] Error installing collection bar hooks: " + eColHooks.message);
+                    log("[+] Interceptor.replace installed on CardBookScene main view functions!");
+                } catch (eCbMainHooks) {
+                    log("[-] Error installing CardBook main hooks: " + eCbMainHooks.message);
                 }
 
                 // 3f. CardBookControl.GetGroupItem (0x11C83DC) & GetMajorGroupItem (0x11C8528) -> Dynamic group return
@@ -15526,13 +15590,12 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             log("[-] Error in deferred ensureCardBookControlData: " + eCbd2.message);
                         }
 
-                        // 1. Refresh main collection & header view
+                        // 1. Refresh main collection & header view offline
                         try {
-                            var refreshMainFn = new NativeFunction(baseAddr.add(0x11CFDD8), "void", ["pointer", "bool", "pointer"]);
-                            refreshMainFn(sceneThis, 1, NULL);
-                            log("[📖 CARDBOOK] Deferred RefreshSetMainView(true) cleanly executed!");
+                            populateCardBookMainViewOffline(sceneThis);
+                            log("[📖 CARDBOOK] populateCardBookMainViewOffline cleanly executed!");
                         } catch (eRm) {
-                            log("[-] Error in RefreshSetMainView: " + eRm.message);
+                            log("[-] Error in populateCardBookMainViewOffline: " + eRm.message);
                         }
 
                         // 2. Refresh group view page 0 (populates group slots with LOONA groups/themes)
@@ -15542,15 +15605,6 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             log("[📖 CARDBOOK] Deferred RefreshGroup(true) cleanly executed!");
                         } catch (eRg) {
                             log("[-] Error in RefreshGroup: " + eRg.message);
-                        }
-
-                        // 2b. Explicitly populate favorite groups slots
-                        try {
-                            var refreshFavFn = new NativeFunction(baseAddr.add(0x11D0048), "void", ["pointer", "bool", "pointer"]);
-                            refreshFavFn(sceneThis, 1, NULL);
-                            log("[📖 CARDBOOK] Deferred RefreshFavoriteGroupFive(true) cleanly executed!");
-                        } catch (eRff) {
-                            log("[-] Error in deferred RefreshFavoriteGroupFive: " + eRff.message);
                         }
 
                         // 3. Mark state as WaitDone
@@ -15836,6 +15890,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     log("[📖 SCENE CMD] Switching CardBook tab to MAIN (0)...");
                                     var onTabBtnFn = new NativeFunction(baseAddr.add(0x11D252C), "void", ["pointer", "int", "pointer"]);
                                     onTabBtnFn(targetScene, 0, NULL);
+                                    populateCardBookMainViewOffline(targetScene);
                                 } catch (eTm) {
                                     log("[-] Error switching CardBook to main tab: " + eTm.message);
                                 }
