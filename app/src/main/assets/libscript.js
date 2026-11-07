@@ -11042,7 +11042,7 @@ function initIl2Cpp(module) {
                                     try {
                                         var nameTxt = favCell.add(0x40).readPointer();
                                         if (!nameTxt.isNull()) {
-                                            var setTextFn = new NativeFunction(baseAddr.add(0x1ED197C), "void", ["pointer", "pointer", "pointer"]);
+                                            var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
                                             setTextFn(nameTxt, createIl2CppString(gName), NULL);
                                         }
                                     } catch (eTxt) {}
@@ -11221,32 +11221,46 @@ function initIl2Cpp(module) {
 
                         if (typeof page !== "number" || page < 0) page = 0;
                         if (page > 2) page = 2;
-                        groupView.add(0x58).writeS32(page); // nowPage = page
+                        try {
+                            groupView.add(0x58).writeS32(page); // nowPage = page
+                        } catch (eNp) {}
 
                         var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                         var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
                         var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
                         var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
                         var getChildCountFn = new NativeFunction(baseAddr.add(0x181F1A0), "int", ["pointer", "pointer"]);
-                        var setTextFn = new NativeFunction(baseAddr.add(0x1ED197C), "void", ["pointer", "pointer", "pointer"]);
+                        var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
                         var setTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
                         var setSpFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
                         var getSpFn = new NativeFunction(baseAddr.add(0xD0CAB8), "pointer", ["pointer", "int", "pointer"]);
 
                         // 0. Update page text ("1 / 3", "2 / 3", "3 / 3")
-                        var pageTextObj = groupView.add(0x48).readPointer();
-                        if (!pageTextObj.isNull()) {
-                            setTextFn(pageTextObj, createIl2CppString((page + 1) + " / 3"), NULL);
+                        try {
+                            var pageTextObj = groupView.add(0x48).readPointer();
+                            if (!pageTextObj.isNull()) {
+                                setTextFn(pageTextObj, createIl2CppString((page + 1) + " / 3"), NULL);
+                            }
+                        } catch (ePt) {
+                            log("[-] Error setting pageText: " + ePt.message);
                         }
 
                         // 1. Update Left/Right Arrow button GameObjects
-                        var leftArrow = groupView.add(0x40).readPointer();
-                        if (!leftArrow.isNull()) {
-                            setActFn(leftArrow, page > 0 ? 1 : 0, NULL);
+                        try {
+                            var leftArrow = groupView.add(0x40).readPointer();
+                            if (!leftArrow.isNull()) {
+                                setActFn(leftArrow, page > 0 ? 1 : 0, NULL);
+                            }
+                        } catch (eLa) {
+                            log("[-] Error updating leftArrow: " + eLa.message);
                         }
-                        var rightArrow = groupView.add(0x38).readPointer();
-                        if (!rightArrow.isNull()) {
-                            setActFn(rightArrow, page < 2 ? 1 : 0, NULL);
+                        try {
+                            var rightArrow = groupView.add(0x38).readPointer();
+                            if (!rightArrow.isNull()) {
+                                setActFn(rightArrow, page < 2 ? 1 : 0, NULL);
+                            }
+                        } catch (eRa) {
+                            log("[-] Error updating rightArrow: " + eRa.message);
                         }
 
                         // 2. Populate 8 Cell Slots
@@ -11259,92 +11273,118 @@ function initIl2Cpp(module) {
                         var startIdx = page * 8;
 
                         for (var i = 0; i < slotCount && i < 8; i++) {
-                            var cell = slots.add(0x20 + i * 8).readPointer();
-                            if (cell.isNull()) continue;
-                            var cellGo = getGoFn(cell, NULL);
+                            try {
+                                var cell = slots.add(0x20 + i * 8).readPointer();
+                                if (cell.isNull()) continue;
+                                var cellGo = getGoFn(cell, NULL);
 
-                            var itemIdx = startIdx + i;
-                            if (itemIdx >= playables.length) {
-                                // Deactivate slot beyond LOONA group count (page 2 slots 5, 6, 7)
-                                if (!cellGo.isNull()) setActFn(cellGo, 0, NULL);
-                                continue;
-                            }
+                                var itemIdx = startIdx + i;
+                                if (itemIdx >= playables.length) {
+                                    // Deactivate slot beyond LOONA group count (page 2 slots 5, 6, 7)
+                                    if (!cellGo.isNull()) setActFn(cellGo, 0, NULL);
+                                    continue;
+                                }
 
-                            if (!cellGo.isNull()) setActFn(cellGo, 1, NULL);
+                                if (!cellGo.isNull()) setActFn(cellGo, 1, NULL);
 
-                            var gCode = playables[itemIdx];
-                            var baseGc = getBaseGroupCode(gCode);
-                            var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gCode] : null;
-                            var gName = (gMeta && gMeta.name) ? gMeta.name : ("Group " + gCode);
-                            var embPath = "asiudgasg/asodhsg/aweoijs/" + baseGc + ".i.bytes";
+                                var gCode = playables[itemIdx];
+                                var baseGc = getBaseGroupCode(gCode);
+                                var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gCode] : null;
+                                var gName = (gMeta && gMeta.name) ? gMeta.name : ("Group " + gCode);
+                                var embPath = "asiudgasg/asodhsg/aweoijs/" + baseGc + ".i.bytes";
 
-                            // Deactivate majorFrame and majorEmblem (Dalcom envelopes)
-                            var mf = cell.add(0x60).readPointer();
-                            if (!mf.isNull()) setActFn(mf, 0, NULL);
-                            var me = cell.add(0x68).readPointer();
-                            if (!me.isNull()) {
-                                var meGo = getGoFn(me, NULL);
-                                if (!meGo.isNull()) setActFn(meGo, 0, NULL);
-                            }
-
-                            // Setup status (CardBookStatusView)
-                            var st = cell.add(0x50).readPointer();
-                            if (!st.isNull()) {
-                                var stGo = getGoFn(st, NULL);
-                                if (!stGo.isNull()) setActFn(stGo, 1, NULL);
-
-                                // Deactivate child 0 "bg" placeholder quad
-                                var stTf = getTfFn(st, NULL);
-                                if (!stTf.isNull() && getChildCountFn(stTf, NULL) > 0) {
-                                    var bgTf = getChildFn(stTf, 0, NULL);
-                                    if (!bgTf.isNull()) {
-                                        var bgGo = getGoFn(bgTf, NULL);
-                                        if (!bgGo.isNull()) setActFn(bgGo, 0, NULL);
+                                // Deactivate majorFrame and majorEmblem (Dalcom envelopes)
+                                try {
+                                    var mf = cell.add(0x60).readPointer();
+                                    if (!mf.isNull()) setActFn(mf, 0, NULL);
+                                } catch (eMf) {}
+                                try {
+                                    var me = cell.add(0x68).readPointer();
+                                    if (!me.isNull()) {
+                                        var meGo = getGoFn(me, NULL);
+                                        if (!meGo.isNull()) setActFn(meGo, 0, NULL);
                                     }
-                                }
+                                } catch (eMe) {}
 
-                                // Apply Grade R & Gauge R sprites
-                                var gaugeSpComp = st.add(0x40).readPointer();
-                                var gradeSpComp = st.add(0x60).readPointer();
-                                var gauge = st.add(0x48).readPointer();
-                                var grade = st.add(0x70).readPointer();
-                                if (!gaugeSpComp.isNull() && !gradeSpComp.isNull() && !gauge.isNull() && !grade.isNull()) {
-                                    var spGradeR = getSpFn(gradeSpComp, 4, NULL);
-                                    var spGraphR = getSpFn(gaugeSpComp, 4, NULL);
-                                    if (!spGradeR.isNull()) setSpFn(grade, spGradeR, NULL);
-                                    if (!spGraphR.isNull()) setSpFn(gauge, spGraphR, NULL);
-                                }
+                                // Setup status (CardBookStatusView)
+                                try {
+                                    var st = cell.add(0x50).readPointer();
+                                    if (!st.isNull()) {
+                                        var stGo = getGoFn(st, NULL);
+                                        if (!stGo.isNull()) setActFn(stGo, 1, NULL);
 
-                                // Activate MAX badge
-                                var maxLvl = st.add(0x80).readPointer();
-                                if (!maxLvl.isNull()) {
-                                    var mlGo = getGoFn(maxLvl, NULL);
-                                    if (!mlGo.isNull()) setActFn(mlGo, 1, NULL);
-                                }
-                            }
-
-                            // Setup Emblem
-                            var emb = cell.add(0x58).readPointer();
-                            if (!emb.isNull()) {
-                                var embGo = getGoFn(emb, NULL);
-                                if (!embGo.isNull()) setActFn(embGo, 1, NULL);
-                                var rawImg = emb.add(0x40).readPointer();
-                                if (!rawImg.isNull()) {
-                                    var tex = loadLocalTexture2D(embPath);
-                                    if (tex && !tex.isNull()) {
-                                        setTexFn(rawImg, tex, NULL);
+                                        // Deactivate child 0 "bg" placeholder quad
                                         try {
-                                            var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
-                                            setNativeSizeFn(rawImg, NULL);
-                                        } catch (eSns) {}
-                                    }
-                                }
-                            }
+                                            var stTf = getTfFn(st, NULL);
+                                            if (!stTf.isNull() && getChildCountFn(stTf, NULL) > 0) {
+                                                var bgTf = getChildFn(stTf, 0, NULL);
+                                                if (!bgTf.isNull()) {
+                                                    var bgGo = getGoFn(bgTf, NULL);
+                                                    if (!bgGo.isNull()) setActFn(bgGo, 0, NULL);
+                                                }
+                                            }
+                                        } catch (eBg) {}
 
-                            // Setup Group Name Text
-                            var gn = cell.add(0x70).readPointer();
-                            if (!gn.isNull()) {
-                                setTextFn(gn, createIl2CppString(gName), NULL);
+                                        // Apply Grade R & Gauge R sprites
+                                        try {
+                                            var gaugeSpComp = st.add(0x40).readPointer();
+                                            var gradeSpComp = st.add(0x60).readPointer();
+                                            var gauge = st.add(0x48).readPointer();
+                                            var grade = st.add(0x70).readPointer();
+                                            if (!gaugeSpComp.isNull() && !gradeSpComp.isNull() && !gauge.isNull() && !grade.isNull()) {
+                                                var spGradeR = getSpFn(gradeSpComp, 4, NULL);
+                                                var spGraphR = getSpFn(gaugeSpComp, 4, NULL);
+                                                if (!spGradeR.isNull()) setSpFn(grade, spGradeR, NULL);
+                                                if (!spGraphR.isNull()) setSpFn(gauge, spGraphR, NULL);
+                                            }
+                                        } catch (eSp) {}
+
+                                        // Activate MAX badge
+                                        try {
+                                            var maxLvl = st.add(0x80).readPointer();
+                                            if (!maxLvl.isNull()) {
+                                                var mlGo = getGoFn(maxLvl, NULL);
+                                                if (!mlGo.isNull()) setActFn(mlGo, 1, NULL);
+                                            }
+                                        } catch (eMax) {}
+                                    }
+                                } catch (eSt) {
+                                    log("[-] Error in cell[" + i + "] status: " + eSt.message);
+                                }
+
+                                // Setup Emblem
+                                try {
+                                    var emb = cell.add(0x58).readPointer();
+                                    if (!emb.isNull()) {
+                                        var embGo = getGoFn(emb, NULL);
+                                        if (!embGo.isNull()) setActFn(embGo, 1, NULL);
+                                        var rawImg = emb.add(0x40).readPointer();
+                                        if (!rawImg.isNull()) {
+                                            var tex = loadLocalTexture2D(embPath);
+                                            if (tex && !tex.isNull()) {
+                                                setTexFn(rawImg, tex, NULL);
+                                                try {
+                                                    var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
+                                                    setNativeSizeFn(rawImg, NULL);
+                                                } catch (eSns) {}
+                                            }
+                                        }
+                                    }
+                                } catch (eEmb) {
+                                    log("[-] Error in cell[" + i + "] emblem: " + eEmb.message);
+                                }
+
+                                // Setup Group Name Text
+                                try {
+                                    var gn = cell.add(0x70).readPointer();
+                                    if (!gn.isNull()) {
+                                        setTextFn(gn, createIl2CppString(gName), NULL);
+                                    }
+                                } catch (eGn) {
+                                    log("[-] Error in cell[" + i + "] groupName: " + eGn.message);
+                                }
+                            } catch (eCell) {
+                                log("[-] Error populating cell[" + i + "]: " + eCell.message);
                             }
                         }
                         log("[📖 CARDBOOK] Fully populated GroupView page " + page + " offline (" + playables.length + " total LOONA groups)!");
@@ -11568,7 +11608,7 @@ function initIl2Cpp(module) {
                                 if (!gnText.isNull()) {
                                     var gnStrPtr = this.param.add(0x28).readPointer();
                                     if (!gnStrPtr.isNull()) {
-                                        var setTextFn = new NativeFunction(baseAddr.add(0x1ED197C), "void", ["pointer", "pointer", "pointer"]);
+                                        var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
                                         setTextFn(gnText, gnStrPtr, NULL);
                                     }
                                 }

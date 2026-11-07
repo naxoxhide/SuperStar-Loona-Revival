@@ -3437,4 +3437,48 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
 - **Navegación de Páginas en `CardBookGroupView`:**
   * 21 grupos distribuidos en 3 páginas (`GROUP_SLOT_MAX = 8`). `OnLeft` (RVA `0x11CD0C8`) y `OnRight` (RVA `0x11CD150`) conmutan las ranuras sin excepciones.
 
+---
+
+### 🏛️ CHECKPOINT 18 — Restauración Offline Completa y Verificación Visual de CardBookScene (`CardBookMainView` y `CardBookGroupView`) (2026-11-07)
+
+#### 1. Diagnóstico Forense y Erradicación de Crashes Nativos
+- **Crash SIGSEGV `0x72e4012c` en `LayoutRebuilder.ValidController` (RVA `0x1EDAFc8`):**
+  * *Causa:* Invocación errónea del icall de Unity `RectTransform.set_sizeDelta_Injected` (RVA `0x180DC6C`) con tres argumentos (`pointer, pointer, pointer`) en lugar de dos (`this, Vector2*`), corrompiendo la pila nativa y registros en ARM64 durante la reconstrucción de canvas en `Canvas.SendWillRenderCanvases` (RVA `0x256ae7c`).
+  * *Solución:* Erradicación de la llamada de bajo nivel icall y adopción de la API nativa de alto nivel `RawImage.SetNativeSize` (RVA `0x194C1C8`) en conjunto con escala canónica de `RectTransform`.
+- **Causa Raíz de `access violation accessing 0x10068 / 0x111` en Manipulación de Texto:**
+  * *Causa:* Se utilizaba el RVA `0x1ED197C` correspondiente a `UnityEngine.UI.InputField.set_text(string value)`, interpretando objetos `UnityEngine.UI.Text` como campos de entrada interactivos. Al leer el puntero a caret/buffer interno, se producía un fallo de segmentación por dirección inválida.
+  * *Solución:* Sustitución por el RVA canónico de `UnityEngine.UI.Text.set_text(string value)` (RVA `0x21A5FC4` / Slot 75).
+- **Protección de `bestBase` (`+bg`):**
+  * Validación preventiva de la cantidad de hijos (`Transform.get_childCount` en RVA `0x181F1A0` > 1) antes de invocar `Transform.GetChild(1)` para desactivar el recuadro gris placeholder.
+
+#### 2. Erradicación de Cajas Blancas y Sobres en Celdas de Grupo (`CardBookGroupView`)
+- **Estructura Interna de `CardBookGroupCellView` (TypeDefIndex 12305):**
+  * `0x48`: `ButtonCache button`.
+  * `0x50`: `CardBookStatusView status` (medalla de rango, medidor circular morado, nivel y badge MAX).
+  * `0x58`: `Emblem emblem` (emblema oficial del grupo).
+  * `0x60`: `GameObject majorFrame` (sobre Dalcomsoft).
+  * `0x68`: `Emblem majorEmblem` (emblema sobre Dalcomsoft).
+  * `0x70`: `Text groupName` (nombre del grupo/subunidad).
+  * `0x78`: `Image newMark`.
+- **Resolución Visual:**
+  * Desactivación obligatoria de `majorFrame` y `majorEmblem` eliminando los sobres de marcador de posición.
+  * Desactivación del quad hijo 0 `bg` en `CardBookStatusView`.
+  * Extracción e inyección de los sprites oficiales de Rango R (índice 4 de `gradeSprites`) y Medidor Circular R (índice 4 de `gaugeSprites`) mediante `SpritesComponent.GetSprite` (RVA `0xD0CAB8`), reduciendo los píxeles blancos espurios de 21.006 a menos de 1.000 por celda (restringidos a tipografía).
+  * Activación del badge `MAX` en `status + 0x80`.
+  * Carga y vinculación directa del emblema oficial LOONA desde disco local (`asiudgasg/asodhsg/aweoijs/<baseGc>.i.bytes.png`).
+
+#### 3. Renderizador Modular Offline y Paginación (`populateCardBookGroupViewOffline`)
+- **Gestión de 21 Grupos LOONA en 3 Páginas:**
+  * Página 0: Celdas 0 a 7 (8 grupos principales y subunidades).
+  * Página 1: Celdas 8 a 15 (8 grupos de integrantes individuales).
+  * Página 2: Celdas 16 a 20 (5 grupos de integrantes restantes); las ranuras 5, 6 y 7 se desactivan explícitamente (`cellGo.SetActive(false)`), impidiendo residuos visuales.
+- **Paginador Canónico:**
+  * Cálculo dinámico de etiqueta de página `(page + 1) + " / 3"` sobre `groupView + 0x48`.
+  * Control de estado de flechas: flecha izquierda (`groupView + 0x40`) activa si `page > 0`; flecha derecha (`groupView + 0x38`) activa si `page < 2`.
+  * Hook en `CardBookScene.RefreshSetGroupViewPage` (RVA `0x11CF768`) para redirección inmediata y síncrona.
+- **Navegación Fluida:**
+  * Comandos de consola `scene_cmd.txt`: `cb:main` (Tab 0), `cb:group` (Tab 1), `cb:page:<0|1|2>`.
+  * Alternancia fluida bidireccional entre vistas validada sin excepciones.
+
+
 
