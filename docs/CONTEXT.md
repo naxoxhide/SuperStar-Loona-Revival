@@ -6,6 +6,51 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ✅ CHECKPOINT 20 — Cálculo Dinámico y Reactivo del Puntaje de Colecciones (All Cards & All Themes) Basado en Inventario Offline y Localización Oficial en Inglés (2026-11-08)
+
+**Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 4456:**
+
+1. **Auditoría e Investigación del Sistema de Puntajes de CardBook:**
+   - La vista principal de CardBook (`CardBookMainView`, RVA `0x11C5184`) gestiona dos métricas de colección principales representadas en sus tarjetas de interfaz:
+     * **All Cards Collection (`cap.json` tipo 0):** Otorga exactamente **1 punto por cada carta única** normal/regular en posesión dentro del inventario offline (`accountOwnedCards` / [player_profile.json](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/player_profile.json)). Para los 21 grupos y subunidades de LOONA, el total teórico posible es de **197 cartas normales**.
+     * **All Themes Collection (`cap.json` tipo 1):** Otorga puntos únicamente cuando un tema regular (no-limited) está **completado en su totalidad** (`themeOwnedSlots === slotCount`). El puntaje asignado al tema depende del grado mínimo presente en el equipo:
+       - Grado C (0): **300 puntos**
+       - Grado B (1): **600 puntos**
+       - Grado A (2): **1,000 puntos**
+       - Grado S (3): **1,600 puntos**
+       - Grado R (4): **2,400 puntos**
+       - Si falta al menos una integrante (`themeOwnedSlots < slotCount`), el puntaje del tema es estrictamente **0 puntos**.
+       - LOONA cuenta con 31 temas regulares no-limited. El total teórico posible es de $31 \times 2,400 =$ **74,400 puntos**. En el inventario actual, el usuario alcanza **53,400 puntos** debido a temas donde no todas las integrantes están en rango R o faltan cartas.
+
+2. **Eliminación del Hardcoding e Implementación del Motor de Cálculo Reactivo:**
+   - En [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js):
+     * En `ensureCardBookControlData` (L15940): Se calcularon dinámicamente los acumuladores de inventario (`offlineTotalCardsPossible`, `offlineTotalCardsOwned`, `offlineTotalThemesPossible`, `offlineTotalThemesCompleted`, `offlineTotalThemePointsEarned`, `offlineTotalThemePointsPossible`).
+     * Se inyectaron en `CardBookControl.Info` (RVA `0xB96D38`):
+       - Offset `+0x20` (`CardCollectTotalPoint`): `offlineTotalCardsPossible` (197).
+       - Offset `+0x24` (`CardCollectCurrentPoint`): `offlineTotalCardsOwned` (197 con perfil completo).
+     * En `populateCollectionPointsOffline` (L11140): Se suprimieron los valores hardcodeados (`50400 / 50400` y `2400 / 2400`), enlazando los parámetros a las variables dinámicas del inventario.
+   - **Prueba de Reactividad en Tiempo Real (Hot-Reload / Dynamic Verification):**
+     * Al remover en memoria la carta 1001 (HeeJin ++):
+       - Logcat y UI reflejaron al instante: `Cards: 196 / 197` y `Themes: 51,000 / 74,400` (el tema ++ quedó incompleto, deduciendo con exactitud los 2,400 puntos correspondientes).
+     * Al restaurar la carta 1001:
+       - Logcat y UI retornaron automáticamente a: `Cards: 197 / 197` y `Themes: 53,400 / 74,400`.
+
+3. **Localización Oficial en Inglés Canónico (Sustitución de Cadenas Coreanas):**
+   - Se reemplazaron todas las cadenas en coreano por los textos oficiales en inglés canónicos del juego extraídos de [app/src/files/asiudgasg/sdisgkdc/lcd.json](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/sdisgkdc/lcd.json):
+     * **Subtítulo general** (código `181414027`): `*Any Theme is available.` (reemplazando `"모든 테마가 포함 됩니다."`).
+     * **Aviso de All Cards** (código `181414025`): `Collect new cards and get rewards!\n1 point per Card!` (reemplazando `"새로운 카드를 수집하고 보상을 획득하세요!"`).
+     * **Aviso de All Themes** (código `181414026`): `Add points by matching your Themes in C~R Grades for reward!` (reemplazando `"등급별로 테마를 맞cu고 곡 점수를 올려보세요!"`).
+     * **Mensaje de Recompensa** (código `181416001`): `Achieve {0} points!` (reemplazando `"{0} POINT 를\n달성하세요."`).
+     * **Etiqueta del botón:** `RECEIVE` (reemplazando `GET`).
+
+4. **Verificación Visual y Quality Gate (PIL & ADB):**
+   - [qa_cardbook_main_english.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_main_english.png) — Captura completa de `CardBookMainView` en 1920x1080.
+   - [qa_verified_top.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_verified_top.png) — Recorte verificado de la tarjeta **All Cards Collection** mostrando legibilidad óptima, ausencia de desbordamiento tipográfico y textos en inglés canónicos.
+   - [qa_verified_bottom.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_verified_bottom.png) — Recorte verificado de la tarjeta **All Themes Collection** mostrando formato de puntaje `P 53.400 / 74.400` y descripciones en inglés completas.
+   - **Alcance Restringido:** Ningún componente externo a `CardBookScene` fue alterado.
+
+---
+
 ### ✅ CHECKPOINT 19 — Integración de Empty Cards (`sdhgauwehdnu`) de Alta Fidelidad en Collect Book (`CardBookDetailPopup`) y Eliminación Definitiva de Cuelgues en Scroll de Temas (2026-11-02)
 
 **Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 11756:**

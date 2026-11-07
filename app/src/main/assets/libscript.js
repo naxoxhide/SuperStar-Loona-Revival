@@ -11082,6 +11082,14 @@ function initIl2Cpp(module) {
                     }
                 };
 
+                // Offline CardBook Collection Metrics (calculated dynamically from inventory & metadata)
+                var offlineTotalCardsPossible = 197;
+                var offlineTotalCardsOwned = 197;
+                var offlineTotalThemesPossible = 31;
+                var offlineTotalThemesCompleted = 31;
+                var offlineTotalThemePointsPossible = 74400;
+                var offlineTotalThemePointsEarned = 74400;
+
                 var buildCollectionRewardData = function (currentPts, nextPts) {
                     var cellParamKlass = resolveMetadataSlot(0x31F0E80);
                     var rewardParamKlass = resolveMetadataSlot(0x31F41F8);
@@ -11090,7 +11098,8 @@ function initIl2Cpp(module) {
                     var cpObj = il2cpp_object_new(cellParamKlass);
                     if (il2cpp_gchandle_new && !cpObj.isNull()) il2cpp_gchandle_new(cpObj, 2);
 
-                    var ptStr = createIl2CppString(currentPts.toLocaleString() + " POINT 를\n달성하세요.");
+                    // Canonical Dalcomsoft English from lcd.json (code 181416001: 'Achieve {0} points!')
+                    var ptStr = createIl2CppString("Achieve " + currentPts.toLocaleString() + " points!");
                     cpObj.add(0x10).writePointer(ptStr);
 
                     if (rewardParamKlass && !rewardParamKlass.isNull()) {
@@ -11103,7 +11112,7 @@ function initIl2Cpp(module) {
                         cpObj.add(0x18).writePointer(rpObj);
                     }
 
-                    cpObj.add(0x20).writePointer(createIl2CppString("GET"));
+                    cpObj.add(0x20).writePointer(createIl2CppString("RECEIVE"));
                     cpObj.add(0x28).writePointer(createIl2CppString("COMPLETED"));
                     cpObj.add(0x30).writeS32(2); // type = 2 (Completed)
                     return cpObj;
@@ -11142,21 +11151,43 @@ function initIl2Cpp(module) {
                         var themeColPoint = mainView.add(0x70).readPointer();
                         var setColFn = new NativeFunction(baseAddr.add(0x11C5184), "void", ["pointer", "pointer", "pointer"]);
 
+                        // Dynamic values from offline inventory calculation
+                        var curCards = offlineTotalCardsOwned;
+                        var totCards = offlineTotalCardsPossible;
+                        var curThemes = offlineTotalThemePointsEarned;
+                        var totThemes = offlineTotalThemePointsPossible;
+
                         if (!cardColPoint.isNull()) {
-                            var cpCell = buildCollectionRewardData(50400, 50400);
-                            var cpParam = createCollectionPointViewParam("ALL CARDS COLLECTION", "모든 테마가 포함 됩니다.", "새로운 카드를 수집하고 보상을 획득하세요!", 50400, 50400, 50, cpCell);
+                            var cpCell = buildCollectionRewardData(totCards, totCards);
+                            var cpParam = createCollectionPointViewParam(
+                                "ALL CARDS COLLECTION",
+                                "*Any Theme is available.",
+                                "Collect new cards and get rewards!\n1 point per Card!",
+                                curCards,
+                                totCards,
+                                50,
+                                cpCell
+                            );
                             if (cpParam && !cpParam.isNull()) {
                                 setColFn(cardColPoint, cpParam, NULL);
                             }
                         }
                         if (!themeColPoint.isNull()) {
-                            var tpCell = buildCollectionRewardData(2400, 2400);
-                            var tpParam = createCollectionPointViewParam("ALL THEMES COLLECTION", "모든 테마가 포함 됩니다.", "등급별로 테마를 맞추고 곡 점수를 올려보세요!", 2400, 2400, 50, tpCell);
+                            var tpCell = buildCollectionRewardData(totThemes, totThemes);
+                            var tpParam = createCollectionPointViewParam(
+                                "ALL THEMES COLLECTION",
+                                "*Any Theme is available.",
+                                "Add points by matching your Themes in C~R Grades for reward!",
+                                curThemes,
+                                totThemes,
+                                50,
+                                tpCell
+                            );
                             if (tpParam && !tpParam.isNull()) {
                                 setColFn(themeColPoint, tpParam, NULL);
                             }
                         }
-                        log("[📖 CARDBOOK] Populated collection points in CardBookMainView!");
+                        log("[📖 CARDBOOK] Populated collection points in CardBookMainView: Cards " + curCards + "/" + totCards + " | Themes " + curThemes + "/" + totThemes);
                     } catch (eCol) {
                         log("[-] Error in collection points population: " + eCol.message);
                     }
@@ -15907,6 +15938,14 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         allCbGroupItemToCodeMap = {};
                         var totalCollectPoints = 0;
 
+                        // Reset offline inventory collection metrics
+                        offlineTotalCardsPossible = 0;
+                        offlineTotalCardsOwned = 0;
+                        offlineTotalThemesPossible = 0;
+                        offlineTotalThemesCompleted = 0;
+                        offlineTotalThemePointsPossible = 0;
+                        offlineTotalThemePointsEarned = 0;
+
                         for (var pgi = 0; pgi < playables.length; pgi++) {
                             var gCode = playables[pgi];
                             var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gCode] : null;
@@ -15928,6 +15967,9 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 if (il2cpp_gchandle_new) il2cpp_gchandle_new(tItem, 2);
                                 themeCtorFn(tItem, tData, slotCount, NULL);
 
+                                var themeOwnedSlots = 0;
+                                var minGradeInTheme = 99;
+
                                 // Populate CardList FastArray with genuine CardItem for each slot
                                 var cardListFa = tItem.add(0x18).readPointer();
                                 if (!cardListFa.isNull()) {
@@ -15938,17 +15980,26 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                             var cardId = themeArtistCardMap[tCode + "_" + aCode] || 0;
                                             var isOwned = (cardId > 0 && accountOwnedCards[cardId] && !isLimited);
 
+                                            if (!isLimited) {
+                                                offlineTotalCardsPossible++;
+                                            }
+
                                             var cItem = il2cpp_object_new(cbCardItemKlass);
                                             if (il2cpp_gchandle_new && !cItem.isNull()) il2cpp_gchandle_new(cItem, 2);
 
                                             if (isOwned) {
+                                                themeOwnedSlots++;
+                                                offlineTotalCardsOwned++;
+                                                var cardGrade = (accountOwnedCards[cardId].grade !== undefined) ? accountOwnedCards[cardId].grade : 4;
+                                                if (cardGrade < minGradeInTheme) minGradeInTheme = cardGrade;
+
                                                 var ccd = getOrCreateCardControlData(cardId);
                                                 cbCardItemCtor(cItem, ccd, NULL);
 
                                                 var cbData = il2cpp_object_new(cbCardDataKlass);
                                                 if (il2cpp_gchandle_new && !cbData.isNull()) il2cpp_gchandle_new(cbData, 2);
                                                 cbData.add(0x10).writeS32(cardId);
-                                                cbData.add(0x14).writeS32(accountOwnedCards[cardId].grade || 4);
+                                                cbData.add(0x14).writeS32(cardGrade);
                                                 cbData.add(0x18).writeS32(1);
                                                 cItem.add(0x10).writePointer(cbData);
                                             } else {
@@ -15961,16 +16012,32 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     }
                                 }
 
+                                var themeGradePoint = 0;
                                 if (isLimited) {
                                     // USER CONSTRAINT: "evita las cartas limited como las que aparezcan que se van a tener como obtenidas en la cuenta"
-                                    tItem.add(0x28).writeS32(0); // themeGradePoint = 0
-                                    tItem.add(0x2C).writeS32(0); // Count = 0 (unobtained)
+                                    themeGradePoint = 0;
+                                    themeOwnedSlots = 0;
                                 } else {
-                                    tItem.add(0x28).writeS32(2400); // themeGradePoint = 2400
-                                    tItem.add(0x2C).writeS32(slotCount); // Count = slotCount (obtained)
-                                    groupObtainedCards += slotCount;
-                                    groupPoints += 2400;
+                                    offlineTotalThemesPossible++;
+                                    offlineTotalThemePointsPossible += 2400;
+
+                                    if (themeOwnedSlots === slotCount && slotCount > 0) {
+                                        offlineTotalThemesCompleted++;
+                                        if (minGradeInTheme === 0) themeGradePoint = 300;       // C
+                                        else if (minGradeInTheme === 1) themeGradePoint = 600;  // B
+                                        else if (minGradeInTheme === 2) themeGradePoint = 1000; // A
+                                        else if (minGradeInTheme === 3) themeGradePoint = 1600; // S
+                                        else themeGradePoint = 2400;                            // R
+                                        offlineTotalThemePointsEarned += themeGradePoint;
+                                    } else {
+                                        themeGradePoint = 0;
+                                    }
                                 }
+
+                                tItem.add(0x28).writeS32(themeGradePoint); // themeGradePoint
+                                tItem.add(0x2C).writeS32(themeOwnedSlots); // Count = obtained cards in theme
+                                groupObtainedCards += themeOwnedSlots;
+                                groupPoints += themeGradePoint;
                                 themeItems.push(tItem);
                             }
 
@@ -16026,8 +16093,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         // 6. Populate CardBookControl.Info fields
                         info.add(0x10).writePointer(cachedLoonaCbGroupItem || allCbGroupItemList[0]);
                         info.add(0x18).writePointer(groupListManaged);
-                        info.add(0x20).writeS32(totalCollectPoints);
-                        info.add(0x24).writeS32(totalCollectPoints);
+                        info.add(0x20).writeS32(offlineTotalCardsPossible); // CardCollectTotalPoint
+                        info.add(0x24).writeS32(offlineTotalCardsOwned);    // CardCollectCurrentPoint
                         info.add(0x28).writePointer(NULL);
 
                         // 7. Register info in CardBookControl
