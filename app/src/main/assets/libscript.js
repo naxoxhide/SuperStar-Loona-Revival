@@ -11525,10 +11525,10 @@ function initIl2Cpp(module) {
                                                 if (!spGraph.isNull()) setSpFn(gauge, spGraph, NULL);
 
                                                 try {
-                                                    var setGaugeFn = new NativeFunction(baseAddr.add(0x11D3EB0), "void", ["pointer", "float", "pointer"]);
-                                                    setGaugeFn(st, gMetrics.gauge, NULL);
+                                                    var setFillAmountFn = new NativeFunction(baseAddr.add(0x1ECBD4C), "void", ["pointer", "float", "pointer"]);
+                                                    setFillAmountFn(gauge, gMetrics.gauge, NULL);
                                                 } catch(eSg) {
-                                                    try { gauge.add(0x74).writeFloat(gMetrics.gauge); } catch(eFa) {}
+                                                    try { gauge.add(0x164).writeFloat(gMetrics.gauge); } catch(eFa) {}
                                                 }
                                             }
 
@@ -11868,6 +11868,120 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on CardBookScene.OnTabButton (0x11D252C)!");
                 } catch (eHotb) {
                     log("[-] Error replacing OnTabButton: " + eHotb.message);
+                }
+
+                // 3g5. CardBookStatusView.SetGauge (0x11D3EB0) -> Safe gauge fill amount setter (avoids missing tailStart/tailEnd NullReferenceException)
+                try {
+                    Interceptor.replace(baseAddr.add(0x11D3EB0), keepCb(new NativeCallback(function (statusView, gaugeVal, methodInfo) {
+                        try {
+                            if (!statusView || statusView.isNull()) return;
+                            var gaugeImg = statusView.add(0x48).readPointer();
+                            if (!gaugeImg.isNull()) {
+                                var setFillAmountFn = new NativeFunction(baseAddr.add(0x1ECBD4C), "void", ["pointer", "float", "pointer"]);
+                                setFillAmountFn(gaugeImg, gaugeVal, NULL);
+                            }
+                        } catch (eSg) {}
+                    }, "void", ["pointer", "float", "pointer"])));
+                    log("[+] Interceptor.replace installed on CardBookStatusView.SetGauge (0x11D3EB0)!");
+                } catch (eHsg) {
+                    log("[-] Error replacing CardBookStatusView.SetGauge: " + eHsg.message);
+                }
+
+                // 3g6. CardBookStatusView.Refresh (0x11CC9B4) -> Robust status renderer for all CardBookStatusView instances (MainView & GroupView)
+                try {
+                    Interceptor.replace(baseAddr.add(0x11CC9B4), keepCb(new NativeCallback(function (statusView, param, methodInfo) {
+                        try {
+                            if (!statusView || statusView.isNull() || !param || param.isNull()) return;
+
+                            var gradeVal = param.add(0x10).readS32();
+                            var isR = param.add(0x14).readU8() !== 0;
+                            var isMax = param.add(0x15).readU8() !== 0;
+                            var lvl = param.add(0x18).readS32();
+                            var gaugeVal = param.add(0x20).readFloat();
+
+                            if (gradeVal < 0 || gradeVal > 4) gradeVal = 0;
+
+                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                            var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                            var getSpFn = new NativeFunction(baseAddr.add(0xD0CAB8), "pointer", ["pointer", "int", "pointer"]);
+                            var setSpFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
+                            var setFillAmountFn = new NativeFunction(baseAddr.add(0x1ECBD4C), "void", ["pointer", "float", "pointer"]);
+
+                            // 1. Grade Sprite
+                            var gradeSpComp = statusView.add(0x60).readPointer();
+                            var gradeImg = statusView.add(0x70).readPointer();
+                            if (!gradeSpComp.isNull() && !gradeImg.isNull()) {
+                                var sp = getSpFn(gradeSpComp, gradeVal, NULL);
+                                if (!sp.isNull()) setSpFn(gradeImg, sp, NULL);
+                            }
+
+                            // 2. Gauge Sprite & FillAmount
+                            var gaugeSpComp = statusView.add(0x40).readPointer();
+                            var gaugeImg = statusView.add(0x48).readPointer();
+                            if (!gaugeSpComp.isNull() && !gaugeImg.isNull()) {
+                                var spG = getSpFn(gaugeSpComp, gradeVal, NULL);
+                                if (!spG.isNull()) setSpFn(gaugeImg, spG, NULL);
+                                setFillAmountFn(gaugeImg, gaugeVal, NULL);
+                            }
+
+                            // 3. MAX badge vs Level NumberBox
+                            var maxLvl = statusView.add(0x80).readPointer();
+                            var lvlBox = statusView.add(0x88).readPointer();
+
+                            if (isR && isMax) {
+                                if (!maxLvl.isNull()) {
+                                    var mlGo = getGoFn(maxLvl, NULL);
+                                    if (!mlGo.isNull()) setActFn(mlGo, 1, NULL);
+                                }
+                                if (!lvlBox.isNull()) {
+                                    var lbGo = getGoFn(lvlBox, NULL);
+                                    if (!lbGo.isNull()) setActFn(lbGo, 0, NULL);
+                                }
+                            } else if (isR && !isMax) {
+                                if (!maxLvl.isNull()) {
+                                    var mlGo = getGoFn(maxLvl, NULL);
+                                    if (!mlGo.isNull()) setActFn(mlGo, 0, NULL);
+                                }
+                                if (!lvlBox.isNull()) {
+                                    var lbGo = getGoFn(lvlBox, NULL);
+                                    if (!lbGo.isNull()) setActFn(lbGo, 1, NULL);
+                                    try {
+                                        var setNumFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "int", "pointer"]);
+                                        setNumFn(lvlBox, lvl, NULL);
+                                    } catch(eSn) {}
+                                }
+                            } else {
+                                if (!maxLvl.isNull()) {
+                                    var mlGo = getGoFn(maxLvl, NULL);
+                                    if (!mlGo.isNull()) setActFn(mlGo, 0, NULL);
+                                }
+                                if (!lvlBox.isNull()) {
+                                    var lbGo = getGoFn(lvlBox, NULL);
+                                    if (!lbGo.isNull()) setActFn(lbGo, 0, NULL);
+                                }
+                            }
+
+                            // Deactivate child 0 "bg" placeholder quad on statusView transform if present
+                            try {
+                                var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                var getChildCountFn = new NativeFunction(baseAddr.add(0x181F1A0), "int", ["pointer", "pointer"]);
+                                var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                                var stTf = getTfFn(statusView, NULL);
+                                if (!stTf.isNull() && getChildCountFn(stTf, NULL) > 0) {
+                                    var bgTf = getChildFn(stTf, 0, NULL);
+                                    if (!bgTf.isNull()) {
+                                        var bgGo = getGoFn(bgTf, NULL);
+                                        if (!bgGo.isNull()) setActFn(bgGo, 0, NULL);
+                                    }
+                                }
+                            } catch(eBg) {}
+                        } catch(eRfs) {
+                            log("[-] Error in CardBookStatusView.Refresh hook: " + eRfs.message);
+                        }
+                    }, "void", ["pointer", "pointer", "pointer"])));
+                    log("[+] Interceptor.replace installed on CardBookStatusView.Refresh (0x11CC9B4)!");
+                } catch (eRcs) {
+                    log("[-] Error replacing CardBookStatusView.Refresh: " + eRcs.message);
                 }
 
                 // 4. CardBookScene UI Refresh Safety Patches (guard against NullReferenceException on decorative elements)

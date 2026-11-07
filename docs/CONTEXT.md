@@ -6,6 +6,57 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ✅ CHECKPOINT 21 — Cálculo Dinámico y Reactivo del Rango de Grupos en Group View, Selección Automática del Mejor Grupo en Best Banner y Validación Visual de Progresión (2026-11-08)
+
+**Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 5150:**
+
+1. **Investigación y Auditoría del Motor de Cálculo de Grupos (`CardBookGroupView`):**
+   - **Causa Raíz de Valores Fijos Previos:**
+     * `CardBookScene.GetGroupCellViewData` (RVA `0x11D0688`) forzaba en memoria un objeto `CardBookStatusView.Param` con valores fijos: `grade = 4` (R), `isRGrade = 1`, `isMaxLevel = 1`, `level = 50`, `gauge = 1.0`.
+     * `populateCardBookGroupViewOffline` forzaba en todas las celdas el sprite `R` (`spGradeR = 4`, `spGraphR = 4`) y la placa dorada `maxLvl` encendida, ignorando las cartas reales del usuario.
+     * `populateBestCardBookBanner` apuntaba siempre a LOONA como grupo fijo sin evaluar el progreso real del inventario.
+   - **Lógica Canónica Oficial Dalcomsoft (`CardBookControl.GetCardbookGradeInfo`, RVA `0x11C8614`):**
+     * **Grupos con Cartas Grado R ($N_R > 0$):**
+       - Rango asignado: **R (4)**.
+       - Si $N_R == N_{total}$: Condición de maestría **R MAX** (`isMaxLevel = true`, `gauge = 1.0`, placa `MAX` visible, `NumberBox` oculto).
+       - Si $N_R < N_{total}$: Nivel numérico $L \in [1 .. T_{total}]$ proporcional a temas completados (`isMaxLevel = false`, placa `MAX` oculta, `NumberBox` visible con el nivel $L$, anillo de gauge = $N_R / N_{total}$).
+     * **Grupos sin Cartas Grado R ($N_R == 0$):**
+       - Ambos elementos (`maxLevel` y `level NumberBox`) se ocultan.
+       - Rango determinado por el promedio por slot de los puntos de cartas no-R según `cgd.json` (C=1, B=2, A=3, S=4):
+         * $avg \ge 4.0 \rightarrow$ **S (3)**
+         * $avg \ge 2.5 \rightarrow$ **A (2)**
+         * $avg \ge 1.0 \rightarrow$ **B (1)**
+         * $avg < 1.0 \rightarrow$ **C (0)**
+       - Gauge circular: $N_{obtenidas} / N_{total}$.
+
+2. **Diagnóstico y Eliminación de Crash Crítico en `CardBookStatusView.SetGauge` (RVA `0x11D3EB0`):**
+   - **Causa Raíz del `SIGSEGV` / `Il2CppExceptionWrapper`:**
+     * Al calcular dinámicamente un gauge con progreso parcial ($0.0 < gauge < 1.0$), el método original `SetGauge` intenta posicionar trigonométricamente un sprite de partícula/cola (`tailEnd`) en el arco circular leyendo `[this + 0x50]` (`tailStart`) y `[this.gauge + 0xd0]`.
+     * En los prefabs de Dalcomsoft para `CardBookGroupCellView`, estos punteros son nulos (`NULL`), provocando un salto directo a `0x11D41A8` (`bl #0xa43cc0` $\rightarrow$ `NullReferenceException`), lo que generaba `abort was called` y terminaba el proceso.
+   - **Solución Robusta con Interceptor:**
+     * Se reemplazó quirúrgicamente `CardBookStatusView.SetGauge` (0x11D3EB0) mediante `Interceptor.replace`, asignando directamente el progreso a `UnityEngine.UI.Image.set_fillAmount` (RVA `0x1ECBD4C`) en `this.gauge` (`+0x48`) sin desreferenciar componentes de cola ausentes.
+     * Se reemplazó igualmente `CardBookStatusView.Refresh` (RVA `0x11CC9B4`) para desacoplar el renderizado de badges (C, B, A, S, R), activación de `MAX`/`level` y ocultamiento del quad `bg` gris, blindando contra cualquier puntero nulo en prefabs de la interfaz.
+
+3. **Prueba de Calidad Dinámica y Calibración Reactiva (Quality Gate):**
+   - Se evaluó el grupo 7001 (HeeJin, 3 slots) modificando temporalmente sus cartas en inventario para validar la progresión visual en tiempo real:
+     * **Estado 1 (Grado C):** 1 carta Grado C $\rightarrow$ Insignia plateada **C**, anillo con 33% de progreso, MAX/Level ocultos.
+     * **Estado 2 (Grado A):** 3 cartas Grado A $\rightarrow$ Insignia púrpura/azul **A**, anillo con 33% de progreso, MAX/Level ocultos.
+     * **Estado 3 (Grado S):** 3 cartas Grado S $\rightarrow$ Insignia dorada **S**, MAX/Level ocultos.
+     * **Estado 4 (Grado R Nivel 1):** 1 carta R + 2 cartas S $\rightarrow$ Insignia diamantada **R**, `NumberBox` indicando **Nivel 1**, anillo con 33% de progreso, placa MAX oculta.
+     * **Estado 5 (Grado R MAX):** 3 cartas R $\rightarrow$ Insignia diamantada **R**, placa dorada **MAX** activa, anillo al 100% cerrado.
+     * **Restauración:** Inventario original restaurado al 100% sin efectos secundarios.
+
+4. **Evidencias Visuales Generadas:**
+   - [qa_groupview_progression_proof.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_groupview_progression_proof.png) — Matriz comparativa directa de los 5 estados de rango demostrando la reactividad y fidelidad del renderizado.
+   - [qa_groupview_final_verified.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_groupview_final_verified.png) — Captura completa de la cuadrícula de `GroupView` (Página 1) con los rangos reales e individualizados de cada grupo de LOONA.
+   - [qa_heejin_cell_c.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_heejin_cell_c.png) — Recorte verificado de insignia C.
+   - [qa_heejin_cell_a.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_heejin_cell_a.png) — Recorte verificado de insignia A.
+   - [qa_heejin_cell_s.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_heejin_cell_s.png) — Recorte verificado de insignia S.
+   - [qa_heejin_cell_r1.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_heejin_cell_r1.png) — Recorte verificado de insignia R Nivel 1.
+   - [qa_heejin_cell_rmax.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_heejin_cell_rmax.png) — Recorte verificado de insignia R MAX.
+
+---
+
 ### ✅ CHECKPOINT 20 — Cálculo Dinámico y Reactivo del Puntaje de Colecciones (All Cards & All Themes) Basado en Inventario Offline y Localización Oficial en Inglés (2026-11-08)
 
 **Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 4456:**
