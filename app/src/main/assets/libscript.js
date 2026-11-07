@@ -4131,7 +4131,7 @@ function initIl2Cpp(module) {
                         dp.add(0x18).writePointer(createIl2CppString(relPath));
                         dp.add(0x20).writePointer(createIl2CppString("1"));
                         dp.add(0x28).writeU8(0);
-                        dp.add(0x29).writeU8(0); // shared = false (local file path)
+                        dp.add(0x29).writeU8(1); // shared = true (was 0)
                         dp.add(0x2A).writeU8(0);
                         dp.add(0x30).writePointer(NULL);
                         dp.add(0x38).writeS32(1); // Texture = 1
@@ -9485,30 +9485,46 @@ function initIl2Cpp(module) {
                         var fileExistsFn = new NativeFunction(baseAddr.add(0x1F01DF4), "bool", ["pointer", "pointer"]);
                         var fileReadAllBytesFn = new NativeFunction(baseAddr.add(0x1F0268C), "pointer", ["pointer", "pointer"]);
 
-                        step = "pathStr";
-                        var pathStr = createIl2CppString(fullPath);
-                        step = "fileExists";
-                        var exists = fileExistsFn(pathStr, NULL);
+                        var candidatePaths = [
+                            fullPath,
+                            fullPath + ".png",
+                            relPath.indexOf(".i.bytes") !== -1 ? (basePath + relPath.replace(".i.bytes", ".png")) : null,
+                            relPath.indexOf(".i.bytes.png") !== -1 ? (basePath + relPath.replace(".i.bytes.png", ".i.bytes")) : null
+                        ];
 
-                        if (!exists) {
-                            fullPath = fullPath + ".png";
-                            pathStr = createIl2CppString(fullPath);
-                            exists = fileExistsFn(pathStr, NULL);
+                        var posixAccessPtr = Module.findExportByName("libc.so", "access");
+                        var posixAccessFn = posixAccessPtr ? new NativeFunction(posixAccessPtr, "int", ["pointer", "int"]) : null;
+
+                        var foundPath = null;
+                        for (var cp = 0; cp < candidatePaths.length; cp++) {
+                            var cand = candidatePaths[cp];
+                            if (!cand) continue;
+                            try {
+                                var pStr = createIl2CppString(cand);
+                                if (fileExistsFn(pStr, NULL)) {
+                                    foundPath = cand;
+                                    break;
+                                }
+                                if (posixAccessFn) {
+                                    var cStr = Memory.allocUtf8String(cand);
+                                    if (posixAccessFn(cStr, 0) === 0) {
+                                        foundPath = cand;
+                                        break;
+                                    }
+                                }
+                            } catch (eCp) {}
                         }
 
-                        if (!exists && relPath.indexOf(".i.bytes") !== -1) {
-                            fullPath = basePath + relPath.replace(".i.bytes", ".png");
-                            pathStr = createIl2CppString(fullPath);
-                            exists = fileExistsFn(pathStr, NULL);
-                        }
-
-                        if (!exists) {
+                        if (!foundPath) {
+                            log("[🖼️ loadLocalTexture2D] File not found: " + relPath);
                             return NULL;
                         }
 
                         step = "readBytes";
+                        var pathStr = createIl2CppString(foundPath);
                         var bytesObj = fileReadAllBytesFn(pathStr, NULL);
                         if (!bytesObj || bytesObj.isNull()) {
+                            log("[🖼️ loadLocalTexture2D] ReadAllBytes returned null for: " + foundPath);
                             return NULL;
                         }
 
@@ -9548,8 +9564,10 @@ function initIl2Cpp(module) {
                             } catch (ePin) {}
 
                             loadedTextureCache[relPath] = texObj;
-                            log("[🖼️ TEXTURE] Loaded and cached: " + relPath);
+                            log("[🖼️ TEXTURE] Loaded and cached: " + relPath + " (from " + foundPath + ")");
                             return texObj;
+                        } else {
+                            log("[🖼️ loadLocalTexture2D] LoadImage failed for: " + foundPath);
                         }
                     } catch (eLt) {
                         log("[-] Error in loadLocalTexture2D (" + step + ") for " + relPath + ": " + eLt.message);
@@ -10871,6 +10889,36 @@ function initIl2Cpp(module) {
 
                         var setBestFn = new NativeFunction(baseAddr.add(0x11D0A24), "void", ["pointer", "pointer", "pointer", "pointer", "pointer", "pointer", "pointer"]);
                         setBestFn(sceneView, headerStr, groupNameStr, emblemDp, imageDp, spObj, NULL);
+
+                        // Direct guarantee of bestImage texture (foewghkc/1001.i.bytes)
+                        try {
+                            var bestImg = sceneView.add(0xA8).readPointer();
+                            if (!bestImg.isNull()) {
+                                var bgTex = loadLocalTexture2D("asiudgasg/asodhsg/foewghkc/1001.i.bytes");
+                                if (bgTex && !bgTex.isNull()) {
+                                    var setTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                                    setTexFn(bestImg, bgTex, NULL);
+                                    log("[📖 CARDBOOK] Directly applied bestImage LOONA background texture!");
+                                }
+                            }
+                        } catch (eBi) {}
+
+                        // Direct guarantee of bestEmblem texture (aweoijs/1001.i.bytes)
+                        try {
+                            var bestEmb = sceneView.add(0xA0).readPointer();
+                            if (!bestEmb.isNull()) {
+                                var embRaw = bestEmb.add(0x40).readPointer();
+                                if (!embRaw.isNull()) {
+                                    var embTex = loadLocalTexture2D("asiudgasg/asodhsg/aweoijs/1001.i.bytes");
+                                    if (embTex && !embTex.isNull()) {
+                                        var setTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                                        setTexFn(embRaw, embTex, NULL);
+                                        log("[📖 CARDBOOK] Directly applied bestEmblem LOONA texture!");
+                                    }
+                                }
+                            }
+                        } catch (eBe) {}
+
                         log("[📖 CARDBOOK] SetBest cleanly invoked offline with LOONA R50 banner!");
                     } catch (eSb) {
                         log("[-] Error in SetBest: " + eSb.message);
@@ -10887,6 +10935,7 @@ function initIl2Cpp(module) {
 
                         var favItemList = mainView.add(0x58).readPointer(); // CardBookFavoriteGroupItemView[] (len 5)
                         var favEmptyList = mainView.add(0x60).readPointer(); // GameObject[] (len 5)
+                        var favBgList = mainView.add(0x48).readPointer(); // GameObject[] (len 5)
                         if (favItemList.isNull()) return;
 
                         var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
@@ -10907,6 +10956,9 @@ function initIl2Cpp(module) {
                             var emptyGo = (!favEmptyList.isNull() && i < favEmptyList.add(0x18).readS32())
                                 ? favEmptyList.add(0x20 + i * 8).readPointer()
                                 : NULL;
+                            var bgGo = (!favBgList.isNull() && i < favBgList.add(0x18).readS32())
+                                ? favBgList.add(0x20 + i * 8).readPointer()
+                                : NULL;
 
                             if (i < favCodes.length && favParamKlass && !favParamKlass.isNull()) {
                                 var gCode = favCodes[i];
@@ -10914,6 +10966,15 @@ function initIl2Cpp(module) {
                                 var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gCode] : null;
                                 var gName = (gMeta && gMeta.name) ? gMeta.name : ("Group " + gCode);
                                 var embPath = "asiudgasg/asodhsg/aweoijs/" + baseGc + ".i.bytes";
+
+                                // 1. Activate background GameObject
+                                if (!bgGo.isNull()) {
+                                    setActFn(bgGo, 1, NULL);
+                                }
+                                // 2. Hide empty placeholder (---)
+                                if (!emptyGo.isNull()) {
+                                    setActFn(emptyGo, 0, NULL);
+                                }
 
                                 if (!favCell.isNull()) {
                                     var fvGo = getGoFn(favCell, NULL);
@@ -10925,9 +10986,31 @@ function initIl2Cpp(module) {
                                     fParam.add(0x18).writePointer(createDownloadPath(embPath));
                                     fParam.add(0x20).writeU8(0); // newmark = false
                                     setFavCellFn(favCell, fParam, NULL);
-                                }
-                                if (!emptyGo.isNull()) {
-                                    setActFn(emptyGo, 0, NULL);
+
+                                    // Explicitly apply text to artistName
+                                    try {
+                                        var nameTxt = favCell.add(0x40).readPointer();
+                                        if (!nameTxt.isNull()) {
+                                            var setTextFn = new NativeFunction(baseAddr.add(0x1ED197C), "void", ["pointer", "pointer", "pointer"]);
+                                            setTextFn(nameTxt, createIl2CppString(gName), NULL);
+                                        }
+                                    } catch (eTxt) {}
+
+                                    // Explicitly apply emblem texture to RawImage
+                                    try {
+                                        var embRaw = favCell.add(0x48).readPointer();
+                                        if (!embRaw.isNull()) {
+                                            var embTex = loadLocalTexture2D(embPath);
+                                            if (embTex && !embTex.isNull()) {
+                                                var setTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                                                setTexFn(embRaw, embTex, NULL);
+                                                var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
+                                                setNativeSizeFn(embRaw, NULL);
+                                                var rawGo = getGoFn(embRaw, NULL);
+                                                if (!rawGo.isNull()) setActFn(rawGo, 1, NULL);
+                                            }
+                                        }
+                                    } catch (eEm) {}
                                 }
                             } else {
                                 if (!favCell.isNull()) {
@@ -10936,6 +11019,9 @@ function initIl2Cpp(module) {
                                 }
                                 if (!emptyGo.isNull()) {
                                     setActFn(emptyGo, 1, NULL);
+                                }
+                                if (!bgGo.isNull()) {
+                                    setActFn(bgGo, 0, NULL);
                                 }
                             }
                         }
@@ -11184,6 +11270,51 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on CardBookScene.GetGroupCellViewData (0x11D0688)!");
                 } catch (eHgcvd) {
                     log("[-] Error replacing GetGroupCellViewData: " + eHgcvd.message);
+                }
+
+                // 3g3. CardBookGroupCellView.Refresh (0x11CC6D0) -> Directly apply group emblem texture to prevent white rectangles
+                try {
+                    Interceptor.attach(baseAddr.add(0x11CC6D0), {
+                        onEnter: function (args) {
+                            this.cellView = args[0];
+                            this.param = args[1];
+                        },
+                        onLeave: function (retval) {
+                            try {
+                                if (!this.cellView || this.cellView.isNull() || !this.param || this.param.isNull()) return;
+                                var embComp = this.cellView.add(0x58).readPointer(); // Emblem component
+                                if (!embComp.isNull()) {
+                                    var rawImg = embComp.add(0x40).readPointer(); // RawImage
+                                    if (!rawImg.isNull()) {
+                                        var embPathPtr = this.param.add(0x20).readPointer(); // DownloadPath
+                                        if (!embPathPtr.isNull()) {
+                                            var fpPtr = embPathPtr.add(0x18).readPointer();
+                                            if (!fpPtr.isNull()) {
+                                                var len = fpPtr.add(0x10).readS32();
+                                                if (len > 0) {
+                                                    var relPath = fpPtr.add(0x14).readUtf16String(len);
+                                                    var tex = loadLocalTexture2D(relPath);
+                                                    if (tex && !tex.isNull()) {
+                                                        var setTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                                                        setTexFn(rawImg, tex, NULL);
+                                                        try {
+                                                            var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
+                                                            setNativeSizeFn(rawImg, NULL);
+                                                        } catch (eSns) {}
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (eGcv) {
+                                log("[-] Error in GroupCellView emblem onLeave: " + eGcv.message);
+                            }
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on CardBookGroupCellView.Refresh (0x11CC6D0)!");
+                } catch (eHgcv) {
+                    log("[-] Error attaching to CardBookGroupCellView.Refresh: " + eHgcv.message);
                 }
 
                 // 4. CardBookScene UI Refresh Safety Patches (guard against NullReferenceException on decorative elements)
