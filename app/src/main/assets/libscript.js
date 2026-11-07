@@ -4616,6 +4616,10 @@ function initIl2Cpp(module) {
                             klassSlotRva = 0x31E3228;  // System.Collections.Generic.List<string>_TypeInfo
                             ctorSlotRva = 0x3209ED0;   // Method$System.Collections.Generic.List<string>..ctor()
                             addSlotRva = 0x3209EE8;    // Method$System.Collections.Generic.List<string>.Add()
+                        } else if (type === 'download_path') {
+                            klassSlotRva = 0x31E3878;  // System.Collections.Generic.List<WWWFile.DownloadPath>_TypeInfo
+                            ctorSlotRva = 0x320BDD8;   // Method$System.Collections.Generic.List<WWWFile.DownloadPath>..ctor()
+                            addSlotRva = 0x320BDE8;    // Method$System.Collections.Generic.List<WWWFile.DownloadPath>.Add()
                         }
 
                         var klass = resolveMetadataSlot(klassSlotRva);
@@ -4860,10 +4864,23 @@ function initIl2Cpp(module) {
                         var ttCode = tMeta ? tMeta.themeTypeCode : 0;
                         var lType = tMeta ? tMeta.limitedType : 0;
 
-                        tObj.add(0x20).writePointer(createIl2CppString(tName));
+                        tObj.add(0x20).writePointer(NULL);
                         tObj.add(0x30).writePointer(createDownloadPath(sPath));
                         tObj.add(0x38).writePointer(createDownloadPath(lPath));
                         tObj.add(0x40).writePointer(createDownloadPath(lPath));
+
+                        // Populate CardBookMarkList for theme badges (Limited, Event, Original) with genuine managed list
+                        if (cardbookThemeBadges && cardbookThemeBadges[themeId]) {
+                            var bCodes = cardbookThemeBadges[themeId];
+                            var bPaths = [];
+                            for (var bi = 0; bi < bCodes.length; bi++) {
+                                bPaths.push("asiudgasg/asodhsg/bhfbfhbf/" + bCodes[bi] + ".i.bytes");
+                            }
+                            var badgeListObj = createDownloadPathList(bPaths);
+                            if (badgeListObj && !badgeListObj.isNull()) {
+                                tObj.add(0x18).writePointer(badgeListObj);
+                            }
+                        }
 
                         var tdKlass = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "ThemeData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "ThemeData");
                         if (tdKlass && !tdKlass.isNull()) {
@@ -5241,9 +5258,8 @@ function initIl2Cpp(module) {
 
                     Interceptor.replace(baseAddr.add(0xCA4F3C), new NativeCallback(function (thisPtr, methodInfo) {
                         var gc = getGroupCodeFromData(thisPtr);
-                        var gMeta = getGroupMetadata(gc);
-                        var emb = gMeta ? gMeta.emblemPath : ("asiudgasg/asodhsg/aweoijs/" + gc + ".i.bytes");
-                        return createDownloadPath(emb);
+                        var baseGc = getBaseGroupCode(gc);
+                        return createDownloadPath("asiudgasg/asodhsg/aweoijs/" + baseGc + ".i.bytes");
                     }, "pointer", ["pointer", "pointer"]));
 
                     Interceptor.replace(baseAddr.add(0xCA4EC0), new NativeCallback(function (thisPtr, methodInfo) {
@@ -5276,9 +5292,8 @@ function initIl2Cpp(module) {
 
                     Interceptor.replace(baseAddr.add(0xCA4D4C), new NativeCallback(function (thisPtr, methodInfo) {
                         var gc = getGroupCodeFromData(thisPtr);
-                        var gMeta = getGroupMetadata(gc);
-                        var emb = gMeta ? gMeta.emblemPath : ("asiudgasg/asodhsg/aweoijs/" + gc + ".i.bytes");
-                        return createDownloadPath(emb);
+                        var baseGc = getBaseGroupCode(gc);
+                        return createDownloadPath("asiudgasg/asodhsg/foewghkc/" + baseGc + ".i.bytes");
                     }, "pointer", ["pointer", "pointer"]));
 
                     log("[+] Interceptor.replace installed on all GroupControl.Data getters!");
@@ -9371,6 +9386,54 @@ function initIl2Cpp(module) {
 
                 // Dedicated pool for Empty Card textures (sdhgauwehdnu) - shared across all themes to prevent OOM
                 var emptyCardTexturePool = {};
+                // CardBook UI & Asset Resolution Dictionaries
+                var cardbookBgMap = {"cardbook_mybg_double_plus.png": "1001", "cardbook_mybg_xx.png": "2001", "cardbook_mybg_hash.png": "3001", "cardbook_mybg_12.png": "4001", "cardbook_mybg_and.png": "5001", "cardbook_mybg_flip_that.png": "6001", "cardbook_mybg_heejin.png": "7001", "cardbook_mybg_hyunjin.png": "8001", "cardbook_mybg_haseul.png": "9001", "cardbook_mybg_yeojin.png": "10001", "cardbook_mybg_vivi.png": "11001", "cardbook_mybg_kim_lip.png": "12001", "cardbook_mybg_jin_soul.png": "13001", "cardbook_mybg_choerry.png": "14001", "cardbook_mybg_yves.png": "15001", "cardbook_mybg_go_won.png": "16001", "cardbook_mybg_olivia_hye.png": "17001", "cardbook_mybg_love_n_live.png": "18001", "cardbook_mybg_love_n_evil.png": "19001", "cardbook_mybg_mix_n_match.png": "20001", "cardbook_mybg_max_n_match.png": "21001"};
+                var cardbookEmblemMap = {"emblem_double_plus.png": "1001", "emblem_xx.png": "2001", "emblem_hash.png": "3001", "emblem_12.png": "4001", "emblem_and.png": "5001", "emblem_flip_that.png": "6001", "emblem_heejin.png": "7001", "emblem_hyunjin.png": "8001", "emblem_haseul.png": "9001", "emblem_yeojin.png": "10001", "emblem_vivi.png": "11001", "emblem_kim_lip.png": "12001", "emblem_jinsoul.png": "13001", "emblem_choerry.png": "14001", "emblem_yves.png": "15001", "emblem_gowon.png": "16001", "emblem_olivia_hye.png": "17001", "emblem_love_live.png": "18001", "emblem_love_evil.png": "19001", "emblem_mix_match.png": "20001", "emblem_max_match.png": "21001"};
+                var cardbookBadgeMap = {"icon_limited.png": "901", "icon_event.png": "902", "icon_original.png": "903"};
+                var cardbookThemeLogoMap = {"theme_l_hi_high.png": "1001_l", "theme_s_hi_high.png": "1001_s", "theme_l_heat.png": "1002_l", "theme_s_heat.png": "1002_s", "theme_l_stylish.png": "1003_l", "theme_s_stylish.png": "1003_s", "theme_l_take_me_high.png": "15003_l", "theme_s_take_me_high.png": "15003_s", "theme_l_perfect_love.png": "1005_l", "theme_s_perfect_love.png": "1005_s", "theme_l_favorite.png": "1006_l", "theme_s_favorite.png": "1006_s", "theme_l_you_know_you_know.png": "1007_l", "theme_s_you_know_you_know.png": "1007_s", "theme_l_only_you_love.png": "1008_l", "theme_s_only_you_love.png": "1008_s", "theme_l_make_you_mine.png": "1009_l", "theme_s_make_you_mine.png": "1009_s", "theme_l_butterfly.png": "2001_l", "theme_s_butterfly.png": "2001_s", "theme_l_satellite.png": "2002_l", "theme_s_satellite.png": "2002_s", "theme_l_where_you_at.png": "2003_l", "theme_s_where_you_at.png": "2003_s", "theme_l_colors.png": "2004_l", "theme_s_colors.png": "2004_s", "theme_l_curiosity.png": "2005_l", "theme_s_curiosity.png": "2005_s", "theme_l_wing_wing_wing.png": "2006_l", "theme_s_wing_wing_wing.png": "2006_s", "theme_l_wanna_go.png": "2007_l", "theme_s_wanna_go.png": "2007_s", "theme_l_number1.png": "3001_l", "theme_s_number1.png": "3001_s", "theme_l_oh_yes_i_am.png": "3002_l", "theme_s_oh_yes_i_am.png": "3002_s", "theme_l_so_what.png": "3003_l", "theme_s_so_what.png": "3003_s", "theme_l_365.png": "3004_l", "theme_s_365.png": "3004_s", "theme_l_my_number_1.png": "3005_l", "theme_s_my_number_1.png": "3005_s", "theme_l_im_so_bad.png": "3006_l", "theme_s_im_so_bad.png": "3006_s", "theme_l_who_am_i.png": "3007_l", "theme_s_who_am_i.png": "3007_s", "theme_l_four_seasons.png": "3008_l", "theme_s_four_seasons.png": "3008_s", "theme_l_fall_again.png": "4001_l", "theme_s_fall_again.png": "4001_s", "theme_l_why_not.png": "4002_l", "theme_s_why_not.png": "4002_s", "theme_l_oops.png": "4003_l", "theme_s_oops.png": "4003_s", "theme_l_voice.png": "4004_l", "theme_s_voice.png": "4004_s", "theme_l_hide_seek.png": "4005_l", "theme_s_hide_seek.png": "4005_s", "theme_l_your_voice.png": "4006_l", "theme_s_your_voice.png": "4006_s", "theme_l_universe.png": "4007_l", "theme_s_universe.png": "4007_s", "theme_l_i_love_myself.png": "4008_l", "theme_s_i_love_myself.png": "4008_s", "theme_l_dont_mind.png": "4009_l", "theme_s_dont_mind.png": "4009_s", "theme_l_dam_di_dam.png": "4010_l", "theme_s_dam_di_dam.png": "4010_s", "theme_l_i_like_it_like_that.png": "4011_l", "theme_s_i_like_it_like_that.png": "4011_s", "theme_l_starlight.png": "4012_l", "theme_s_starlight.png": "4012_s", "theme_l_ptt.png": "5001_l", "theme_s_ptt.png": "5001_s", "theme_l_be_honest.png": "5002_l", "theme_s_be_honest.png": "5002_s", "theme_l_wow.png": "5003_l", "theme_s_wow.png": "5003_s", "theme_l_dance_on_my_own.png": "5004_l", "theme_s_dance_on_my_own.png": "5004_s", "theme_l_time_to_shine.png": "5005_l", "theme_s_time_to_shine.png": "5005_s", "theme_l_a_different_night.png": "5006_l", "theme_s_a_different_night.png": "5006_s", "theme_l_paint_the_town.png": "5007_l", "theme_s_paint_the_town.png": "5007_s", "theme_l_ur.png": "5008_l", "theme_s_ur.png": "5008_s", "theme_l_hury_hury.png": "5009_l", "theme_s_hury_hury.png": "5009_s", "theme_l_every_night.png": "5010_l", "theme_s_every_night.png": "5010_s", "theme_l_need_u.png": "6001_l", "theme_s_need_u.png": "6001_s", "theme_l_pale_blue_dot.png": "6002_l", "theme_s_pale_blue_dot.png": "6002_s", "theme_l_loonatheworld.png": "6003_l", "theme_s_loonatheworld.png": "6003_s", "theme_l_flip_that.png": "6004_l", "theme_s_flip_that.png": "6004_s", "theme_l_playback.png": "6005_l", "theme_s_playback.png": "6005_s", "theme_l_pose.png": "6006_l", "theme_s_pose.png": "6006_s", "theme_l_bring_the_light.png": "6007_l", "theme_s_bring_the_light.png": "6007_s", "theme_l_go_my_way.png": "6008_l", "theme_s_go_my_way.png": "6008_s", "theme_l_that_that.png": "6009_l", "theme_s_that_that.png": "6009_s", "theme_l_under_the_sky.png": "6010_l", "theme_s_under_the_sky.png": "6010_s", "theme_l_heejin.png": "7001_l", "theme_s_heejin.png": "7001_s", "theme_l_hyunjin.png": "8003_l", "theme_s_hyunjin.png": "8003_s", "theme_l_be_there.png": "8002_l", "theme_s_be_there.png": "8002_s", "theme_l_haseul.png": "9001_l", "theme_s_haseul.png": "9001_s", "theme_l_the_carol.png": "9002_l", "theme_s_the_carol.png": "9002_s", "theme_l_yeojin.png": "10001_l", "theme_s_yeojin.png": "10001_s", "theme_l_yeojin_.png": "10002_l", "theme_s_yeojin_.png": "10002_s", "theme_l_vivi.png": "11003_l", "theme_s_vivi.png": "11003_s", "theme_l_i_need_you.png": "11002_l", "theme_s_i_need_you.png": "11002_s", "theme_l_kim_lip.png": "12001_l", "theme_s_kim_lip.png": "12001_s", "theme_l_twilight.png": "12002_l", "theme_s_twilight.png": "12002_s", "theme_l_queenlip.png": "12003_l", "theme_s_queenlip.png": "12003_s", "theme_l_jinsoul.png": "13001_l", "theme_s_jinsoul.png": "13001_s", "theme_l_love_letter.png": "13002_l", "theme_s_love_letter.png": "13002_s", "theme_l_jindori.png": "13003_l", "theme_s_jindori.png": "13003_s", "theme_l_choerry.png": "14001_l", "theme_s_choerry.png": "14001_s", "theme_l_puzzle.png": "14002_l", "theme_s_puzzle.png": "14002_s", "theme_l_cherry.png": "14003_l", "theme_s_cherry.png": "14003_s", "theme_l_yves.png": "15001_l", "theme_s_yves.png": "15001_s", "theme_l_d1.png": "15002_l", "theme_s_d1.png": "15002_s", "theme_l_go_won.png": "16001_l", "theme_s_go_won.png": "16001_s", "theme_l_my_one_only.png": "16002_l", "theme_s_my_one_only.png": "16002_s", "theme_l_gowon.png": "16003_l", "theme_s_gowon.png": "16003_s", "theme_l_olivia_hye.png": "17001_l", "theme_s_olivia_hye.png": "17001_s", "theme_l_rosy.png": "17002_l", "theme_s_rosy.png": "17002_s", "theme_l_oliviahye.png": "17003_l", "theme_s_oliviahye.png": "17003_s", "theme_l_love_live.png": "18001_l", "theme_s_love_live.png": "18001_s", "theme_l_a_valentine_girl.png": "18002_l", "theme_s_a_valentine_girl.png": "18002_s", "theme_l_you_and_me.png": "18003_l", "theme_s_you_and_me.png": "18003_s", "theme_l_rain_51db.png": "19001_l", "theme_s_rain_51db.png": "19001_s", "theme_l_sonatine.png": "19002_l", "theme_s_sonatine.png": "19002_s", "theme_l_fairy_tale.png": "19003_l", "theme_s_fairy_tale.png": "19003_s", "theme_l_loonatic.png": "20001_l", "theme_s_loonatic.png": "20001_s", "theme_l_girl_front.png": "20002_l", "theme_s_girl_front.png": "20002_s", "theme_l_sweet_crazy_love.png": "21001_l", "theme_s_sweet_crazy_love.png": "21001_s", "theme_l_uncover.png": "21002_l", "theme_s_uncover.png": "21002_s"};
+                var cardbookThemeBadges = {"1002": [901], "1003": [902, 903], "1004": [901], "1005": [902, 903], "1007": [901], "1008": [901], "1009": [901], "2002": [901], "2003": [902, 903], "2004": [901], "2005": [902, 903], "2007": [901], "3003": [901], "3004": [901], "3005": [901], "3006": [901], "3007": [901], "3008": [901], "4002": [901], "4003": [901], "4004": [901], "4005": [901], "4006": [901], "4007": [901], "4009": [901], "4010": [901], "4011": [901], "4012": [901], "5002": [901], "5003": [902, 903], "5004": [901], "5005": [902, 903], "5006": [901], "5007": [901], "5008": [901], "5009": [901], "5010": [901], "6002": [901, 902], "6004": [901], "6005": [901], "6007": [902, 903], "6008": [901], "6010": [901], "7002": [901], "7003": [901, 902], "8002": [901], "8003": [901, 902], "9002": [901], "9003": [901, 902], "10002": [901], "10003": [901, 902], "11002": [901], "11003": [901, 902], "12002": [901], "12003": [901, 902], "13002": [901], "13003": [901, 902], "14002": [901], "14003": [901, 902], "15002": [901], "15003": [901, 902], "16002": [901], "16003": [901, 902], "17002": [901], "17003": [901, 902], "18002": [901], "19002": [901], "20002": [901]};
+
+                function getBaseGroupCode(gc) {
+                    gc = parseInt(gc, 10) || 1001;
+                    if (gc >= 1001 && gc <= 1009) return 1001;
+                    if (gc >= 2001 && gc <= 2007) return 2001;
+                    if (gc >= 3001 && gc <= 3008) return 3001;
+                    if (gc >= 4001 && gc <= 4012) return 4001;
+                    if (gc >= 5001 && gc <= 5010) return 5001;
+                    if (gc >= 6001 && gc <= 6008) return 6001;
+                    if (gc >= 7001 && gc <= 7002) return 7001;
+                    if (gc >= 8001 && gc <= 8002) return 8001;
+                    if (gc >= 9001 && gc <= 9002) return 9001;
+                    if (gc >= 10001 && gc <= 10002) return 10001;
+                    if (gc >= 11001 && gc <= 11002) return 11001;
+                    if (gc >= 12001 && gc <= 12002) return 12001;
+                    if (gc >= 13001 && gc <= 13002) return 13001;
+                    if (gc >= 14001 && gc <= 14002) return 14001;
+                    if (gc >= 15001 && gc <= 15002) return 15001;
+                    if (gc >= 16001 && gc <= 16002) return 16001;
+                    if (gc >= 17001 && gc <= 17002) return 17001;
+                    if (gc >= 18001 && gc <= 18003) return 18001;
+                    if (gc >= 19001 && gc <= 19003) return 19001;
+                    if (gc >= 20001 && gc <= 20002) return 20001;
+                    if (gc >= 21001 && gc <= 21002) return 21001;
+                    return gc;
+                }
+
+                function createDownloadPathList(paths) {
+                    if (!paths || paths.length === 0) return NULL;
+                    try {
+                        var items = [];
+                        for (var i = 0; i < paths.length; i++) {
+                            var dp = createDownloadPath(paths[i]);
+                            if (dp && !dp.isNull()) items.push(dp);
+                        }
+                        return createManagedList(items, 'download_path');
+                    } catch (eDpl) {
+                        log("[-] Error creating DownloadPathList: " + eDpl.message);
+                        return NULL;
+                    }
+                }
+
                 function getOrCreateEmptyCardTexture(artistCode, isLarge) {
                     var key = artistCode + (isLarge ? "_l" : "_s");
                     if (emptyCardTexturePool[key]) {
@@ -10439,7 +10502,17 @@ function initIl2Cpp(module) {
                                             relPath = fullUrl.substring(idx);
                                         } else {
                                             var cleanUrl = fullUrl.split("?")[0];
-                                            if (urlToCardMap && urlToCardMap[cleanUrl]) {
+                                            var filename = cleanUrl.split("/").pop();
+
+                                            if (cardbookBgMap && cardbookBgMap[filename]) {
+                                                relPath = "asiudgasg/asodhsg/foewghkc/" + cardbookBgMap[filename] + ".i.bytes";
+                                            } else if (cardbookEmblemMap && cardbookEmblemMap[filename]) {
+                                                relPath = "asiudgasg/asodhsg/aweoijs/" + cardbookEmblemMap[filename] + ".i.bytes";
+                                            } else if (cardbookBadgeMap && cardbookBadgeMap[filename]) {
+                                                relPath = "asiudgasg/asodhsg/bhfbfhbf/" + cardbookBadgeMap[filename] + ".i.bytes";
+                                            } else if (cardbookThemeLogoMap && cardbookThemeLogoMap[filename]) {
+                                                relPath = "asiudgasg/asodhsg/agewfcbxhaa/" + cardbookThemeLogoMap[filename] + ".i.bytes";
+                                            } else if (urlToCardMap && urlToCardMap[cleanUrl]) {
                                                 var uInfo = urlToCardMap[cleanUrl];
                                                 var uFolder = "wadceg";
                                                 relPath = "asiudgasg/asodhsg/" + uFolder + "/" + uInfo.cId + "_" + uInfo.type + ".i.bytes";
@@ -10543,6 +10616,63 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on URLsControl.SetCdnTexture (0x163A9E8)!");
                 } catch (eHsct) {
                     log("[-] Error replacing SetCdnTexture: " + eHsct.message);
+                }
+
+                // CardBook Protocol Offline Handlers
+                var offlineFavoriteGroups = [1001, 2001, 3001, 4001, 5001];
+
+                try {
+                    // CardBook.getReward (0xE9EFB4)
+                    Interceptor.replace(baseAddr.add(0xE9EFB4), keepCb(new NativeCallback(function (callback, achievementCode, achievementType, methodInfo) {
+                        log("[🏆 CARDBOOK] CardBook.getReward called offline: achievementCode=" + achievementCode + " type=" + achievementType);
+                        try {
+                            if (!callback.isNull()) {
+                                var nhClass = getClass("Assembly-CSharp", "com.dalcomsoft.project.client", "NetworkHandler") || getClass("Assembly-CSharp", "", "NetworkHandler");
+                                var nhObj = il2cpp_object_new(nhClass);
+                                if (il2cpp_gchandle_new && !nhObj.isNull()) il2cpp_gchandle_new(nhObj, 2);
+
+                                var methodPtr = callback.add(0x10).readPointer();
+                                var targetObj = callback.add(0x20).readPointer();
+                                if (!methodPtr.isNull() && !targetObj.isNull()) {
+                                    var cbFn = new NativeFunction(methodPtr, "void", ["pointer", "pointer", "pointer", "pointer"]);
+                                    cbFn(targetObj, nhObj, NULL, NULL);
+                                    log("[✅ CARDBOOK] getReward callback successfully invoked offline!");
+                                }
+                            }
+                        } catch (eGr) {
+                            log("[-] Error in CardBook.getReward offline: " + eGr.message);
+                        }
+                        return NULL;
+                    }, "pointer", ["pointer", "int64", "int16", "pointer"])));
+                    log("[+] Interceptor.replace installed on CardBook.getReward (0xE9EFB4)!");
+                } catch (eHgr) {
+                    log("[-] Error replacing CardBook.getReward: " + eHgr.message);
+                }
+
+                try {
+                    // CardBook.setFavoriteGroup (0xE9F2A4)
+                    Interceptor.replace(baseAddr.add(0xE9F2A4), keepCb(new NativeCallback(function (callback, groupList, methodInfo) {
+                        log("[⭐ CARDBOOK] CardBook.setFavoriteGroup called offline");
+                        try {
+                            if (!callback.isNull()) {
+                                var nhClass = getClass("Assembly-CSharp", "com.dalcomsoft.project.client", "NetworkHandler") || getClass("Assembly-CSharp", "", "NetworkHandler");
+                                var nhObj = il2cpp_object_new(nhClass);
+                                if (il2cpp_gchandle_new && !nhObj.isNull()) il2cpp_gchandle_new(nhObj, 2);
+                                var methodPtr = callback.add(0x10).readPointer();
+                                var targetObj = callback.add(0x20).readPointer();
+                                if (!methodPtr.isNull() && !targetObj.isNull()) {
+                                    var cbFn = new NativeFunction(methodPtr, "void", ["pointer", "pointer", "pointer"]);
+                                    cbFn(targetObj, nhObj, NULL);
+                                }
+                            }
+                        } catch (eSfg) {
+                            log("[-] Error in setFavoriteGroup offline: " + eSfg.message);
+                        }
+                        return NULL;
+                    }, "pointer", ["pointer", "pointer", "pointer"])));
+                    log("[+] Interceptor.replace installed on CardBook.setFavoriteGroup (0xE9F2A4)!");
+                } catch (eHsfg) {
+                    log("[-] Error replacing CardBook.setFavoriteGroup: " + eHsfg.message);
                 }
 
                 // CardBook Stabilization Hooks
@@ -10675,14 +10805,158 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing GroupItem.GetGrade: " + eGrd.message);
                 }
 
-                // 3e. CardBookScene.RefreshFavoriteGroupFive (0x11D0048) -> Safe no-op
+                // 3e. CardBookScene.RefreshFavoriteGroupFive (0x11D0048) -> Populate 5 favorite group slots in CardBookMainView
                 try {
-                    Interceptor.replace(baseAddr.add(0x11D0048), new NativeCallback(function (thisPtr, isReload, methodInfo) {
-                        log("[📖 CARDBOOK] RefreshFavoriteGroupFive intercepted (safe no-op)!");
-                    }, "void", ["pointer", "bool", "pointer"]));
+                    Interceptor.replace(baseAddr.add(0x11D0048), keepCb(new NativeCallback(function (sceneThis, isReload, methodInfo) {
+                        log("[📖 CARDBOOK] RefreshFavoriteGroupFive entered for scene: " + sceneThis);
+                        try {
+                            if (!sceneThis || sceneThis.isNull()) return;
+                            var sceneView = sceneThis.add(0x48).readPointer();
+                            if (sceneView.isNull()) return;
+                            var mainView = sceneView.add(0xE0).readPointer();
+                            if (mainView.isNull()) return;
+
+                            var favItemList = mainView.add(0x58).readPointer(); // CardBookFavoriteGroupItemView[] (len 5)
+                            var favEmptyList = mainView.add(0x60).readPointer(); // GameObject[] (len 5)
+                            if (favItemList.isNull()) return;
+
+                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                            var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                            var getFavSetDataFn = new NativeFunction(baseAddr.add(0x11CDB7C), "pointer", ["pointer", "int", "pointer"]);
+                            var setFavViewFn = new NativeFunction(baseAddr.add(0x11CD330), "void", ["pointer", "pointer", "pointer"]);
+
+                            var metaAll = getGlobalMetadata();
+                            var favCodes = (typeof offlineFavoriteGroups !== "undefined" && offlineFavoriteGroups && offlineFavoriteGroups.length > 0)
+                                ? offlineFavoriteGroups
+                                : [1001, 2001, 3001, 4001, 5001];
+
+                            var arrLen = favItemList.add(0x18).readS32();
+                            for (var i = 0; i < arrLen && i < 5; i++) {
+                                var favView = favItemList.add(0x20 + i * 8).readPointer();
+                                var emptyGo = (!favEmptyList.isNull() && i < favEmptyList.add(0x18).readS32())
+                                    ? favEmptyList.add(0x20 + i * 8).readPointer()
+                                    : NULL;
+
+                                if (i < favCodes.length) {
+                                    var gCode = favCodes[i];
+                                    var baseGc = getBaseGroupCode(gCode);
+                                    var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gCode] : null;
+                                    var gName = (gMeta && gMeta.name) ? gMeta.name : ("Group " + gCode);
+                                    var embPath = "asiudgasg/asodhsg/aweoijs/" + baseGc + ".i.bytes";
+
+                                    if (!favView.isNull()) {
+                                        var fvGo = getGoFn(favView, NULL);
+                                        if (!fvGo.isNull()) setActFn(fvGo, 1, NULL);
+
+                                        var setData = getFavSetDataFn(mainView, i, NULL);
+                                        if (!setData.isNull()) {
+                                            setData.add(0x10).writePointer(createIl2CppString(gName));
+                                            setData.add(0x18).writePointer(createDownloadPath(embPath));
+                                            setData.add(0x20).writeU8(0); // isNew = false
+                                            setFavViewFn(favView, setData, NULL);
+                                        }
+                                    }
+                                    if (!emptyGo.isNull()) {
+                                        setActFn(emptyGo, 0, NULL);
+                                    }
+                                } else {
+                                    if (!favView.isNull()) {
+                                        var fvGo2 = getGoFn(favView, NULL);
+                                        if (!fvGo2.isNull()) setActFn(fvGo2, 0, NULL);
+                                    }
+                                    if (!emptyGo.isNull()) {
+                                        setActFn(emptyGo, 1, NULL);
+                                    }
+                                }
+                            }
+                            log("[📖 CARDBOOK] Populated " + Math.min(arrLen, favCodes.length) + " favorite groups in CardBookMainView!");
+                        } catch (eFav) {
+                            log("[-] Error in RefreshFavoriteGroupFive: " + eFav.message);
+                        }
+                    }, "void", ["pointer", "bool", "pointer"])));
                     log("[+] Interceptor.replace installed on CardBookScene.RefreshFavoriteGroupFive (0x11D0048)!");
                 } catch (eRfgf) {
                     log("[-] Error replacing RefreshFavoriteGroupFive: " + eRfgf.message);
+                }
+
+                // 3e2. CardBookMainView.SetRefreshCardCollection (0x11CD560) & SetRefreshThemeCollection (0x11CD6F8) -> Safe offline collection bars
+                try {
+                    var buildCollectionRewardData = function (currentPts, nextPts) {
+                        var rewardKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.cardbook", "CardBookCollectionItemView/SetData/Reward");
+                        var rewardIconKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.common", "RewardIconView/SetData");
+                        if (!rewardKlass || rewardKlass.isNull()) return NULL;
+
+                        var rObj = il2cpp_object_new(rewardKlass);
+                        if (il2cpp_gchandle_new && !rObj.isNull()) il2cpp_gchandle_new(rObj, 2);
+
+                        var rGoalStr = createIl2CppString(nextPts + " Pts");
+                        rObj.add(0x10).writePointer(rGoalStr);
+
+                        if (rewardIconKlass && !rewardIconKlass.isNull()) {
+                            var riObj = il2cpp_object_new(rewardIconKlass);
+                            if (il2cpp_gchandle_new && !riObj.isNull()) il2cpp_gchandle_new(riObj, 2);
+                            var getIconFn = new NativeFunction(baseAddr.add(0xD25670), "pointer", ["int", "pointer"]);
+                            var iconSprite = getIconFn(20001, NULL); // Diamond icon
+                            riObj.add(0x10).writePointer(iconSprite);
+                            riObj.add(0x18).writePointer(createIl2CppString("50"));
+                            riObj.add(0x20).writeU8(1);
+                            rObj.add(0x18).writePointer(riObj);
+                        }
+                        rObj.add(0x30).writeS32(2); // state = 2 (Completed / Received)
+                        return rObj;
+                    };
+
+                    Interceptor.replace(baseAddr.add(0x11CD560), keepCb(new NativeCallback(function (mainViewPtr, itemDataPtr, methodInfo) {
+                        try {
+                            if (mainViewPtr.isNull() || itemDataPtr.isNull()) return;
+                            var curPts = itemDataPtr.add(0x30).readS32();
+                            var maxPts = itemDataPtr.add(0x34).readS32();
+                            var rObj = buildCollectionRewardData(curPts, maxPts);
+                            if (!rObj.isNull()) {
+                                var mvSetData = mainViewPtr.add(0x38).readPointer();
+                                if (!mvSetData.isNull()) {
+                                    rObj.add(0x20).writePointer(mvSetData.add(0x18).readPointer());
+                                    rObj.add(0x28).writePointer(mvSetData.add(0x20).readPointer());
+                                }
+                                itemDataPtr.add(0x48).writePointer(rObj);
+                            }
+                            var cardColView = mainViewPtr.add(0x68).readPointer();
+                            if (!cardColView.isNull()) {
+                                var setColViewFn = new NativeFunction(baseAddr.add(0x11C5184), "void", ["pointer", "pointer", "pointer"]);
+                                setColViewFn(cardColView, itemDataPtr, NULL);
+                            }
+                        } catch (eSrcc) {
+                            log("[-] Error in SetRefreshCardCollection: " + eSrcc.message);
+                        }
+                    }, "void", ["pointer", "pointer", "pointer"])));
+
+                    Interceptor.replace(baseAddr.add(0x11CD6F8), keepCb(new NativeCallback(function (mainViewPtr, itemDataPtr, methodInfo) {
+                        try {
+                            if (mainViewPtr.isNull() || itemDataPtr.isNull()) return;
+                            itemDataPtr.add(0x40).writeS32(50); // total bonus score
+                            var curPts = itemDataPtr.add(0x30).readS32();
+                            var maxPts = itemDataPtr.add(0x34).readS32();
+                            var rObj = buildCollectionRewardData(curPts, maxPts);
+                            if (!rObj.isNull()) {
+                                var mvSetData = mainViewPtr.add(0x38).readPointer();
+                                if (!mvSetData.isNull()) {
+                                    rObj.add(0x20).writePointer(mvSetData.add(0x18).readPointer());
+                                    rObj.add(0x28).writePointer(mvSetData.add(0x20).readPointer());
+                                }
+                                itemDataPtr.add(0x48).writePointer(rObj);
+                            }
+                            var themeColView = mainViewPtr.add(0x70).readPointer();
+                            if (!themeColView.isNull()) {
+                                var setColViewFn = new NativeFunction(baseAddr.add(0x11C5184), "void", ["pointer", "pointer", "pointer"]);
+                                setColViewFn(themeColView, itemDataPtr, NULL);
+                            }
+                        } catch (eSrtc) {
+                            log("[-] Error in SetRefreshThemeCollection: " + eSrtc.message);
+                        }
+                    }, "void", ["pointer", "pointer", "pointer"])));
+                    log("[+] Interceptor.replace installed on SetRefreshCardCollection (0x11CD560) & SetRefreshThemeCollection (0x11CD6F8)!");
+                } catch (eColHooks) {
+                    log("[-] Error installing collection bar hooks: " + eColHooks.message);
                 }
 
                 // 3f. CardBookControl.GetGroupItem (0x11C83DC) & GetMajorGroupItem (0x11C8528) -> Dynamic group return
@@ -10719,10 +10993,6 @@ function initIl2Cpp(module) {
                     0x11D0B64, // CardBookScene.RefreshAchieveNewMark -> ret
                     0x11D0C1C, // CardBookScene.RefreshGroupNewMark -> ret
                     0x11CFB80, // CardBookScene.RefreshOthers -> ret
-                    0x11CFE18, // CardBookScene.RefreshBestCardBook -> ret (decorative online rank only)
-                    0x11D0300, // CardBookScene.RefreshCollection -> ret (achievement progress points bar)
-                    0x11CD560, // CardBookMainView.SetRefreshCardCollection -> ret (prevent ArgumentOutOfRangeException on empty CardAchievementList)
-                    0x11CD6F8, // CardBookMainView.SetRefreshThemeCollection -> ret (prevent ArgumentOutOfRangeException on empty ThemeAchievementList)
                     0x11D446C, // CardBookView.RafreshTabMainNewMark -> ret
                     0x11D0914, // CardBookView.RefreshGroupNewMark -> ret
                     0xB98210,  // CardBookControl.GroupItem.ExtractTexturePath -> ret
@@ -10877,11 +11147,21 @@ function initIl2Cpp(module) {
                 // Proxy ThemeControl.Data.get_SmallNameImagePath (0xC89BCC)
                 try {
                     Interceptor.replace(baseAddr.add(0xC89BCC), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        var themeCode = 1001;
                         if (!thisPtr.isNull()) {
                             var dp = thisPtr.add(0x30).readPointer();
-                            if (!dp.isNull()) return dp;
+                            if (!dp.isNull() && dp.compare(ptr(0x1000)) > 0) return dp;
+                            var model = thisPtr.add(0x10).readPointer();
+                            if (!model.isNull() && model.compare(ptr(0x1000)) > 0) {
+                                var c = model.add(0x10).readS32();
+                                if (c > 0) themeCode = c;
+                            }
                         }
-                        return createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/1001_s.i.bytes");
+                        var newDp = createDownloadPath("asiudgasg/asodhsg/agewfcbxhaa/" + themeCode + "_s.i.bytes");
+                        if (!thisPtr.isNull()) {
+                            thisPtr.add(0x30).writePointer(newDp);
+                        }
+                        return newDp;
                     }, "pointer", ["pointer", "pointer"])));
                     log("[+] Interceptor.replace installed on ThemeControl.Data.get_SmallNameImagePath (0xC89BCC)!");
                 } catch (eTip) {
@@ -10891,11 +11171,21 @@ function initIl2Cpp(module) {
                 // Proxy ThemeControl.Data.get_LargeNameImagePath (0xC89CA4)
                 try {
                     Interceptor.replace(baseAddr.add(0xC89CA4), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        var themeCode = 1001;
                         if (!thisPtr.isNull()) {
                             var dp = thisPtr.add(0x38).readPointer();
-                            if (!dp.isNull()) return dp;
+                            if (!dp.isNull() && dp.compare(ptr(0x1000)) > 0) return dp;
+                            var model = thisPtr.add(0x10).readPointer();
+                            if (!model.isNull() && model.compare(ptr(0x1000)) > 0) {
+                                var c = model.add(0x10).readS32();
+                                if (c > 0) themeCode = c;
+                            }
                         }
-                        return createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/1001_l.i.bytes");
+                        var newDp = createDownloadPath("asiudgasg/asodhsg/agewfcbxhaa/" + themeCode + "_l.i.bytes");
+                        if (!thisPtr.isNull()) {
+                            thisPtr.add(0x38).writePointer(newDp);
+                        }
+                        return newDp;
                     }, "pointer", ["pointer", "pointer"])));
                     log("[+] Interceptor.replace installed on ThemeControl.Data.get_LargeNameImagePath (0xC89CA4)!");
                 } catch (eLnip) {
@@ -15091,6 +15381,13 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     try {
                         log("[📖 CARDBOOK] Deferred UI activation starting for instance: " + sceneThis);
 
+                        // 0. Ensure CardBookControl.MyInfo and SharedInfo are populated after OnOpen
+                        try {
+                            ensureCardBookControlData();
+                        } catch (eCbd2) {
+                            log("[-] Error in deferred ensureCardBookControlData: " + eCbd2.message);
+                        }
+
                         // 1. Refresh main collection & header view
                         try {
                             var refreshMainFn = new NativeFunction(baseAddr.add(0x11CFDD8), "void", ["pointer", "bool", "pointer"]);
@@ -15118,7 +15415,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             log("[-] Error in SetStateWaitDone: " + eWd.message);
                         }
 
-                        // 4. Ensure sceneView GameObjects and Canvases are active and visible
+                        // 4. Ensure sceneView GameObjects and Canvases are active and visible (MainView active, GroupView inactive initially)
                         try {
                             var sceneView = sceneThis.add(0x48).readPointer();
                             if (!sceneView.isNull()) {
@@ -15130,16 +15427,9 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
                                 var svGo = getGoFn(sceneView, NULL);
                                 if (!svGo.isNull()) setActFn(svGo, 1, NULL);
-                                var mainView = sceneView.add(0xE0).readPointer();
-                                if (!mainView.isNull()) {
-                                    var mvGo = getGoFn(mainView, NULL);
-                                    if (!mvGo.isNull()) setActFn(mvGo, 1, NULL);
-                                }
-                                var groupView = sceneView.add(0x100).readPointer();
-                                if (!groupView.isNull()) {
-                                    var gvGo = getGoFn(groupView, NULL);
-                                    if (!gvGo.isNull()) setActFn(gvGo, 1, NULL);
-                                }
+
+                                var setTabViewFn = new NativeFunction(baseAddr.add(0x11CF5BC), "int", ["pointer", "int", "pointer"]);
+                                setTabViewFn(sceneView, 0, NULL);
                             }
                         } catch (eAct) {
                             log("[-] Error activating sceneView GameObjects: " + eAct.message);
