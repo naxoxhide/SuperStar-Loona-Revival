@@ -10859,6 +10859,138 @@ function initIl2Cpp(module) {
                 }
 
                 // --- CARDBOOK MAINVIEW OFFLINE RESTORATION HELPERS ---
+                // Dynamic offline CardBook group metrics calculator based on accountOwnedCards
+                var calculateOfflineGroupCardBookMetrics = function (gCode) {
+                    var metaAll = getGlobalMetadata();
+                    var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gCode] : null;
+                    if (!gMeta) {
+                        return {
+                            grade: 0,
+                            isRGrade: false,
+                            isMaxLevel: false,
+                            level: 0,
+                            gauge: 0.0,
+                            points: 0,
+                            totalSlots: 0,
+                            obtainedCards: 0
+                        };
+                    }
+
+                    var themeCodes = gMeta.themeCodes || [gCode];
+                    var artistCodes = gMeta.artistCodes || [gCode];
+                    var slotCount = artistCodes.length;
+
+                    var regularThemes = [];
+                    for (var t = 0; t < themeCodes.length; t++) {
+                        var tCode = themeCodes[t];
+                        var tMeta = (metaAll && metaAll.themes) ? metaAll.themes[tCode] : null;
+                        var isLimited = (tMeta && tMeta.limitedType !== undefined) ? (tMeta.limitedType !== 0) : false;
+                        if (!isLimited) {
+                            regularThemes.push(tCode);
+                        }
+                    }
+
+                    var totalSlots = regularThemes.length * slotCount;
+                    var themeCount = regularThemes.length;
+                    var obtainedCards = 0;
+                    var rCardCount = 0;
+                    var nonRPoints = 0;
+                    var cardBookValues = { 0: 1, 1: 2, 2: 3, 3: 4 }; // C=1, B=2, A=3, S=4
+
+                    for (var i = 0; i < regularThemes.length; i++) {
+                        var tCode = regularThemes[i];
+                        for (var s = 0; s < slotCount; s++) {
+                            var aCode = artistCodes[s];
+                            var cardId = (typeof themeArtistCardMap !== "undefined" && themeArtistCardMap[tCode + "_" + aCode])
+                                ? themeArtistCardMap[tCode + "_" + aCode]
+                                : 0;
+                            if (cardId > 0 && typeof accountOwnedCards !== "undefined" && accountOwnedCards[cardId]) {
+                                obtainedCards++;
+                                var g = (accountOwnedCards[cardId].grade !== undefined) ? accountOwnedCards[cardId].grade : 4;
+                                if (g === 4) {
+                                    rCardCount++;
+                                } else {
+                                    nonRPoints += (cardBookValues[g] || 0);
+                                }
+                            }
+                        }
+                    }
+
+                    if (totalSlots === 0 || obtainedCards === 0) {
+                        return {
+                            grade: 0, // C fallback
+                            isRGrade: false,
+                            isMaxLevel: false,
+                            level: 0,
+                            gauge: 0.0,
+                            points: 0,
+                            totalSlots: totalSlots,
+                            obtainedCards: 0
+                        };
+                    }
+
+                    // CASE 1: Group has R cards
+                    if (rCardCount > 0) {
+                        var isMaxLevel = (rCardCount === totalSlots && totalSlots > 0);
+                        var level = 0;
+                        if (themeCount > 0) {
+                            for (var th = 1; th <= themeCount; th++) {
+                                var threshold = Math.floor(totalSlots / themeCount * th);
+                                if (threshold <= rCardCount) {
+                                    level = th;
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+                        if (isMaxLevel) {
+                            level = themeCount;
+                        } else if (level < 1) {
+                            level = 1;
+                        }
+                        var gauge = totalSlots > 0 ? (rCardCount / totalSlots) : 1.0;
+                        return {
+                            grade: 4, // R
+                            isRGrade: true,
+                            isMaxLevel: isMaxLevel,
+                            level: level,
+                            gauge: gauge,
+                            points: rCardCount * 2400,
+                            totalSlots: totalSlots,
+                            obtainedCards: obtainedCards
+                        };
+                    }
+
+                    // CASE 2: Group has non-R cards (C, B, A, S)
+                    var avg = nonRPoints / totalSlots;
+                    var grade = 0; // C
+                    var gauge = 0.0;
+                    if (avg >= 4.0) {
+                        grade = 3; // S
+                        gauge = Math.min(1.0, (avg - 4.0) / 1.0);
+                    } else if (avg >= 2.5) {
+                        grade = 2; // A
+                        gauge = Math.min(1.0, (avg - 2.5) / 1.5);
+                    } else if (avg >= 1.0) {
+                        grade = 1; // B
+                        gauge = Math.min(1.0, (avg - 1.0) / 1.5);
+                    } else {
+                        grade = 0; // C
+                        gauge = Math.min(1.0, avg / 1.0);
+                    }
+
+                    return {
+                        grade: grade,
+                        isRGrade: false,
+                        isMaxLevel: false,
+                        level: 0,
+                        gauge: gauge,
+                        points: nonRPoints,
+                        totalSlots: totalSlots,
+                        obtainedCards: obtainedCards
+                    };
+                };
+
                 var populateBestCardBookBanner = function (sceneThis) {
                     try {
                         if (!sceneThis || sceneThis.isNull()) return;
@@ -10868,19 +11000,44 @@ function initIl2Cpp(module) {
                         var statusParamKlass = resolveMetadataSlot(0x31F0FD0);
                         if (!statusParamKlass || statusParamKlass.isNull()) return;
 
+                        // Dynamically find best group among playable groups
+                        var metaAll = getGlobalMetadata();
+                        var playables = (metaAll && metaAll.playableGroups) ? metaAll.playableGroups : PLAYABLE_GROUP_CODES;
+                        var bestGCode = 1001;
+                        var bestMetrics = null;
+                        var bestScore = -1;
+
+                        for (var b = 0; b < playables.length; b++) {
+                            var checkGc = playables[b];
+                            var m = calculateOfflineGroupCardBookMetrics(checkGc);
+                            var compositeScore = m.grade * 1000000 + m.points;
+                            if (compositeScore > bestScore) {
+                                bestScore = compositeScore;
+                                bestGCode = checkGc;
+                                bestMetrics = m;
+                            }
+                        }
+                        if (!bestMetrics) bestMetrics = calculateOfflineGroupCardBookMetrics(bestGCode);
+
                         var spObj = il2cpp_object_new(statusParamKlass);
                         if (il2cpp_gchandle_new && !spObj.isNull()) il2cpp_gchandle_new(spObj, 2);
-                        spObj.add(0x10).writeS32(4);     // grade = R (4)
-                        spObj.add(0x14).writeU8(1);      // isRGrade = true
-                        spObj.add(0x15).writeU8(1);      // isMaxLevel = true
-                        spObj.add(0x18).writeS32(50);    // level = 50
+                        spObj.add(0x10).writeS32(bestMetrics.grade);
+                        spObj.add(0x14).writeU8(bestMetrics.isRGrade ? 1 : 0);
+                        spObj.add(0x15).writeU8(bestMetrics.isMaxLevel ? 1 : 0);
+                        spObj.add(0x18).writeS32(bestMetrics.level);
                         spObj.add(0x1C).writeU8(0);      // useEffect = false
-                        spObj.add(0x20).writeFloat(1.0); // gauge = 1.0
+                        spObj.add(0x20).writeFloat(bestMetrics.gauge);
+
+                        var baseBestGc = getBaseGroupCode(bestGCode);
+                        var bestGMeta = (metaAll && metaAll.groups) ? metaAll.groups[bestGCode] : null;
+                        var bestGName = (bestGMeta && bestGMeta.name) ? bestGMeta.name : ("[+ +]");
+                        var bestEmbPath = "asiudgasg/asodhsg/aweoijs/" + baseBestGc + ".i.bytes";
+                        var bestImgPath = "asiudgasg/asodhsg/foewghkc/" + baseBestGc + ".i.bytes";
 
                         var headerStr = createIl2CppString("BEST CARD BOOK");
-                        var groupNameStr = createIl2CppString("[+ +]");
-                        var emblemDp = createDownloadPath("asiudgasg/asodhsg/aweoijs/1001.i.bytes");
-                        var imageDp = createDownloadPath("asiudgasg/asodhsg/foewghkc/1001.i.bytes");
+                        var groupNameStr = createIl2CppString(bestGName);
+                        var emblemDp = createDownloadPath(bestEmbPath);
+                        var imageDp = createDownloadPath(bestImgPath);
 
                         var setBestFn = new NativeFunction(baseAddr.add(0x11D0A24), "void", ["pointer", "pointer", "pointer", "pointer", "pointer", "pointer", "pointer"]);
                         setBestFn(sceneView, headerStr, groupNameStr, emblemDp, imageDp, spObj, NULL);
@@ -10890,11 +11047,11 @@ function initIl2Cpp(module) {
                         var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
                         var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
 
-                        // Direct guarantee of bestImage texture (foewghkc/1001.i.bytes)
+                        // Direct guarantee of bestImage texture
                         try {
                             var bestImg = sceneView.add(0xA8).readPointer();
                             if (!bestImg.isNull()) {
-                                var bgTex = loadLocalTexture2D("asiudgasg/asodhsg/foewghkc/1001.i.bytes");
+                                var bgTex = loadLocalTexture2D(bestImgPath);
                                 if (bgTex && !bgTex.isNull()) {
                                     var setTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
                                     setTexFn(bestImg, bgTex, NULL);
@@ -10902,7 +11059,6 @@ function initIl2Cpp(module) {
                                         var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
                                         setNativeSizeFn(bestImg, NULL);
                                     } catch (eNs) {}
-                                    // Native size safely applied via setNativeSizeFn without calling low-level injected icalls
                                     bestImg.add(0x20).writeFloat(1.0);
                                     bestImg.add(0x24).writeFloat(1.0);
                                     bestImg.add(0x28).writeFloat(1.0);
@@ -10910,12 +11066,12 @@ function initIl2Cpp(module) {
                                     var biGo = getGoFn(bestImg, NULL);
                                     if (!biGo.isNull()) setActFn(biGo, 1, NULL);
 
-                                    log("[📖 CARDBOOK] Directly applied bestImage LOONA background texture (480x264)!");
+                                    log("[📖 CARDBOOK] Directly applied bestImage background texture for group " + bestGCode);
                                 }
                             }
                         } catch (eBi) {}
 
-                        // Deactivate bestBase child 1 (+bg) gray placeholder quad to reveal LOONA banner
+                        // Deactivate bestBase child 1 (+bg) gray placeholder quad to reveal banner
                         try {
                             var bestBase = sceneView.add(0x88).readPointer(); // UICache
                             if (!bestBase.isNull()) {
@@ -10928,23 +11084,20 @@ function initIl2Cpp(module) {
                                             var plusBgGo = getGoFn(plusBgTf, NULL);
                                             if (!plusBgGo.isNull()) {
                                                 setActFn(plusBgGo, 0, NULL);
-                                                log("[📖 CARDBOOK] Deactivated bestBase child 1 (+bg) gray placeholder!");
                                             }
                                         }
                                     }
                                 }
                             }
-                        } catch (ePb) {
-                            log("[-] Error deactivating +bg: " + ePb.message);
-                        }
+                        } catch (ePb) {}
 
-                        // Direct guarantee of bestEmblem texture (aweoijs/1001.i.bytes)
+                        // Direct guarantee of bestEmblem texture
                         try {
                             var bestEmb = sceneView.add(0xA0).readPointer();
                             if (!bestEmb.isNull()) {
                                 var embRaw = bestEmb.add(0x40).readPointer();
                                 if (!embRaw.isNull()) {
-                                    var embTex = loadLocalTexture2D("asiudgasg/asodhsg/aweoijs/1001.i.bytes");
+                                    var embTex = loadLocalTexture2D(bestEmbPath);
                                     if (embTex && !embTex.isNull()) {
                                         var setTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
                                         setTexFn(embRaw, embTex, NULL);
@@ -10954,17 +11107,14 @@ function initIl2Cpp(module) {
                                         embRaw.add(0x24).writeFloat(1.0);
                                         embRaw.add(0x28).writeFloat(1.0);
                                         embRaw.add(0x2C).writeFloat(1.0);
-                                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                                        var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
                                         var beGo = getGoFn(embRaw, NULL);
                                         if (!beGo.isNull()) setActFn(beGo, 1, NULL);
-                                        log("[📖 CARDBOOK] Directly applied bestEmblem LOONA texture!");
                                     }
                                 }
                             }
                         } catch (eBe) {}
 
-                        log("[📖 CARDBOOK] SetBest cleanly invoked offline with LOONA R50 banner!");
+                        log("[📖 CARDBOOK] SetBest cleanly invoked offline for group " + bestGCode + " (Grade " + bestMetrics.grade + ", Level " + bestMetrics.level + ")!");
                     } catch (eSb) {
                         log("[-] Error in SetBest: " + eSb.message);
                     }
@@ -11356,28 +11506,69 @@ function initIl2Cpp(module) {
                                             }
                                         } catch (eBg) {}
 
-                                        // Apply Grade R & Gauge R sprites
+                                        // Apply dynamic Grade, Gauge, and MAX/Level
                                         try {
                                             var gaugeSpComp = st.add(0x40).readPointer();
                                             var gradeSpComp = st.add(0x60).readPointer();
                                             var gauge = st.add(0x48).readPointer();
                                             var grade = st.add(0x70).readPointer();
-                                            if (!gaugeSpComp.isNull() && !gradeSpComp.isNull() && !gauge.isNull() && !grade.isNull()) {
-                                                var spGradeR = getSpFn(gradeSpComp, 4, NULL);
-                                                var spGraphR = getSpFn(gaugeSpComp, 4, NULL);
-                                                if (!spGradeR.isNull()) setSpFn(grade, spGradeR, NULL);
-                                                if (!spGraphR.isNull()) setSpFn(gauge, spGraphR, NULL);
-                                            }
-                                        } catch (eSp) {}
-
-                                        // Activate MAX badge
-                                        try {
                                             var maxLvl = st.add(0x80).readPointer();
-                                            if (!maxLvl.isNull()) {
-                                                var mlGo = getGoFn(maxLvl, NULL);
-                                                if (!mlGo.isNull()) setActFn(mlGo, 1, NULL);
+                                            var lvlBox = st.add(0x88).readPointer();
+
+                                            var gMetrics = calculateOfflineGroupCardBookMetrics(gCode);
+                                            var displayGrade = (gMetrics.grade >= 0 && gMetrics.grade <= 4) ? gMetrics.grade : 0;
+
+                                            if (!gaugeSpComp.isNull() && !gradeSpComp.isNull() && !gauge.isNull() && !grade.isNull()) {
+                                                var spGrade = getSpFn(gradeSpComp, displayGrade, NULL);
+                                                var spGraph = getSpFn(gaugeSpComp, displayGrade, NULL);
+                                                if (!spGrade.isNull()) setSpFn(grade, spGrade, NULL);
+                                                if (!spGraph.isNull()) setSpFn(gauge, spGraph, NULL);
+
+                                                try {
+                                                    var setGaugeFn = new NativeFunction(baseAddr.add(0x11D3EB0), "void", ["pointer", "float", "pointer"]);
+                                                    setGaugeFn(st, gMetrics.gauge, NULL);
+                                                } catch(eSg) {
+                                                    try { gauge.add(0x74).writeFloat(gMetrics.gauge); } catch(eFa) {}
+                                                }
                                             }
-                                        } catch (eMax) {}
+
+                                            // MAX badge vs Level NumberBox
+                                            if (gMetrics.isRGrade && gMetrics.isMaxLevel) {
+                                                if (!maxLvl.isNull()) {
+                                                    var mlGo = getGoFn(maxLvl, NULL);
+                                                    if (!mlGo.isNull()) setActFn(mlGo, 1, NULL);
+                                                }
+                                                if (!lvlBox.isNull()) {
+                                                    var lbGo = getGoFn(lvlBox, NULL);
+                                                    if (!lbGo.isNull()) setActFn(lbGo, 0, NULL);
+                                                }
+                                            } else if (gMetrics.isRGrade && !gMetrics.isMaxLevel) {
+                                                if (!maxLvl.isNull()) {
+                                                    var mlGo = getGoFn(maxLvl, NULL);
+                                                    if (!mlGo.isNull()) setActFn(mlGo, 0, NULL);
+                                                }
+                                                if (!lvlBox.isNull()) {
+                                                    var lbGo = getGoFn(lvlBox, NULL);
+                                                    if (!lbGo.isNull()) setActFn(lbGo, 1, NULL);
+                                                    try {
+                                                        var setNumFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "int", "pointer"]);
+                                                        setNumFn(lvlBox, gMetrics.level, NULL);
+                                                    } catch(eSn) {}
+                                                }
+                                            } else {
+                                                // Non-R Grade (C, B, A, S): hide both MAX badge and level NumberBox
+                                                if (!maxLvl.isNull()) {
+                                                    var mlGo = getGoFn(maxLvl, NULL);
+                                                    if (!mlGo.isNull()) setActFn(mlGo, 0, NULL);
+                                                }
+                                                if (!lvlBox.isNull()) {
+                                                    var lbGo = getGoFn(lvlBox, NULL);
+                                                    if (!lbGo.isNull()) setActFn(lbGo, 0, NULL);
+                                                }
+                                            }
+                                        } catch (eSp) {
+                                            log("[-] Error in cell[" + i + "] dynamic status: " + eSp.message);
+                                        }
                                     }
                                 } catch (eSt) {
                                     log("[-] Error in cell[" + i + "] status: " + eSt.message);
@@ -11513,23 +11704,25 @@ function initIl2Cpp(module) {
                             var cellParam = il2cpp_object_new(cellParamKlass);
                             if (il2cpp_gchandle_new && !cellParam.isNull()) il2cpp_gchandle_new(cellParam, 2);
 
+                            var gMetrics = calculateOfflineGroupCardBookMetrics(gCode);
+
                             var statusParamKlass = resolveMetadataSlot(0x31F0FD0);
                             var spObj = il2cpp_object_new(statusParamKlass);
                             if (il2cpp_gchandle_new && !spObj.isNull()) il2cpp_gchandle_new(spObj, 2);
-                            spObj.add(0x10).writeS32(4);     // grade = R (4)
-                            spObj.add(0x14).writeU8(1);      // isRGrade = 1
-                            spObj.add(0x15).writeU8(1);      // isMaxLevel = 1
-                            spObj.add(0x18).writeS32(50);    // level = 50
+                            spObj.add(0x10).writeS32(gMetrics.grade);
+                            spObj.add(0x14).writeU8(gMetrics.isRGrade ? 1 : 0);
+                            spObj.add(0x15).writeU8(gMetrics.isMaxLevel ? 1 : 0);
+                            spObj.add(0x18).writeS32(gMetrics.level);
                             spObj.add(0x1C).writeU8(1);      // useEffect = 1
-                            spObj.add(0x20).writeFloat(1.0); // gauge = 1.0
+                            spObj.add(0x20).writeFloat(gMetrics.gauge);
 
                             cellParam.add(0x10).writeS32(gCode);
                             cellParam.add(0x18).writePointer(spObj);
                             cellParam.add(0x20).writePointer(createDownloadPath(embPath));
                             cellParam.add(0x28).writePointer(createIl2CppString(gName));
                             cellParam.add(0x30).writeU8(0); // isNew = false
-                            cellParam.add(0x31).writeU8(1); // isRGrade = true
-                            cellParam.add(0x32).writeU8(1); // isMaxLevel = true
+                            cellParam.add(0x31).writeU8(gMetrics.isRGrade ? 1 : 0);
+                            cellParam.add(0x32).writeU8(gMetrics.isMaxLevel ? 1 : 0);
                             cellParam.add(0x33).writeU8(0); // isUpdatedTheme = false
                             cellParam.add(0x34).writeU8(0); // isMajor = false
 
@@ -16043,17 +16236,19 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                             var themeListManaged = createManagedList(themeItems, 'cardbook_theme');
 
+                            var gMetrics = calculateOfflineGroupCardBookMetrics(gCode);
+
                             var cbGroupGradeInfo = NULL;
                             if (cbGradeInfoKlass && !cbGradeInfoKlass.isNull()) {
                                 cbGroupGradeInfo = il2cpp_object_new(cbGradeInfoKlass);
                                 if (il2cpp_gchandle_new) il2cpp_gchandle_new(cbGroupGradeInfo, 2);
-                                cbGroupGradeInfo.add(0x10).writeS32(4);     // grade = CardGrade.R (4)
-                                cbGroupGradeInfo.add(0x14).writeS32(50);    // currentLevel = 50
-                                cbGroupGradeInfo.add(0x18).writeS32(50);    // maxLevel = 50
+                                cbGroupGradeInfo.add(0x10).writeS32(gMetrics.grade);
+                                cbGroupGradeInfo.add(0x14).writeS32(gMetrics.level);
+                                cbGroupGradeInfo.add(0x18).writeS32(gMetrics.level);
                                 cbGroupGradeInfo.add(0x1C).writeS32(groupPoints);  // currentPoint
                                 cbGroupGradeInfo.add(0x20).writeS32(groupPoints);  // nextPoint
-                                cbGroupGradeInfo.add(0x24).writeS32(groupObtainedCards); // cardCount
-                                cbGroupGradeInfo.add(0x28).writeU8(1);      // isMaxLevel = true
+                                cbGroupGradeInfo.add(0x24).writeS32(gMetrics.obtainedCards); // cardCount
+                                cbGroupGradeInfo.add(0x28).writeU8(gMetrics.isMaxLevel ? 1 : 0);
                             }
 
                             var cbGroupItem = il2cpp_object_new(cbGroupItemKlass);
@@ -16064,13 +16259,13 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             cbGroupItem.add(0x20).writePointer(NULL);
                             cbGroupItem.add(0x28).writePointer(themeListManaged);
                             cbGroupItem.add(0x30).writePointer(NULL);
-                            cbGroupItem.add(0x38).writeS32(4);
-                            cbGroupItem.add(0x3C).writeS32(4);
+                            cbGroupItem.add(0x38).writeS32(gMetrics.grade);
+                            cbGroupItem.add(0x3C).writeS32(gMetrics.grade);
                             cbGroupItem.add(0x40).writeS32(groupPoints);
                             cbGroupItem.add(0x44).writeS32(groupPoints);
-                            cbGroupItem.add(0x48).writeFloat(1.0);
-                            cbGroupItem.add(0x4C).writeS32(50);
-                            cbGroupItem.add(0x50).writeS32(groupObtainedCards);
+                            cbGroupItem.add(0x48).writeFloat(gMetrics.gauge);
+                            cbGroupItem.add(0x4C).writeS32(gMetrics.level);
+                            cbGroupItem.add(0x50).writeS32(gMetrics.obtainedCards);
                             cbGroupItem.add(0x60).writeU8(0);
                             cbGroupItem.add(0x61).writeU8(0);
                             cbGroupItem.add(0x62).writeU8(1);
