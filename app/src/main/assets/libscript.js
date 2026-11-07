@@ -10869,8 +10869,7 @@ function initIl2Cpp(module) {
                         var sceneView = sceneThis.add(0x48).readPointer();
                         if (sceneView.isNull()) return;
 
-                        var statusParamKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardBookStatusView/Param")
-                            || getClass("Assembly-CSharp", "", "CardBookStatusView/Param");
+                        var statusParamKlass = resolveMetadataSlot(0x31F0FD0);
                         if (!statusParamKlass || statusParamKlass.isNull()) return;
 
                         var spObj = il2cpp_object_new(statusParamKlass);
@@ -10898,6 +10897,14 @@ function initIl2Cpp(module) {
                                 if (bgTex && !bgTex.isNull()) {
                                     var setTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
                                     setTexFn(bestImg, bgTex, NULL);
+                                    bestImg.add(0x20).writeFloat(1.0);
+                                    bestImg.add(0x24).writeFloat(1.0);
+                                    bestImg.add(0x28).writeFloat(1.0);
+                                    bestImg.add(0x2C).writeFloat(1.0);
+                                    var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                    var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                    var biGo = getGoFn(bestImg, NULL);
+                                    if (!biGo.isNull()) setActFn(biGo, 1, NULL);
                                     log("[📖 CARDBOOK] Directly applied bestImage LOONA background texture!");
                                 }
                             }
@@ -10913,6 +10920,16 @@ function initIl2Cpp(module) {
                                     if (embTex && !embTex.isNull()) {
                                         var setTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
                                         setTexFn(embRaw, embTex, NULL);
+                                        var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
+                                        setNativeSizeFn(embRaw, NULL);
+                                        embRaw.add(0x20).writeFloat(1.0);
+                                        embRaw.add(0x24).writeFloat(1.0);
+                                        embRaw.add(0x28).writeFloat(1.0);
+                                        embRaw.add(0x2C).writeFloat(1.0);
+                                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                        var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                        var beGo = getGoFn(embRaw, NULL);
+                                        if (!beGo.isNull()) setActFn(beGo, 1, NULL);
                                         log("[📖 CARDBOOK] Directly applied bestEmblem LOONA texture!");
                                     }
                                 }
@@ -10942,8 +10959,14 @@ function initIl2Cpp(module) {
                         var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
                         var setFavCellFn = new NativeFunction(baseAddr.add(0x11CD330), "void", ["pointer", "pointer", "pointer"]);
 
-                        var favParamKlass = getClass("Assembly-CSharp", "", "CardBookMainFavoriteGroupCellView/Param")
-                            || getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardBookMainFavoriteGroupCellView/Param");
+                        var favParamKlass = resolveMetadataSlot(0x31F0F48);
+                        var favDisplayNames = {
+                            1001: "+ +",
+                            2001: "[X X]",
+                            3001: "[#]",
+                            4001: "[12:00]",
+                            5001: "[&]"
+                        };
 
                         var metaAll = getGlobalMetadata();
                         var favCodes = (typeof offlineFavoriteGroups !== "undefined" && offlineFavoriteGroups && offlineFavoriteGroups.length > 0)
@@ -10964,7 +10987,7 @@ function initIl2Cpp(module) {
                                 var gCode = favCodes[i];
                                 var baseGc = getBaseGroupCode(gCode);
                                 var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gCode] : null;
-                                var gName = (gMeta && gMeta.name) ? gMeta.name : ("Group " + gCode);
+                                var gName = (favDisplayNames && favDisplayNames[gCode]) ? favDisplayNames[gCode] : ((gMeta && gMeta.name) ? gMeta.name : ("Group " + gCode));
                                 var embPath = "asiudgasg/asodhsg/aweoijs/" + baseGc + ".i.bytes";
 
                                 // 1. Activate background GameObject
@@ -11032,10 +11055,8 @@ function initIl2Cpp(module) {
                 };
 
                 var buildCollectionRewardData = function (currentPts, nextPts) {
-                    var cellParamKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardBookCollectionPointCellView/Param")
-                        || getClass("Assembly-CSharp", "", "CardBookCollectionPointCellView/Param");
-                    var rewardParamKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "MyRecordRewardInfoItemView/Params")
-                        || getClass("Assembly-CSharp", "", "MyRecordRewardInfoItemView/Params");
+                    var cellParamKlass = resolveMetadataSlot(0x31F0E80);
+                    var rewardParamKlass = resolveMetadataSlot(0x31F41F8);
                     if (!cellParamKlass || cellParamKlass.isNull()) return NULL;
 
                     var cpObj = il2cpp_object_new(cellParamKlass);
@@ -11061,8 +11082,7 @@ function initIl2Cpp(module) {
                 };
 
                 var createCollectionPointViewParam = function (title, subNotice, notice, curPts, maxPts, buffScore, cellParam) {
-                    var paramKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardBookCollectionPointView/Params")
-                        || getClass("Assembly-CSharp", "", "CardBookCollectionPointView/Params");
+                    var paramKlass = resolveMetadataSlot(0x31F0E88);
                     if (!paramKlass || paramKlass.isNull()) return NULL;
 
                     var pObj = il2cpp_object_new(paramKlass);
@@ -11132,6 +11152,12 @@ function initIl2Cpp(module) {
                                 if (!oGo.isNull()) setActFn(oGo, 0, NULL);
                             }
                         } catch (eOb) {}
+
+                        // Tab localized titles ("Collection" / "Group")
+                        try {
+                            var setTabNameFn = new NativeFunction(baseAddr.add(0x11CE86C), "void", ["pointer", "pointer", "pointer"]);
+                            setTabNameFn(sceneView, createIl2CppString("Collection"), createIl2CppString("Group"), NULL);
+                        } catch (eStn) {}
 
                         // 1. BEST CARD BOOK Banner
                         populateBestCardBookBanner(sceneThis);
@@ -11233,15 +11259,13 @@ function initIl2Cpp(module) {
                             var gName = (gMeta && gMeta.name) ? gMeta.name : ("Group " + gCode);
                             var embPath = "asiudgasg/asodhsg/aweoijs/" + baseGc + ".i.bytes";
 
-                            var cellParamKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardBookGroupCellView/Param")
-                                || getClass("Assembly-CSharp", "", "CardBookGroupCellView/Param");
+                            var cellParamKlass = resolveMetadataSlot(0x31F0F38);
                             if (!cellParamKlass || cellParamKlass.isNull()) return NULL;
 
                             var cellParam = il2cpp_object_new(cellParamKlass);
                             if (il2cpp_gchandle_new && !cellParam.isNull()) il2cpp_gchandle_new(cellParam, 2);
 
-                            var statusParamKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardBookStatusView/Param")
-                                || getClass("Assembly-CSharp", "", "CardBookStatusView/Param");
+                            var statusParamKlass = resolveMetadataSlot(0x31F0FD0);
                             var spObj = il2cpp_object_new(statusParamKlass);
                             if (il2cpp_gchandle_new && !spObj.isNull()) il2cpp_gchandle_new(spObj, 2);
                             spObj.add(0x10).writeS32(4);     // grade = R (4)
@@ -12158,7 +12182,19 @@ function initIl2Cpp(module) {
                     var offlineLocaleStrings = {
                         0x2FC86C1: "Shop",
                         0x30423FA: "Sell All",
+                        0xAD007D3: "Collection",
+                        0xAD007D4: "Group",
+                        0xAD007D5: "Choose Group",
+                        0xAD02874: "Collection",
+                        0xAD02875: "Group",
                         0xAD02876: "Choose Group",
+                        0x1D9405B: "Card Book",
+                        0xAD020A1: "My Card Book",
+                        0xAC86041: "ALL CARDS COLLECTION",
+                        0xAC9DB29: "ALL THEMES COLLECTION",
+                        0x1CB55D9: "Card Book",
+                        0x1D94059: "Card Book",
+                        0x1D9405A: "Card Book",
                         0x1D9405D: "Card Book",
                         0x1D94064: "Card Book",
                         0x3072969: "{0} / {1}",
@@ -16065,6 +16101,17 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 } catch (eCbs) {
                                     log("[-] Error opening CardBook detail popup: " + eCbs.message);
                                 }
+                            }
+                        } else if (cmdRaw.indexOf("eval:") === 0) {
+                            var jsCode = cmdRaw.substring(5).trim();
+                            try {
+                                var evalRes = (function () {
+                                    var targetScene = (activeCardBookSceneInstance && !activeCardBookSceneInstance.isNull()) ? activeCardBookSceneInstance : curScene;
+                                    return eval(jsCode);
+                                })();
+                                log("[💡 EVAL RESULT] " + evalRes);
+                            } catch (eEv) {
+                                log("[-] Error in eval: " + eEv.message);
                             }
                         } else if (cmdRaw === "group" || cmdRaw === "default") {
                             if (curScene && !curScene.isNull() && sceneId === 4) {
