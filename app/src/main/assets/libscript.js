@@ -10897,6 +10897,20 @@ function initIl2Cpp(module) {
                                 if (bgTex && !bgTex.isNull()) {
                                     var setTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
                                     setTexFn(bestImg, bgTex, NULL);
+                                    try {
+                                        var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
+                                        setNativeSizeFn(bestImg, NULL);
+                                    } catch (eNs) {}
+                                    try {
+                                        var rt = bestImg.add(0x48).readPointer();
+                                        if (!rt.isNull()) {
+                                            var setSdFn = new NativeFunction(baseAddr.add(0x1DC75EC), "void", ["pointer", "pointer", "pointer"]);
+                                            var buf = Memory.alloc(16);
+                                            buf.writeFloat(480.0);
+                                            buf.add(4).writeFloat(264.0);
+                                            setSdFn(rt, buf, NULL);
+                                        }
+                                    } catch (eSd) {}
                                     bestImg.add(0x20).writeFloat(1.0);
                                     bestImg.add(0x24).writeFloat(1.0);
                                     bestImg.add(0x28).writeFloat(1.0);
@@ -10905,7 +10919,7 @@ function initIl2Cpp(module) {
                                     var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
                                     var biGo = getGoFn(bestImg, NULL);
                                     if (!biGo.isNull()) setActFn(biGo, 1, NULL);
-                                    log("[📖 CARDBOOK] Directly applied bestImage LOONA background texture!");
+                                    log("[📖 CARDBOOK] Directly applied bestImage LOONA background texture (480x264)!");
                                 }
                             }
                         } catch (eBi) {}
@@ -11296,7 +11310,7 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing GetGroupCellViewData: " + eHgcvd.message);
                 }
 
-                // 3g3. CardBookGroupCellView.Refresh (0x11CC6D0) -> Directly apply group emblem texture to prevent white rectangles
+                // 3g3. CardBookGroupCellView.Refresh (0x11CC6D0) -> Directly apply group emblem texture, deactivate status placeholder bg to eliminate white quads
                 try {
                     Interceptor.attach(baseAddr.add(0x11CC6D0), {
                         onEnter: function (args) {
@@ -11306,8 +11320,41 @@ function initIl2Cpp(module) {
                         onLeave: function (retval) {
                             try {
                                 if (!this.cellView || this.cellView.isNull() || !this.param || this.param.isNull()) return;
+
+                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                                var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+
+                                // 1. Deactivate majorFrame and majorEmblem (Dalcom envelopes) for LOONA
+                                var mf = this.cellView.add(0x60).readPointer();
+                                if (!mf.isNull()) setActFn(mf, 0, NULL);
+                                var me = this.cellView.add(0x68).readPointer();
+                                if (!me.isNull()) {
+                                    var meGo = getGoFn(me, NULL);
+                                    if (!meGo.isNull()) setActFn(meGo, 0, NULL);
+                                }
+
+                                // 2. Deactivate child 0 "bg" of status (CardBookStatusView) to eliminate white placeholder quad
+                                var st = this.cellView.add(0x50).readPointer();
+                                if (!st.isNull()) {
+                                    var stGo = getGoFn(st, NULL);
+                                    if (!stGo.isNull()) setActFn(stGo, 1, NULL);
+                                    var stTf = getTfFn(st, NULL);
+                                    if (!stTf.isNull()) {
+                                        var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                                        var bgTf = getChildFn(stTf, 0, NULL);
+                                        if (!bgTf.isNull()) {
+                                            var bgGo = getGoFn(bgTf, NULL);
+                                            if (!bgGo.isNull()) setActFn(bgGo, 0, NULL);
+                                        }
+                                    }
+                                }
+
+                                // 3. Ensure emblem component is active and load official LOONA emblem
                                 var embComp = this.cellView.add(0x58).readPointer(); // Emblem component
                                 if (!embComp.isNull()) {
+                                    var embGo = getGoFn(embComp, NULL);
+                                    if (!embGo.isNull()) setActFn(embGo, 1, NULL);
                                     var rawImg = embComp.add(0x40).readPointer(); // RawImage
                                     if (!rawImg.isNull()) {
                                         var embPathPtr = this.param.add(0x20).readPointer(); // DownloadPath
@@ -11331,14 +11378,49 @@ function initIl2Cpp(module) {
                                         }
                                     }
                                 }
+
+                                // 4. Explicitly apply groupName text
+                                var gnText = this.cellView.add(0x70).readPointer();
+                                if (!gnText.isNull()) {
+                                    var gnStrPtr = this.param.add(0x28).readPointer();
+                                    if (!gnStrPtr.isNull()) {
+                                        var setTextFn = new NativeFunction(baseAddr.add(0x1ED197C), "void", ["pointer", "pointer", "pointer"]);
+                                        setTextFn(gnText, gnStrPtr, NULL);
+                                    }
+                                }
                             } catch (eGcv) {
-                                log("[-] Error in GroupCellView emblem onLeave: " + eGcv.message);
+                                log("[-] Error in GroupCellView Refresh onLeave: " + eGcv.message);
                             }
                         }
                     });
                     log("[+] Interceptor.attach installed on CardBookGroupCellView.Refresh (0x11CC6D0)!");
                 } catch (eHgcv) {
                     log("[-] Error attaching to CardBookGroupCellView.Refresh: " + eHgcv.message);
+                }
+
+                // 3g4. CardBookScene.OnTabButton (0x11D252C) -> Clean offline tab switching without crash in sound/analytics
+                try {
+                    Interceptor.replace(baseAddr.add(0x11D252C), keepCb(new NativeCallback(function (sceneThis, tabType, methodInfo) {
+                        log("[📖 CARDBOOK] OnTabButton clicked offline: tab=" + tabType);
+                        try {
+                            if (!sceneThis || sceneThis.isNull()) return;
+                            var sceneView = sceneThis.add(0x48).readPointer();
+                            if (sceneView.isNull()) return;
+                            var setTabFn = new NativeFunction(baseAddr.add(0x11CF5BC), "bool", ["pointer", "int", "pointer"]);
+                            setTabFn(sceneView, tabType, NULL);
+                            if (tabType === 0) {
+                                populateCardBookMainViewOffline(sceneThis);
+                            } else if (tabType === 1) {
+                                var refreshGroupPageFn = new NativeFunction(baseAddr.add(0x11CF768), "void", ["pointer", "int", "bool", "pointer"]);
+                                refreshGroupPageFn(sceneThis, 0, 0, NULL);
+                            }
+                        } catch (eTab) {
+                            log("[-] Error in OnTabButton hook: " + eTab.message);
+                        }
+                    }, "void", ["pointer", "int", "pointer"])));
+                    log("[+] Interceptor.replace installed on CardBookScene.OnTabButton (0x11D252C)!");
+                } catch (eHotb) {
+                    log("[-] Error replacing OnTabButton: " + eHotb.message);
                 }
 
                 // 4. CardBookScene UI Refresh Safety Patches (guard against NullReferenceException on decorative elements)
@@ -16055,8 +16137,11 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             if (targetScene && !targetScene.isNull()) {
                                 try {
                                     log("[📖 SCENE CMD] Switching CardBook tab to MAIN (0)...");
-                                    var onTabBtnFn = new NativeFunction(baseAddr.add(0x11D252C), "void", ["pointer", "int", "pointer"]);
-                                    onTabBtnFn(targetScene, 0, NULL);
+                                    var sceneView = targetScene.add(0x48).readPointer();
+                                    if (!sceneView.isNull()) {
+                                        var setTabFn = new NativeFunction(baseAddr.add(0x11CF5BC), "bool", ["pointer", "int", "pointer"]);
+                                        setTabFn(sceneView, 0, NULL);
+                                    }
                                     populateCardBookMainViewOffline(targetScene);
                                 } catch (eTm) {
                                     log("[-] Error switching CardBook to main tab: " + eTm.message);
@@ -16067,8 +16152,13 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             if (targetScene && !targetScene.isNull()) {
                                 try {
                                     log("[📖 SCENE CMD] Switching CardBook tab to GROUP_VIEW (1)...");
-                                    var onTabBtnFn = new NativeFunction(baseAddr.add(0x11D252C), "void", ["pointer", "int", "pointer"]);
-                                    onTabBtnFn(targetScene, 1, NULL);
+                                    var sceneView = targetScene.add(0x48).readPointer();
+                                    if (!sceneView.isNull()) {
+                                        var setTabFn = new NativeFunction(baseAddr.add(0x11CF5BC), "bool", ["pointer", "int", "pointer"]);
+                                        setTabFn(sceneView, 1, NULL);
+                                    }
+                                    var refreshGroupPageFn = new NativeFunction(baseAddr.add(0x11CF768), "void", ["pointer", "int", "bool", "pointer"]);
+                                    refreshGroupPageFn(targetScene, 0, 0, NULL);
                                 } catch (eTg) {
                                     log("[-] Error switching CardBook to group tab: " + eTg.message);
                                 }
