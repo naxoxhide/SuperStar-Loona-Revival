@@ -3624,6 +3624,33 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
   * [qa_best_yyxy.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_best_yyxy.png)
   * [qa_best_restored.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_best_restored.png)
 
+---
+
+### 🏛️ CHECKPOINT 23 — Investigación Técnica y Plan de Optimización de Calidad Visual de Fondos "BEST CARD BOOK" (`foewghkc`) (2026-11-08)
+
+#### 1. Auditoría de Origen y Métricas de Assets Gráficos
+- **Validación del Directorio `foewghkc`:**
+  * Se analizó el desensamblado del método IL2CPP [`GroupControl.Data.get_BestCardbookImage`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L598355) (RVA `0xCA4D4C`).
+  * La rutina nativa construye la ruta invocando `ToImagePath(cdnUrl, "foewghkc", groupCode, null)` (RVA `0xAE9BC4`), confirmando que la carpeta [app/src/files/asiudgasg/asodhsg/foewghkc/](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/foewghkc/) es la fuente oficial canónica de fondos del Best Card Book de Dalcomsoft.
+  * Existen exactamente 21 archivos PNG de $480 \times 264$ píxeles en modo RGB (24-bit), correspondientes a los 21 códigos de grupo LOONA (`1001` a `21001`).
+
+#### 2. Causa Raíz de la Pixelación y Pérdida de Calidad
+- **Generación Indeseada de Mipmaps por Constructor por Defecto:**
+  * En [`libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L9538), la rutina `loadLocalTexture2D` utilizaba `Texture2D..ctor(int, int)` (RVA `0x181B6BC`), el cual activa internamente `mipChain = true`.
+  * Al llamar a `ImageConversion.LoadImage` (RVA `0x25B3E90`), Unity generaba una pirámide de mipmaps ($480 \times 264 \rightarrow 240 \times 132 \rightarrow 120 \times 66 \dots$).
+  * En el renderizado 2D de Canvas UI, al escalar a la pantalla 1080p física (~$702 \times 397$ px), el hardware muestreaba o blendaba el mipmap inferior (LOD 1), degradando drásticamente la nitidez visual y produciendo un aspecto pixelado/borroso.
+- **Geometría y Dimensiones de Prefab:**
+  * En el prefab original (`level6`, PathID 34 y 126), `TitleArea` mide `(468.0, 265.0)` y `myBgImage` tiene anclas `(0, 0)` a `(1, 1)` con `sizeDelta = (0, 0)`.
+  * La solución óptima erradica los mipmaps invocando `Texture2D..ctor(int width, int height, TextureFormat textureFormat, bool mipChain)` en RVA **`0x181B634`** con `mipChain = false` (`0`), asegurando muestreo exclusivo del nivel 0 nativo en alta definición.
+
+#### 3. Evidencias Visuales de QA y Plan Aprobado
+- **Comparativas Generadas en Tiempo Real:**
+  * [qa_before_after_comparison.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_before_after_comparison.png) (Vista general antes vs después).
+  * [qa_zoom_detail_comparison.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_zoom_detail_comparison.png) (Detalle macro de rostros en Flip That).
+  * [qa_heejin_comparison.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_heejin_comparison.png) y [qa_heejin_zoom.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_heejin_zoom.png) (Validación grupo HeeJin `7001`).
+  * [qa_mixmatch_comparison.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_mixmatch_comparison.png) y [qa_mixmatch_zoom.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_mixmatch_zoom.png) (Validación subunidad Mix & Match `20001`).
+
+
 
 
 
