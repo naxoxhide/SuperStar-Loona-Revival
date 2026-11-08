@@ -3576,5 +3576,54 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
   * Comandos de consola `scene_cmd.txt`: `cb:main` (Tab 0), `cb:group` (Tab 1), `cb:page:<0|1|2>`.
   * Alternancia fluida bidireccional entre vistas validada sin excepciones.
 
+---
+
+### 🏛️ CHECKPOINT 22 — Posicionamiento Pixel-Perfect de Imagen en "BEST CARD BOOK" y Reactividad Standalone Offline (2026-11-08)
+
+#### 1. Diagnóstico Forense de la Jerarquía en `TitleArea`
+- **Contenedor `TitleArea` (`UICache` en `sceneView + 0x88`):**
+  * Dimensiones: `sizeDelta = (468.0, 265.0)`, `pivot = (1.0, 0.5)`, anclado a `(0.5, 1.0)`.
+  * Hijos analizados en tiempo de ejecución:
+    * Child 0: `myBgImage` (`RawImage` en `sceneView + 0xA8`). Configuración de prefab desfasada: `min = (0, 0)`, `max = (0, 0)`, `pivot = (0.5, 0.5)`, `pos = (0, 0)`, lo que ubicaba su centro geométrico en la esquina inferior izquierda de `TitleArea` y dejaba el 75% del área fuera de la tarjeta.
+    * Child 1: `+bg` (`Image`). Quad gris placeholder con anclaje extendido `(0,0)-(1,1)` que se dibujaba por encima de `myBgImage` (orden de pintor en Canvas).
+    * Child 2: `Status` (`CardBookStatusView`). Insignia de rango y medidor circular.
+    * Child 3: `Emblem` (`Emblem`). Emblema oficial del grupo.
+    * Child 4: `Title` (`Text`: "BEST CARD BOOK").
+    * Child 5: `SubTitle` (`Text`: Nombre del grupo líder).
+- **Causas Raíz Identificadas:**
+  1. Componente `RawImage` deshabilitado: `Behaviour.enabled` se encontraba en `false` (`en = 0`).
+  2. Desalineación de `RectTransform`: Sin anclas completas para estirarse al contenedor.
+  3. Oclusión por `+bg`: El intento previo de desactivarlo fallaba silenciosamente por invocar `Transform.get_childCount` con la RVA errónea `0x181F1A0`.
+
+#### 2. Implementación de Geometría y Activación en `libscript.js`
+- **Configuración Canónica de `RectTransform` para `myBgImage`:**
+  * `anchorMin = (0.0, 0.0)`
+  * `anchorMax = (1.0, 1.0)`
+  * `pivot = (0.5, 0.5)`
+  * `anchoredPosition = (0.0, 0.0)`
+  * `sizeDelta = (0.0, 0.0)`
+  * La textura nativa de $480 \times 264$ px (`asiudgasg/asodhsg/foewghkc/<baseGc>.i.bytes.png`) encaja exactamente en el marco de la tarjeta ($468 \times 265$ unidades Canvas) con alineación milimétrica a los bordes sin desbordar los paneles laterales.
+- **Activación de Componente:**
+  * Invocación de `Behaviour.set_enabled(bestImg, 1)` (RVA `0x1DB3CFC`).
+- **Desactivación Segura de Placeholder `+bg`:**
+  * Uso de la RVA canónica `Transform.get_childCount` (`0x181ECF0`) e iteración por nombre (`Object.get_name` `0x1DC5A54`) para desactivar `+bg` (`GameObject.SetActive(false)` RVA `0x1DBADF4`).
+- **Reordenamiento Sibling:**
+  * Asignación de `Transform.SetSiblingIndex(myBgRt, 1)` (RVA `0x181EDB0`) para asegurar que dibuje detrás de los overlays de texto, emblema y rango.
+
+#### 3. Verificación de Dinamismo Standalone Offline
+- **Algoritmo de Selección:**
+  * `populateBestCardBookBanner` calcula dinámicamente el puntaje de todos los grupos jugables mediante `calculateOfflineGroupCardBookMetrics` y la fórmula compuesta `score = grade * 1,000,000 + points`.
+- **Pruebas de Conmutación Reactiva Multi-Grupo:**
+  1. **Estado Base:** *Flip That* (`6001`, Rango $R_1$, medidor circular, foto de 12 integrantes en vagón, emblema oficial).
+  2. **Inyección Dinámica 1:** *HeeJin* (`7001`, Rango $R_{MAX}$, medidor circular 100%, foto en vestido blanco con fondo de piedra parisino, emblema caligráfico oficial).
+  3. **Inyección Dinámica 2:** *Mix & Match* (`20001`, Rango $R_2$, medidor circular 65%, foto de ODD EYE CIRCLE, emblema de subunidad).
+  4. **Restauración:** Retorno limpio al estado de inventario canónico legítimo (*Flip That*) validado tras reinicio.
+- **Evidencias Visuales de QA:**
+  * [qa_best_clean_reboot.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_best_clean_reboot.png)
+  * [qa_best_heejin.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_best_heejin.png)
+  * [qa_best_yyxy.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_best_yyxy.png)
+  * [qa_best_restored.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_best_restored.png)
+
+
 
 

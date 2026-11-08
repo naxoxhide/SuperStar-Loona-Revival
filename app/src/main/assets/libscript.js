@@ -11047,7 +11047,7 @@ function initIl2Cpp(module) {
                         var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
                         var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
 
-                        // Direct guarantee of bestImage texture
+                        // Direct guarantee of bestImage texture and proper RectTransform stretch positioning
                         try {
                             var bestImg = sceneView.add(0xA8).readPointer();
                             if (!bestImg.isNull()) {
@@ -11055,41 +11055,94 @@ function initIl2Cpp(module) {
                                 if (bgTex && !bgTex.isNull()) {
                                     var setTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
                                     setTexFn(bestImg, bgTex, NULL);
-                                    try {
-                                        var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
-                                        setNativeSizeFn(bestImg, NULL);
-                                    } catch (eNs) {}
+
+                                    // Set full opacity white
                                     bestImg.add(0x20).writeFloat(1.0);
                                     bestImg.add(0x24).writeFloat(1.0);
                                     bestImg.add(0x28).writeFloat(1.0);
                                     bestImg.add(0x2C).writeFloat(1.0);
+
+                                    // Ensure Behaviour component is enabled (0x1DB3CFC)
+                                    try {
+                                        var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int"]);
+                                        setEnabledFn(bestImg, 1);
+                                    } catch (eEn) {}
+
                                     var biGo = getGoFn(bestImg, NULL);
                                     if (!biGo.isNull()) setActFn(biGo, 1, NULL);
 
-                                    log("[📖 CARDBOOK] Directly applied bestImage background texture for group " + bestGCode);
+                                    // Configure RectTransform to stretch cleanly across TitleArea (0,0) to (1,1)
+                                    try {
+                                        var getRtFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                        var myBgRt = getRtFn(bestImg, NULL);
+                                        if (!myBgRt.isNull()) {
+                                            var setPosFn = new NativeFunction(baseAddr.add(0x180DB20), "void", ["pointer", "pointer"]);
+                                            var setSizeFn = new NativeFunction(baseAddr.add(0x180DC6C), "void", ["pointer", "pointer"]);
+                                            var setMinFn = new NativeFunction(baseAddr.add(0x180D888), "void", ["pointer", "pointer"]);
+                                            var setMaxFn = new NativeFunction(baseAddr.add(0x180D9D4), "void", ["pointer", "pointer"]);
+                                            var setPivFn = new NativeFunction(baseAddr.add(0x180DDB8), "void", ["pointer", "pointer"]);
+                                            var setSibFn = new NativeFunction(baseAddr.add(0x181EDB0), "void", ["pointer", "int", "pointer"]);
+
+                                            var vZero = Memory.alloc(8);
+                                            vZero.writeFloat(0.0);
+                                            vZero.add(4).writeFloat(0.0);
+
+                                            var vOne = Memory.alloc(8);
+                                            vOne.writeFloat(1.0);
+                                            vOne.add(4).writeFloat(1.0);
+
+                                            var vHalf = Memory.alloc(8);
+                                            vHalf.writeFloat(0.5);
+                                            vHalf.add(4).writeFloat(0.5);
+
+                                            setMinFn(myBgRt, vZero);
+                                            setMaxFn(myBgRt, vOne);
+                                            setPivFn(myBgRt, vHalf);
+                                            setPosFn(myBgRt, vZero);
+                                            setSizeFn(myBgRt, vZero);
+
+                                            setSibFn(myBgRt, 1, NULL); // Place above +bg placeholder
+                                        }
+                                    } catch (eRt) {
+                                        log("[-] Error configuring bestImage RectTransform: " + eRt.message);
+                                    }
+
+                                    log("[📖 CARDBOOK] Directly applied bestImage background texture and geometry for group " + bestGCode);
                                 }
                             }
                         } catch (eBi) {}
 
-                        // Deactivate bestBase child 1 (+bg) gray placeholder quad to reveal banner
+                        // Deactivate bestBase child (+bg) gray placeholder quad to reveal banner
                         try {
                             var bestBase = sceneView.add(0x88).readPointer(); // UICache
                             if (!bestBase.isNull()) {
                                 var bbTf = bestBase.add(0x18).readPointer(); // Transform
                                 if (!bbTf.isNull()) {
-                                    var getChildCountFn = new NativeFunction(baseAddr.add(0x181F1A0), "int", ["pointer", "pointer"]);
-                                    if (getChildCountFn(bbTf, NULL) > 1) {
-                                        var plusBgTf = getChildFn(bbTf, 1, NULL); // Child 1: "+bg" (gray placeholder)
-                                        if (!plusBgTf.isNull()) {
-                                            var plusBgGo = getGoFn(plusBgTf, NULL);
-                                            if (!plusBgGo.isNull()) {
-                                                setActFn(plusBgGo, 0, NULL);
+                                    var getChildCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer"]);
+                                    var count = getChildCountFn(bbTf);
+                                    var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer"]);
+                                    for (var c = 0; c < count; c++) {
+                                        var chTf = getChildFn(bbTf, c, NULL);
+                                        if (!chTf.isNull()) {
+                                            var chGo = getGoFn(chTf, NULL);
+                                            if (!chGo.isNull()) {
+                                                var nPtr = getNameFn(chGo);
+                                                if (!nPtr.isNull()) {
+                                                    var nLen = nPtr.add(0x10).readS32();
+                                                    var chName = nPtr.add(0x14).readUtf16String(nLen);
+                                                    if (chName === "+bg") {
+                                                        setActFn(chGo, 0, NULL);
+                                                        log("[📖 CARDBOOK] Deactivated +bg placeholder quad!");
+                                                    }
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
-                        } catch (ePb) {}
+                        } catch (ePb) {
+                            log("[-] Error deactivating +bg placeholder: " + ePb.message);
+                        }
 
                         // Direct guarantee of bestEmblem texture
                         try {
