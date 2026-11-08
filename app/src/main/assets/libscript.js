@@ -11293,7 +11293,7 @@ function initIl2Cpp(module) {
                 var offlineTotalThemePointsPossible = 74400;
                 var offlineTotalThemePointsEarned = 74400;
 
-                var buildCollectionRewardData = function (currentPts, nextPts) {
+                var buildCollectionRewardData = function (type, currentPts, targetPts, rewardQuantity, rewardIconPath) {
                     var cellParamKlass = resolveMetadataSlot(0x31F0E80);
                     var rewardParamKlass = resolveMetadataSlot(0x31F41F8);
                     if (!cellParamKlass || cellParamKlass.isNull()) return NULL;
@@ -11308,10 +11308,10 @@ function initIl2Cpp(module) {
                     if (rewardParamKlass && !rewardParamKlass.isNull()) {
                         var rpObj = il2cpp_object_new(rewardParamKlass);
                         if (il2cpp_gchandle_new && !rpObj.isNull()) il2cpp_gchandle_new(rpObj, 2);
-                        var diaDp = createDownloadPath("asiudgasg/asodhsg/bhfbfhbf/317.i.bytes");
-                        rpObj.add(0x10).writePointer(diaDp);
-                        rpObj.add(0x18).writePointer(createIl2CppString("50"));
-                        rpObj.add(0x20).writeU8(1); // autoSize = true
+                        var iconDp = createDownloadPath(rewardIconPath);
+                        rpObj.add(0x10).writePointer(iconDp);
+                        rpObj.add(0x18).writePointer(createIl2CppString(rewardQuantity));
+                        rpObj.add(0x20).writeU8(0); // autoSize = false to preserve prefab 50x50 sizeDelta
                         cpObj.add(0x18).writePointer(rpObj);
                     }
 
@@ -11361,7 +11361,7 @@ function initIl2Cpp(module) {
                         var totThemes = offlineTotalThemePointsPossible;
 
                         if (!cardColPoint.isNull()) {
-                            var cpCell = buildCollectionRewardData(totCards, totCards);
+                            var cpCell = buildCollectionRewardData("card", totCards, totCards, "10", "asiudgasg/asodhsg/bhfbfhbf/317.i.bytes");
                             var cpParam = createCollectionPointViewParam(
                                 "ALL CARDS COLLECTION",
                                 "*Any Theme is available.",
@@ -11376,7 +11376,7 @@ function initIl2Cpp(module) {
                             }
                         }
                         if (!themeColPoint.isNull()) {
-                            var tpCell = buildCollectionRewardData(totThemes, totThemes);
+                            var tpCell = buildCollectionRewardData("theme", totThemes, totThemes, "2,000", "asiudgasg/asodhsg/bhfbfhbf/968.i.bytes");
                             var tpParam = createCollectionPointViewParam(
                                 "ALL THEMES COLLECTION",
                                 "*Any Theme is available.",
@@ -11390,6 +11390,49 @@ function initIl2Cpp(module) {
                                 setColFn(themeColPoint, tpParam, NULL);
                             }
                         }
+
+                        // Explicit high-fidelity texture binding for CardBook reward icons
+                        try {
+                            var setTextureFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                            var setColourFn = new NativeFunction(baseAddr.add(0x14E69AC), "void", ["pointer", "float", "float", "float", "float", "pointer"]);
+                            var diaTex = loadLocalTexture2D("asiudgasg/asodhsg/bhfbfhbf/317.i.bytes");
+                            var rpTex = loadLocalTexture2D("asiudgasg/asodhsg/bhfbfhbf/968.i.bytes");
+
+                            if (!cardColPoint.isNull() && diaTex && !diaTex.isNull()) {
+                                var cAch = cardColPoint.add(0x60).readPointer();
+                                if (!cAch.isNull()) {
+                                    var cRwView = cAch.add(0x48).readPointer();
+                                    if (!cRwView.isNull()) {
+                                        var cRwImg = cRwView.add(0x38).readPointer();
+                                        if (!cRwImg.isNull()) {
+                                            setTextureFn(cRwImg, diaTex, NULL);
+                                            try {
+                                                setColourFn(cRwImg, 1.0, 1.0, 1.0, 1.0, NULL);
+                                            } catch (eColC) {}
+                                        }
+                                    }
+                                }
+                            }
+                            if (!themeColPoint.isNull() && rpTex && !rpTex.isNull()) {
+                                var tAch = themeColPoint.add(0x60).readPointer();
+                                if (!tAch.isNull()) {
+                                    var tRwView = tAch.add(0x48).readPointer();
+                                    if (!tRwView.isNull()) {
+                                        var tRwImg = tRwView.add(0x38).readPointer();
+                                        if (!tRwImg.isNull()) {
+                                            setTextureFn(tRwImg, rpTex, NULL);
+                                            try {
+                                                setColourFn(tRwImg, 1.0, 1.0, 1.0, 1.0, NULL);
+                                            } catch (eColT) {}
+                                        }
+                                    }
+                                }
+                            }
+                            log("[📖 CARDBOOK] Assigned high-fidelity Diamond & RP reward icons directly to RawImages!");
+                        } catch (eRwBind) {
+                            log("[-] Error binding reward icons directly: " + eRwBind.message);
+                        }
+
                         log("[📖 CARDBOOK] Populated collection points in CardBookMainView: Cards " + curCards + "/" + totCards + " | Themes " + curThemes + "/" + totThemes);
                     } catch (eCol) {
                         log("[-] Error in collection points population: " + eCol.message);
@@ -18430,7 +18473,10 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                             var txtObj = il2cpp_runtime_invoke(cachedReadAllTextMethod, NULL, cmdReusableBuf, excReusableBuf);
                                             il2cpp_runtime_invoke(cachedDeleteMethod, NULL, cmdReusableBuf, excReusableBuf);
                                             if (!txtObj.isNull()) {
-                                                var cmdRaw = readIl2CppString(txtObj).replace(/['"]/g, '').trim();
+                                                var cmdRaw = readIl2CppString(txtObj).trim();
+                                                if (cmdRaw.indexOf("eval:") !== 0) {
+                                                    cmdRaw = cmdRaw.replace(/['"]/g, '').trim();
+                                                }
                                                 executeSceneCommand(cmdRaw);
                                             }
                                         }

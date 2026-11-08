@@ -3650,6 +3650,55 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
   * [qa_heejin_comparison.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_heejin_comparison.png) y [qa_heejin_zoom.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_heejin_zoom.png) (Validación grupo HeeJin `7001`).
   * [qa_mixmatch_comparison.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_mixmatch_comparison.png) y [qa_mixmatch_zoom.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_mixmatch_zoom.png) (Validación subunidad Mix & Match `20001`).
 
+---
+
+### 🏛️ CHECKPOINT 24 — Restauración Integral de Iconos de Recompensa (Diamante y R) en "ALL CARDS COLLECTION" y "ALL THEMES COLLECTION" (2026-11-08)
+
+#### 1. Diagnóstico Forense y Mapeo Canónico de Assets
+- **Problema Detectado:**
+  En la escena `CardBookScene` (Scene ID: 5), pestaña **Collection View** (`CardBookMainView`), el panel lateral derecho con las cajas de recompensa no renderizaba los iconos oficiales a la izquierda del texto numérico de recompensa:
+  * En `ALL CARDS COLLECTION`: Faltaba el icono de Diamante.
+  * En `ALL THEMES COLLECTION`: Faltaba el icono de Rhythm Point (`R`).
+- **Auditoría de Metadata Dalcomsoft (`cac.json` y `erd.json`):**
+  * `cac.json` (`collectionPointType: 0`, Cards): `rewardIcon: 967`, `rewardItem: 2` (Diamante), `rewardQuantity: 10`.
+  * `cac.json` (`collectionPointType: 1`, Themes): `rewardIcon: 968`, `rewardItem: 4` (Rhythm Points), `rewardQuantity: 2000`.
+  * En `erd.json`:
+    - `code: 967` $\rightarrow$ `resources/images/icon/80x80/icon_mission_diamond_w.png`.
+    - `code: 968` $\rightarrow$ `resources/images/icon/80x80/icon_mission_rp_w.png`.
+  * Verificación física en almacenamiento local:
+    - Diamante blanco: [`app/src/files/asiudgasg/asodhsg/bhfbfhbf/317.i.bytes.png`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/bhfbfhbf/317.i.bytes.png) ($80 \times 80$ RGBA, 2,180 bytes).
+    - Icono R blanco: [`app/src/files/asiudgasg/asodhsg/bhfbfhbf/968.i.bytes.png`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/asodhsg/bhfbfhbf/968.i.bytes.png) ($80 \times 80$ RGBA, 2,312 bytes).
+
+#### 2. Causa Raíz Identificada en IL2CPP y Código Frida
+1. **Hardcoding no diferenciado en `buildCollectionRewardData`:**
+   En [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js), la rutina construía `MyRecordRewardInfoItemView.Params` asignando siempre la ruta `317.i.bytes` tanto a cartas como a temas, ignorando `968.i.bytes`. Además, fijaba la cantidad en `"50"` en lugar de `"10"` y `"2,000"`.
+2. **Deformación por flag `autoSize = true`:**
+   Al escribir `1` en `rpObj + 0x20` (`autoSize = true`), `URLsControl.SetCdnTexture` llamaba a `RawImage.SetNativeSize()` (RVA `0x194C1C8`), modificando el tamaño de diseño del prefab ($50 \times 50$ px con anclaje $X = -20$) al tamaño nativo de $80 \times 80$ px, desbordando y desalineando el layout.
+3. **Pérdida de comillas en comandos `eval:`:**
+   En la línea 18433 de `libscript.js` (fallback `SceneControl.Update`), `readIl2CppString(txtObj).replace(/['"]/g, '')` despojaba indiscriminadamente las comillas de strings en comandos JS dinámicos, provocando fallas silenciosas de sintaxis.
+
+#### 3. Implementación Técnica y Correcciones Aplicadas
+1. **Refactorización de `buildCollectionRewardData`:**
+   * Firma tipada: `buildCollectionRewardData(type, currentPts, targetPts, rewardQuantity, rewardIconPath)`.
+   * Para cartas: descarga y resolución con `317.i.bytes`, texto `"10"`, `autoSize = false` (`0`).
+   * Para temas: descarga y resolución con `968.i.bytes`, texto `"2,000"`, `autoSize = false` (`0`).
+2. **Inyección Directa de Alta Fidelidad en `populateCollectionPointsOffline`:**
+   * Carga de texturas nativas vía `loadLocalTexture2D` con filtrado bilineal y modo clamp.
+   * Asignación directa a los componentes `RawImage` `reward` (`cAch + 0x48 -> cRwView + 0x38`) mediante `RawImage.set_texture` (RVA `0x194C074`).
+   * Forzado de color blanco opaco `Graphic.set_color` (RVA `0x14E69AC`, `Color(1, 1, 1, 1)`).
+3. **Corrección de la consola `scene_cmd.txt`:**
+   * Guarda condicional: `if (cmdRaw.indexOf("eval:") !== 0)` antes de sanitizar comillas en `SceneControl.Update`.
+
+#### 4. Evidencias Visuales y Aprobación Senior QA
+- **Captura en Vivo Nativa:**
+  * [qa_reward_icons_live.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_reward_icons_live.png) ($1920 \times 1080$, pantalla completa).
+  * [qa_live_collection_panel.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_live_collection_panel.png) (Panel derecho completo con ambas filas y cajas de recompensa).
+- **Mosaicos Comparativos Contra la Referencia del Usuario:**
+  * [qa_comparison_cards_diamond.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_comparison_cards_diamond.png) (Referencia de Ignacio vs Live: Diamante nítido en caja gris con `10` y `COMPLETED`).
+  * [qa_comparison_themes_rp.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_comparison_themes_rp.png) (Referencia de Ignacio vs Live: Icono `R` nítido en caja gris con `2,000` y `COMPLETED`).
+  * [qa_full_comparison_composite.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_full_comparison_composite.png) (Comparativa integral side-by-side de ambos paneles).
+
+
 
 
 
