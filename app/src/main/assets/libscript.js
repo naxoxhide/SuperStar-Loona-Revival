@@ -5868,7 +5868,7 @@ function initIl2Cpp(module) {
                         if (!p || p.isNull()) return NULL;
                         if (il2cpp_gchandle_new) il2cpp_gchandle_new(p, 2);
 
-                        var photoDp = createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/" + cardId + "_l.i.bytes");
+                        var photoDp = createDownloadPath("asiudgasg/asodhsg/sdhgauwehdnu/" + cardId + "_s.i.bytes");
 
                         p.add(0x10).writePointer(photoDp || NULL);
                         p.add(0x18).writePointer(NULL); // tierPath = null
@@ -6129,7 +6129,7 @@ function initIl2Cpp(module) {
                                 if (eqCard) {
                                     smallParam = createMockSmallCardParams(cIdMi, grMi, lvlMi, false, isPrismMi);
                                 } else {
-                                    smallParam = createMockEmptySmallCardParams(cIdMi);
+                                    smallParam = createMockEmptySmallCardParams(targetArtist || cIdMi);
                                 }
                                 cardSmallParamsList.push(smallParam || NULL);
                             }
@@ -9535,8 +9535,9 @@ function initIl2Cpp(module) {
                         if (!texObj || texObj.isNull()) return NULL;
 
                         step = "ctor";
-                        var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
-                        texCtorFn(texObj, 2, 2, NULL);
+                        // Texture2D..ctor(int width, int height, TextureFormat textureFormat, bool mipChain) -> 0x181B634 (mipChain=false avoids pixelation)
+                        var texCtorFn = new NativeFunction(baseAddr.add(0x181B634), "void", ["pointer", "int", "int", "int", "bool", "pointer"]);
+                        texCtorFn(texObj, 2, 2, 4, 0, NULL);
 
                         step = "loadImage";
                         var loadImageFn = new NativeFunction(baseAddr.add(0x25B3E90), "bool", ["pointer", "pointer"]);

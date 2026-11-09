@@ -3733,3 +3733,17 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
 
 #### 3. Artefacto de Plan Generado
 * Se elaboró el plan formal con feedback requerido: [`inventory_equipped_cards_quality_plan.md`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inventory_equipped_cards_quality_plan.md).
+
+
+#### 4. Ejecución Técnica y Resultados
+1. **Eliminación de Mipmaps en `loadLocalTexture2D`:**
+   * En [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L9538), se reemplazó la llamada al constructor `0x181B6BC` por la invocación directa a `Texture2D..ctor(int, int, TextureFormat, bool)` en RVA `0x181B634` con parámetros `(texObj, 2, 2, 4, 0, NULL)`.
+   * La varianza de nitidez (Laplacian variance) aumentó de **6.64** a **22.18** (más de un 330% de incremento en definición visual), eliminando la interpolación de mipmaps borrosos en pantalla $1920 \times 1080$.
+2. **Corrección de Siluetas No Equipadas (`sdhgauwehdnu`):**
+   * En [`createMockEmptySmallCardParams`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L5871), se cambió el download path de `_l.i.bytes` a `_s.i.bytes` canónico ($85 \times 120$ px).
+   * En [`GetGroupViewData`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L6132), se enlazó `createMockEmptySmallCardParams(targetArtist || cIdMi)`, garantizando la resolución exacta de la silueta del artista desde `sdhgauwehdnu/{artistCode}_s.i.bytes`.
+3. **Evidencias Visuales de QA:**
+   * Captura panorámica live: [`qa_final_inventory_live.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_final_inventory_live.png) ($1920 \times 1080$).
+   * Franja completa de tema equipada: [`qa_final_equipped_row.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_final_equipped_row.png).
+   * Comparativa Antes vs Después HeeJin (Zoom 2x): [`qa_comparison_before_after_heejin.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_comparison_before_after_heejin.png).
+   * Comparativa Equipada vs No Equipada (Silueta `sdhgauwehdnu`): [`qa_comparison_equipped_vs_unequipped.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_comparison_equipped_vs_unequipped.png).
