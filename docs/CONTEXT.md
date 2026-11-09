@@ -3703,3 +3703,33 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
 
 
 
+
+
+---
+
+### CHECKPOINT 25: Diagnóstico y Plan de Optimización de Calidad en Cartas de Inventario (wadceg y sdhgauwehdnu)
+
+#### 1. Contexto y Alcance
+* **Solicitud de Ignacio:**
+  * Investigar y optimizar la resolución y calidad visual de las cartas equipadas en el tema dentro de la escena de inventario (`InventoryScene`, ID: 4).
+  * Asegurar el uso estricto de las imágenes de `wadceg` terminadas en `_s.i.bytes` ($85 \times 120$ px).
+  * Verificar que las cartas no equipadas utilicen las imágenes de silueta de la carpeta `sdhgauwehdnu` terminadas en `_s.i.bytes` ($85 \times 120$ px).
+  * Garantizar el comportamiento autónomo standalone offline sin distorsiones ni pixelación por mipmaps.
+* **Componentes IL2CPP Clave:**
+  * [`InventoryScene`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L536380) (Scene ID: 4), `InventoryView` (RVA `0x536380`, offset `0x70`: `groupView` [`InvenGroupView`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L543201)).
+  * [`InvenGroupItemView`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L543014) (RVA `0xF23954`, offset `0x60`: `cardList` de [`CardSmallView`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L539347)).
+  * [`CardSmallView`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L539347) (TypeDefIndex: 12270, hereda de `CardView`), `BasicSize = (92, 130)` px en offset `0xF0`.
+  * `UnityEngine.Texture2D..ctor(int, int, TextureFormat, bool)` (RVA `0x181B634`).
+
+#### 2. Causa Raíz Identificada
+1. **Mipmapping en `loadLocalTexture2D`:**
+   * `Texture2D..ctor(int width, int height)` (RVA `0x181B6BC`) genera mipmaps por defecto (`mipChain = true`).
+   * Al cargar texturas pequeñas ($85 \times 120$ px) con `ImageConversion.LoadImage` (`0x25B3E90`), Unity genera la pirámide de mipmaps ($42 \times 60$, $21 \times 30$, etc.). El Canvas UI en $1920 \times 1080$ muestrea el Mipmap 1 ($42 \times 60$), provocando pixelación y pérdida de definición.
+2. **Path incorrecto en `createMockEmptySmallCardParams`:**
+   * La línea 5871 de `libscript.js` solicitaba `_l.i.bytes` ($226 \times 318$ px) en lugar de `_s.i.bytes` ($85 \times 120$ px) para las siluetas no equipadas de `sdhgauwehdnu`.
+   * Además, se pasaba `cardId` en lugar de `targetArtist`, lo que para temas con IDs superiores fallaba al resolver la silueta del artista.
+3. **Validación de Constructor sin Mipmaps:**
+   * Se comprobó exitosamente en runtime que `Texture2D..ctor(texObj, 2, 2, 4, 0, NULL)` (RVA `0x181B634`) crea la textura con `mipChain = false`, cargando exitosamente el PNG con `LoadImage` y preservando los $85 \times 120$ px nativos con máxima nitidez.
+
+#### 3. Artefacto de Plan Generado
+* Se elaboró el plan formal con feedback requerido: [`inventory_equipped_cards_quality_plan.md`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inventory_equipped_cards_quality_plan.md).
