@@ -6144,8 +6144,9 @@ function initIl2Cpp(module) {
                             var eqCards = (profile && profile.inventoryCards) ? profile.inventoryCards.filter(function(c) { return c.isEquip; }) : [];
                             var eqCount = 0;
                             var minGrade = 4;
-                            var isAllHiHigh = true;
                             var memberEquipped = {};
+                            var themeFrequency = {};
+
                             for (var ei = 0; ei < eqCards.length; ei++) {
                                 var ec = eqCards[ei];
                                 var ecm = getCardMetadata(ec.cardID);
@@ -6154,32 +6155,57 @@ function initIl2Cpp(module) {
                                     if (!memberEquipped[aId]) {
                                         memberEquipped[aId] = true;
                                         eqCount++;
-                                        if (ec.grade < minGrade) minGrade = ec.grade;
-                                        if (ec.themeID && ec.themeID !== 1001) isAllHiHigh = false;
+                                        if (ec.grade !== undefined && ec.grade < minGrade) minGrade = ec.grade;
+                                        var tId = ec.themeID || (ecm ? ecm.theme : null) || 1001;
+                                        themeFrequency[tId] = (themeFrequency[tId] || 0) + 1;
                                     }
                                 }
                             }
 
-                            var gVal = (eqCount === slotCount) ? minGrade : -1;
+                            // 1. Group Grade calculation
+                            var isGroupComplete = (eqCount === slotCount);
+                            var gVal = isGroupComplete ? minGrade : -1;
                             var gScore = 0;
-                            if (gVal === 4) gScore = 500000;
-                            else if (gVal === 3) gScore = 400000;
-                            else if (gVal === 2) gScore = 300000;
-                            else if (gVal === 1) gScore = 200000;
-                            else if (gVal === 0) gScore = 100000;
+                            if (isGroupComplete) {
+                                var scoreByGrade = [100000, 200000, 300000, 400000, 500000];
+                                gScore = scoreByGrade[gVal] !== undefined ? scoreByGrade[gVal] : 500000;
+                            }
 
-                            var tLevel = (eqCount === slotCount && isAllHiHigh) ? 3 : 0;
+                            // 2. Group Theme calculation
+                            var bestThemeId = -1;
+                            var maxThemeMatches = 0;
+                            for (var thId in themeFrequency) {
+                                if (themeFrequency[thId] > maxThemeMatches) {
+                                    maxThemeMatches = themeFrequency[thId];
+                                    bestThemeId = parseInt(thId, 10);
+                                }
+                            }
+
+                            // Level calculation: strictly 0 if not all cards equipped, or proportional if all equipped
+                            var tLevel = 0;
+                            if (isGroupComplete && bestThemeId > 0 && maxThemeMatches > 0) {
+                                tLevel = Math.min(3, Math.floor((3.0 / slotCount) * maxThemeMatches));
+                            }
+
+                            // Rave bonus string and Theme image path
+                            var raveText = "-";
+                            var themeDp = NULL;
+                            if (tLevel >= 1 && bestThemeId > 0) {
+                                if (tLevel === 3) raveText = "ULTRA RAVE";
+                                else if (tLevel === 2) raveText = "SUPER RAVE";
+                                else if (tLevel === 1) raveText = "RAVE";
+                                themeDp = createDownloadPath("asiudgasg/asodhsg/agewfcbxhaa/" + bestThemeId + "_l.i.bytes");
+                            }
 
                             p.add(0x38).writePointer(createIl2CppString("Group Grade"));
-                            p.add(0x40).writePointer(createIl2CppString("Collect All Cards"));
+                            p.add(0x40).writePointer(createIl2CppString("Collect all cards!"));
                             p.add(0x48).writeS32(gVal);
                             p.add(0x4C).writeS32(gScore);
                             p.add(0x50).writePointer(createIl2CppString("Group Theme"));
                             p.add(0x58).writePointer(createIl2CppString("No Theme"));
                             p.add(0x60).writeS32(tLevel);
-                            var themeDp = createDownloadPath("asiudgasg/asodhsg/aweoijs/2.i.bytes");
                             p.add(0x68).writePointer(themeDp || NULL);
-                            p.add(0x70).writePointer(createIl2CppString("ULTRA RAVE"));
+                            p.add(0x70).writePointer(createIl2CppString(raveText));
                             p.add(0x78).writePointer(createIl2CppString("Auto Equip"));
                             p.add(0x80).writePointer(NULL); // LOONA has no sub-groups!
                             p.add(0x88).writePointer(createIl2CppString("Unequip All"));

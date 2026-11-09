@@ -3747,3 +3747,48 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
    * Franja completa de tema equipada: [`qa_final_equipped_row.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_final_equipped_row.png).
    * Comparativa Antes vs Después HeeJin (Zoom 2x): [`qa_comparison_before_after_heejin.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_comparison_before_after_heejin.png).
    * Comparativa Equipada vs No Equipada (Silueta `sdhgauwehdnu`): [`qa_comparison_equipped_vs_unequipped.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_comparison_equipped_vs_unequipped.png).
+
+---
+
+### CHECKPOINT 26: Actualización Dinámica de Group Theme, Nivel y Rave Bonus en InventoryScene (InvenGroupItemView)
+
+#### 1. Contexto y Requerimiento
+* **Objetivo:**
+  - Resolver el bug en `InventoryScene` donde el tema de grupos como `[x x]` (Butterfly) mostraba `"No Theme"` y `"-"` a pesar de tener todas las 11 cartas equipadas.
+  - Asegurar el cálculo dinámico de `themeLevel` ($0..3$), logotipo del tema (`asiudgasg/asodhsg/agewfcbxhaa/{themeId}_l.i.bytes`), bonificación Rave (`"ULTRA RAVE"`, `"SUPER RAVE"`, `"RAVE"`, o `"-"`), y `groupGrade` (`R..C` con su puntuación o `"Collect all cards!"`).
+  - Garantizar el comportamiento cuando no todas las cartas están equipadas (`equippedCount < totalSlots`): `themeLevel = 0`, `"No Theme"`, `"-"`, ocultando logotipo, brillo y nivel.
+* **Componentes Involucrados:**
+  - UI: [`InvenGroupItemView`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L543014) (`groupName` 0x48, `gradeHeader` 0x70, `gradeEmpty` 0x78, `grade` 0x88, `gradeLight` 0x98, `gradeText` 0xA0, `themeHeader` 0xA8, `themeEmpty` 0xB0, `themeLevel` 0xB8, `theme` 0xC0, `themeIcon` 0xC8, `themeLight` 0xD0, `themeText` 0xD8).
+  - Lógica nativa: `InventoryControl.GroupItem.BonusCheck` (RVA `0xB57C88`), `InventoryScene.GetGroupViewData` (RVA `0x105E8E4`), `InvenGroupItemView.UpdateGrade` (RVA `0xF246B4`), `InvenGroupItemView.UpdateTheme` (RVA `0xF248E8`).
+
+#### 2. Causa Raíz Identificada
+1. En [`GetGroupViewData`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L6147), existía una condición estricta hardcodeada:
+   `if (ec.themeID && ec.themeID !== 1001) isAllHiHigh = false;`
+   Esto provocaba que cualquier grupo con un tema distinto a 1001 (*Hi High*), como *Butterfly* (2001) en `[x x]`, evaluara `isAllHiHigh = false` y por ende `tLevel = 0`.
+2. Al evaluar `tLevel < 1`, `InvenGroupItemView.UpdateTheme` (RVA `0xF248E8`) desactiva el componente `theme` (RawImage), oculta `themeLevel` (`Lv ...`), oculta `themeLight`, activa `themeEmpty` (`"No Theme"`) y coloca `"-"` en `themeText`.
+3. Además, `p.themePath` estaba fijado a un recurso genérico `aweoijs/2.i.bytes` en vez de cargar dinámicamente el logotipo de tema canónico desde `asiudgasg/asodhsg/agewfcbxhaa/{themeId}_l.i.bytes`.
+
+#### 3. Implementación Realizada
+1. **Fórmula Oficial de Cálculo de Nivel y Tema:**
+   - Se agruparon las cartas equipadas en `themeFrequency`.
+   - Se determinó el tema con mayor concurrencia `bestThemeId` con `maxThemeMatches`.
+   - Si `isGroupComplete` (`eqCount === slotCount`):
+     $$\text{ThemeLevel} = \min\left(3, \left\lfloor \frac{3}{\text{slotCount}} \times \text{maxThemeMatches} \right\rfloor\right)$$
+   - Si `tLevel >= 1`:
+     * `p.themePath` = `asiudgasg/asodhsg/agewfcbxhaa/{bestThemeId}_l.i.bytes`.
+     * `p.themeText` = `tLevel === 3 ? "ULTRA RAVE" : (tLevel === 2 ? "SUPER RAVE" : "RAVE")`.
+   - Si `eqCount < slotCount`:
+     * `gVal = -1`, `gScore = 0` -> activa `"Collect all cards!"` y `"-"`.
+     * `tLevel = 0`, `p.themePath = NULL`, `p.themeText = "-"` -> activa `"No Theme"`, `"-"`, desactiva logo y nivel.
+2. **Archivos Modificados:**
+   - [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L6143-L6195): Implementación del cálculo dinámico en `GetGroupViewData`.
+
+#### 4. Evidencias Visuales de QA
+* **Caso 1: Grupo `[x x]` Completo con Butterfly (Antes vs Después):**
+  - Artefacto: [`qa_comparison_before_after_xx.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_comparison_before_after_xx.png).
+  - Captura live completa: [`qa_live_case1_butterfly.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_live_case1_butterfly.png).
+* **Caso 2: Grupo `[+ +]` Completo con Hi High:**
+  - Captura live completa: [`qa_live_case2_hihigh.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_live_case2_hihigh.png).
+* **Caso 3: Grupo `[#]` Incompleto (Coincidencia con Guía del Usuario Imagen 3):**
+  - Artefacto: [`qa_comparison_case3_match_user_guide.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_comparison_case3_match_user_guide.png).
+  - Captura live completa: [`qa_live_case3_unequipped.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_live_case3_unequipped.png).
