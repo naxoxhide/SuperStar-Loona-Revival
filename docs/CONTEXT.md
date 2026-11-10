@@ -6,6 +6,57 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### 🔬 CHECKPOINT 26 — Análisis Forense y Arquitectura de Corrección para los Botones de Inventario: `Unequip All`, `Auto Equip` y `Equip Theme` (2026-11-11)
+
+**Investigación técnica, desensamblado ARM64 y diagnóstico de causa raíz:**
+
+1. **Problema 1: Desaparición del Carrusel Inferior de Cartas (`InvenCardView`) al presionar `Unequip All`:**
+   - **Flujo Nativo:** `InventoryScene.OnAllUnequip` (RVA `0x105C158`) invocado al presionar el botón `Unequip All`.
+   - **Causa Raíz:**
+     * En [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js) (L13523), `handleAllUnequipOffline()` estaba hardcodeado para LOONA OT11: `profile.equipedCards["1001"] = []` y solo vaciaba `loonaGroupItemObj.add(0x28)`, sin actualizar `allInvenGroupItems[currentSelectedGroupCode]`.
+     * Posteriormente, `refreshInventoryCardList()` invocaba la función nativa `UpdateDisplayCardList(this, 1, 0, 1, NULL)` con `isGroup = 1`.
+     * En código nativo `UpdateDisplayCardList` (`0x10542F4`), `displayCardList.Clear()` vaciaba la lista y `AddCardItem` (`0x1057FF0`) descartaba todas las cartas cuyo grupo no coincidía estrictamente con `InventoryControl.SelectedGroupCode`.
+     * En el interceptor `onLeave` de `UpdateDisplayCardList` (L10105), cuando `count === 0`, se ejecutaba `restoreDefaultDisplayCardList(this.scene, true, true)` pasando el flag `skipSetData = true`. Al diferir `SetData`, nunca se invocaba `InvenCardView.SetData(count)` con las cartas restauradas, dejando `maxCount = 0` en el scroller nativo (`EnhancedScroller`).
+     * Visualmente, el texto superior mostraba `670 / 2500`, pero las celdas inferiores del inventario quedaban totalmente en blanco.
+   - **Solución Diseñada:**
+     * Hacer `handleAllUnequipOffline()` dinámico respecto a `currentSelectedGroupCode`.
+     * Limpiar únicamente las cartas equipadas correspondientes al grupo activo en `profile.inventoryCards` y vaciar `profile.equipedCards[currentSelectedGroupCode]`.
+     * Sincronizar en memoria `loonaCardItems` (poner `raw.add(0x28).writeU8(0)` para las cartas de dicho grupo) y asignar un FastArray vacío (`createFastArray([], 'card')`) a `allInvenGroupItems[currentSelectedGroupCode].add(0x28)`.
+     * Reemplazar la llamada a `UpdateDisplayCardList` por `applyOfflineSortAndFilter(activeInventorySceneInstance, true)` (sin `skipSetData`). Esto regenera y ordena `displayCardList`, llama a `InvenCardView.SetData(filtered.length)` y repinta activamente todas las celdas.
+
+2. **Problema 2: Inoperancia del Botón `Auto Equip`:**
+   - **Flujo Nativo:** `InventoryScene.OnAutoEquip` (RVA `0x105C024`) invocado al presionar el botón `Auto Equip`.
+   - **Causa Raíz:**
+     * En [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js) (L13449), `handleAutoEquipOffline()` contenía un bucle hardcodeado `for (var m = 0; m < 11; m++)` evaluando `((c.cardID - 1001) % 11) === m` y guardando únicamente en `profile.equipedCards["1001"]`.
+     * Al estar situado el usuario en cualquier otro de los 20 grupos (ej. *Max & Match* `21001`, *Mix & Match* `20001`, solos, etc.), la lógica de módulo 11 no seleccionaba las cartas de los integrantes del grupo activo y jamás modificaba `allInvenGroupItems[currentSelectedGroupCode]`. El botón no producía ningún efecto visual ni cambio en el estado del juego.
+   - **Solución Diseñada:**
+     * Determinar el grupo activo mediante `currentSelectedGroupCode` y consultar la metadata oficial en `getGlobalMetadata().groups[currentSelectedGroupCode]`.
+     * Leer los `artistCodes` del grupo (ej. `[21001, 21002, 21003]` para Max & Match; `[1001..1011]` para LOONA OT11; `[7001, 7002, 7003]` para solos).
+     * Para cada artista, buscar en `profile.inventoryCards` las cartas disponibles y ordenarlas por grado descendente (`R > S > A > B > C`), nivel descendente y cartas Prism prioritarias.
+     * Marcar la mejor carta como `isEquip = true` y agregarla a `newEqList`; marcar el resto de cartas de ese artista como `isEquip = false`.
+     * Persistir `profile.equipedCards[currentSelectedGroupCode] = newEqList` en `player_profile.json`.
+     * Sincronizar los flags en los objetos nativos de memoria (`loonaCardItems`) y reconstruir el FastArray del grupo en `allInvenGroupItems[currentSelectedGroupCode].add(0x28)`.
+     * Invocar `refreshInventoryHeaderView()` para actualizar el encabezado (mostrar cartas equipadas `wadceg/*_s_i.png`, calcular nivel de tema, título y bonus) y `applyOfflineSortAndFilter()` para refrescar el carrusel inferior con el badge `E`.
+
+3. **Problema 3: Crash por SIGSEGV (NullReferenceException) al presionar `Equip Theme`:**
+   - **Flujo Nativo:**
+     * `InvenGroupItemView.OnSelectTheme` (RVA `0xF24D64`) $\to$ Despacha evento 6 a `InventoryScene.OnSelectTheme` (RVA `0x105C28C`).
+     * `InventoryScene.OnSelectTheme` invoca `SelectThemeAssist.Open(selectedGroupCode, cb)` (RVA `0x104ED88`).
+     * `SelectThemeAssist.Open` ejecuta `OpenSelectThemePopup(selectedGroupCode)` (RVA `0x104EF80`).
+   - **Causa Raíz:**
+     * En RVA `0x104F090-0x104F094`, `OpenSelectThemePopup` desreferencia el campo estático `0x20` de `CardBookControl`:
+       `ldr x8, [x0, #0xb8]` $\to$ `ldr x8, [x8, #0x20]` (`CardBookControl.MyInfo`).
+     * En la escena de Inventario (`InventoryScene`), `CardBookControl.MyInfo` es **NULL** (`0x0`), dado que la función `ensureCardBookControlData()` únicamente se ejecutaba al ingresar a la escena de CardBook (escena 5).
+     * En RVA `0x104F098`: `cbz x8, #0x104f178` bifurca a `bl #0xa43cc0` (lanzamiento de NullReferenceException no capturada que aborta el proceso de Unity).
+     * Si `MyInfo` estuviera instanciado pero no se encontrara el grupo, en RVA `0x104F0D8` `cbz x0, #0x104f178` (`groupItem == null`) también provoca el mismo crash.
+     * Adicionalmente, `ThemeCardEquip` (RVA `0x104F2E4`) dentro de la lógica del popup invoca `InventoryControl.MulitEquip` (RVA `0xF2C474`) y `InventoryControl.AllUnequipCard` (RVA `0xF2D414`), los cuales intentan enviar peticiones de red al servidor oficial Dalcom si no son interceptados.
+   - **Solución Diseñada:**
+     * Ejecutar `ensureCardBookControlData()` durante la inicialización del inventario offline (`populateOfflineInventoryCards()`) para asegurar que `CardBookControl.MyInfo`, `CardBookControl.SharedInfo` y `GroupList` contengan los 21 grupos y sus respectivos temas en memoria en todo momento.
+     * Instalar protección / fallback en `CardBookControl.GetGroupItem` (RVA `0x11C83DC`) para retornar el grupo correspondiente desde `allCbGroupItemMap` en caso de discrepancia de puntero.
+     * Interceptar `InventoryControl.MulitEquip` (RVA `0xF2C474`), `InventoryControl.MulitUnequip` (RVA `0xF2C6DC`) y `InventoryControl.AllUnequipCard` (RVA `0xF2D414`) con callbacks offline para procesar el equipamiento de tema en `player_profile.json` e invocar el callback de finalización sin peticiones HTTP.
+
+---
+
 ### 🔬 CHECKPOINT 25 — Investigación Forense y Arquitectura de Restauración del Vídeo de Background Original de Dalcomsoft (AVPro Video & Hardware Decoding) (2026-11-10)
 
 **Análisis de ingeniería inversa, desensamblado ARM64 y diagnóstico de causa raíz:**
