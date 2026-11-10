@@ -6,6 +6,7 @@ import android.graphics.Point;
 import android.graphics.SurfaceTexture;
 import android.os.Build;
 import android.os.Handler;
+import android.os.Looper;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Random;
@@ -708,7 +709,11 @@ public abstract class AVProVideoPlayer implements SurfaceTexture.OnFrameAvailabl
     private void CreateAndBindSinkTexture(int i) {
         SurfaceTexture surfaceTexture = new SurfaceTexture(i);
         this.m_SurfaceTexture = surfaceTexture;
-        surfaceTexture.setOnFrameAvailableListener(this);
+        if (Build.VERSION.SDK_INT >= 21) {
+            surfaceTexture.setOnFrameAvailableListener(this, new Handler(Looper.getMainLooper()));
+        } else {
+            surfaceTexture.setOnFrameAvailableListener(this);
+        }
         BindSurfaceToPlayer();
     }
 

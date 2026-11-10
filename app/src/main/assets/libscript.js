@@ -3066,7 +3066,11 @@ function initIl2Cpp(module) {
                         onLeave: function (retval) {
                             if (this.scId === 3 || this.scId === 4 || this.scId === 5 || this.scId === 6 || this.scId === 7) {
                                 globalSceneId = this.scId;
-                                loadAndApplySceneBackground(true);
+                                // In video scenes (Lobby = 3, Inventory = 4), native AVPro Video handles background.
+                                // Only apply static background if on scenes that do not use video.
+                                if (this.scId !== 3 && this.scId !== 4) {
+                                    loadAndApplySceneBackground(true);
+                                }
                             }
                             try {
                                 refreshTopViewAll();
@@ -3083,15 +3087,8 @@ function initIl2Cpp(module) {
                     log("[-] Error hooking UpdateScene: " + eUsc.message);
                 }
 
-                // NOP out the single call to BackgroundImage.HideBackgroundImage at TopViewControl.UpdateScene (0xB2ED70)
-                try {
-                    Memory.protect(baseAddr.add(0xB2ED70), 4, 'rwx');
-                    baseAddr.add(0xB2ED70).writeByteArray([0x1f, 0x20, 0x03, 0xd5]); // NOP
-                    Memory.protect(baseAddr.add(0xB2ED70), 4, 'r-x');
-                    log("[🛡️ BACKGROUND SHIELD] Successfully patched TopViewControl.UpdateScene bl HideBackgroundImage with NOP!");
-                } catch (eNop) {
-                    log("[-] Error patching 0xB2ED70 with NOP: " + eNop.message);
-                }
+                // Native Hardware AVPro Video Playback: Allow BackgroundImage.HideBackgroundImage (0xB2ED70) to execute natively
+                log("[🎬 VIDEO RESTORE] TopViewControl.UpdateScene bl HideBackgroundImage (0xB2ED70) left UNTOUCHED for native video!");
 
                 // NOP out the cbz w8, #0xb2f0ec at TopViewControl.UpdateScene (0xB2EF18)
                 // This permanently bypasses the online IngameView.IsLogin gatekeeper and ensures TopView is ALWAYS shown in LobbyScene!
@@ -3137,7 +3134,20 @@ function initIl2Cpp(module) {
                     });
                     Interceptor.attach(baseAddr.add(0xABCD70), {
                         onEnter: function (args) {
-                            log("[🎬 VC DIAG] VideoControl.OnVideoEvent! eventType=" + args[2].toInt32() + ", errorCode=" + args[3].toInt32());
+                            var et = args[2].toInt32();
+                            var ec = args[3].toInt32();
+                            log("[🎬 VC DIAG] VideoControl.OnVideoEvent! eventType=" + et + ", errorCode=" + ec);
+                            if (et === 3) {
+                                try {
+                                    var getBiFn = new NativeFunction(baseAddr.add(0xE93AAC), "pointer", []);
+                                    var bi = getBiFn();
+                                    if (bi && !bi.isNull()) {
+                                        var hideBgFn = new NativeFunction(baseAddr.add(0xE93E08), "void", ["pointer"]);
+                                        hideBgFn(bi);
+                                        log("[🎬 VIDEO SUCCESS] FirstFrameReady -> BackgroundImage hidden for native video!");
+                                    }
+                                } catch (eHbg) {}
+                            }
                         }
                     });
                 } catch (eDiagVc) {

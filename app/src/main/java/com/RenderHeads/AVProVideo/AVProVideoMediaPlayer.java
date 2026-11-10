@@ -22,6 +22,7 @@ public class AVProVideoMediaPlayer extends AVProVideoPlayer implements MediaPlay
     private MediaExtractor m_MediaExtractor;
     private MediaPlayer m_MediaPlayer;
     private MediaPlayer.TrackInfo[] m_aTrackInfo;
+    protected String m_VideoPath;
 
     @Override // com.RenderHeads.AVProVideo.AVProVideoPlayer
     public double GetCurrentAbsoluteTimestamp() {
@@ -155,6 +156,7 @@ public class AVProVideoMediaPlayer extends AVProVideoPlayer implements MediaPlay
                         strSubstring = strSubstring.substring(6);
                     }
                     String str3 = strSubstring;
+                    this.m_VideoPath = str3;
                     try {
                         AssetFileDescriptor assetFileDescriptorOpenFd = this.m_Context.getAssets().openFd(str3.substring(str3.lastIndexOf("/assets/") + 8));
                         if (assetFileDescriptorOpenFd != null) {
@@ -172,28 +174,23 @@ public class AVProVideoMediaPlayer extends AVProVideoPlayer implements MediaPlay
                         }
                     } catch (Exception unusedAssets) {
                         try {
-                            FileInputStream fis = new FileInputStream(str3);
-                            FileDescriptor fd = fis.getFD();
                             if (j == 0) {
-                                this.m_MediaPlayer.setDataSource(fd);
+                                this.m_MediaPlayer.setDataSource(str3);
                             } else {
+                                FileInputStream fis = new FileInputStream(str3);
+                                FileDescriptor fd = fis.getFD();
                                 this.m_MediaPlayer.setDataSource(fd, j, fis.getChannel().size() - j);
                             }
                             if (Build.VERSION.SDK_INT > 15) {
                                 MediaExtractor mediaExtractor2 = new MediaExtractor();
                                 this.m_MediaExtractor = mediaExtractor2;
                                 try {
-                                    if (j == 0) {
-                                        mediaExtractor2.setDataSource(fd);
-                                    } else {
-                                        mediaExtractor2.setDataSource(fd, j, fis.getChannel().size() - j);
-                                    }
+                                    mediaExtractor2.setDataSource(str3);
                                 } catch (IOException unusedMediaExt) {
                                     this.m_MediaExtractor.release();
                                     this.m_MediaExtractor = null;
                                 }
                             }
-                            fis.close();
                         } catch (Exception unusedFile) {
                             Uri uri = Uri.parse("file:/" + str3);
                             this.m_MediaPlayer.setDataSource(this.m_Context, uri);
@@ -492,6 +489,25 @@ public class AVProVideoMediaPlayer extends AVProVideoPlayer implements MediaPlay
     @Override // android.media.MediaPlayer.OnErrorListener
     public boolean onError(MediaPlayer mediaPlayer, int i, int i2) {
         new StringBuilder("onError what(").append(i).append("), extra(").append(i2).append(")");
+        if (this.m_bLooping && this.m_VideoPath != null) {
+            try {
+                if (this.m_MediaPlayer != null) {
+                    this.m_MediaPlayer.reset();
+                    this.m_MediaPlayer.setDataSource(this.m_VideoPath);
+                    this.m_MediaPlayer.setOnPreparedListener(this);
+                    this.m_MediaPlayer.setOnVideoSizeChangedListener(this);
+                    this.m_MediaPlayer.setOnErrorListener(this);
+                    this.m_MediaPlayer.setOnCompletionListener(this);
+                    this.m_MediaPlayer.setOnBufferingUpdateListener(this);
+                    this.m_MediaPlayer.setOnInfoListener(this);
+                    this.m_MediaPlayer.setLooping(true);
+                    this.m_VideoState = 2;
+                    this.m_bIsBuffering = true;
+                    this.m_MediaPlayer.prepareAsync();
+                    return true;
+                }
+            } catch (Exception e) {}
+        }
         int i3 = this.m_VideoState;
         if (i3 == 1 || i3 == 2 || i3 == 4) {
             this.m_iLastError = 100;
@@ -506,7 +522,16 @@ public class AVProVideoMediaPlayer extends AVProVideoPlayer implements MediaPlay
 
     @Override // android.media.MediaPlayer.OnCompletionListener
     public void onCompletion(MediaPlayer mediaPlayer) {
-        if (this.m_bLooping || this.m_VideoState < 3 || this.m_VideoState >= 8) {
+        if (this.m_bLooping) {
+            try {
+                if (this.m_MediaPlayer != null) {
+                    this.m_MediaPlayer.seekTo(0);
+                    this.m_MediaPlayer.start();
+                }
+            } catch (Exception e) {}
+            return;
+        }
+        if (this.m_VideoState < 3 || this.m_VideoState >= 8) {
             return;
         }
         this.m_VideoState = 8;
