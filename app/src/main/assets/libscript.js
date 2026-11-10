@@ -2544,7 +2544,7 @@ function initIl2Cpp(module) {
                 var cachedRawImage = NULL;
 
                 function initBackgroundVideoPlayer() {
-                    if (bgVideoLoaded || bgVideoLoading) return;
+                    return; // Disabled in favor of native AVPro hardware video player
                     bgVideoLoading = true;
                     try {
                         var domain = il2cpp_domain_get ? il2cpp_domain_get() : NULL;
@@ -2777,25 +2777,7 @@ function initIl2Cpp(module) {
                         var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
                         var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
 
-                        // Neutralize VideoControl DisplayUGUI and VideoPlayer GameObject
-                        try {
-                            var getVcInstanceFn = new NativeFunction(baseAddr.add(0xABAE34), "pointer", []);
-                            var vc = getVcInstanceFn();
-                            if (vc && !vc.isNull()) {
-                                var hideDispFn = new NativeFunction(baseAddr.add(0xABCE98), "void", ["pointer", "pointer"]);
-                                hideDispFn(vc, NULL);
-                                var display = vc.add(0x28).readPointer();
-                                if (display && !display.isNull()) {
-                                    var dispGo = getGoFn(display, NULL);
-                                    if (dispGo && !dispGo.isNull()) setActiveFn(dispGo, 0, NULL);
-                                }
-                                var targetTr = vc.add(0x38).readPointer();
-                                if (targetTr && !targetTr.isNull()) {
-                                    var tGo = getGoFn(targetTr, NULL);
-                                    if (tGo && !tGo.isNull()) setActiveFn(tGo, 0, NULL);
-                                }
-                            }
-                        } catch (eVcD) {}
+                        // DisplayUGUI and VideoPlayer are kept ACTIVE for native hardware video playback
 
                         if (bgInstance && !bgInstance.isNull()) {
                             var bgGo = getGoFn(bgInstance, NULL);
@@ -2965,17 +2947,9 @@ function initIl2Cpp(module) {
                             // Non-title scene: clear title cache so next visit gets new random
                             cachedTitleTexObj = null;
                             cachedTitleFileName = "";
-                            // Active card or menu scene: activate authentic video playback
-                            bgVideoActive = true;
-                            if (!bgVideoLoaded && !bgVideoLoading) {
-                                initBackgroundVideoPlayer();
-                            }
-                            if (bgVideoLoaded && bgVideoTextures.length > 0) {
-                                selectedFileName = "main_24.webm (active 90-frame video loop)";
-                                texObj = bgVideoTextures[0];
-                            } else {
-                                selectedFileName = "background_main.png (fallback)";
-                                var primaryPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/background_main.png";
+                            // Backdrop image under VideoControl DisplayUGUI
+                            selectedFileName = "background_main.png (backdrop)";
+                            var primaryPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/background_main.png";
                                 var readAllBytesMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllBytes", 1);
                                 var pathStr = createIl2CppString(primaryPath);
                                 var args1 = Memory.alloc(Process.pointerSize);
@@ -2994,7 +2968,6 @@ function initIl2Cpp(module) {
                                     loadImageFn(texObj, bytesObj);
                                 }
                             }
-                        }
 
                         if (!texObj || texObj.isNull()) {
                             log("[-] Failed to initialize background texture!");
@@ -3131,19 +3104,44 @@ function initIl2Cpp(module) {
                     log("[-] Error patching 0xB2EF18 with NOP: " + eNopTv.message);
                 }
 
-                // Neutralize VideoControl.Show (0xABBDA8) and VideoControl.ShowDisplay (0xABCEC8) with RET
-                // This permanently prevents AVPro's broken DisplayUGUI quad from rendering solid white over BackgroundImage
-                try {
-                    Memory.protect(baseAddr.add(0xABBDA8), 4, 'rwx');
-                    baseAddr.add(0xABBDA8).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]); // ret
-                    Memory.protect(baseAddr.add(0xABBDA8), 4, 'r-x');
+                // Native Hardware AVPro Video Playback: Leave VideoControl.Show and ShowDisplay UNTOUCHED
+                log("[🎬 VIDEO RESTORE] VideoControl.Show and ShowDisplay left unpatched for native hardware playback!");
 
-                    Memory.protect(baseAddr.add(0xABCEC8), 4, 'rwx');
-                    baseAddr.add(0xABCEC8).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]); // ret
-                    Memory.protect(baseAddr.add(0xABCEC8), 4, 'r-x');
-                    log("[🛡️ VIDEO SHIELD] Successfully neutralized VideoControl.Show and ShowDisplay with RET!");
-                } catch (eRet) {
-                    log("[-] Error patching VideoControl Show/ShowDisplay with RET: " + eRet.message);
+                // Diagnostic Interceptors for Dalcomsoft Native Video Engine
+                try {
+                    Interceptor.attach(baseAddr.add(0xABBC34), {
+                        onEnter: function (args) {
+                            log("[🎬 VC DIAG] VideoControl.Open called! this=" + args[0] + ", type=" + args[1].toInt32() + ", isPrepare=" + args[2].toInt32());
+                        }
+                    });
+                    Interceptor.attach(baseAddr.add(0xABBDA8), {
+                        onEnter: function (args) {
+                            log("[🎬 VC DIAG] VideoControl.Show called! this=" + args[0]);
+                        }
+                    });
+                    Interceptor.attach(baseAddr.add(0xABCC34), {
+                        onEnter: function (args) {
+                            log("[🎬 VC DIAG] VideoControl.OnOpenStep2 called! key=" + args[1].toInt32() + ", isPrepare=" + args[2].toInt32());
+                        }
+                    });
+                    Interceptor.attach(baseAddr.add(0xCAEFC4), {
+                        onEnter: function (args) {
+                            var loc = args[1].toInt32();
+                            var pathPtr = args[2];
+                            var pStr = (!pathPtr.isNull()) ? readIl2CppString(pathPtr) : "null";
+                            log("[🎬 MP DIAG] MediaPlayer.OpenVideoFromFile called! loc=" + loc + ", path=" + pStr + ", autoPlay=" + args[3].toInt32());
+                        },
+                        onLeave: function (retval) {
+                            log("[🎬 MP DIAG] MediaPlayer.OpenVideoFromFile returned: " + retval);
+                        }
+                    });
+                    Interceptor.attach(baseAddr.add(0xABCD70), {
+                        onEnter: function (args) {
+                            log("[🎬 VC DIAG] VideoControl.OnVideoEvent! eventType=" + args[2].toInt32() + ", errorCode=" + args[3].toInt32());
+                        }
+                    });
+                } catch (eDiagVc) {
+                    log("[-] Error attaching VideoControl diagnostics: " + eDiagVc.message);
                 }
 
                 // Patch GroupControl.InitFavoriteLocalData (0xB9FF50) with RET to prevent NullReferenceException on Ready
@@ -18259,12 +18257,21 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             if (unlinkFn) unlinkFn(cmdPathCStr);
                             if (content) {
                                 var cmdTrim = content.trim();
-                                if (cmdTrim.indexOf("eval:") !== 0) {
+                                if (cmdTrim.indexOf("eval:") === 0) {
+                                    var jsCode = cmdTrim.substring(5).trim();
+                                    log("[⚡ DIRECT EVAL] Executing: " + jsCode);
+                                    try {
+                                        var evalRes = eval(jsCode);
+                                        log("[⚡ DIRECT EVAL RESULT] " + evalRes);
+                                    } catch (eEv) {
+                                        log("[-] Error in direct eval: " + eEv.message);
+                                    }
+                                } else {
                                     cmdTrim = cmdTrim.replace(/['"]/g, '').trim();
-                                }
-                                if (cmdTrim.length > 0) {
-                                    pendingSceneCommand = cmdTrim;
-                                    log("[🚀 SCENE CMD QUEUED] Queued for Unity Main Thread: '" + cmdTrim + "'");
+                                    if (cmdTrim.length > 0) {
+                                        pendingSceneCommand = cmdTrim;
+                                        log("[🚀 SCENE CMD QUEUED] Queued for Unity Main Thread: '" + cmdTrim + "'");
+                                    }
                                 }
                             }
                         }
@@ -18317,8 +18324,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         try {
                             sceneUpdateCounter++;
 
-                        // 🎬 Continuous Background Video Frame Update across ALL scenes (Main Thread 60fps)
-                        updateBackgroundVideoFrame();
+                        // Native AVPro hardware video player handles background video at 60fps natively
+                        // (updateBackgroundVideoFrame removed)
 
                         // Main-thread CardIntensifyPopup timers (safe from cross-thread Unity UI access)
                         if (popupTryCountdown > 0) {
