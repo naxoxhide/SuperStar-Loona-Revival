@@ -3946,3 +3946,57 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
 * **Artefactos Visuales:**
   - Captura en Lobby: [`lobby_screen1.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/lobby_screen1.png).
   - Captura en Inventario: [`inven_test1.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inven_test1.png).
+
+---
+
+### CHECKPOINT 28: Corrección y Habilitación Offline de Unequip All, Auto Equip y Equip Theme en InventoryScene
+
+#### 1. Contexto y Requerimiento
+* **Objetivo:**
+  - Corregir el funcionamiento del botón `Unequip All` en [`InventoryScene`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js) para que al desequipar las cartas de un grupo, **las cartas del inventario inferior permanezcan visibles** (sin vaciar el carrusel de 670 cartas) y muestren las siluetas no equipadas correctas (`sdhgauwehdnu/*_s_i.png`).
+  - Habilitar el botón `Auto Equip` para que seleccione automáticamente las cartas óptimas para cada artista del grupo activo (`highest grade > highest level > prism`), actualice la memoria y el perfil offline [`player_profile.json`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/player_profile.json), y refresque tanto el encabezado del grupo como el carrusel inferior.
+  - Corregir el crash (`SIGSEGV` / `NullReferenceException`) al pulsar el botón `Equip Theme`, permitiendo abrir de forma fluida el popup nativo de selección de tema ([`SelectThemePopup`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L530144)) y equipar temas offline.
+  - Preservar la arquitectura offline standalone sin alterar módulos ajenos a lo solicitado.
+
+#### 2. Causa Raíz Identificada
+1. **Desaparición del carrusel inferior en `Unequip All`:**
+   - La función nativa `InventoryControl.AllUnequipCard` o `InventoryScene.OnAllUnequip` invocaba `UpdateDisplayCardList(isGroup=1)` que vaciaba el buffer `displayCardList`, y el hook `onLeave` llamaba a `restoreDefaultDisplayCardList(skipSetData=true)`, omitiendo `InvenCardView.SetData` y dejando el carrusel con 0 celdas activas.
+2. **Inactividad en `Auto Equip`:**
+   - En el juego original, `InventoryScene.OnAutoEquip` delegaba en `InventoryControl.AutoEquipCard` (RVA `0xF2CFD0`) que enviaba una petición de red asíncrona hacia el servidor de Dalcomsoft. Al no haber backend online, la llamada moría sin respuesta ni actualización local.
+3. **Crash al pulsar `Equip Theme`:**
+   - **Primer punto de quiebre (RVA `0x104F17C`):** En `SelectThemeAssist.OpenSelectThemePopup` (RVA `0x104EF80`), la instrucción en `0x104F094: ldr x8, [CardBookControl, #0x20]` intentaba leer `CardBookControl.MyInfo`, el cual era `NULL` en `InventoryScene`, derivando en un branch forzoso a `0x104F178` (`bl #0xa43cc0` / `ThrowNullReferenceException`).
+   - **Segundo punto de quiebre (RVA `0xBF5170`):** Dentro del delegado asíncrono `<OpenSelectThemePopup>b__0` (RVA `0xBF4600`), en `0xBF4914` se ejecutaba `LocalePopupControl.Find(2052)` para obtener el título del popup. Al no existir el código 2052 en el diccionario local o estar cerrado el controlador, retornaba `NULL`, disparando la bifurcación `0xBF4940: cbz x22, #0xbf516c` hacia `ThrowNullReferenceException`.
+   - **Tercer punto de quiebre (RVA `0x104F6D0`):** `SelectThemeAssist.GetCardListByGroup` leía `InventoryControl.CardMap` (offset estático `0xB8`), el cual no estaba inicializado en modo offline, provocando un fallo al intentar iterar sobre sus elementos.
+
+#### 3. Implementación Realizada ([`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js))
+1. **Reconstrucción Dinámica de `FastArray` y Sincronización:**
+   - Función [`syncGroupEquippedFastArray(gCode, newEqList)`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js): localiza el `GroupItem` del grupo especificado y reconstruye su `FastArray<CardItem>` legítimo con las ranuras correspondientes (11, 4 o 3 artistas).
+2. **Corrección de `handleAllUnequipOffline()`:**
+   - Detecta dinámicamente `currentSelectedGroupCode` del grupo en pantalla.
+   - Vacia `profile.equipedCards[gCode]`, marca `cItem.IsEquip = false` en `loonaCardItems`, reconstruye el `FastArray` vacío y sincroniza `player_profile.json`.
+   - Modificada la rutina [`refreshInventoryCardList()`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js) para llamar a `applyOfflineSortAndFilter(activeInventorySceneInstance, true)` en vez del nativo `UpdateDisplayCardList(isGroup=1)`, preservando las 670 cartas en el carrusel inferior con sus badges actualizados.
+3. **Implementación de `handleAutoEquipOffline()`:**
+   - Resuelve los artistas del grupo activo desde los metadatos globales (`getGlobalMetadata().groups[gCode].artistCodes`).
+   - Para cada artista, evalúa el inventario disponible y selecciona la carta con mayor grado, mayor nivel y propiedad prism.
+   - Actualiza `profile.equipedCards[gCode]`, sincroniza los punteros nativos en el `FastArray` y refresca instantáneamente [`InvenGroupItemView`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs) e [`InvenCardView`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs).
+4. **Habilitación y Estabilización de `SelectThemePopup`:**
+   - Interceptado [`InventoryScene.OnSelectTheme`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L571340) (RVA `0x105C28C`), [`SelectThemeAssist.Open`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs) (RVA `0x104ED88`) y [`SelectThemeAssist.OpenSelectThemePopup`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L571342) (RVA `0x104EF80`) asegurando la ejecución de `ensureCardBookControlData()` y la apertura de [`LocalePopupControl`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L621806) (`0xCF2C44`).
+   - Interceptor en [`LocalePopupControl.Find`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L621840) (RVA `0xCF2998`) con fallback a puntero seguro no nulo cuando la búsqueda retorna `NULL`.
+   - Reemplazo de [`LocalePopupControl.Data.get_Title`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L621774) (RVA `0xE78048`) retornando de forma segura la cadena IL2CPP `"Select Theme"`.
+   - Reemplazo de [`SelectThemeAssist.GetCardListByGroup`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L571342) (RVA `0x104F6D0`) con implementación offline que filtra `loonaCardItems` por `(groupCode, themeCode, slotIndex)` y genera una `List<InventoryControl.CardItem>` administrada genuina mediante `createManagedList(matchingCards, 'card')`.
+   - Protección con fallback en [`CardBookControl.GetGroupItem`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs) (RVA `0x11C83DC`).
+
+#### 4. Evidencias Visuales de QA
+* **Prueba 1: Unequip All en Grupo `[+ +]`:**
+  - Evidencia: [`inven_unequip_test.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inven_unequip_test.png).
+  - Resultado: Las 11 cartas superiores se desequipan mostrando las siluetas oficiales de cada miembro con sus nombres (`sdhgauwehdnu/*_s_i.png`), Group Grade pasa a "Collect all cards!" (S -), Group Theme pasa a "No Theme", y el carrusel inferior mantiene intactas sus **670 cartas visibles sin insignias 'E'**.
+* **Prueba 2: Auto Equip en Grupo `[+ +]`:**
+  - Evidencia: [`inven_autoequip_test.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inven_autoequip_test.png).
+  - Resultado: Se equipan automáticamente las 11 cartas óptimas R50 Hi High, restableciendo Group Grade a R (+500,000) y Group Theme a ULTRA RAVE Lv 3 Hi High con texturas HD sin alterar el inventario inferior.
+* **Prueba 3: Equip Theme Popup en Grupo `[+ +]`:**
+  - Evidencia: [`inven_equiptheme_popup.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inven_equiptheme_popup.png).
+  - Resultado: Se abre limpiamente el popup `Custom/Popup_Theme_Select` mostrando los temas disponibles (Hi High con checkmark de equipado, HEAT con ranuras disponibles), botones de bloqueo y selección de líder, y botón de cierre funcional ([`inven_after_popup_close.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inven_after_popup_close.png)).
+* **Prueba 4: Validación Cruzada en Grupo `[x x]` (Grupo 1002):**
+  - Unequip All: [`inven_xx_unequip.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inven_xx_unequip.png) (Siluetas específicas de `[x x]`, carrusel de 670 cartas íntegro).
+  - Auto Equip: [`inven_xx_autoequip.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inven_xx_autoequip.png) (Reequipamiento automático de R50 Butterfly, ULTRA RAVE Lv 3).
+  - Equip Theme Popup: [`inven_xx_equiptheme_popup.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inven_xx_equiptheme_popup.png) (Temas Butterfly y Satellite presentados sin fallos).
