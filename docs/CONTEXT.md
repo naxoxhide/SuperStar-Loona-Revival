@@ -3845,3 +3845,53 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
 * **Caso 3: Grupo `[#]` Incompleto (Coincidencia con Guía del Usuario Imagen 3):**
   - Artefacto: [`qa_comparison_case3_match_user_guide.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_comparison_case3_match_user_guide.png).
   - Captura live completa: [`qa_live_case3_unequipped.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_live_case3_unequipped.png).
+
+---
+
+### CHECKPOINT 27: Restauración Integral del Vídeo de Fondo Nativo (AVPro Hardware Decoder)
+
+#### 1. Contexto y Requerimiento
+* **Objetivo:**
+  - Reinstaurar la reproducción por hardware nativo del vídeo de fondo original (`main_24.webm` y `title_24.webm`) en las escenas del juego (`LobbyScene` e `InventoryScene`), siguiendo fielmente la arquitectura original de Dalcomsoft (`VideoControl`, `DisplayUGUI` y `MediaPlayer` respaldados por `libAVProLocal.so`).
+  - Erradicar parches sintéticos anteriores (ticker emulado de 90 frames JPEG a ~8 fps, NOP en `HideBackgroundImage` y supresión de `DisplayUGUI`).
+  - No modificar componentes ajenos a lo solicitado.
+  - Validar matemáticamente la reproducción continua y fluida mediante capturas comparativas en BlueStacks (`hd-adb`) y aguardar la confirmación visual de Ignacio.
+
+#### 2. Causa Raíz Identificada
+1. **Fallo en Enlace OES en `AVProMobileVideo_GlRender.Blit()`:**
+   - La llamada `GLES20.glBindTexture(i, this.m_TextureHandle)` estaba contenida dentro de `if (!z)`. Cuando `z` era `true` (`m_bTextureFormat_EOS`, target `36197 = GL_TEXTURE_EXTERNAL_OES`), nunca se enlazaba el handle de la textura a `GL_TEXTURE0`.
+   - Adicionalmente, al finalizar `Blit()`, `GLES20.glBindTexture(i, 0)` desvinculaba la textura, dejando el quad con textura 0.
+2. **Omisión de Uniform Sampler en `SetupGlShaderProgram()`:**
+   - El shader de fragmentos `LoadGlShaders_TextureOES` define `uniform samplerExternalOES texture;`, pero no se configuraba explícitamente `GLES20.glUniform1i(samplerLoc, 0)`.
+3. **Cierre Prematuro del FileDescriptor (`fis.close()`):**
+   - En `AVProVideoMediaPlayer.OpenVideoFromFileInternal()`, `fis.close()` cerraba el descriptor de kernel mientras el motor asíncrono de Android intentaba decodificarlo, arrojando error `0x80000000` en el códec `c2.android.vp8.decoder`.
+4. **Pérdida de Bucle Infinito en NuPlayer (`autoLoop(0)`):**
+   - El decodificador nativo de Android no reactivaba automáticamente la reproducción de archivos WebM al alcanzar el final del flujo (`atEOS(1)`).
+
+#### 3. Implementación Realizada
+1. **Pipeline Java de AVPro Video ([`app/src/main/java/com/RenderHeads/AVProVideo/`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/java/com/RenderHeads/AVProVideo/)):**
+   - [`AVProMobileVideo_GlRender.java`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/java/com/RenderHeads/AVProVideo/AVProMobileVideo_GlRender.java):
+     * En `SetupGlShaderProgram()`: Enlace explícito de `samplerLoc` hacia la unidad de textura `0` con `glUniform1i(samplerLoc, 0)`.
+     * En `Blit()`: Activación de `GL_TEXTURE0` y enlace forzoso de `m_TextureHandle` antes y después de `surfaceTexture.updateTexImage()`, asegurando que el quad dibuje los frames decodificados hacia el FBO (`m_FrameBufferTextureHandle`, textura 2D ID 988/6605 en Unity).
+   - [`AVProVideoMediaPlayer.java`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/java/com/RenderHeads/AVProVideo/AVProVideoMediaPlayer.java):
+     * Reemplazo del descriptor cerrado por asignación directa mediante ruta `m_MediaPlayer.setDataSource(str3)`.
+     * En `onCompletion()`: Bucle infinito real mediante `seekTo(0)` y `start()` cuando `m_bLooping` es verdadero.
+     * En `onError()`: Recuperación y reinicio transparente de la reproducción en caso de pérdida de contexto.
+   - [`AVProVideoPlayer.java`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/java/com/RenderHeads/AVProVideo/AVProVideoPlayer.java):
+     * Registro de `surfaceTexture.setOnFrameAvailableListener` en el `Looper.getMainLooper()` para garantizar la recepción de eventos de frames en el render thread.
+2. **Orquestación en [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js):**
+   - Retirado el parche NOP en `0xB2ED70`, permitiendo que `TopViewControl.UpdateScene` invoque legítimamente `HideBackgroundImage` (RVA `0xE93E08`).
+   - Condicionado `loadAndApplySceneBackground` para omitir la carga estática en escenas con reproductor de vídeo nativo (Lobby = 3, Inventory = 4).
+   - En `VideoControl.OnVideoEvent` (RVA `0xABCD70`), al recibir `eventType === 3` (`FirstFrameReady`), se oculta `BackgroundImage` para revelar el canvas `DisplayUGUI`.
+
+#### 4. Evidencias de QA y Métricas en Vivo
+* **Estado de Decodificación Hardware (`dumpsys media.player`):**
+  - Códec: `c2.android.vp8.decoder` (`video/x-vnd.on2.vp8`).
+  - Resolución: $1024 \times 512$.
+  - Estado: `state(5), atEOS(0), looping(1)`, más de 4000 frames decodificados continuamente a 60 FPS sin caídas.
+* **Métricas de Movimiento de Frames en Vivo:**
+  - `LobbyScene`: 101,821 píxeles cambiantes entre frames consecutivos (`lobby_screen1.png` vs `lobby_screen2.png`).
+  - `InventoryScene`: 1,209,280 píxeles cambiantes y 144,936 píxeles en la región superior de fondo (`inven_test1.png` vs `inven_test2.png`, diferencia máxima de 41 niveles de color).
+* **Artefactos Visuales:**
+  - Captura en Lobby: [`lobby_screen1.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/lobby_screen1.png).
+  - Captura en Inventario: [`inven_test1.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inven_test1.png).
