@@ -6,6 +6,59 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### 🔬 CHECKPOINT 25 — Investigación Forense y Arquitectura de Restauración del Vídeo de Background Original de Dalcomsoft (AVPro Video & Hardware Decoding) (2026-11-10)
+
+**Análisis de ingeniería inversa, desensamblado ARM64 y diagnóstico de causa raíz:**
+
+1. **Jerarquía Oficial de Dalcomsoft para Reproducción de Vídeo en `libil2cpp.so`:**
+   - **Flujo de Inicialización y Llamadas:**
+     * `TopViewControl.UpdateScene(SCENE_TYPE scene)` (RVA `0xB2ECE4`):
+       - Consulta el tipo de vídeo llamando a `VideoControl.GetMovieType(scene)` (RVA `0xABB8A8`), que mapea escenas como Lobby/Inventario a `MOVIE_TYPE.Main` (`1`).
+       - Obtiene el singleton `VideoControl.get_Instance()` (RVA `0xABAE34`).
+       - Invoca `VideoControl.Open(MOVIE_TYPE type = 1, isPrepare = false)` (RVA `0xABBC34`).
+       - Invoca `VideoControl.Show()` (RVA `0xABBDA8`).
+     * `VideoControl.Open(1, false)` ejecuta:
+       - `OnOpenStep1(key, isPrepare)` (RVA `0xABCAE0`).
+       - `OnOpenStep2(key, isPrepare)` (RVA `0xABCC34`):
+         * Comprueba la existencia en disco mediante `System.IO.File.Exists(path)` (RVA `0x1F01DF4`).
+         * Si existe en `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/main_24.webm`, invoca `MediaPlayer.OpenVideoFromFile(location = 4 [RelativeToPeristentDataFolder], "main_24.webm", autoPlay = true)` (RVA `0xCAEFC4`).
+         * Si no, recurre a `location = 2 [RelativeToStreamingAssetsFolder]` con `"video/main_24.webm"`.
+     * `MediaPlayer.OpenVideoFromFile` delega en `AndroidMediaPlayer.OpenVideoFromFile(path, offset, httpHeaderJson)` (RVA `0x123FF5C`), llamando vía JNI a `s_Interface.Call<AndroidJavaObject>("CreatePlayer", api, ...)`.
+
+2. **Causa Raíz del Fallo Histórico y del Quad Blanco en Pantalla:**
+   - **Diagnóstico del Crash / Error Logcat:**
+     `E Unity: [AVProVideo] m_Video is null!`
+     `E Unity: [AVProVideo] Failed to open /storage/.../main_24.webm`
+   - **Origen:** En el archivo [app/src/main/java/com/RenderHeads/AVProVideo/AVProMobileVideo.java](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/java/com/RenderHeads/AVProVideo/AVProMobileVideo.java), la clase Java era un **stub vacío**:
+     ```java
+     public Object CreatePlayer(int i, boolean z, boolean z2, int i2, boolean z3) {
+         return null;
+     }
+     ```
+     Al retornar `null`, el puntero nativo JNI `m_Video` quedaba nulo en `AndroidMediaPlayer`, la inicialización fallaba completamente y `DisplayUGUI` (al carecer de textura vinculada) renderizaba un polígono cuadrado blanco sólido sobre la pantalla.
+   - **Workaround Previo Ineficiente:**
+     * En [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js) (L3134-3144), se neutralizó `VideoControl.Show` (`0xABBDA8`) y `VideoControl.ShowDisplay` (`0xABCEC8`) con instrucciones `RET` en memoria.
+     * En `ensureBackgroundHierarchyActive`, se forzó la desactivación de `DisplayUGUI` y su `GameObject`.
+     * En `SceneControl.Update` (`0xD55EE8`), se programó un ticker cuadro por cuadro (`updateBackgroundVideoFrame`) cargando 90 archivos JPEG estáticos a `8.56 fps` hacia `BackgroundImage.backgroundRawImage`.
+     * Dicho ticker generaba alta latencia, sobrecarga de memoria, saltos de cuadro perceptibles y pérdida de la calidad de vídeo nativo a 60 fps.
+
+3. **Descubrimiento de la Implementación Original en el Repositorio:**
+   - La implementación Java real y completa de AVPro Video ya reside en [app/src/main/_decompiled_ads/com/RenderHeads/AVProVideo/](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/_decompiled_ads/com/RenderHeads/AVProVideo/):
+     * `AVProMobileVideo.java` (implementación legítima con gestión de instancias `m_Players`, enlace JNI `nativeInit` y carga de `libAVProLocal.so`).
+     * `AVProVideoMediaPlayer.java` (reproductor de hardware basado en `android.media.MediaPlayer` nativo de Android).
+     * `AVProVideoPlayer.java` (gestión de `SurfaceTexture.OnFrameAvailableListener`, mutex y estados).
+     * `AVProMobileVideo_GlRender.java` (shaders de renderizado OpenGL ES 2.0 / 3.0 directo a textura).
+   - `libAVProLocal.so` (en `app/src/main/lib/arm64-v8a/`) ya expone `Java_com_RenderHeads_AVProVideo_AVProMobileVideo_nativeInit`, `UnityRenderEvent` y las rutinas C++ de vinculación gráfica.
+   - Android soporta nativamente el códec VP8/WebM a través de `android.media.MediaPlayer` sin dependencias externas.
+
+4. **Plan de Acción de Restauración:**
+   - Promover las clases reales de AVPro Video a `app/src/main/java/com/RenderHeads/AVProVideo/`.
+   - Limpiar artefactos del descompilador (`Data.MAX_DATA_BYTES` $\rightarrow$ `GLES20.GL_TEXTURE_MAG_FILTER`).
+   - Retirar los parches `RET` de Frida sobre `VideoControl.Show` y `ShowDisplay`.
+   - Desmantelar el ticker sintético de 90 frames en `libscript.js` y permitir la reproducción nativa del vídeo original [app/src/files/soidhskd/main_24.webm](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/soidhskd/main_24.webm).
+
+---
+
 ### ✅ CHECKPOINT 21 — Cálculo Dinámico y Reactivo del Rango de Grupos en Group View, Selección Automática del Mejor Grupo en Best Banner y Validación Visual de Progresión (2026-11-08)
 
 **Estado verificado y validado en sesión activa en emulador (`emulator-5554`) con PID 5150:**
