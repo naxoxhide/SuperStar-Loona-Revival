@@ -235,20 +235,9 @@ public class AVProMobileVideo_GlRender {
         boolean z = this.m_bTextureFormat_EOS;
         int i = z ? 36197 : 3553;
         long timestamp = 0;
-        if (!z) {
-            GLES20.glActiveTexture(33984);
-            GLES20.glBindTexture(i, this.m_TextureHandle);
-        } else if (surfaceTexture != null) {
-            IntBuffer intBufferAllocate = IntBuffer.allocate(1);
-            GLES20.glGetTexParameteriv(36197, 36200, intBufferAllocate);
-            int i2 = intBufferAllocate.get(0);
-            if (i2 == 2) {
-                GLES20.glActiveTexture(33985);
-            } else if (i2 == 3) {
-                GLES20.glActiveTexture(33986);
-                GLES20.glActiveTexture(33985);
-            }
-            GLES20.glActiveTexture(33984);
+        GLES20.glActiveTexture(33984);
+        GLES20.glBindTexture(i, this.m_TextureHandle);
+        if (z && surfaceTexture != null) {
             try {
                 surfaceTexture.updateTexImage();
                 timestamp = surfaceTexture.getTimestamp();
@@ -260,6 +249,7 @@ public class AVProMobileVideo_GlRender {
                 surfaceTexture.getTransformMatrix(fArr);
             }
         }
+        GLES20.glBindTexture(i, this.m_TextureHandle);
         if (fArr != null) {
             FloatBuffer floatBufferCreateFloatBuffer = CreateFloatBuffer(fArr);
             this.m_MatrixFloatBuffer = floatBufferCreateFloatBuffer;
@@ -377,6 +367,12 @@ public class AVProMobileVideo_GlRender {
         this.m_VertexAttribHandle = GLES20.glGetAttribLocation(this.m_ProgramHandle, "vertexPosition");
         this.m_uvAttribHandle = GLES20.glGetAttribLocation(this.m_ProgramHandle, "vertexUV");
         this.m_MatrixHandle = GLES20.glGetUniformLocation(this.m_ProgramHandle, "textureMat");
+        int samplerLoc = GLES20.glGetUniformLocation(this.m_ProgramHandle, "texture");
+        if (samplerLoc >= 0) {
+            GLES20.glUseProgram(this.m_ProgramHandle);
+            GLES20.glUniform1i(samplerLoc, 0);
+            GLES20.glUseProgram(0);
+        }
     }
 
     private void CreateGlQuadGeometry() {
