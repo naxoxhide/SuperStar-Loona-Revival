@@ -6,6 +6,52 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### 🔬 CHECKPOINT 27 — Análisis Forense, Desensamblado ARM64 y Arquitectura de Restauración Integral para la Pestaña Group en `CardBookScene` (`CardBookGroupView` y `CardBookDetailPopup`) (2026-11-11)
+
+**Investigación técnica, desensamblado ARM64 y diagnóstico de causa raíz:**
+
+1. **Flujo de Ejecución e Interacción de la Pestaña Group:**
+   - **Navegación e Índices:**
+     * `CardBookGroupView.OnSelectGroupItem(int index)` (RVA `0x11CD1D8`) despacha el evento de clic al delegado de `CardBookScene.OnSelectGroupItem` (RVA `0x11D2EAC`).
+     * `CardBookScene.OnSelectGroupItem` calcula el índice absoluto del grupo como:
+       $$\text{index} = \text{siblingIndex} + (\text{nowPage} \times 8)$$
+     * Los 21 grupos del juego se distribuyen en 3 páginas:
+       - **Página 1 (nowPage = 0, slots 0..7):** `[ + + ]` (1001), `[x x]` (2001), `[#]` (3001), `[12:00]` (4001), `[&]` (5001), `[Flip That]` (6001), HeeJin (7001), HyunJin (8001).
+       - **Página 2 (nowPage = 1, slots 0..7):** HaSeul (9001), YeoJin (10001), ViVi (11001), Kim Lip (12001), JinSoul (13001), Choerry (14001), Yves (15001), Chuu (16001).
+       - **Página 3 (nowPage = 2, slots 0..4 activos, slots 5..7 vacíos):** Go Won (17001), Olivia Hye (18001), LOONA 1/3 (19001), LOONA ODD EYE CIRCLE (20001), LOONA yyxy (21001).
+   - **Apertura del Popup de Detalle:**
+     * `CardBookScene.OpenDetailPopup(CardBookControl.GroupItem groupItem, int nowPage)` (RVA `0x11CF9C0`):
+       - Asigna callbacks de vida del popup:
+         * `<OpenDetailPopup>b__0` (RVA `0xE40874`): Inicialización del scroller y encabezado del tema.
+         * `<OpenDetailPopup>b__1` (RVA `0xE411F8`): Poblado y refresco de cada celda de tema (`CardBookDetailCellView`), donde se iteran las cartas normales (`CardList`) y cartas Prism (`PrismCardList`).
+         * `<OpenDetailPopup>b__4` (RVA `0xE4173C`): Callback de cierre, que invoca `RefreshSetGroupViewPage(sceneThis, nowPage, false)` (RVA `0x11CF768`).
+       - Invoca `CardBookDetailPopup.Open(groupItem, ...)` (RVA `0x11CC220`), el cual activa el `EnhancedScroller` vertical.
+
+2. **Diagnóstico Forense de Causas Raíz de Errores y Crashes:**
+   - **Fallo A: Crash por `ThrowArgumentOutOfRangeException` en `OnSelectGroupItem`:**
+     * *RVA Crítica:* `0x11D2EAC` (`CardBookScene.OnSelectGroupItem`) $\to$ `0x1FF9000` (`ThrowHelper.ThrowArgumentOutOfRangeException`).
+     * *Causa:* En la Página 3 (`nowPage = 2`), si el usuario hace clic en los slots residuales 5, 6 o 7 (que están visualmente invisibles o deshabilitados pero sus BoxColliders o botones uGUI pueden recibir eventos táctiles en coordenadas extremas), el cálculo arroja $\text{index} \ge 21$. Al evaluar `cmp w8, w20` contra `GroupList.Count = 21`, el runtime de IL2CPP lanza una excepción no capturada que provoca `SIGABRT` instantáneo.
+   - **Fallo B: Crash por `NullReferenceException` en `<OpenDetailPopup>b__1` (`0xE411F8`):**
+     * *RVA Crítica:* `0xE4153C-0xE4158C` dentro del delegado `<OpenDetailPopup>b__1`.
+     * *Causa:*
+       1. En `CardBookControl.ThemeItem..ctor` (RVA `0xB9766C`), `PrismCardList` (`0x20`) se dimensiona con la cantidad de miembros del grupo (`slotCount`), pero sus punteros de elementos quedan en `0x0` (NULL).
+       2. Al iterar `PrismCardList`, la instrucción `cbz x0, #0xe41578` bifurca y ejecuta `CardBookScene.GetCollectionCardViewData(card = NULL, isMe = true)` (RVA `0x11D204C`).
+       3. `GetCollectionCardViewData` retorna `NULL`, el cual es insertado en `prismCardParam` (`List.Add(NULL)`).
+       4. Posteriormente, en `CardBookDetailCellView.RepositioningCard` (RVA `0x11CB3F4`), al intentar desreferenciar los datos del parámetro de la carta Prism o al manipular cartas silueta uncollected (Grade None = 5) sin configuración completa de `ThemeTypeControl.Data` / `downloadSmallImagePath`, se produce una desreferencia nula que salta a `il2cpp_codegen_raise_null_reference_exception` (RVA `0xA43CC0`).
+   - **Fallo C: Ausencia de Badges (`EVENT` y `ORIGINAL`) en Temas Normales como *Hi High*:**
+     * En [app/src/main/assets/libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js) (L9434), el diccionario `cardbookThemeBadges` carecía de la entrada `"1001": [902, 903]`.
+     * Al faltar, `tObj.add(0x18)` (`CardBookMarkList`) permanecía nulo en el objeto `ThemeControl.Data` correspondiente a *Hi High*, impidiendo que el motor nativo renderizara los badges oficiales de evento y tema original presentes en la captura de referencia.
+
+3. **Arquitectura de Solución:**
+   - **Componente A (Guarda de Rango en `OnSelectGroupItem`):** Interceptar `CardBookScene.OnSelectGroupItem` (`0x11D2EAC`) para validar que $\text{index} \in [0, 20]$ y que el slot cliqueado corresponda a un grupo válido en `allCbGroupItemList`. Ignorar de forma segura cualquier interacción en slots vacíos.
+   - **Componente B (Estabilización de `PrismCardList` y Siluetas Uncollected):**
+     * En `ensureCardBookControlData()`, poblar completamente `PrismCardList` (`0x20`) de cada `ThemeItem` con instancias válidas de `CardBookControl.CardItem` (configurando `isPrism = true` y asociando `CardControl.Data` neutral con `downloadSmallImagePath` y `ThemeType` consistentes).
+     * Interceptar `CardBookScene.GetCollectionCardViewData` (`0x11D204C`) para garantizar que ante cualquier tarjeta no poseída retorne un objeto `CardCollectionView.Params` válido con silueta estándar en lugar de `NULL`.
+   - **Componente C (Badges Oficiales):** Agregar `"1001": [902, 903]` a `cardbookThemeBadges` en `libscript.js`.
+   - **Componente D (Matriz de Verificación Visual de los 21 Grupos):** Validar la navegación de las 3 páginas, apertura de popups, scroll vertical de temas y renderizado de cartas tanto poseídas (R con marco dorado) como no poseídas (siluetas).
+
+---
+
 ### 🔬 CHECKPOINT 26 — Análisis Forense y Arquitectura de Corrección para los Botones de Inventario: `Unequip All`, `Auto Equip` y `Equip Theme` (2026-11-11)
 
 **Investigación técnica, desensamblado ARM64 y diagnóstico de causa raíz:**
