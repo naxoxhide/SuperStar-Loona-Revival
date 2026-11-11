@@ -4046,3 +4046,77 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
   - Unequip All: [`inven_xx_unequip.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inven_xx_unequip.png) (Siluetas específicas de `[x x]`, carrusel de 670 cartas íntegro).
   - Auto Equip: [`inven_xx_autoequip.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inven_xx_autoequip.png) (Reequipamiento automático de R50 Butterfly, ULTRA RAVE Lv 3).
   - Equip Theme Popup: [`inven_xx_equiptheme_popup.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inven_xx_equiptheme_popup.png) (Temas Butterfly y Satellite presentados sin fallos).
+
+---
+
+### CHECKPOINT 29: Estabilización Integral y Renderizado de Temas en CardBookScene (Pestaña Group y Detail Popup)
+
+#### 1. Contexto y Requerimiento
+* **Objetivo:**
+  - Restaurar el funcionamiento pleno de la pestaña `Group` en `CardBookScene` (`CardBookGroupView` y `CardBookDetailPopup`).
+  - Habilitar la navegación fluida a través de las 3 páginas de grupos (21 grupos en total: 6 de LOONA OT11, 12 Solistas desde HeeJin hasta Olivia Hye, y subunidades LOONA 1/3, LOONA Odd Eye Circle y LOONA yyxy).
+  - Verificar que cada grupo abra limpiamente su popup de detalle (`CardBookDetailPopup`) listando todos sus temas con cartas obtenidas (Gold R nivel 50) y siluetas no obtenidas monocromáticas con nombre oficial del integrante.
+  - Asegurar la visualización de insignias oficiales en temas especiales (`LIMITED` [901], `EVENT` [902], `ORIGINAL` [903]), especialmente para `Hi High` (`EVENT` + `ORIGINAL`).
+  - Blindar la UI contra excepciones fuera de límites (`ArgumentOutOfRangeException`) al interactuar con slots vacíos o grupos con menos de 11 integrantes.
+  - Mantener la estricta operación offline standalone sin alterar módulos no vinculados.
+
+#### 2. Causa Raíz Identificada
+1. **Crash Universal en Solistas y Subunidades (`ThrowArgumentOutOfRangeException` / `SIGABRT`):**
+   - En el prefab de Unity de `CardBookDetailCellView`, las listas nativas de celdas (`itemList` y `prismItemList`) contienen **11 ranuras de UI fijas**, diseñadas para la formación completa de LOONA OT11.
+   - En la función nativa `CardBookDetailCellView.RefreshCellView` (RVA `0x11C9E44`), el bucle de actualización itera siempre `itemList.Count` (11 veces).
+   - Para solistas (`cardParam.Count == 3`) y subunidades (`cardParam.Count == 3` o `4`), la instrucción nativa en `0x11CA390` (`cmp x24, x8`) evaluaba el índice del bucle `x24` contra la cantidad real de cartas del grupo `x8`. Al superarlo, saltaba forzosamente a `ThrowHelper.ThrowArgumentOutOfRangeException` (RVA `0x1FF9000`), generando una excepción no capturada en C# y provocando la terminación abrupta del proceso Android (`SIGABRT` / `abort+164`).
+   - El mismo comportamiento se repetía para las cartas prism en la instrucción `0x11CA4A8`.
+2. **Crash al Tocar Ranuras Vacías en Página 3/3 (`CardBookScene.OnSelectGroupItem` RVA `0x11D2EAC`):**
+   - La rutina nativa calculaba el índice destino como `siblingIndex + nowPage * 8`. En la página 3 (`nowPage = 2`), tocar los slots vacíos 5, 6 o 7 generaba índices 21, 22 y 23. Al tener `allCbGroupItemList` únicamente 21 elementos (índices 0..20), el acceso indexado desbordaba el array lanzando una excepción no manejada.
+3. **Omisión de Badges Oficiales en Hi High (Theme 1001):**
+   - El tema 1001 carecía de la entrada `[902, 903]` en `cardbookThemeBadges`, omitiendo los badges `EVENT` y `ORIGINAL`.
+4. **FastArray de PrismCardList no Poblado:**
+   - En `ensureCardBookControlData`, `tItem.add(0x20)` (`prismCardFa`) contenía celdas nulas en su búfer interno `prismPool`, arriesgando lecturas inválidas al abrir el popup.
+
+#### 3. Implementación Realizada ([`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js))
+1. **Parches Binarios Nativo ARM64 en `CardBookDetailCellView.RefreshCellView`:**
+   - **Normal Cards (RVA `0x11CA394`):**
+     - Se reemplazaron 12 bytes nativos con `Memory.protect` y `writeByteArray`:
+       `[0x82, 0x02, 0x00, 0x54, 0x02, 0x00, 0x00, 0x14, 0x1f, 0x20, 0x03, 0xd5]`
+       Desensamblado equivalente:
+       ```arm64
+       b.hs #0x11ca3e4   ; Si x24 >= cardParam.Count, salta directamente a la rutina de desactivación SetActive(false)
+       b    #0x11ca3a0   ; En caso contrario, salta al procesamiento normal de la carta
+       nop                ; Instrucción de relleno
+       ```
+   - **Prism Cards (RVA `0x11CA4AC`):**
+     - Parche binario idéntico redirigiendo la bifurcación condicional:
+       `b.hs #0x11ca4fc; b #0x11ca4b8; nop`.
+     - Esto garantiza que cualquier ranura sobrante en solistas y subunidades sea ocultada de forma nativa sin disparar ninguna excepción.
+2. **Hook Protector con Verificación de Límites en `CardBookScene.OnSelectGroupItem` (RVA `0x11D2EAC`):**
+   - Interceptado con `Interceptor.replace`.
+   - Calcula `targetIndex = siblingIndex + nowPage * 8`.
+   - Verifica `if (targetIndex < 0 || targetIndex >= allCbGroupItemList.length) return;`, ignorando silenciosa y seguramente cualquier clic en ranuras vacías.
+   - Despacha al método nativo `OpenDetailPopupFn` (RVA `0x11CF9C0`) para el grupo seleccionado.
+3. **Mapeo Oficial de Badges:**
+   - Clave `"1001": [902, 903]` integrada en `cardbookThemeBadges` tanto en la inicialización temprana como en el pipeline de temas.
+4. **Poblado Dinámico de `PrismCardList`:**
+   - Se instancian objetos `CardItem` legítimos con `emptyPrismCcd` y puntero de modelo `NULL` en `prismPool`, satisfaciendo la estructura de datos que espera la vista de detalle.
+
+#### 4. Evidencias Visuales y Aserciones QA
+* **Prueba 1: Solistas en Página 1/3 (HeeJin y HyunJin):**
+  - Evidencias: [`detail_heejin_live.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/detail_heejin_live.png) y [`detail_hyunjin_live.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/detail_hyunjin_live.png).
+  - Resultado: Apertura instantánea sin crashes. Se muestran sus 3 cartas R doradas correspondientes (Vocal, Dance, Rhythm) y las siluetas del segundo tema, con las 8 ranuras restantes desactivadas limpiamente.
+* **Prueba 2: Navegación y Solistas en Página 2/3:**
+  - Evidencia de vista de grupo: [`group_p2.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/group_p2.png).
+  - Evidencias de detalle: [`detail_kimlip_live.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/detail_kimlip_live.png) y [`detail_choerry_live.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/detail_choerry_live.png).
+  - Resultado: Carga perfecta de las 8 solistas de la página 2 con sus badges y siluetas.
+* **Prueba 3: Subunidades en Página 3/3 (LOONA 1/3, OEC, yyxy):**
+  - Evidencia de vista de grupo: [`group_p3.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/group_p3.png).
+  - Evidencias de detalle:
+    - LOONA 1/3 (*Love & Live*): [`detail_loona13_live.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/detail_loona13_live.png) con exactamente 4 miembros (HeeJin, HyunJin, HaSeul, ViVi).
+    - LOONA Odd Eye Circle (*Mix & Match / LOONATIC*): [`detail_oec_live.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/detail_oec_live.png) con exactamente 3 miembros (Kim Lip, JinSoul, Choerry).
+    - LOONA Odd Eye Circle Repackage (*Max & Match / Sweet Crazy Love*): [`detail_maxmatch_live.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/detail_maxmatch_live.png).
+* **Prueba 4: Resistencia ante Ranuras Vacías en Página 3/3:**
+  - Evidencia: [`p3_empty_slots_test.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/p3_empty_slots_test.png).
+  - Resultado: Clics secuenciales en slots 5, 6 y 7 descartados de manera segura. Cero caídas, app completamente estable.
+* **Prueba 5: Insignias Oficiales y Scroll en Grupo OT11 `[+ +]`:**
+  - Evidencias: [`detail_plusplus_recheck.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/detail_plusplus_recheck.png) y [`detail_plusplus_scroll.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/detail_plusplus_scroll.png).
+  - Resultado: Tema *Hi High* despliega insignias `EVENT` y `ORIGINAL`. Al deslizar hacia abajo, el tema *HEAT* despliega insignia `LIMITED` y las 11 cartas de la formación completa.
+* **Control de Calidad (Quality Gate Logcat):**
+  - Registro de logcat filtrado por `CRASH|FATAL|Exception|CardBook|Throw`: 0 errores, estabilidad del 100%. Sign-off otorgado.
