@@ -4987,9 +4987,10 @@ function initIl2Cpp(module) {
 
                 // Empty CardControl.Data map and factory for CardBook slots
                 var emptyCardControlDataMap = {};
-                function getOrCreateEmptyCardControlData(groupId, artistId, themeId, cardId) {
+                function getOrCreateEmptyCardControlData(groupId, artistId, themeId, cardId, isPrismFlag) {
                     ensureLoonaMocks();
-                    var key = groupId + "_" + artistId + "_" + themeId;
+                    var isPrismVal = isPrismFlag ? 1 : 0;
+                    var key = groupId + "_" + artistId + "_" + themeId + "_" + isPrismVal;
                     if (emptyCardControlDataMap[key]) {
                         return emptyCardControlDataMap[key];
                     }
@@ -5029,7 +5030,7 @@ function initIl2Cpp(module) {
                                 var cd = il2cpp_object_new(cdKlass);
                                 if (il2cpp_gchandle_new && !cd.isNull()) il2cpp_gchandle_new(cd, 2);
                                 cd.add(0x10).writeS32(cardId || artistId);
-                                cd.add(0x14).writeS32(0); // isPrism = 0
+                                cd.add(0x14).writeS32(isPrismVal); // Distinguish Normal (0) vs Prism (1)
                                 cd.add(0x20).writePointer(createIl2CppString(sPath));
                                 cd.add(0x28).writePointer(createIl2CppString(lPath));
                                 cd.add(0x30).writeS32(themeId);
@@ -5050,6 +5051,7 @@ function initIl2Cpp(module) {
 
                 // Global theme + artist -> cardCode mapping cache
                 var themeArtistCardMap = {};
+                var themeArtistPrismCardMap = {};
                 var themeArtistCardMapInitialized = false;
                 function ensureThemeArtistCardMap() {
                     if (themeArtistCardMapInitialized) return;
@@ -5061,6 +5063,9 @@ function initIl2Cpp(module) {
                                 var key = c.theme + "_" + c.artistID;
                                 if (!themeArtistCardMap[key] || c.type === 0) {
                                     themeArtistCardMap[key] = c.code;
+                                }
+                                if (c.type === 1) {
+                                    themeArtistPrismCardMap[key] = c.code;
                                 }
                             }
                         }
@@ -13039,6 +13044,8 @@ function initIl2Cpp(module) {
                         0xAD02876: "Choose Group",
                         0x1D9405B: "Card Book",
                         0xAD020A1: "My Card Book",
+                        0xAD02C5D: "Normal Card",
+                        0xAD02C5E: "Prism Card",
                         0xAC86041: "ALL CARDS COLLECTION",
                         0xAC9DB29: "ALL THEMES COLLECTION",
                         0x1CB55D9: "Card Book",
@@ -16790,6 +16797,30 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 var themeOwnedSlots = 0;
                                 var minGradeInTheme = 99;
 
+                                // Shared builder for Normal and Prism CardBook slot items
+                                function createCardBookSlotItem(slotCardId, artistCode, isOwnedSlot, emptyIsPrism) {
+                                    var slotItem = il2cpp_object_new(cbCardItemKlass);
+                                    if (il2cpp_gchandle_new && !slotItem.isNull()) il2cpp_gchandle_new(slotItem, 2);
+                                    if (isOwnedSlot) {
+                                        var ownedEntry = accountOwnedCards[slotCardId];
+                                        var cardGrade = (ownedEntry && ownedEntry.grade !== undefined) ? ownedEntry.grade : 4;
+                                        var ccd = getOrCreateCardControlData(slotCardId);
+                                        cbCardItemCtor(slotItem, ccd, NULL);
+
+                                        var cbData = il2cpp_object_new(cbCardDataKlass);
+                                        if (il2cpp_gchandle_new && !cbData.isNull()) il2cpp_gchandle_new(cbData, 2);
+                                        cbData.add(0x10).writeS32(slotCardId);
+                                        cbData.add(0x14).writeS32(cardGrade);
+                                        cbData.add(0x18).writeS32(1);
+                                        slotItem.add(0x10).writePointer(cbData);
+                                        return { item: slotItem, grade: cardGrade };
+                                    }
+                                    var emptyCcd = getOrCreateEmptyCardControlData(gCode, artistCode, tCode, slotCardId, emptyIsPrism);
+                                    cbCardItemCtor(slotItem, emptyCcd, NULL);
+                                    slotItem.add(0x10).writePointer(NULL); // model = NULL -> IsVaild = false, Grade = None (5)
+                                    return { item: slotItem, grade: 99 };
+                                }
+
                                 // Populate CardList FastArray with genuine CardItem for each slot
                                 var cardListFa = tItem.add(0x18).readPointer();
                                 if (!cardListFa.isNull()) {
@@ -16804,48 +16835,28 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                                 offlineTotalCardsPossible++;
                                             }
 
-                                            var cItem = il2cpp_object_new(cbCardItemKlass);
-                                            if (il2cpp_gchandle_new && !cItem.isNull()) il2cpp_gchandle_new(cItem, 2);
-
+                                            var slotRes = createCardBookSlotItem(cardId, aCode, isOwned, false);
                                             if (isOwned) {
                                                 themeOwnedSlots++;
                                                 offlineTotalCardsOwned++;
-                                                var cardGrade = (accountOwnedCards[cardId].grade !== undefined) ? accountOwnedCards[cardId].grade : 4;
-                                                if (cardGrade < minGradeInTheme) minGradeInTheme = cardGrade;
-
-                                                var ccd = getOrCreateCardControlData(cardId);
-                                                cbCardItemCtor(cItem, ccd, NULL);
-
-                                                var cbData = il2cpp_object_new(cbCardDataKlass);
-                                                if (il2cpp_gchandle_new && !cbData.isNull()) il2cpp_gchandle_new(cbData, 2);
-                                                cbData.add(0x10).writeS32(cardId);
-                                                cbData.add(0x14).writeS32(cardGrade);
-                                                cbData.add(0x18).writeS32(1);
-                                                cItem.add(0x10).writePointer(cbData);
-                                            } else {
-                                                var emptyCcd = getOrCreateEmptyCardControlData(gCode, aCode, tCode, cardId);
-                                                cbCardItemCtor(cItem, emptyCcd, NULL);
-                                                cItem.add(0x10).writePointer(NULL); // model = NULL -> IsValid = false, Grade = None (5)
+                                                if (slotRes.grade < minGradeInTheme) minGradeInTheme = slotRes.grade;
                                             }
-                                            pool.add(0x20 + s * 8).writePointer(cItem);
+                                            pool.add(0x20 + s * 8).writePointer(slotRes.item);
                                         }
                                     }
                                 }
 
-                                // Populate PrismCardList FastArray with valid CardItems to safeguard Detail Popup
+                                // Populate PrismCardList FastArray reflecting owned inventory Prism cards across all Groups
                                 var prismCardFa = tItem.add(0x20).readPointer();
                                 if (!prismCardFa.isNull()) {
                                     var prismPool = prismCardFa.add(0x10).readPointer();
                                     if (!prismPool.isNull()) {
                                         for (var ps = 0; ps < slotCount; ps++) {
                                             var paCode = (ps < pArtistCodes.length) ? pArtistCodes[ps] : (1001 + ps);
-                                            var pCardId = themeArtistCardMap[tCode + "_" + paCode] || 0;
-                                            var pItem = il2cpp_object_new(cbCardItemKlass);
-                                            if (il2cpp_gchandle_new && !pItem.isNull()) il2cpp_gchandle_new(pItem, 2);
-                                            var emptyPrismCcd = getOrCreateEmptyCardControlData(gCode, paCode, tCode, pCardId);
-                                            cbCardItemCtor(pItem, emptyPrismCcd, NULL);
-                                            pItem.add(0x10).writePointer(NULL); // model = NULL (uncollected prism)
-                                            prismPool.add(0x20 + ps * 8).writePointer(pItem);
+                                            var pCardId = themeArtistPrismCardMap[tCode + "_" + paCode] || 0;
+                                            var isPrismOwned = (pCardId > 0 && typeof accountOwnedCards !== "undefined" && accountOwnedCards[pCardId] && !isLimited);
+                                            var pSlotRes = createCardBookSlotItem(pCardId, paCode, isPrismOwned, true);
+                                            prismPool.add(0x20 + ps * 8).writePointer(pSlotRes.item);
                                         }
                                     }
                                 }
