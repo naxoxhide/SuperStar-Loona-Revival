@@ -4120,3 +4120,16 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
   - Resultado: Tema *Hi High* despliega insignias `EVENT` y `ORIGINAL`. Al deslizar hacia abajo, el tema *HEAT* despliega insignia `LIMITED` y las 11 cartas de la formación completa.
 * **Control de Calidad (Quality Gate Logcat):**
   - Registro de logcat filtrado por `CRASH|FATAL|Exception|CardBook|Throw`: 0 errores, estabilidad del 100%. Sign-off otorgado.
+
+---
+
+### CHECKPOINT 30 (Pre-Implementación): Etiquetas Normal/Prism Card y Prism Cards del Inventario en Collect Book por Group
+
+#### 1. Análisis Técnico Verificado
+* **Cuadros blancos sin texto en [`CardBookDetailCellView`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L540438):**
+  - [`CardBookScene.<OpenDetailPopup>b__1`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L575800) (`0xE41394`–`0xE413BC`) consulta `LocaleControl.GetString` (`0xCF1064`) con las claves **`0x0AD02C5D`** (`181415005` $\rightarrow$ `"Normal Card"`) y **`0x0AD02C5E`** (`181415006` $\rightarrow$ `"Prism Card"`), verificadas en [`app/src/files/asiudgasg/sdisgkdc/lcd.json`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/sdisgkdc/lcd.json), asignándolas a `Param.normalCard` (`+0x40`) y `Param.prismCard` (`+0x48`), que [`CardBookDetailCellView.RefreshCellView`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L540500) (`0x11CA530`–`0x11CA56C`) asigna a los textos `+0xB0` y `+0xB8`.
+  - Ambas claves faltan en `offlineLocaleStrings` dentro de [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L13031-L13050).
+* **Ausencia de Prism Cards coleccionadas en `PrismCardList`:**
+  - En [`card_metadata_map.json`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/data/card_metadata_map.json) existen 731 Prism Cards con `cardID` propio (`type === 1`), y en [`player_profile.json`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/player_profile.json) existen **197 Prism Cards** distribuidas en los **21 Groups jugables** (`1001`–`21001`), todas con textura `wadceg/<cardID>_s.i.bytes` verificada.
+  - [`ensureThemeArtistCardMap`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L5054-L5071) solo mapea `c.type === 0` (`themeArtistCardMap`), [`getOrCreateEmptyCardControlData`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L4990-L5049) no incluye indicador Normal/Prism en su clave de caché ni en `cd+0x14`, y el bucle de `PrismCardList` (`tItem + 0x20`) en [`ensureCardBookControlData`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L16835-L16851) fuerza `model = NULL` sin consultar `accountOwnedCards`.
+  - [`CardBookScene.GetCollectionCardViewData`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs#L575800) (`0x11D204C`–`0x11D2264`) propaga `isPrism` (`+0x20`) desde `CardControl.Data.get_IsPrism` (`0xE43344`) y omite `CardSpritesControl.GetSmallPrismSprite` de forma segura cuando `PrismData == NULL` (`+0x48`), activando `this.prismEffect` (`+0xB0`) en `CardView.ShowPrismEffect` (`0x1394720`).
