@@ -9351,7 +9351,8 @@ function initIl2Cpp(module) {
 
                 try {
                     Interceptor.replace(baseAddr.add(0x105DE08), new NativeCallback(function (sceneThis, methodInfo) {
-                        log("[📖 CARDBOOK] Intercepted InventoryScene.OnMyCollection -> Direct SceneControl.OpenScene(5)!");
+                        log("[📖 CARDBOOK] Intercepted InventoryScene.OnMyCollection -> Direct SceneControl.OpenScene(5) from Inventory!");
+                        cardBookPreviousSceneId = 4;
                         try { ensureCardBookControlData(); } catch (eCbd) {}
                         isCardBookActivated = false;
                         var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
@@ -9364,7 +9365,8 @@ function initIl2Cpp(module) {
 
                 try {
                     Interceptor.replace(baseAddr.add(0xB4C628), new NativeCallback(function (sceneThis, methodInfo) {
-                        log("[📖 CARDBOOK] Intercepted LobbyScene.OnMyCollection -> Direct SceneControl.OpenScene(5)!");
+                        log("[📖 CARDBOOK] Intercepted LobbyScene.OnMyCollection -> Direct SceneControl.OpenScene(5) from Lobby!");
+                        cardBookPreviousSceneId = 3;
                         try { ensureCardBookControlData(); } catch (eCbd) {}
                         isCardBookActivated = false;
                         var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
@@ -10831,6 +10833,40 @@ function initIl2Cpp(module) {
                     log("[+] Byte patch on CardBookScene.SetStateWait (0x11CF378): ret (callee-saved x19 preserved)");
                 } catch (eSsw) {
                     log("[-] Error patching SetStateWait: " + eSsw.message);
+                }
+
+                // 3a2. CardBookScene.RefreshGroup (0x11CFB40) -> Null-safe group view refresh
+                try {
+                    Interceptor.replace(baseAddr.add(0x11CFB40), keepCb(new NativeCallback(function (sceneThis, isReload, methodInfo) {
+                        log("[📖 CARDBOOK] CardBookScene.RefreshGroup called! isReload=" + isReload);
+                        if (sceneThis.isNull()) return;
+                        try {
+                            var refreshOthersFn = new NativeFunction(baseAddr.add(0x11CFB80), "void", ["pointer", "pointer"]);
+                            refreshOthersFn(sceneThis, NULL);
+                        } catch (eRo) {}
+                        try {
+                            var sceneView = sceneThis.add(0x48).readPointer();
+                            if (sceneView.isNull()) {
+                                log("[📖 CARDBOOK] sceneView is NULL, skipping group view refresh!");
+                                return;
+                            }
+                            var groupView = sceneView.add(0x100).readPointer();
+                            if (groupView.isNull()) {
+                                log("[📖 CARDBOOK] groupView is NULL, skipping group view refresh!");
+                                return;
+                            }
+                            var nowPage = groupView.add(0x58).readS32();
+                            try {
+                                populateCardBookGroupViewOffline(sceneThis, nowPage >= 0 ? nowPage : 0);
+                            } catch (eGvo) {}
+                            log("[📖 CARDBOOK] populateCardBookGroupViewOffline cleanly invoked for page " + nowPage);
+                        } catch (eRsg) {
+                            log("[-] Error in RefreshGroup safe handler: " + eRsg.message);
+                        }
+                    }, "void", ["pointer", "bool", "pointer"])));
+                    log("[+] Interceptor.replace installed on CardBookScene.RefreshGroup (0x11CFB40)!");
+                } catch (eRfg) {
+                    log("[-] Error replacing CardBookScene.RefreshGroup: " + eRfg.message);
                 }
 
                 // 3b. CardBookControl.Info.Sort (0xB98720) -> Safe no-op
@@ -13042,15 +13078,15 @@ function initIl2Cpp(module) {
                         0xAD02874: "Collection",
                         0xAD02875: "Group",
                         0xAD02876: "Choose Group",
-                        0x1D9405B: "Card Book",
+                        0x1D9405B: "Shop",
                         0xAD020A1: "My Card Book",
                         0xAD02C5D: "Normal Card",
                         0xAD02C5E: "Prism Card",
                         0xAC86041: "ALL CARDS COLLECTION",
                         0xAC9DB29: "ALL THEMES COLLECTION",
                         0x1CB55D9: "Card Book",
-                        0x1D94059: "Card Book",
-                        0x1D9405A: "Card Book",
+                        0x1D94059: "Inventory",
+                        0x1D9405A: "Mission",
                         0x1D9405D: "Card Book",
                         0x1D94064: "Card Book",
                         0x3072969: "{0} / {1}",
@@ -14377,10 +14413,24 @@ function initIl2Cpp(module) {
 
                     Interceptor.attach(baseAddr.add(0x105E33C), {
                         onEnter: function(args) {
-                            log("[🎯 GetMaterialViewData 0x105E33C] ENTER: card=" + args[1] + ", mat=" + args[2] + ", idx=" + args[3]);
+                            try {
+                                var cardItem = args[1];
+                                if (!cardItem.isNull()) {
+                                    var cardObj = cardItem.add(0x10).readPointer();
+                                    if (cardObj.isNull()) {
+                                        args[1] = ptr(0);
+                                    }
+                                }
+                                var matItem = args[2];
+                                if (!matItem.isNull()) {
+                                    var cardInfo = matItem.add(0x18).readPointer();
+                                    if (cardInfo.isNull()) {
+                                        args[2] = ptr(0);
+                                    }
+                                }
+                            } catch (eGmvSafe) {}
                         },
                         onLeave: function(retval) {
-                            log("[🎯 GetMaterialViewData 0x105E33C] LEAVE");
                         }
                     });
 
@@ -16965,12 +17015,18 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                 }
 
                 var isCardBookActivated = false;
+                var cardBookPreviousSceneId = 4;
                 var activateCardBookUI = function (sceneThis) {
                     if (!sceneThis || sceneThis.isNull()) return;
                     if (isCardBookActivated) return;
-                    isCardBookActivated = true;
-                    activeCardBookSceneInstance = sceneThis;
                     try {
+                        var sceneView = sceneThis.add(0x48).readPointer();
+                        if (sceneView.isNull()) {
+                            // Waiting for Unity to instantiate sceneView
+                            return;
+                        }
+                        isCardBookActivated = true;
+                        activeCardBookSceneInstance = sceneThis;
                         log("[📖 CARDBOOK] Deferred UI activation starting for instance: " + sceneThis);
 
                         // 0. Ensure CardBookControl.MyInfo and SharedInfo are populated after OnOpen
@@ -16990,11 +17046,15 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                         // 2. Refresh group view page 0 (populates group slots with LOONA groups/themes)
                         try {
-                            var refreshGroupFn = new NativeFunction(baseAddr.add(0x11CFB40), "void", ["pointer", "bool", "pointer"]);
-                            refreshGroupFn(sceneThis, 1, NULL);
-                            log("[📖 CARDBOOK] Deferred RefreshGroup(true) cleanly executed!");
+                            var groupView = sceneView.add(0x100).readPointer();
+                            if (!groupView.isNull()) {
+                                populateCardBookGroupViewOffline(sceneThis, 0);
+                                log("[📖 CARDBOOK] Deferred populateCardBookGroupViewOffline(0) cleanly executed!");
+                            } else {
+                                log("[📖 CARDBOOK] groupView not ready yet, skipping synchronous populateCardBookGroupViewOffline");
+                            }
                         } catch (eRg) {
-                            log("[-] Error in RefreshGroup: " + eRg.message);
+                            log("[-] Error in populateCardBookGroupViewOffline: " + eRg.message);
                         }
 
                         // 3. Mark state as WaitDone
@@ -17008,17 +17068,17 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                         // 4. Ensure sceneView GameObjects and Canvases are active and visible (MainView active, GroupView inactive initially)
                         try {
-                            var sceneView = sceneThis.add(0x48).readPointer();
-                            if (!sceneView.isNull()) {
-                                var showCanvasesFn = new NativeFunction(baseAddr.add(0xD47D00), "void", ["pointer", "pointer"]);
-                                showCanvasesFn(sceneView, NULL);
-                                log("[📖 CARDBOOK] SceneView.ShowCanvases() executed on CardBookView!");
+                            var showCanvasesFn = new NativeFunction(baseAddr.add(0xD47D00), "void", ["pointer", "pointer"]);
+                            showCanvasesFn(sceneView, NULL);
+                            log("[📖 CARDBOOK] SceneView.ShowCanvases() executed on CardBookView!");
 
-                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                                var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                                var svGo = getGoFn(sceneView, NULL);
-                                if (!svGo.isNull()) setActFn(svGo, 1, NULL);
+                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                            var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                            var svGo = getGoFn(sceneView, NULL);
+                            if (!svGo.isNull()) setActFn(svGo, 1, NULL);
 
+                            var tabMain = sceneView.add(0xD0).readPointer();
+                            if (!tabMain.isNull()) {
                                 var setTabViewFn = new NativeFunction(baseAddr.add(0x11CF5BC), "int", ["pointer", "int", "pointer"]);
                                 setTabViewFn(sceneView, 0, NULL);
                             }
@@ -17034,7 +17094,11 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                 try {
                     Interceptor.attach(baseAddr.add(0x11CEDE8), {
                         onEnter: function (args) {
-                            log("[📖 CARDBOOK SCENE] CardBookScene.OnBack entered! Closing CardBook... instance: " + args[0]);
+                            log("[📖 CARDBOOK SCENE] CardBookScene.OnBack entered! Closing CardBook... returning to scene: " + cardBookPreviousSceneId);
+                            try {
+                                var forceSetPrevSceneFn = new NativeFunction(baseAddr.add(0xD55938), "void", ["int", "pointer"]);
+                                forceSetPrevSceneFn(cardBookPreviousSceneId || 4, NULL);
+                            } catch (eFspBack) {}
                             activeCardBookSceneInstance = NULL;
                             isCardBookActivated = false;
                         },

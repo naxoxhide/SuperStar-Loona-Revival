@@ -4151,3 +4151,54 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
   - Evidencia: [`cardbook_group_subunit_prism.png`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media/cardbook_group_subunit_prism.png).
   - Verificado: Subunidades de 3 y 4 miembros renderizan `"Normal Card"`, `"Prism Card"`, todas las Prism Cards obtenidas (`R/B/C` en *Sweet Crazy Love*, `B/C/B/S` en *Love&Live*, `A/B/R` en *LOONATIC*) y tema LIMITED *Valentine Girl* en silueta.
 * **Control de Calidad (Logcat):** Registro `adb logcat -d --pid=3496` sin fallos de texturas (`success=1` en todas las cargas `wadceg/<id>_s.i.bytes`), sin excepciones en navegación `CardBookScene` / `OpenDetailPopup`, sin `CRASH|FATAL|SIGSEGV`. Sign-off otorgado.
+
+
+---
+
+### CHECKPOINT 31: Restauración y Navegación del Botón Card Book desde InventoryScene (Transición Bidireccional Limpia)
+
+#### 1. Análisis Técnico Verificado
+* **Crash en `CardBookScene.RefreshGroup` (`0x11CFB40`):**
+  - Al pulsar el botón Card Book (`btnMyCollection` en `InventoryView` offset `0xA8`), se invocaba `InventoryScene.OnMyCollection` (`0x105DE08`) abriendo `CardBookScene` (`SceneId: 5`).
+  - Durante la activación diferida en `activateCardBookUI`, la función nativa `CardBookScene.RefreshGroup` (`0x11CFB40`) desreferenciaba `sceneView + 0x100` (`groupView`). Si `groupView` era nulo o aún no inicializado por Unity, saltaba a `0x11CFB7C` (`bl #0xa43cc0`) lanzando un `NullReferenceException` que derivaba en `libc++abi: terminating with uncaught exception of type Il2CppExceptionWrapper` y `SIGABRT` / `abort()`.
+  - Además, `RefreshGroup` llamaba a `0x11CF768` (`RefreshSetGroupViewPage`), método que realizaba llamadas no preparadas para el entorno offline.
+* **Sobreescritura de `SceneControl.prevScene` en `SetPrevScene` (`0xD55504`):**
+  - Al abrir la escena 5 (`CardBookScene`), `SceneControl.OpenScene(5)` llama internamente a `SetPrevScene(5)` (`0xD55504`), que en el offset `0xD555BC` (`mov w9, #3; str w9, [x8, #0xc]`) forzaba hardcodeadamente `prevScene = 3` (`Lobby`). Por lo tanto, pulsar el botón de cerrar ("X", `CardBookScene.OnBack` `0x11CEDE8`) devolvía siempre al Lobby en vez de regresar a `InventoryScene` (`Scene 4`).
+* **Blindaje en `InventoryScene.GetMaterialViewData` (`0x105E33C`):**
+  - Al retornar a `InventoryScene`, `SetStateLoadingData` (`0x1055670`) procesaba `materialCardItemList`. Si alguna tarjeta carecía de modelo válido (`args[2]->cardInfo == null`), `0xABEB30` lanzaba `NullReferenceException`.
+* **Corrección de Textos en `Lobby` (`0x1D94059`–`0x1D9405D`):**
+  - Las constantes de textos del Lobby en Dalcomsoft:
+    - `31015001` (`0x1D94059`): `LOBBY_INVENTORY_BUTTON_TEXT` $\rightarrow$ `"Inventory"`.
+    - `31015002` (`0x1D9405A`): `LOBBY_MISSION_BUTTON_TEXT` $\rightarrow$ `"Mission"`.
+    - `31015003` (`0x1D9405B`): `LOBBY_STORE_BUTTON_TEXT` $\rightarrow$ `"Shop"`.
+    - `31015005` (`0x1D9405D`): `LOBBY_CARDBOOK_BUTTON_TEXT` $\rightarrow$ `"Card Book"`.
+  - Se corrigió el mapeo de `0x1D94059` que erróneamente decía `"Card Book"` para que vuelva a mostrar `"Inventory"`.
+
+#### 2. Implementación Aplicada (Estrictamente Acotada en `libscript.js`)
+* **Blindaje de `CardBookScene.RefreshGroup` (`0x11CFB40`):**
+  - Reemplazo seguro mediante `Interceptor.replace(baseAddr.add(0x11CFB40))` que valida `sceneView` y `groupView` antes de invocar `populateCardBookGroupViewOffline(sceneThis, nowPage)`, eliminando la llamada a `0x11CF768` y cualquier riesgo de `NullReferenceException`.
+* **Guardas de activación diferida en `activateCardBookUI` (`#L17015-L17080`):**
+  - Comprobación estricta de `sceneView` (`sceneThis + 0x48`) antes de marcar `isCardBookActivated = true`.
+  - Población limpia de `GroupView` mediante `populateCardBookGroupViewOffline(sceneThis, 0)` solo cuando `groupView` es válido.
+* **Navegación bidireccional y preservación de `prevScene` (`#L9353-L9375`, `#L17095-L17108`):**
+  - Variable `cardBookPreviousSceneId` que rastrea el origen (`4` desde `InventoryScene`, `3` desde `LobbyScene`).
+  - En `CardBookScene.OnBack` (`0x11CEDE8`), se invoca dinámicamente `SceneControl.ForceSetPrevScene(cardBookPreviousSceneId)` en `onEnter`, permitiendo que el botón "X" regrese directamente a `InventoryScene` cuando se accedió desde el inventario.
+* **Blindaje de `GetMaterialViewData` (`0x105E33C`):**
+  - Filtro seguro en `onEnter` para anular `args[1]` o `args[2]` si `cardObj` o `cardInfo` son nulos, permitiendo que la bifurcación nativa a `0x105E40C` retorne sin lanzar excepción.
+
+#### 3. QA Sign-Off (`qa-tester`) — Validación Visual y Logcat en BlueStacks (`127.0.0.1:5555`, PID `23589`)
+* **Sintaxis:** `node --check app/src/main/assets/libscript.js` $\rightarrow$ exit code `0`.
+* **Lobby con etiquetas correctas:**
+  - Evidencia: [`qa_e2e_lobby.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_e2e_lobby.png).
+  - Verificado: "Mission", "Shop", "Card Book" e "Inventory" correctamente diferenciados.
+* **Transición `InventoryScene` $\rightarrow$ `CardBookScene`:**
+  - Evidencia: [`qa_cardbook_opened_clean.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_opened_clean.png).
+  - Verificado: Pulsar botón "Card Book" (`x=100, y=300`) en la barra lateral izquierda carga inmediatamente `CardBookScene` (Scene 5) con banner Flip That R1, favoritos y colecciones completas sin cierre forzado.
+* **Retorno `CardBookScene` $\rightarrow$ `InventoryScene`:**
+  - Evidencia: [`qa_cardbook_returned_inven.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_returned_inven.png).
+  - Verificado: Pulsar botón "X" (`x=1835, y=70`) devuelve directamente a `InventoryScene` (Scene 4) con todas las cartas y elementos visuales intactos.
+* **Prueba de ciclo consecutivo:**
+  - Evidencias: [`qa_cardbook_second_time.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_second_time.png) y [`qa_verify_second_return.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_verify_second_return.png).
+  - Verificado: Re-ingreso y salida múltiple sin fugas de estado ni cierres.
+* **Control de Calidad (Logcat):**
+  - Registro de logcat filtrado por `fatal|sigabrt|abort|uncaught` durante la navegación: 0 errores, 0 cierres de proceso, 100% de estabilidad. Sign-off otorgado.
