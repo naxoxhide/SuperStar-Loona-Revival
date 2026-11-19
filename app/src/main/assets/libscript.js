@@ -4989,8 +4989,10 @@ function initIl2Cpp(module) {
                 var emptyCardControlDataMap = {};
                 function getOrCreateEmptyCardControlData(groupId, artistId, themeId, cardId, isPrismFlag) {
                     ensureLoonaMocks();
+                    ensureThemeArtistCardMap();
                     var isPrismVal = isPrismFlag ? 1 : 0;
-                    var key = groupId + "_" + artistId + "_" + themeId + "_" + isPrismVal;
+                    var effectiveCardId = cardId || (isPrismFlag ? themeArtistPrismCardMap[themeId + "_" + artistId] : themeArtistCardMap[themeId + "_" + artistId]) || artistId;
+                    var key = groupId + "_" + artistId + "_" + themeId + "_" + isPrismVal + "_" + effectiveCardId;
                     if (emptyCardControlDataMap[key]) {
                         return emptyCardControlDataMap[key];
                     }
@@ -5003,11 +5005,13 @@ function initIl2Cpp(module) {
                         var aObj = allArtistDataMap[artistId] || loonaArtistDataMap[((artistId - 1001) % 11) + 1] || NULL;
                         var tObj = getOrCreateThemeData(themeId);
                         var gObj = allGroupDataMap[groupId] || loonaGroupData || NULL;
-                        var ttObj = getOrCreateThemeTypeData(0);
 
                         var metaAll = getGlobalMetadata();
                         var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[groupId] : null;
                         var gName = gMeta ? gMeta.name : "LOONA";
+                        var tMeta = (metaAll && metaAll.themes) ? metaAll.themes[themeId] : null;
+                        var ttCode = tMeta ? tMeta.themeTypeCode : 0;
+                        var ttObj = getOrCreateThemeTypeData(ttCode);
 
                         ccd.add(0x18).writePointer(createIl2CppString(gName));
                         ccd.add(0x20).writeS32(groupId);
@@ -5019,8 +5023,8 @@ function initIl2Cpp(module) {
                         ccd.add(0x50).writeU8(1); // IsViewCard = true (mandatory for CardBookScene)
                         ccd.add(0x51).writeU8(0); // IsGetCard = false
 
-                        var sPath = "asiudgasg/asodhsg/sdhgauwehdnu/" + artistId + "_s.i.bytes";
-                        var lPath = "asiudgasg/asodhsg/sdhgauwehdnu/" + artistId + "_l.i.bytes";
+                        var sPath = "asiudgasg/asodhsg/sdhgauwehdnu/" + effectiveCardId + "_s.i.bytes";
+                        var lPath = "asiudgasg/asodhsg/sdhgauwehdnu/" + effectiveCardId + "_l.i.bytes";
                         ccd.add(0x58).writePointer(createDownloadPath(sPath));
                         ccd.add(0x60).writePointer(createDownloadPath(lPath));
 
@@ -5029,7 +5033,7 @@ function initIl2Cpp(module) {
                             if (cdKlass && !cdKlass.isNull()) {
                                 var cd = il2cpp_object_new(cdKlass);
                                 if (il2cpp_gchandle_new && !cd.isNull()) il2cpp_gchandle_new(cd, 2);
-                                cd.add(0x10).writeS32(cardId || artistId);
+                                cd.add(0x10).writeS32(effectiveCardId);
                                 cd.add(0x14).writeS32(isPrismVal); // Distinguish Normal (0) vs Prism (1)
                                 cd.add(0x20).writePointer(createIl2CppString(sPath));
                                 cd.add(0x28).writePointer(createIl2CppString(lPath));
@@ -9507,6 +9511,9 @@ function initIl2Cpp(module) {
                     }
                     var relPath = "asiudgasg/asodhsg/sdhgauwehdnu/" + artistCode + (isLarge ? "_l.i.bytes" : "_s.i.bytes");
                     var tex = loadLocalTexture2D(relPath);
+                    if (!tex || tex.isNull()) {
+                        tex = loadLocalTexture2D("asiudgasg/asodhsg/wadceg/" + artistCode + (isLarge ? "_l.i.bytes" : "_s.i.bytes"));
+                    }
                     if (tex && !tex.isNull()) {
                         emptyCardTexturePool[key] = tex;
                     }
@@ -10613,12 +10620,8 @@ function initIl2Cpp(module) {
                                 if (matchWad) {
                                     var cId = parseInt(matchWad[1], 10);
                                     if (!accountOwnedCards[cId]) {
-                                        // Unowned card in inventory or preview: redirect to artist empty card
-                                        var metaAll = getGlobalMetadata();
-                                        if (metaAll && metaAll.cards && metaAll.cards[cId]) {
-                                            var aCode2 = metaAll.cards[cId].artistID || 1001;
-                                            tex = getOrCreateEmptyCardTexture(aCode2, matchWad[2] === "l");
-                                        }
+                                        // Unowned card in inventory or preview: load card's sdhgauwehdnu empty texture
+                                        tex = getOrCreateEmptyCardTexture(cId, matchWad[2] === "l");
                                     }
                                 }
                             }
@@ -12702,6 +12705,10 @@ function initIl2Cpp(module) {
                 // Hook CardControl.Data.get_ThemeType (0xE433B4)
                 try {
                     Interceptor.replace(baseAddr.add(0xE433B4), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        if (!thisPtr.isNull()) {
+                            var ttPtr = thisPtr.add(0x40).readPointer();
+                            if (!ttPtr.isNull()) return ttPtr;
+                        }
                         ensureLoonaMocks();
                         return loonaThemeTypeData || NULL;
                     }, "pointer", ["pointer", "pointer"])));
@@ -17040,7 +17047,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                         for (var s = 0; s < slotCount; s++) {
                                             var aCode = (s < pArtistCodes.length) ? pArtistCodes[s] : (1001 + s);
                                             var cardId = themeArtistCardMap[tCode + "_" + aCode] || 0;
-                                            var isOwned = (cardId > 0 && accountOwnedCards[cardId] && !isLimited);
+                                            var isOwned = (cardId > 0 && typeof accountOwnedCards !== "undefined" && accountOwnedCards[cardId]);
 
                                             if (!isLimited) {
                                                 offlineTotalCardsPossible++;
@@ -17065,7 +17072,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                         for (var ps = 0; ps < slotCount; ps++) {
                                             var paCode = (ps < pArtistCodes.length) ? pArtistCodes[ps] : (1001 + ps);
                                             var pCardId = themeArtistPrismCardMap[tCode + "_" + paCode] || 0;
-                                            var isPrismOwned = (pCardId > 0 && typeof accountOwnedCards !== "undefined" && accountOwnedCards[pCardId] && !isLimited);
+                                            var isPrismOwned = (pCardId > 0 && typeof accountOwnedCards !== "undefined" && accountOwnedCards[pCardId]);
                                             var pSlotRes = createCardBookSlotItem(pCardId, paCode, isPrismOwned, true);
                                             prismPool.add(0x20 + ps * 8).writePointer(pSlotRes.item);
                                         }
