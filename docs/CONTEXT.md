@@ -4319,3 +4319,57 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
 * Alcance estricto: Resolución de texturas en Collect Book e Inventario sin tocar lógica ni balances ajenos.
 * Generación de las 791 imágenes grayscale faltantes en `sdhgauwehdnu/` a partir de `wadceg/` y corrección de punteros y rutas en `libscript.js`.
 
+---
+
+### 🎨 CHECKPOINT 30 — Implementación y Validación Visual Definitiva de Texturas para Todos los Temas (Normales y Limited Edition) en Collect Book e Inventario (2026-11-20)
+
+#### 1. Resumen Ejecutivo
+Se completó con éxito la implementación y validación integral de la resolución de texturas de cartas en **Collect Book (`CardBookScene`)** y en el **Inventario (`InventoryScene` / `SelectThemePopup`)**.
+* **Cartas en propiedad (Equipadas/Obtenidas):** Renderizan en color pleno con su marco y estrellas doradas desde `asiudgasg/asodhsg/wadceg/`.
+* **Cartas no obtenidas (Ranuras vacías):** Renderizan con su imagen grayscale exclusiva del tema, emblema del grupo y nombre del integrante desde `asiudgasg/asodhsg/sdhgauwehdnu/`, eliminando definitivamente el error en el que todos los temas mostraban la foto de *Hi High*.
+* **Temas Limited Edition (LE):** Renderizan con sus imágenes y tipologías auténticas en vez de ser excluidos o forzados a placeholders de *Hi High*.
+
+#### 2. Modificaciones Técnicas Implementadas
+1. **Generación Masiva de Assets en Dispositivo (`sdhgauwehdnu/`):**
+   - Se crearon los 1,467 archivos `_s.i.bytes` y `_l.i.bytes` (junto con enlaces simbólicos `.png`) en `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/sdhgauwehdnu/`.
+   - Verificación en dispositivo: 1,467 de 1,467 cartas verificadas $\rightarrow$ Faltantes en `sdhgauwehdnu/`: **0**.
+2. **Corrección de Mapeo en `getOrCreateEmptyCardControlData` ([`app/src/main/assets/libscript.js#L4989`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L4989)):**
+   - Se calcula `effectiveCardId = cardId || (isPrismFlag ? themeArtistPrismCardMap[themeId + "_" + artistId] : themeArtistCardMap[themeId + "_" + artistId]) || artistId`.
+   - Se asignan las rutas: `asiudgasg/asodhsg/sdhgauwehdnu/${effectiveCardId}_s.i.bytes` y `_l.i.bytes` a `DownloadPath`.
+   - Se asigna el `themeTypeCode` correspondiente al tema en `ThemeTypeControl.Data`.
+3. **Redirección de Texturas en `URLsControl.SetCdnTexture` ([`#L10615`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L10615)):**
+   - Para cartas no poseídas, se redirige a `getOrCreateEmptyCardTexture(cId, isLarge)` con el ID de la carta en lugar de `artistID`.
+4. **Desbloqueo de Temas Limited en `ensureCardBookControlData` ([`#L17045`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L17045)):**
+   - Se eliminó el filtro `&& !isLimited` que impedía renderizar temas LE en el libro de colección.
+5. **Lectura Directa de `CardControl.Data.get_ThemeType` (`0xE433B4`):**
+   - Se lee el puntero de tema real en `thisPtr.add(0x40).readPointer()`.
+6. **Parche Nativo ARM64 para `SelectThemeCellView.RefreshCellView` (`0x104FA1C`):**
+   - Al cambiar entre grupos con distinto número de integrantes (ej. `[++]/[xx]` con 11 integrantes frente a `[#]/[12:00]` con 10 integrantes), `itemList` contenía 11 vistas instanciadas mientras que `cardParam` contenía 10 elementos.
+   - En `0x104fba0`, el motor ejecutaba `b.lo 0x104fbac` y en caso contrario lanzaba `System.ArgumentOutOfRangeException` vía `bl 0x1ff9000`, provocando `abort()` y crash de Unity.
+   - Se aplicó un parche binario en caliente en `0x104fba0`:
+     - `0x104fba0`: `b.hs #0x104fc30` (`[0x82, 0x04, 0x00, 0x54]`) para ocultar limpiamente la ranura excedente vía `SetActive(false)`.
+     - `0x104fba4`: `b #0x104fbac` (`[0x02, 0x00, 0x00, 0x14]`).
+   - Resultado: Navegación y apertura de temas 100% estable y fluida en todos los grupos.
+
+#### 3. Matriz de Validación Visual (12 Integrantes con Temas Diferentes) — Sign-Off QA
+Se realizaron capturas directas de pantalla vía ADB sobre el emulador BlueStacks (`127.0.0.1:5555`), confirmando visualmente cada caso:
+
+| # | Integrante | Grupo | Tema Validado | Tipo | Estado / Evidencia |
+|---|---|---|---|---|---|
+| 1 | **HeeJin** | `[ + + ]` | **HEAT** (1002) | Limited | Foto con vela/vaso de leche, grayscale auténtico. Evidencia: [`qa_select_theme_popup_fresh.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_select_theme_popup_fresh.png) |
+| 2 | **HyunJin** | `[ + + ]` | **Stylish** (1003) | Limited | Foto sosteniendo rosa, grayscale exclusivo. Evidencia: [`qa_select_theme_scroll1.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_select_theme_scroll1.png) |
+| 3 | **HaSeul** | `[ + + ]` | **Take me High** (1004) | Limited | Pose Take me High con moño, grayscale. Evidencia: [`qa_select_theme_scroll1.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_select_theme_scroll1.png) |
+| 4 | **YeoJin** | `[ + + ]` | **Perfect Love** (1005) | Limited | Foto leyendo libro, grayscale exclusivo. Evidencia: [`qa_select_theme_scroll2.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_select_theme_scroll2.png) |
+| 5 | **ViVi** | `[ + + ]` | **favOriTe** (1006) | Normal | Foto con dos colitas estilo favOriTe. Evidencia: [`qa_select_theme_scroll2.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_select_theme_scroll2.png) |
+| 6 | **Kim Lip** | `[ + + ]` | **You know you know** (1007) | Limited | Sesión exclusiva LE con cuello blanco. Evidencia: [`qa_select_theme_scroll3.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_select_theme_scroll3.png) |
+| 7 | **JinSoul** | `[ + + ]` | **Only you love** (1008) | Limited | Foto haciendo corazón y guiño, LE. Evidencia: [`qa_select_theme_scroll3.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_select_theme_scroll3.png) |
+| 8 | **Choerry** | `[ + + ]` | **Make you mine** (1009) | Limited | Foto con dos colitas sonriendo, LE. Evidencia: [`qa_select_theme_scroll4.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_select_theme_scroll4.png) |
+| 9 | **Yves** | `[ # ]` | **So What** (3003) | Normal | Foto con mano en mentón, emblema `(#)`. Evidencia: [`qa_group3_popup_scroll_sowhat.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_group3_popup_scroll_sowhat.png) |
+| 10 | **Chuu** | `[ + + ]` | **HEAT** (1002) / **Hi High** (1001) | Limited/Normal | Manos en mejillas en Hi High y pose HEAT completa. Evidencias: [`qa_select_theme_popup_fresh.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_select_theme_popup_fresh.png) y [`qa_group1_heat_full.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_group1_heat_full.png) |
+| 11 | **Go Won** | `[ & ]` | **PTT** (5001) | Normal | Pelo rubio con flequillo en PTT (color y gris). Evidencias: [`qa_group5_ptt.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_group5_ptt.png) y [`qa_group5_popup.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_group5_popup.png) |
+| 12 | **Olivia Hye** | `[ Flip That ]` | **Flip That** (6004) / **Need U** (6001) | Limited/Normal | Trenza al hombro en Need U y estilismo Flip That auténtico. Evidencias: [`qa_group6_flipthat.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_group6_flipthat.png) y [`qa_group6_flipthat_centered.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_group6_flipthat_centered.png) |
+
+#### 4. Validación en CardBookDetailPopup (Libro de Colección)
+* **Tema Hi High (Normal y Prism):** Se muestran las cartas Normales en R50 en color completo y las cartas Prism en la hilera inferior con sus marcos holográficos irisados auténticos. Evidencia: [`qa_cardbook_detail_popup_view.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_detail_popup_view.png).
+* **Tema HEAT (Limited Edition):** Muestra el badge oficial dorado `LIMITED`, con sus ranuras normales y prismáticas mostrando cada integrante con su foto exclusiva de HEAT en grayscale. Evidencias: [`qa_cardbook_detail_drag_right.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_detail_drag_right.png) y [`qa_cardbook_detail_scroll_stylish.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_detail_scroll_stylish.png).
+

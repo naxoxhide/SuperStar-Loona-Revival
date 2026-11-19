@@ -454,6 +454,17 @@ function initIl2Cpp(module) {
             log("[-] Error patching CardListCompare: " + eClc.message);
         }
 
+        // SelectThemeCellView.RefreshCellView (0x104fa1c):
+        // Prevent ArgumentOutOfRangeException when cell view is reused for groups with fewer members (e.g. 10 members in [#] / [12:00] vs 11 in [++])
+        try {
+            Memory.protect(baseAddr.add(0x104fba0), 8, "rwx");
+            baseAddr.add(0x104fba0).writeByteArray([0x82, 0x04, 0x00, 0x54]); // b.hs #0x104fc30 (hide unused slot)
+            baseAddr.add(0x104fba4).writeByteArray([0x02, 0x00, 0x00, 0x14]); // b #0x104fbac
+            log("[🛡️ THEME CELL SHIELD] Successfully patched SelectThemeCellView.RefreshCellView bounds check!");
+        } catch (eStcv) {
+            log("[-] Error patching SelectThemeCellView.RefreshCellView: " + eStcv.message);
+        }
+
         // Boehm GC Mark Procedure Shield: native direct branch trampoline in libil2cpp .text (at 0xF288B0)
         // Prevents SIGSEGV when conservative scanning encounters non-pointer/32-bit values with GC_DS_PROC tag
         try {
