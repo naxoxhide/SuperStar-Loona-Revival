@@ -13230,7 +13230,8 @@ function initIl2Cpp(module) {
                         0x399A951: "Notice",
                         0x399AD3A: "Rhythm Points are insufficient.",
                         0x399B121: "OK",
-                        0x399B509: "Cancel"
+                        0x399B509: "Cancel",
+                        0x263EC8F: "Equip"
                     };
 
                     Interceptor.attach(baseAddr.add(0xCF1064), {
@@ -13501,7 +13502,7 @@ function initIl2Cpp(module) {
                 var invokeNativeCallbackInt = function(callback, resVal) {
                     if (!callback || callback.isNull()) return;
                     try {
-                        var res = (resVal !== undefined) ? resVal : 0;
+                        var res = (resVal !== undefined) ? resVal : 1000;
                         var invokePtr = callback.add(Process.pointerSize * 2).readPointer();
                         if (!invokePtr.isNull()) {
                             var invokeFn = new NativeFunction(invokePtr, "void", ["pointer", "int", "pointer"]);
@@ -13569,7 +13570,7 @@ function initIl2Cpp(module) {
                                     }
                                 }
                             }
-                            if (foundCard) gEquippedCards.push(foundCard);
+                            gEquippedCards.push(foundCard || NULL);
                         }
 
                         var groupCardFastArray = createFastArray(gEquippedCards, 'card');
@@ -13675,7 +13676,7 @@ function initIl2Cpp(module) {
                             refreshInventoryCardList();
                         }
                     } catch (eHeq) {
-                        log("[-] Error in handleCardEquipOffline: " + eHeq.message);
+                        log("[-] Error in handleCardEquipOffline: " + eHeq.message + " | stack: " + eHeq.stack);
                     }
                 };
 
@@ -13854,21 +13855,8 @@ function initIl2Cpp(module) {
                             }
                         }
 
-                        // FastArray with empty list
-                        var emptyFastArray = createFastArray([], 'card');
-                        if (il2cpp_gchandle_new && emptyFastArray && !emptyFastArray.isNull()) {
-                            il2cpp_gchandle_new(emptyFastArray, 2);
-                        }
-                        var gItemObj = allInvenGroupItems[gCode];
-                        if (gItemObj && !gItemObj.isNull()) {
-                            gItemObj.add(0x28).writePointer(emptyFastArray);
-                        }
-                        if (gCode === 1001) {
-                            loonaCardListFastArray = emptyFastArray;
-                            if (loonaGroupItemObj && !loonaGroupItemObj.isNull()) {
-                                loonaGroupItemObj.add(0x28).writePointer(loonaCardListFastArray);
-                            }
-                        }
+                        // Rebuild FastArray preserving slotCount filled with NULLs
+                        syncGroupEquippedFastArray(gCode, []);
 
                         refreshInventoryHeaderView();
                         refreshInventoryCardList();
@@ -13881,7 +13869,11 @@ function initIl2Cpp(module) {
                     try {
                         if (!cardItemsArray || cardItemsArray.isNull()) return;
                         var count = cardItemsArray.add(0x18).readS32();
-                        log("[🗃️ MULTI_EQUIP] Processing " + count + " cards for multi-equip...");
+                        log("[MULTI_EQUIP] Processing " + count + " cards for multi-equip (array=" + cardItemsArray + ")...");
+                        if (count <= 0 || count > 50) {
+                            log("[-] MultiEquip invalid or empty count: " + count);
+                            return;
+                        }
                         for (var i = 0; i < count; i++) {
                             var itemPtr = cardItemsArray.add(0x20 + i * 8).readPointer();
                             if (!itemPtr.isNull()) {
@@ -13900,7 +13892,7 @@ function initIl2Cpp(module) {
                     Interceptor.replace(baseAddr.add(0xF2C374), new NativeCallback(function (isEnterImmediately, beforeCardItem, newCardItem, callback, methodInfo) {
                         log("[🗃️ INVENTORY_CONTROL] Offline Equip called! before=" + beforeCardItem + ", new=" + newCardItem);
                         handleCardEquipOffline(beforeCardItem, newCardItem);
-                        invokeNativeCallbackInt(callback, 0);
+                        invokeNativeCallbackInt(callback, 1000);
                     }, "void", ["int", "pointer", "pointer", "pointer", "pointer"]));
                     log("[+] Replaced InventoryControl.Equip (0xF2C374) successfully!");
                 } catch (eEqHook) {
@@ -13912,7 +13904,7 @@ function initIl2Cpp(module) {
                     Interceptor.replace(baseAddr.add(0xF2C474), new NativeCallback(function (cardItems, callback, methodInfo) {
                         log("[🗃️ INVENTORY_CONTROL] Offline MulitEquip called! cards=" + cardItems);
                         handleMultiEquipOffline(cardItems);
-                        invokeNativeCallbackInt(callback, 0);
+                        invokeNativeCallbackInt(callback, 1000);
                     }, "void", ["pointer", "pointer", "pointer"]));
                     log("[+] Replaced InventoryControl.MulitEquip (0xF2C474) successfully!");
                 } catch (eMeqHook) {
@@ -13924,7 +13916,7 @@ function initIl2Cpp(module) {
                     Interceptor.replace(baseAddr.add(0xF2C5E4), new NativeCallback(function (cardItem, callback, methodInfo) {
                         log("[🗃️ INVENTORY_CONTROL] Offline Unequip called! card=" + cardItem);
                         handleCardUnequipOffline(cardItem);
-                        invokeNativeCallbackInt(callback, 0);
+                        invokeNativeCallbackInt(callback, 1000);
                     }, "void", ["pointer", "pointer", "pointer"]));
                     log("[+] Replaced InventoryControl.Unequip (0xF2C5E4) successfully!");
                 } catch (eUneqHook) {
@@ -13944,7 +13936,7 @@ function initIl2Cpp(module) {
                             refreshInventoryHeaderView();
                             refreshInventoryCardList();
                         }
-                        invokeNativeCallbackInt(callback, 0);
+                        invokeNativeCallbackInt(callback, 1000);
                     }, "void", ["pointer", "pointer", "pointer"]));
                     log("[+] Replaced InventoryControl.MulitUnequip (0xF2C6DC) successfully!");
                 } catch (eMueqHook) {
@@ -13956,7 +13948,7 @@ function initIl2Cpp(module) {
                     Interceptor.replace(baseAddr.add(0xF2D414), new NativeCallback(function (cardItems, callback, methodInfo) {
                         log("[🗃️ INVENTORY_CONTROL] Offline AllUnequipCard called!");
                         handleAllUnequipOffline();
-                        invokeNativeCallbackInt(callback, 0);
+                        invokeNativeCallbackInt(callback, 1000);
                     }, "void", ["pointer", "pointer", "pointer"]));
                     log("[+] Replaced InventoryControl.AllUnequipCard (0xF2D414) successfully!");
                 } catch (eAueqHook) {
@@ -14036,6 +14028,67 @@ function initIl2Cpp(module) {
                     log("[+] Hooked SelectThemeAssist.OpenSelectThemePopup (0x104EF80) successfully!");
                 } catch (eStpPopHook) {
                     log("[-] Error hooking SelectThemeAssist.OpenSelectThemePopup: " + eStpPopHook.message);
+                }
+
+                // Hook SelectThemeAssist.<>c__DisplayClass7_2.<OpenSelectThemePopup>b__9 (0xBF6218, isAllEquip)
+                // Defensive guard against IndexOutOfRangeException / NullReferenceException
+                try {
+                    var origIsAllEquip = new NativeFunction(baseAddr.add(0xBF6218), 'int', ['pointer']);
+                    Interceptor.replace(baseAddr.add(0xBF6218), new NativeCallback(function (thisPtr) {
+                        try {
+                            if (!thisPtr || thisPtr.isNull()) return 0;
+                            var themeCards = thisPtr.add(0x10).readPointer();
+                            if (themeCards.isNull()) return 0;
+                            var themeCardLen = themeCards.add(0x1C).readS32();
+
+                            var locals2 = thisPtr.add(0x20).readPointer();
+                            if (locals2.isNull()) return 0;
+                            var locals1 = locals2.add(0x28).readPointer();
+                            if (locals1.isNull()) return 0;
+                            var gCode = locals1.add(0x20).readS32();
+
+                            var findGroupItemFn = new NativeFunction(baseAddr.add(0xF29604), 'pointer', ['int', 'pointer']);
+                            var nativeGItem = findGroupItemFn(gCode, NULL);
+                            var gItem = (nativeGItem && !nativeGItem.isNull()) ? nativeGItem : (allInvenGroupItems[gCode] || loonaGroupItemObj);
+                            if (!gItem || gItem.isNull()) return 0;
+                            var gCards = gItem.add(0x28).readPointer();
+                            if (gCards.isNull()) return 0;
+                            var gCardLen = gCards.add(0x1C).readS32();
+                            if (gCardLen < themeCardLen) {
+                                log("[🎨 THEME] isAllEquip safe guard: gCardLen (" + gCardLen + ") < themeCardLen (" + themeCardLen + ") -> returning false (0)");
+                                return 0;
+                            }
+
+                            return origIsAllEquip(thisPtr);
+                        } catch (eIae) {
+                            log("[-] Error in isAllEquip guard: " + eIae.message);
+                            return 0;
+                        }
+                    }, 'int', ['pointer']));
+                    log("[+] Hooked SelectThemeAssist.isAllEquip (0xBF6218) with defensive guard successfully!");
+                } catch (eIaeHook) {
+                    log("[-] Error hooking SelectThemeAssist.isAllEquip: " + eIaeHook.message);
+                }
+
+                try {
+                    Interceptor.attach(baseAddr.add(0xBF704C), {
+                        onEnter: function (args) {
+                            log("[🎨 THEME_CLICK] SelectThemeCellView.<SetItem>b__0 (equip click) invoked! this=" + args[0]);
+                        }
+                    });
+                    Interceptor.attach(baseAddr.add(0xBF5928), {
+                        onEnter: function (args) {
+                            log("[🎨 THEME_CLICK] SelectThemeAssist.<OpenSelectThemePopup>b__3 invoked! index=" + args[2].toInt32());
+                        }
+                    });
+                    Interceptor.attach(baseAddr.add(0x104F2E4), {
+                        onEnter: function (args) {
+                            log("[🎨 THEME_EQUIP] SelectThemeAssist.ThemeCardEquip invoked!");
+                        }
+                    });
+                    log("[+] Hooked SelectTheme popup equip click tracers!");
+                } catch (eTcTr) {
+                    log("[-] Error attaching theme equip tracers: " + eTcTr.message);
                 }
 
                 // LocalePopupControl.Find (0xCF2998) & LocalePopupControl.Data.get_Title (0xE78048) safe fallback

@@ -4251,3 +4251,50 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
   - Verificado: Pulsar el botón "X" en `LiveThemeBookScene` retorna inmediatamente a `CardBookScene` con estabilidad total y sin errores de GC.
 * **Control de Calidad (Logcat):**
   - 0 crashes, 0 SIGSEGV, 0 llamadas a abort. Control de calidad aprobado.
+
+
+---
+
+### Checkpoint 28: Corrección de Congelamiento y Cierre (Crash) al presionar "Unequip All" y luego "Equip Theme" en InventoryScene
+
+#### 1. Análisis de Causa Raíz y Reverse Engineering (IL2CPP / ARM64)
+* **Problema Identificado por el Usuario:** En la escena de inventario (`InventoryScene`), tras realizar "Unequip All" y pulsar "Equip Theme", el juego se congelaba y se cerraba inesperadamente (crash forzado).
+* **Diagnóstico y Análisis de Memoria:**
+  - Al ejecutar "Unequip All", la rutina `handleAllUnequipOffline` asignaba un objeto `FastArray` de longitud 0 a `GroupItem.CardItemList` (`offset 0x28`).
+  - Al pulsar "Equip Theme", se llama a `InventoryScene.OnSelectTheme` (`0x105C28C`) $\rightarrow$ `SelectThemeAssist.Open` (`0x104ED88`) $\rightarrow$ `SelectThemeAssist.OpenSelectThemePopup` (`0x104EF80`).
+  - Durante la inicialización de cada fila de tema en el popup (`SelectThemeCellView.SetItem`), el motor invoca al predicado compilado `SelectThemeAssist.<>c__DisplayClass7_2.<OpenSelectThemePopup>b__9` (`RVA 0xBF6218`, método `isAllEquip`).
+  - En `0xBF6218`, la rutina ARM64 itera sobre las cartas requeridas por el tema (`w20` = 11 para LOONA):
+    ```arm64
+    0xbf6318: cmp w21, w20
+    0xbf631c: b.ge #0xbf63a0
+    ...
+    0xbf6334: bl #0x1c48d94   // FastArray.get_Item(gCards, i)
+    ```
+  - Al llamar a `FastArray.get_Item(0)` sobre un `FastArray` con `m_len = 0`, la función nativa en `0x1C48D94` comprobaba `cmp w1, w8; b.ge #0x1ff9000` y saltaba a `0x1FF9000`, lanzando una excepción no controlada `System.IndexOutOfRangeException`. Dado que el hilo principal de Unity (`UnityMain`) no poseía un bloque try-catch para esta invocación de delegado, el runtime de mono/il2cpp ejecutaba `abort()`, congelando la pantalla y matando el proceso de inmediato.
+  - En la arquitectura original de Dalcom Engine, `GroupItem.CardItemList` está diseñado para mantener invariante el número de ranuras del grupo (`equipableSlot`, 11 para LOONA). Cuando una o todas las ranuras están desequipadas, los punteros a `CardItem` deben ser `NULL` (`0x0`). En `isAllEquip`, la instrucción `0xbf6340: cbz x0, #0xbf63a4` comprueba de forma segura si el puntero es nulo y retorna `0` (`false`) sin lanzar excepción de índice fuera de rango.
+  - Adicionalmente, las respuestas simuladas a las funciones de `InventoryControl` (`Equip` `0xF2C374`, `MulitEquip` `0xF2C474`, `Unequip` `0xF2C5E4`, `MulitUnequip` `0xF2C6DC` y `AllUnequipCard` `0xF2D414`) retornaban código de resultado `0`. Dalcom espera explícitamente `1000` (`0x3E8` = `CommonResult.SUCCESS`) en los callbacks para proceder con las transacciones de equipamiento y cierre de ventanas modales.
+  - Se detectó que el botón de equipar tema en `SelectThemePopup` carecía de texto por ausencia de clave en `LocaleTextControl.GetString(0x263EC8F)`.
+
+#### 2. Solución de Ingeniería Implementada
+1. **Preservación Invariante de `slotCount` con Punteros `NULL`:**
+   - En `syncGroupEquippedFastArray` ([`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L13570)): Se cambió la inserción de cartas de `if (foundCard) gEquippedCards.push(foundCard);` a `gEquippedCards.push(foundCard || NULL);`, garantizando que el `FastArray` siempre posea exactamente 11 elementos independientemente de cuántas cartas estén equipadas.
+2. **Reemplazo del FastArray Vacío en Unequip All:**
+   - En `handleAllUnequipOffline`: Se sustituyó la asignación de `createFastArray([], 'card')` por la invocación directa a `syncGroupEquippedFastArray(gCode, []);`, poblando las 11 ranuras con punteros nulos seguros.
+3. **Hook Defensivo en `SelectThemeAssist.isAllEquip` (`0xBF6218`):**
+   - Intercepción de `0xBF6218` para validar que `gCardLen >= themeCardLen`. Si por alguna condición anómala `gCards` tiene un tamaño menor, retorna de forma segura `0` (`false`) previniendo cualquier desbordamiento de índice.
+4. **Restauración de Cadenas de Localización:**
+   - Se registró `0x263EC8F: "Equip"` en `offlineLocaleStrings`, restaurando la etiqueta legible en el botón del popup.
+5. **Alineación de Códigos de Respuesta Dalcom:**
+   - Se actualizaron todos los callbacks nativos offline (`invokeNativeCallbackInt`) en `Equip`, `MulitEquip`, `Unequip`, `MulitUnequip` y `AllUnequipCard` a `1000` (`0x3E8`).
+   - Se blindó `handleMultiEquipOffline` con validación de límites (`count <= 0 || count > 50`) para prevenir iteraciones espurias en memoria no mapeada.
+
+#### 3. QA Sign-Off (`qa-tester`) — Validación en Emulador BlueStacks (`127.0.0.1:5555`, PID `30589`)
+* **Integridad Sintáctica:** `node --check app/src/main/assets/libscript.js` $\rightarrow$ exit code `0`.
+* **Prueba de "Unequip All":**
+  - Evidencia: [`qa_verified_unequip_all.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_verified_unequip_all.png).
+  - Verificado: Todas las 11 ranuras de LOONA se vaciaron limpiamente, mostrando placeholders grises individuales, "Collect all cards!" y "No Theme", sin checkmarks residuales en el scroller inferior.
+* **Prueba de "Equip Theme" Post-Unequip:**
+  - Evidencias: [`qa_verified_equip_theme_popup.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_verified_equip_theme_popup.png) y [`qa_popup_now.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_popup_now.png).
+  - Verificado: La ventana emergente `SelectThemePopup` se abre de manera instantánea y fluida a 60 FPS, renderizando las 11 cartas de "Hi High" con sus estrellas y grados, y con el botón "[ Equip ]" correctamente etiquetado y responsivo.
+* **Control de Calidad (Logcat):**
+  - 0 excepciones `IndexOutOfRangeException`, 0 `SIGSEGV`, 0 congelamientos de renderizado.
