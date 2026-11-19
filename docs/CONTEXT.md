@@ -4298,3 +4298,24 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
   - Verificado: La ventana emergente `SelectThemePopup` se abre de manera instantánea y fluida a 60 FPS, renderizando las 11 cartas de "Hi High" con sus estrellas y grados, y con el botón "[ Equip ]" correctamente etiquetado y responsivo.
 * **Control de Calidad (Logcat):**
   - 0 excepciones `IndexOutOfRangeException`, 0 `SIGSEGV`, 0 congelamientos de renderizado.
+
+---
+
+### 🔬 CHECKPOINT 29 — Investigación y Arquitectura de Resolución de Texturas (Equipadas y No Equipadas) para Todos los Temas (Normales y Limited Edition) en Collect Book e Inventario (2026-11-20)
+
+#### 1. Diagnóstico y Análisis Forense
+* **Problema Planteado por el Usuario (Ignacio):** En `SelectThemePopup` (Equip Theme) y en `CardBookScene` (Collect Book), los temas correspondientes a `[ + + ]` (HEAT, Stylish, Take me High, Perfect Love, etc.) y de los demás grupos muestran repetidamente las fotos de HeeJin/miembros del tema "Hi High" en vez de las imágenes temáticas exclusivas (tanto en estado equipado/color como no equipado/grayscale).
+* **Causas Raíz Detectadas:**
+  1. `getOrCreateEmptyCardControlData` ([`app/src/main/assets/libscript.js#L5022`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L5022)) hardcodeaba `artistId` (1001 para HeeJin) en `sPath = "asiudgasg/asodhsg/sdhgauwehdnu/" + artistId + "_s.i.bytes"`, ignorando el ID de la carta temática del slot (`slotCardId`). Como HeeJin en *Hi High* tiene `code: 1001`, todas las ranuras vacías de HeeJin en todos los temas cargaban la imagen gris de *Hi High*.
+  2. En `ensureCardBookControlData` ([`app/src/main/assets/libscript.js#L17043`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L17043) y [`#L17068`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L17068)), la comprobación `isOwned` forzaba `&& !isLimited`. Esto causaba que cualquier tema Limited Edition (LE) fuera tratado como no obtenido, cayendo siempre a la ranura vacía con la foto de *Hi High*.
+  3. En `URLsControl.SetCdnTexture` ([`app/src/main/assets/libscript.js#L10615`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L10615)), las cartas en `wadceg/` no registradas en `accountOwnedCards` eran redirigidas a `artistID` (1001), sobreescribiendo cualquier intento de renderizar texturas de otros temas.
+  4. En el almacenamiento local (`asiudgasg/asodhsg/`):
+     - `wadceg/` (Color): 1,467 de 1,467 cartas (100%) existen en disco.
+     - `sdhgauwehdnu/` (Grayscale): 353 cartas oficiales existen (incluyendo HEAT 1023..1033, Stylish 1045..1055, etc.), pero 791 cartas (favOriTe 1111, etc.) carecen de archivo en disco por omisión en el paquete original de Dalcom.
+  5. `CardControl.Data.get_ThemeType` (`0xE433B4`) estaba reemplazado incondicionalmente retornando `loonaThemeTypeData` (código 0), eliminando los badges y metadatos de temas Limited.
+
+#### 2. Plan de Solución Diseñado
+* Documentado formalmente en el artefacto: [`all_themes_images_plan.md`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/all_themes_images_plan.md).
+* Alcance estricto: Resolución de texturas en Collect Book e Inventario sin tocar lógica ni balances ajenos.
+* Generación de las 791 imágenes grayscale faltantes en `sdhgauwehdnu/` a partir de `wadceg/` y corrección de punteros y rutas en `libscript.js`.
+
