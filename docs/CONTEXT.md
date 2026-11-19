@@ -4202,3 +4202,52 @@ Durante la integración y pruebas de la escena de Intensify en modo offline aut�
   - Verificado: Re-ingreso y salida múltiple sin fugas de estado ni cierres.
 * **Control de Calidad (Logcat):**
   - Registro de logcat filtrado por `fatal|sigabrt|abort|uncaught` durante la navegación: 0 errores, 0 cierres de proceso, 100% de estabilidad. Sign-off otorgado.
+
+---
+
+### 📌 Checkpoint 32: Estabilización de Botones "My Card Book" y "ALL THEMES COLLECTION" (Drawer de Cartas)
+* **Fecha:** 19 de Noviembre, 2026
+* **Rama:** `feat/card-ui`
+* **Archivos modificados:**
+  - [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js)
+
+#### 1. Análisis de Causa Raíz y Reverse Engineering (IL2CPP / ARM64)
+* **Problema 1: Botón "ALL THEMES COLLECTION" abre `InventoryScene` sin dibujar cartas en el drawer inferior:**
+  - Al pulsar "ALL THEMES COLLECTION" en `CardBookScene`, se ejecuta `CardBookScene.OnInventory` (`0x11D0DE0`) que cambia a `InventoryScene` (Scene 4).
+  - La función nativa `UpdateDisplayCardList` (`0x10542F4`) tenía un byte-patch ARM64 en `0x1054A04` que saltaba la llamada a `InvenCardView.SetData` (`0xF23384`).
+  - En `libscript.js`, los hooks de `InventoryScene.SetStateDefault` y `UpdateDisplayCardList` llamaban a `restoreDefaultDisplayCardList` con `skipSetData = true`, dejando a `EnhancedScroller` con 0 celdas activas instanciadas (`acvCount === 0`).
+  - **Solución:**
+    - En `applyOfflineSortAndFilter` (`#L8045`), se verificó `if (force || acvCount === 0)` para invocar nativamente `InvenCardView.SetData` (`0xF23384`):
+      `setDataFn(cardView, filtered.length, 0, eventListener, NULL);`
+      Esto dispara `EnhancedScroller.ReloadData(0.0f)` (`0x125C640`), instanciando e hidratando todas las celdas visibles con sus sprites, estrellas y marcos de grado.
+    - Se configuró `skipSetData = false` en `SetStateDefault.onLeave` y `UpdateDisplayCardList.onLeave`.
+
+* **Problema 2: Botón "My Card Book" cerraba el juego (Crash SIGABRT / NullReferenceException):**
+  - Al pulsar "My Card Book" en `CardBookScene`, se invoca `CardBookScene.OnLiveBook` (`0x11D2DF8`), que solicita transición a `SceneId: 12` (`LiveThemeBookScene`).
+  - En `LiveThemeBookScene.OnOpen` (`0xC2AB98`):
+    - Se ocultan los lienzos mediante `SceneView.HideCanvases()`.
+    - Pasa a `SetStateHelp` (`0xC2BAD0`) $\rightarrow$ `SetStateLoadingData` (`0xC2C6DC`) $\rightarrow$ `SetStateWait` (`0xC2C7C0`).
+  - En `SetStateWait` (`0xC2C7C0`), el código nativo original dereferencia `LiveThemeControl.AllLiveThemeList` (`offset 0x18`) que en modo offline es nulo, lanzando `NullReferenceException` (`bl #0xa43cc0`).
+  - En `SetStateWaitDone` (`0xC2C9E4`), la instrucción `bl #0xc2c024` llama a `LiveThemeBookView.SetPageAnchor(0)`. Dicha función intentaba recuperar las celdas del scroller; al no haber cartas de temas en vivo cargadas, el scroller estaba vacío y la búsqueda de celda en `0xc2c0b8` retornaba null, ejecutando `0xc2c474: bl #0xa43cc0` (NullReferenceException). Esto abortaba `SetStateWaitDone` antes de llegar a `ShowCanvases()` (`0xc2ca4c`) y `SetStateDefault()` (`0xC2CA84`), dejando los lienzos invisibles.
+  - Además, los métodos de retorno `OnBack` (`0xC2BDE8`), `OnCardBook` (`0xC2D094`) y `OnExit` (`0xC2CBBC`) requerían enrutamiento seguro mediante la API estática `SceneControl.OpenScene(sceneId)` (`0xD534BC`).
+  - **Solución:**
+    - `0xC2C524`: Reemplazo de `LiveThemeBookScene.GetThemeCount` para retornar de forma segura `0`.
+    - `0xC2C024`: Reemplazo de `LiveThemeBookView.SetPageAnchor` por un stub seguro (no-op) cuando el scroller está vacío.
+    - `0xC2C7C0`: Reemplazo de `LiveThemeBookScene.SetStateWait` con transición segura offline: ejecuta `fadeCompleteFn`, invoca `SetStateWaitDone`, valida y activa los lienzos (`SceneView.CollectCanvases` `0xD58C88` y `ShowCanvases` `0xD47D00`) y avanza a `SetStateDefault` (`0xC2CA84`).
+    - `0xB363B8`: Reemplazo de `LiveThemeControl.HideNewMark` por un no-op seguro.
+    - `0xC2BDE8`, `0xC2D094`, `0xC2CBBC`: Reemplazo de `OnBack`, `OnCardBook` y `OnExit` para invocar de manera limpia y no bloqueante `SceneControl.OpenScene(5, NULL, NULL)` (`0xD534BC`), regresando sin problemas a `CardBookScene`.
+    - Adición de cadenas de localización offline: `0x1D94065` ("Live Theme Book"), `0xAD0342A` ("All Live Themes"), `0xAD0342E` ("Equip Live Theme"), `0xAD03432` ("Background Live Theme"), `0xAD0342F` ("ON"), `0xAD03430` ("OFF"), `0xAD03445` ("Live Mode"), `0xAD0343B` ("Live Theme").
+
+#### 2. QA Sign-Off (`qa-tester`) — Validación Visual y Logcat en BlueStacks (`127.0.0.1:5555`, PID `29083`)
+* **Sintaxis:** `node --check app/src/main/assets/libscript.js` $\rightarrow$ exit code `0`.
+* **Prueba Botón "ALL THEMES COLLECTION" (Drawer de Cartas):**
+  - Evidencia: [`qa_all_themes_collection_drawer.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_all_themes_collection_drawer.png).
+  - Verificado: El inventario inferior (`InvenCardView`) dibuja e hidrata perfectamente todas las cartas con sus texturas completas, marcos de nivel, estrellas y grados (R50 Heejin, S Heejin, B Heejin, C Prism Heejin, R50 Hyunjin, etc.).
+* **Prueba Botón "My Card Book" (`LiveThemeBookScene`):**
+  - Evidencia: [`qa_my_cardbook_final_screen.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_my_cardbook_final_screen.png).
+  - Verificado: Transición inmediata a Scene 12 sin cierres forzados ni `NullReferenceException`. Se dibujan de forma completa todos los lienzos de interfaz (encabezado "Live Theme Book", botones "All Live Themes", "Shop", "Live Mode", área de grupo, selectores de Equip y Background con interruptores ON/OFF y botón de Live Theme).
+* **Prueba Retorno a `CardBookScene`:**
+  - Evidencia: [`qa_my_cardbook_return_clean.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_my_cardbook_return_clean.png).
+  - Verificado: Pulsar el botón "X" en `LiveThemeBookScene` retorna inmediatamente a `CardBookScene` con estabilidad total y sin errores de GC.
+* **Control de Calidad (Logcat):**
+  - 0 crashes, 0 SIGSEGV, 0 llamadas a abort. Control de calidad aprobado.

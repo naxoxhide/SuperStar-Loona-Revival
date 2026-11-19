@@ -8041,20 +8041,29 @@ function initIl2Cpp(module) {
                                 if (!scroller.isNull() && eventListener && !eventListener.isNull()) {
                                     log("[DEBUG SORT] Step 4a: Updating InvenCardView with count=" + filtered.length);
 
-                                    // Directly write InvenCardView properties
-                                    cardView.add(0x98).writeS32(filtered.length);
-                                    cardView.add(0x90).writePointer(eventListener);
-                                    cardView.add(0x9C).writeU8(0);
+                                    var acv = scroller.add(0x120).readPointer();
+                                    var acvCount = (!acv.isNull()) ? acv.add(0x18).readS32() : 0;
 
-                                    try {
-                                        var reloadKeepPosFn = new NativeFunction(baseAddr.add(0x125C750), "void", ["pointer", "bool", "pointer"]);
-                                        reloadKeepPosFn(scroller, 0, NULL);
-                                    } catch (eRk) {}
+                                    if (force || acvCount === 0) {
+                                        log("[🗃️ INVENTORY] Initializing InvenCardView via SetData (0xF23384) with count=" + filtered.length);
+                                        var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
+                                        setDataFn(cardView, filtered.length, 0, eventListener, NULL);
+                                    } else {
+                                        // Directly write InvenCardView properties
+                                        cardView.add(0x98).writeS32(filtered.length);
+                                        cardView.add(0x90).writePointer(eventListener);
+                                        cardView.add(0x9C).writeU8(0);
 
-                                    try {
-                                        var resetCellsFn = new NativeFunction(baseAddr.add(0x125D768), "void", ["pointer", "pointer"]);
-                                        resetCellsFn(scroller, NULL);
-                                    } catch (eRcv) {}
+                                        try {
+                                            var reloadKeepPosFn = new NativeFunction(baseAddr.add(0x125C750), "void", ["pointer", "bool", "pointer"]);
+                                            reloadKeepPosFn(scroller, 0, NULL);
+                                        } catch (eRk) {}
+
+                                        try {
+                                            var resetCellsFn = new NativeFunction(baseAddr.add(0x125D768), "void", ["pointer", "pointer"]);
+                                            resetCellsFn(scroller, NULL);
+                                        } catch (eRcv) {}
+                                    }
 
                                     scroller.add(0xE1).writeU8(1);
                                     sanitizeCardScroller(cardView);
@@ -9235,8 +9244,8 @@ function initIl2Cpp(module) {
                         },
                         onLeave: function (retval) {
                             if (this.scene && !this.scene.isNull()) {
-                                log("[🗃️ SET_STATE_DEFAULT] onLeave triggered, restoring all 24 cards to displayCardList!");
-                                restoreDefaultDisplayCardList(this.scene, true, true);
+                                log("[🗃️ SET_STATE_DEFAULT] onLeave triggered, restoring all cards to displayCardList!");
+                                restoreDefaultDisplayCardList(this.scene, true, false);
                             }
                         }
                     });
@@ -10112,7 +10121,7 @@ function initIl2Cpp(module) {
                                     populateMaterialDisplayCardList(this.scene);
                                 } else if (count === 0 && extractType === 0) {
                                     log("[🗃️ UPDATE_DISPLAY_CARD_LIST] displayCardList was left empty! Restoring all cards...");
-                                    restoreDefaultDisplayCardList(this.scene, true, true);
+                                    restoreDefaultDisplayCardList(this.scene, true, false);
                                 }
                             } catch (eUdclLeave) {
                                 log("[-] Error in UpdateDisplayCardList.onLeave: " + eUdclLeave.message);
@@ -12299,6 +12308,97 @@ function initIl2Cpp(module) {
                     log("[-] Error patching OpenDetailPopup callback: " + eOdp.message);
                 }
 
+                // --- LiveThemeBookScene & LiveThemeControl Offline Stabilization ---
+                try {
+                    // 1. LiveThemeBookScene.GetThemeCount (0xC2C524) -> safely return 0
+                    Interceptor.replace(baseAddr.add(0xC2C524), new NativeCallback(function (thisPtr, methodInfo) {
+                        return 0;
+                    }, "int", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on LiveThemeBookScene.GetThemeCount (0xC2C524) -> 0");
+
+                    // 2. LiveThemeBookView.SetPageAnchor (0xC2C024) -> safe no-op to prevent NullReferenceException on empty scroller
+                    Interceptor.replace(baseAddr.add(0xC2C024), new NativeCallback(function (thisPtr, pageType, methodInfo) {
+                        log("[🎨 LIVE THEME] SetPageAnchor called (type: " + pageType + ") -> safe no-op");
+                    }, "void", ["pointer", "int", "pointer"]));
+                    log("[+] Interceptor.replace installed on LiveThemeBookView.SetPageAnchor (0xC2C024) -> no-op");
+
+                    // 3. LiveThemeBookScene.SetStateWait (0xC2C7C0) -> Immediate offline transition to SetStateWaitDone
+                    Interceptor.replace(baseAddr.add(0xC2C7C0), new NativeCallback(function (sceneThis, methodInfo) {
+                        log("[🎨 LIVE THEME] SetStateWait entered -> executing instant offline transition!");
+                        try {
+                            var fadeCompleteFn = new NativeFunction(baseAddr.add(0xB3E230), "void", ["pointer"]);
+                            fadeCompleteFn(NULL);
+
+                            var setStateWaitDoneFn = new NativeFunction(baseAddr.add(0xC2C9E4), "void", ["pointer", "pointer"]);
+                            setStateWaitDoneFn(sceneThis, NULL);
+
+                            // Collect and Show Canvases on sceneView if not already shown
+                            var sceneView = sceneThis.add(0x48).readPointer();
+                            if (!sceneView.isNull()) {
+                                try {
+                                    var colFn = new NativeFunction(baseAddr.add(0xD58C88), "void", ["pointer", "pointer"]);
+                                    colFn(sceneView, NULL);
+                                    var showFn = new NativeFunction(baseAddr.add(0xD47D00), "void", ["pointer", "pointer"]);
+                                    showFn(sceneView, NULL);
+                                } catch (eShw) {}
+                            }
+
+                            // Ensure state 4 (SetStateDefault)
+                            try {
+                                var setStateDefaultFn = new NativeFunction(baseAddr.add(0xC2CA84), "void", ["pointer", "pointer"]);
+                                setStateDefaultFn(sceneThis, NULL);
+                            } catch (eSsd) {}
+                        } catch (eLtw) {
+                            log("[-] Error in LiveThemeBookScene.SetStateWait: " + eLtw.message);
+                        }
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on LiveThemeBookScene.SetStateWait (0xC2C7C0)!");
+
+                    // 4. LiveThemeControl.HideNewMark (0xB363B8) -> safe no-op
+                    Interceptor.replace(baseAddr.add(0xB363B8), new NativeCallback(function (methodInfo) {
+                        // Safe no-op for offline mode
+                    }, "void", ["pointer"]));
+                    log("[+] Interceptor.replace installed on LiveThemeControl.HideNewMark (0xB363B8) -> no-op");
+
+                    // 5. LiveThemeBookScene.OnBack (0xC2BDE8) -> cleanly return to CardBookScene (5)
+                    Interceptor.replace(baseAddr.add(0xC2BDE8), new NativeCallback(function (thisPtr, methodInfo) {
+                        log("[🔙 LIVE THEME] OnBack triggered, returning to CardBookScene (5)...");
+                        try {
+                            var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
+                            openSceneFn(5, NULL, NULL);
+                        } catch (eOb) {
+                            log("[-] Error in LiveThemeBookScene.OnBack: " + eOb.message);
+                        }
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on LiveThemeBookScene.OnBack (0xC2BDE8)!");
+
+                    // 6. LiveThemeBookScene.OnCardBook (0xC2D094) -> cleanly return to CardBookScene (5)
+                    Interceptor.replace(baseAddr.add(0xC2D094), new NativeCallback(function (thisPtr, methodInfo) {
+                        log("[🔙 LIVE THEME] OnCardBook triggered, returning to CardBookScene (5)...");
+                        try {
+                            var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
+                            openSceneFn(5, NULL, NULL);
+                        } catch (eCb) {
+                            log("[-] Error in LiveThemeBookScene.OnCardBook: " + eCb.message);
+                        }
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on LiveThemeBookScene.OnCardBook (0xC2D094)!");
+
+                    // 7. LiveThemeBookScene.OnExit (0xC2CBBC) -> cleanly return to CardBookScene (5)
+                    Interceptor.replace(baseAddr.add(0xC2CBBC), new NativeCallback(function (thisPtr, methodInfo) {
+                        log("[🔙 LIVE THEME] OnExit triggered, returning to CardBookScene (5)...");
+                        try {
+                            var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
+                            openSceneFn(5, NULL, NULL);
+                        } catch (eOe) {
+                            log("[-] Error in LiveThemeBookScene.OnExit: " + eOe.message);
+                        }
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on LiveThemeBookScene.OnExit (0xC2CBBC)!");
+                } catch (eLtbs) {
+                    log("[-] Error setting up LiveThemeBookScene hooks: " + eLtbs.message);
+                }
+
                 // Proxy CardControl.Data primary identity getters
                 try {
                     var originalCardGetCode = new NativeFunction(baseAddr.add(0xE429E4), "int", ["pointer", "pointer"]);
@@ -13080,6 +13180,14 @@ function initIl2Cpp(module) {
                         0xAD02876: "Choose Group",
                         0x1D9405B: "Shop",
                         0xAD020A1: "My Card Book",
+                        0x1D94065: "Live Theme Book",
+                        0xAD0342A: "All Live Themes",
+                        0xAD0342E: "Equip Live Theme",
+                        0xAD03432: "Background Live Theme",
+                        0xAD0342F: "ON",
+                        0xAD03430: "OFF",
+                        0xAD03445: "Live Mode",
+                        0xAD0343B: "Live Theme",
                         0xAD02C5D: "Normal Card",
                         0xAD02C5E: "Prism Card",
                         0xAC86041: "ALL CARDS COLLECTION",
