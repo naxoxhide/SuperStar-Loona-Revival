@@ -4373,3 +4373,32 @@ Se realizaron capturas directas de pantalla vía ADB sobre el emulador BlueStack
 * **Tema Hi High (Normal y Prism):** Se muestran las cartas Normales en R50 en color completo y las cartas Prism en la hilera inferior con sus marcos holográficos irisados auténticos. Evidencia: [`qa_cardbook_detail_popup_view.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_detail_popup_view.png).
 * **Tema HEAT (Limited Edition):** Muestra el badge oficial dorado `LIMITED`, con sus ranuras normales y prismáticas mostrando cada integrante con su foto exclusiva de HEAT en grayscale. Evidencias: [`qa_cardbook_detail_drag_right.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_detail_drag_right.png) y [`qa_cardbook_detail_scroll_stylish.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_cardbook_detail_scroll_stylish.png).
 
+
+
+---
+
+### 🎨 CHECKPOINT 31 — Corrección Definitiva de Glitches Visuales de UI en CardBookDetailPopup y SelectThemePopup (2026-11-20)
+
+#### 1. Resumen Ejecutivo
+Se investigaron a nivel de desensamblado ARM64, corrigieron en runtime y validaron visualmente los problemas de interfaz gráfica reportados en el aseguramiento de calidad (QA) sobre el popup de detalle del libro de colección (**`CardBookDetailPopup`**) y el selector de temas del inventario (**`SelectThemePopup`**).
+
+#### 2. Diagnóstico Forense y Correcciones Aplicadas en Runtime ([`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js))
+1. **White Box Glitch en `CardBookDetailPopup` (`x=511..699, y=46..186`, 189x141 px):**
+   * *Causa Raíz:* En `CardBookDetailPopup.SetGrade` (`0x11CBB50`), cuando el grupo no posee grado alcanzado (`grade < 0` / `EMPTY`), la llamada a `SpritesComponent.GetSprite(-1)` retorna `NULL`. Seguidamente, `Image.set_sprite(null)` (`0x1ECB61C`) se ejecuta sobre `info.image` (`0x10`). Dado que Unity UI renderiza cualquier componente `Image` activo con textura/sprite nula como un cuadrilátero blanco opaco (`White Quad`) y el método nunca desactivaba el `GameObject` de la imagen, el cuadro blanco tapaba el emblema y título del grupo.
+   * *Corrección:* Se implementó un hook `Interceptor.attach` en `0x11CBB50` que obtiene el `GameObject` nativo (`0x1DB6AD4`) y aplica `GameObject.SetActive(go, (isShow && grade >= 0) ? 1 : 0)` (`0x1DBADF4`). Si no hay grado asignado, la imagen queda completamente inactiva y transparente.
+2. **Badges Erradas en *Hi High* (`EVENT` y `ORIGINAL`) en `CardBookDetailCellView`:**
+   * *Causa Raíz:* En `libscript.js` (L4874 y L9466), el diccionario `cardbookThemeBadges` contenía por error `"1001": [902, 903]`. En los metadatos auténticos de Dalcomsoft (`tmd.bin` / `tmd.json`), *Hi High* (`1001`) tiene `limitedType: 0` y `cardbookMarkCode: '[904]'` (`icon_blank.png`, sin insignias). Adicionalmente, el desensamblado de `CardBookDetailCellView.RefreshCellView` (`0x11C9E44`) reveló que cuando `markCount < 1`, la rutina salta directamente a `0x11CA2B4`, omitiendo el bucle de desactivación de badges y permitiendo que celdas recicladas mantuvieran insignias visibles.
+   * *Corrección:* Se corrigió `cardbookThemeBadges` asignando `"1001": []` en ambas declaraciones, y se acopló un hook en `RefreshCellView` (`0x11C9E44`) que desactiva de forma garantizada los `GameObject` de todas las insignias y botones remanentes (`bi >= markCount`) en `badge` (`0x48`) y `badgeButton` (`0x50`).
+3. **Visibilidad de las 5 Cajas de Puntos de Grado en `CardBookDetailPopup` (`x=1280..1720, y=55..110`):**
+   * *Causa Raíz:* Las 5 cajas superiores de puntuación por grado en `pointArea` (`0x188`) no mostraban sus valores numéricos debido a que los componentes de texto no estaban activos o inicializados en el estado offline.
+   * *Corrección:* Se implementó un hook en `CardBookDetailPopup.SetPointArea` (`0x11CBEB8`) que activa (`SetActive(true)`) cada uno de los 5 objetos de texto `pointArea.gradePoint[i]` y asegura la escritura de los puntajes estándar de colección Dalcomsoft (`["15", "10", "7", "5", "3"]`) vía `Text.set_text` (`0x21A5FC4`).
+4. **Punto Azul Celeste Indebido (Theme Type) en `SelectThemePopup`:**
+   * *Causa Raíz:* En `libscript.js` (L12733), la función `ThemeTypeControl.Data.get_Code` (`0xC8AC94`) forzaba un valor estático `return 1;`, provocando que el juego tratara a todos los temas (incluyendo temas normales) como tipo 1 (Limited Edition con indicador celeste).
+   * *Corrección:* Se sustituyó por una lectura segura y dinámica del modelo IL2CPP: `model.code` (`thisPtr.add(0x10).readPointer().add(0x10).readU16()`), retornando `0` para temas normales y preservando sus tipologías auténticas.
+
+#### 3. Validación Visual con Sign-Off QA (ADB Screencaps)
+* [`qa_fix_cb_white_box_check.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_fix_cb_white_box_check.png): El cuadrilátero blanco superior ha desaparecido al 100%, las 5 cajas de puntos (15, 10, 7, 5, 3) se visualizan con total nitidez, y el tema *Hi High* no muestra ninguna insignia indebida de Event/Original.
+* [`qa_fix_cb_scroll_check.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_fix_cb_scroll_check.png): Al deslizar hacia abajo, el tema *HEAT* renderiza correctamente su única insignia oficial `LIMITED`.
+* [`qa_fix_cb_stylish_check.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_fix_cb_stylish_check.png): El tema *Stylish* renderiza fielmente sus insignias oficiales `EVENT` y `ORIGINAL`.
+* [`qa_fix_cb_scroll_back_top.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_fix_cb_scroll_back_top.png): Al deslizar nuevamente hacia arriba, *Hi High* permanece limpio sin reciclaje espurio de badges y sin reaparición de la caja blanca.
+* [`qa_fix_select_theme_popup.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_fix_select_theme_popup.png): En `SelectThemePopup`, *Hi High* ya no muestra el punto celeste de LE, la marca de tema equipado está activa y los botones de Equip, Lock y Crown funcionan correctamente.
