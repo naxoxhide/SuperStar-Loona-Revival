@@ -4698,6 +4698,7 @@ Se realizaron pruebas visuales exhaustivas mediante capturas directas de pantall
   - Ambas variantes representan el slot vacío / silueta (`cardEmpty` / `artistEmpty`, correspondientes a los archivos con sufijo `_em.png` en el CDN original):
     - **No Equipada (S)** ($85 \times 120$ px): Miniatura de slot vacío en inventario o CardBook cuando el jugador no posee la carta.
     - **No Equipada (L)** ($226 \times 318$ px): Imagen grande de slot vacío en pedestal de inventario cuando no hay carta asignada al slot.
+    - **Regla Estricta para Cartas Prismas:** La variante Prisma es una carta con efecto holográfico que se manifiesta al poseerla o equiparla; en estado desequipado o no obtenido (`cardEmpty`), **comparte de forma idéntica la silueta/empty card de su contraparte normal (`type: 0`) en ese mismo tema**. Esto evita colisiones donde el ID numérico de la carta prisma apuntaba indebidamente al empty card de otro tema (ej. la prisma 1012 de Hi High colisionando con el empty 1012 de HEAT).
     - **Mapeo y Resolución:** Dalcomsoft utiliza empty temático específico (`<cardCode>_s/l`) en 676 cartas (principalmente LEs con diseño propio), y empty canónico por artista (`<artistCode>_s/l`) en las restantes 786 cartas, logrando una cobertura del 100% (1.462 / 1.462 cartas resueltas).
 
 ### 3. Hallazgos Forenses y Correcciones de Anomalías de Dalcomsoft
