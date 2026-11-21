@@ -17888,54 +17888,34 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                                     var getActiveInH = new NativeFunction(baseAddr.add(0x1DBAE84), "bool", ["pointer", "pointer"]);
                                     var getActiveSelf = new NativeFunction(baseAddr.add(0x1DBAE44), "bool", ["pointer", "pointer"]);
-                                    var getAlphaFn = new NativeFunction(baseAddr.add(0x258C268), "float", ["pointer", "pointer"]);
-                                    var getOrderFn = new NativeFunction(baseAddr.add(0x258BC48), "int", ["pointer", "pointer"]);
-                                    var getOverrideFn = new NativeFunction(baseAddr.add(0x258BBB8), "bool", ["pointer", "pointer"]);
-                                    var getRenderModeFn = new NativeFunction(baseAddr.add(0x258B948), "int", ["pointer", "pointer"]);
-                                    var getCamFn = new NativeFunction(baseAddr.add(0x258BA08), "pointer", ["pointer", "pointer"]);
+                                    var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                                    var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                    var getChildCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
+                                    var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
 
                                     var liGo = getGoFn(inst, NULL);
-                                    log("[🔍 DIAG_LOADING] liGo: " + liGo + " self: " + getActiveSelf(liGo, NULL) + " inH: " + getActiveInH(liGo, NULL));
+                                    var liName = !liGo.isNull() ? readIl2CppString(getNameFn(liGo, NULL)) : "null";
+                                    log("[🔍 DIAG_LOADING] liGo: " + liGo + " name=" + liName + " self: " + getActiveSelf(liGo, NULL) + " inH: " + getActiveInH(liGo, NULL));
 
-                                    var loadingImg = inst.add(0x38).readPointer();
-                                    log("[🔍 DIAG_LOADING] loadingImg: " + loadingImg);
-                                    if (!loadingImg.isNull()) {
-                                        var lGo = getGoFn(loadingImg, NULL);
-                                        log("[🔍 DIAG_LOADING] loadingGo: " + lGo + " self: " + getActiveSelf(lGo, NULL) + " inH: " + getActiveInH(lGo, NULL));
-                                    }
-
-                                    var cacheBase = inst.add(0x90).readPointer();
-                                    log("[🔍 DIAG_LOADING] cacheBase: " + cacheBase);
-                                    if (!cacheBase.isNull()) {
-                                        log("[🔍 DIAG_LOADING] cacheBase self: " + getActiveSelf(cacheBase, NULL) + " inH: " + getActiveInH(cacheBase, NULL));
-                                    }
-
-                                    var circleCg = inst.add(0x58).readPointer();
-                                    if (!circleCg.isNull()) {
-                                        log("[🔍 DIAG_LOADING] circleCanvasGroup alpha: " + getAlphaFn(circleCg, NULL));
-                                    }
-
-                                    // Check root Canvas
-                                    var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
-                                    var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
-                                    var getCompFn = new NativeFunction(baseAddr.add(0x1DB6B98), "pointer", ["pointer", "pointer", "pointer"]);
-                                    var canvasKlass = getClass("UnityEngine.UIModule", "UnityEngine", "Canvas");
-                                    var classGetType = new NativeFunction(baseAddr.add(0x9C453C), "pointer", ["pointer"]);
-                                    var typeGetObject = new NativeFunction(baseAddr.add(0x9C4FA4), "pointer", ["pointer"]);
-                                    var canvasType = canvasKlass ? typeGetObject(classGetType(canvasKlass)) : NULL;
-
-                                    var pTf = getTfFn(inst, NULL);
-                                    while (!pTf.isNull()) {
-                                        var pGo = getGoFn(pTf, NULL);
-                                        if (!pGo.isNull() && canvasType && !canvasType.isNull()) {
-                                            var cv = getCompFn(pGo, canvasType, NULL);
-                                            if (!cv.isNull()) {
-                                                log("[🔍 DIAG_LOADING CANVAS] cv=" + cv + " order=" + getOrderFn(cv, NULL) + " override=" + getOverrideFn(cv, NULL) + " renderMode=" + getRenderModeFn(cv, NULL) + " cam=" + getCamFn(cv, NULL));
-                                            }
+                                    var instTf = getTfFn(inst, NULL);
+                                    var cc = !instTf.isNull() ? getChildCountFn(instTf, NULL) : 0;
+                                    log("[🔍 DIAG_LOADING] inst childCount: " + cc);
+                                    for (var i = 0; i < cc; i++) {
+                                        var cTf = getChildFn(instTf, i, NULL);
+                                        var cGo = getGoFn(cTf, NULL);
+                                        var cName = !cGo.isNull() ? readIl2CppString(getNameFn(cGo, NULL)) : "null";
+                                        var cSelf = !cGo.isNull() ? getActiveSelf(cGo, NULL) : -1;
+                                        var cInH = !cGo.isNull() ? getActiveInH(cGo, NULL) : -1;
+                                        log("[🔍 DIAG_LOADING CHILD " + i + "] name=" + cName + " self=" + cSelf + " inH=" + cInH + " go=" + cGo);
+                                        var subCc = getChildCountFn(cTf, NULL);
+                                        for (var j = 0; j < subCc; j++) {
+                                            var sjTf = getChildFn(cTf, j, NULL);
+                                            var sjGo = getGoFn(sjTf, NULL);
+                                            var sjName = !sjGo.isNull() ? readIl2CppString(getNameFn(sjGo, NULL)) : "null";
+                                            var sjSelf = !sjGo.isNull() ? getActiveSelf(sjGo, NULL) : -1;
+                                            var sjInH = !sjGo.isNull() ? getActiveInH(sjGo, NULL) : -1;
+                                            log("    [SUB " + j + "] name=" + sjName + " self=" + sjSelf + " inH=" + sjInH + " go=" + sjGo);
                                         }
-                                        var p = getParentFn(pTf, NULL);
-                                        if (p.isNull()) break;
-                                        pTf = p;
                                     }
                                 }
                             } catch (eDld) {
