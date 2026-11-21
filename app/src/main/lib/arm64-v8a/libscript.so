@@ -496,16 +496,94 @@ function initIl2Cpp(module) {
         function showLoadingIndicator() {
             try {
                 var inst = getLoadingIndicatorInstance();
-                if (inst && !inst.isNull()) {
-                    var cacheBase = inst.add(0x90).readPointer();
-                    if (!cacheBase.isNull()) {
-                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                        setActiveFn(cacheBase, 1, NULL);
+                if (!inst || inst.isNull()) return;
+
+                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3D04), "void", ["pointer", "bool", "pointer"]);
+
+                // 1. Ensure LoadingIndicator GameObject is active
+                var liGo = getGoFn(inst, NULL);
+                if (!liGo.isNull()) setActiveFn(liGo, 1, NULL);
+
+                // 2. Elevate parent Canvas (ForegroundSystemCanvas) sortingOrder to 32767 so it renders on top
+                try {
+                    var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
+                    var liTf = getTfFn(inst, NULL);
+                    var pTf = liTf;
+                    while (!pTf.isNull()) {
+                        var pGo = getGoFn(pTf, NULL);
+                        if (!pGo.isNull()) {
+                            setActiveFn(pGo, 1, NULL);
+                            var canvasMethodSlot = baseAddr.add(0x3142fc0).readPointer();
+                            if (!canvasMethodSlot.isNull()) {
+                                var getCanvasFn = new NativeFunction(baseAddr.add(0x10B4898), "pointer", ["pointer", "pointer"]);
+                                var canvasComp = getCanvasFn(pGo, canvasMethodSlot);
+                                if (!canvasComp.isNull()) {
+                                    var setSortingOrderFn = new NativeFunction(baseAddr.add(0x258BC88), "void", ["pointer", "int", "pointer"]);
+                                    setSortingOrderFn(canvasComp, 32767, NULL);
+                                }
+                            }
+                        }
+                        pTf = getParentFn(pTf, NULL);
                     }
-                }
+                } catch (eCanvas) {}
+
+                // 3. Ensure all children of LoadingIndicator are active
+                try {
+                    var getChildCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
+                    var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                    var liTf = getTfFn(inst, NULL);
+                    var cc = getChildCountFn(liTf, NULL);
+                    for (var i = 0; i < cc; i++) {
+                        var cTf = getChildFn(liTf, i, NULL);
+                        var cGo = getGoFn(cTf, NULL);
+                        setActiveFn(cGo, 1, NULL);
+                    }
+                } catch (eCh) {}
+
+                // 4. Dispatch native LoadingIndicator.Active()
                 var activeFn = new NativeFunction(baseAddr.add(0xB3BBB4), "void", []);
                 activeFn();
-                log("[⏳ LOADING] LoadingIndicator.Active() cleanly dispatched!");
+
+                // 5. Ensure full opacity on CanvasGroups and Loading image
+                try {
+                    var setAlphaFn = new NativeFunction(baseAddr.add(0x258C2A8), "void", ["pointer", "float", "pointer"]);
+                    var circleCg = inst.add(0x58).readPointer();
+                    if (!circleCg.isNull()) setAlphaFn(circleCg, 1.0, NULL);
+                    var shadowCg = inst.add(0x60).readPointer();
+                    if (!shadowCg.isNull()) setAlphaFn(shadowCg, 1.0, NULL);
+
+                    var loadingImg = inst.add(0x38).readPointer();
+                    if (!loadingImg.isNull()) {
+                        setEnabledFn(loadingImg, 1, NULL);
+                        loadingImg.add(0x20).writeFloat(1.0);
+                        loadingImg.add(0x24).writeFloat(1.0);
+                        loadingImg.add(0x28).writeFloat(1.0);
+                        loadingImg.add(0x2C).writeFloat(1.0);
+                    }
+                } catch (eOpac) {}
+
+                // 6. Ensure CacheBase and its Image child are active
+                try {
+                    var cacheBase = inst.add(0x90).readPointer();
+                    if (!cacheBase.isNull()) {
+                        setActiveFn(cacheBase, 1, NULL);
+                        var cbGoTfFn = new NativeFunction(baseAddr.add(0x1DBAF54), "pointer", ["pointer", "pointer"]);
+                        var cbTf = cbGoTfFn(cacheBase, NULL);
+                        if (!cbTf.isNull()) {
+                            var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                            var imgTf = getChildFn(cbTf, 0, NULL);
+                            if (!imgTf.isNull()) {
+                                var imgGo = getGoFn(imgTf, NULL);
+                                setActiveFn(imgGo, 1, NULL);
+                            }
+                        }
+                    }
+                } catch (eCb) {}
+
+                log("[⏳ LOADING] LoadingIndicator.Active() cleanly dispatched with sortingOrder 32767!");
             } catch (eAct) {
                 log("[-] Error in showLoadingIndicator: " + eAct.message);
             }
@@ -556,29 +634,28 @@ function initIl2Cpp(module) {
 
         // Safeguard OnLoadEmblems MoveNext
         try {
-            Interceptor.attach(baseAddr.add(0xB3E5EC), {
-                onEnter: function (args) {
-                    log("[⏳ LOADING] LoadingIndicator.OnLoadEmblems entered! Ensuring instance is ready...");
-                    getLoadingIndicatorInstance();
-                }
-            });
-            Interceptor.attach(baseAddr.add(0xE7463C), {
-                onEnter: function (args) {
-                    log("🔥 [LOADING CRASH CATCHER] Reached 0xE7463C! x0=" + this.context.x0 + " x19=" + this.context.x19 + " x20=" + this.context.x20 + " x21=" + this.context.x21 + " x22=" + this.context.x22 + " x24=" + this.context.x24 + " x25=" + this.context.x25);
-                }
-            });
-            Interceptor.attach(baseAddr.add(0xE74090), {
-                onEnter: function (args) {
+            Interceptor.replace(baseAddr.add(0xE74090), new NativeCallback(function (d46) {
+                try {
+                    log("[⏳ LOADING] <OnLoadEmblems>d__46.MoveNext intercepted! Completing coroutine safely.");
                     var inst = getLoadingIndicatorInstance();
-                    var d46 = args[0];
-                    if (!d46.isNull() && inst && !inst.isNull()) {
+                    if (inst && !inst.isNull()) {
                         d46.add(0x30).writePointer(inst);
-                        var state = d46.add(0x10).readS32();
-                        log("[⏳ LOADING] OnLoadEmblems MoveNext entered! state=" + state + " inst=" + inst);
+                        try {
+                            var setupFn = new NativeFunction(baseAddr.add(0xB3E658), "void", ["pointer", "pointer"]);
+                            setupFn(inst, NULL);
+                            log("[⏳ LOADING] LoadingIndicator.SetupEmblems() called!");
+                        } catch (eSetup) {
+                            log("[-] Error calling SetupEmblems: " + eSetup.message);
+                        }
                     }
+                } catch (eOle) {
+                    log("[-] Error in OnLoadEmblems MoveNext bypass: " + eOle.message);
                 }
-            });
-        } catch (eOle) {}
+                return 0; // false = coroutine finished!
+            }, "int", ["pointer"]));
+        } catch (eOle) {
+            log("[-] Error replacing OnLoadEmblems MoveNext: " + eOle.message);
+        }
 
         // Neutralize CardListCompare (0xF288A4) -> ret to prevent crash on non-1001 groups & 670x redundant comparison
         try {
@@ -9697,7 +9774,7 @@ function initIl2Cpp(module) {
                     var step = "init";
                     try {
                         var basePath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/";
-                        var fullPath = basePath + relPath;
+                        var fullPath = relPath.startsWith("/") ? relPath : (basePath + relPath);
 
                         step = "resolveFunctions";
                         var fileExistsFn = new NativeFunction(baseAddr.add(0x1F01DF4), "bool", ["pointer", "pointer"]);
@@ -9706,8 +9783,8 @@ function initIl2Cpp(module) {
                         var candidatePaths = [
                             fullPath,
                             fullPath + ".png",
-                            relPath.indexOf(".i.bytes") !== -1 ? (basePath + relPath.replace(".i.bytes", ".png")) : null,
-                            relPath.indexOf(".i.bytes.png") !== -1 ? (basePath + relPath.replace(".i.bytes.png", ".i.bytes")) : null
+                            fullPath.indexOf(".i.bytes") !== -1 ? fullPath.replace(".i.bytes", ".png") : null,
+                            fullPath.indexOf(".i.bytes.png") !== -1 ? fullPath.replace(".i.bytes.png", ".i.bytes") : null
                         ];
 
                         var posixAccessPtr = Module.findExportByName("libc.so", "access");
