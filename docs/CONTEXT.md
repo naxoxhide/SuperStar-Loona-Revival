@@ -4589,6 +4589,35 @@ Se realizaron pruebas visuales exhaustivas mediante capturas directas de pantall
      - [`qa_inven_ready.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_inven_ready.png): Confirma que el inventario carga de forma instantánea y estable, presentando las 670 cartas sin desajustes.
    * **Dictamen Final Senior QA:** APROBADO (*Sign-off* concedido sin observaciones).
 
+### 24.16. Especificación y Análisis Forense: Restauración Fiel del Logotipo `LOOΠΔ/` en LoadingIndicator (Sin Dalcomsoft)
+
+1. **Diagnóstico y Clarificación del Requerimiento Visual:**
+   * **Imagen Esperada Suministrada por Ignacio:** [`media_1795267287574_42a94709.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/.user_uploaded/media_1795267287574_42a94709.png).
+   * **Análisis Gráfico y Criterio de Aceptación:**
+     - En el centro del rombo celeste resplandeciente (`LoadingIndicator`), debe proyectarse exactamente el isotipo/wordmark tipográfico canónico de LOONA: `LOOΠΔ/` (letras blancas nítidas con transparencia exterior).
+     - El elemento central no debe estar vacío ni transparente, ni tampoco debe contener iconos circulares de miembros o isotipos ajenos como `[+ +]` (`1001.i.bytes`).
+     - El logotipo corporativo de Dalcomsoft (caja isométrica cúbica y texto `"DALCOM SOFT"`, proveniente del sprite `00_common_LoadingIcon`) debe quedar 100% suprimido sin excepción.
+   * **Identificación del Asset Vectorial Canónico:**
+     - En el asset [app/src/files/asiudgasg/pedestal_watermark.png](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/pedestal_watermark.png), en la región `(x: 20..180, y: 147..172)`, reside la tipografía oficial vectorizada de `LOOΠΔ/` con dimensiones nativas de $160 \times 25$ px.
+     - En una resolución de pantalla de $1920 \times 1080$, $160$ px coincide exactamente con los $85$ px medidos en la referencia de $1024 \times 576$ enviada por Ignacio ($85 \times \frac{1920}{1024} = 159.38 \approx 160$ px).
+
+2. **Estrategia Arquitectónica de Inyección en Unity uGUI:**
+   * **Generación del Asset Transparente:**
+     - Procesar `pedestal_watermark.png` para aislar los trazos blancos puros `(255, 255, 255)` y dotarlos de canal alfa suave y anti-aliased, exportando a `app/src/files/asiudgasg/loona_loading_logo.png` y sincronizándolo al emulador Android en `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/loona_loading_logo.png`.
+   * **Carga e Inyección en Frida (`libscript.js`):**
+     - Cargar la textura mediante `loadLocalTexture2D("asiudgasg/loona_loading_logo.png")`.
+     - Instanciar el `Sprite` uGUI mediante `Sprite.CreateSprite` (RVA `0x23E1268`), fijándolo en memoria con handle GC permanente (`il2cpp_gchandle_new(sprite, 2)`).
+     - Asignar el sprite al componente `Image` de `LoadingIndicator/mainBody` (hijo index 2):
+       - `Image.set_sprite(mainBodyImg, cachedLoonaSprite)` (RVA `0x1ECB61C`).
+       - `Image.set_preserveAspect(mainBodyImg, true)` (RVA `0x1ECBBB0`).
+       - `Image.SetNativeSize(mainBodyImg)` (RVA `0x1ECCB18`).
+       - `Behaviour.set_enabled(mainBodyImg, true)` (RVA `0x1DB3CFC`).
+       - `GameObject.SetActive(mainBodyGo, true)` (RVA `0x1DBADF4`).
+   * **Blindaje Contra Dalcomsoft:**
+     - Mantener el hook en `Image.set_sprite` (`0x1ECB61C`) anulando incondicionalmente (`args[1] = NULL`) cualquier intento de dibujar `00_common_LoadingIcon`.
+     - Ajustar `neutralizeDalcomsoftLogo` para que no desactive `mainBody` de forma ciega si aloja el sprite de LOONA, preservando la exclusión contra Dalcomsoft.
+
+
 
 
 
