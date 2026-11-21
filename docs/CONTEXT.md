@@ -4402,3 +4402,56 @@ Se investigaron a nivel de desensamblado ARM64, corrigieron en runtime y validar
 * [`qa_fix_cb_stylish_check.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_fix_cb_stylish_check.png): El tema *Stylish* renderiza fielmente sus insignias oficiales `EVENT` y `ORIGINAL`.
 * [`qa_fix_cb_scroll_back_top.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_fix_cb_scroll_back_top.png): Al deslizar nuevamente hacia arriba, *Hi High* permanece limpio sin reciclaje espurio de badges y sin reaparición de la caja blanca.
 * [`qa_fix_select_theme_popup.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_fix_select_theme_popup.png): En `SelectThemePopup`, *Hi High* ya no muestra el punto celeste de LE, la marca de tema equipado está activa y los botones de Equip, Lock y Crown funcionan correctamente.
+
+---
+
+### 🎨 CHECKPOINT 32 — Resolución Auténtica en Runtime de Siluetas Canónicas para Todos los Temas en `SelectThemePopup` (2026-11-21)
+
+#### 1. Resumen Ejecutivo
+Se investigó a fondo y resolvió con éxito la asignación de texturas para cartas no equipadas o faltantes en el popup de temas del inventario (**`SelectThemePopup`**). Se descubrió que Dalcomsoft ya disponía de la totalidad de las 676 siluetas canónicas oficiales en `sdhgauwehdnu/` ordenadas por `artistCode` (`atd.json`), pero una consulta basada en `cardId` (`cdd.json`) provocaba un desplazamiento sistemático de imágenes entre temas (*HEAT* mostrando *Stylish*, *Stylish* mostrando *Perfect Love*, *Take me High* mostrando *You know you know*, *Perfect Love* mostrando *Make you mine*, y *favOriTe* cayendo en escala de grises plana).
+
+Se implementó una solución de arquitectura limpia en **runtime en [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js)** sin generar ni alterar un solo archivo de asset en el repositorio. Cada tema ahora renderiza su foto, emblema y tipografía oficial exclusiva sin repetirse en otros temas.
+
+#### 2. Diagnóstico Forense y Causa Raíz
+1. **Correspondencia del 100% de Assets Dalcom:**
+   * `atd.json` contiene 676 registros de artistas. La carpeta de volcado oficial `sdhgauwehdnu/` contiene exactamente los mismos 676 códigos numéricos (`_s.i.bytes` y `_l.i.bytes`). La correspondencia es biunívoca (100%).
+   * En `atd.json`, el campo `group` almacena el `themeCode` (ej. 1001 = Hi High, 1002 = HEAT, 1005 = Perfect Love, 1006 = favOriTe), mientras que `orderIndex` (0..10) define la ranura del integrante en el grupo.
+2. **Causa del Cruce y Desplazamiento de Imágenes:**
+   * En `libscript.js` (L5037 y L10635), el sistema solicitaba archivos a `sdhgauwehdnu/` usando el `cardId` (`cdd.json`).
+   * Debido a la discrepancia de numeración entre `cdd.json` y `atd.json`:
+     - *Hi High* (`cardId=1001`) cargaba `1001_s.i.bytes` (atd 1001: Hi High) $\rightarrow$ Correcto por coincidencia.
+     - *HEAT* (`cardId=1023`) cargaba `1023_s.i.bytes` (atd 1023: Stylish) $\rightarrow$ Mostraba erróneamente Stylish.
+     - *Stylish* (`cardId=1045`) cargaba `1045_s.i.bytes` (atd 1045: Perfect Love) $\rightarrow$ Mostraba erróneamente Perfect Love.
+     - *Take me High* (`cardId=1067`) cargaba `1067_s.i.bytes` (atd 1067: You know) $\rightarrow$ Mostraba erróneamente You know.
+     - *Perfect Love* (`cardId=1089`) cargaba `1089_s.i.bytes` (atd 1089: Make you mine) $\rightarrow$ Mostraba erróneamente Make you mine.
+     - *favOriTe* (`cardId=1111`) pedía `1111_s.i.bytes` (inexistente en atd al ser $>1099$) $\rightarrow$ Caía en gris plano sin logo ni nombre.
+
+#### 3. Implementación de Arquitectura Limpia ([`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js))
+1. **Mapeo Canónico `themeArtistEmptyMap` (732 entradas):**
+   * Se inyectó en memoria el diccionario biunívoco que asocia `themeId_artistId` con su correspondiente `atdCode` oficial de Dalcomsoft.
+   * En `ensureThemeArtistCardMap()`, se puebla en $O(1)$ la tabla inversa `cardIdToEmptyArtistMap[c.code] = emptyCode`.
+2. **Corrección de Rutas en `getOrCreateEmptyCardControlData`:**
+   * Se sustituyó la concatenación de `effectiveCardId` por la lectura canónica:
+     `var emptyArtistCode = cardIdToEmptyArtistMap[effectiveCardId] || themeArtistEmptyMap[themeId + "_" + artistId] || artistId;`
+     apuntando directamente al archivo oficial `sdhgauwehdnu/${emptyArtistCode}_{s,l}.i.bytes`.
+3. **Resolución en `URLsControl.SetCdnTexture`:**
+   * En las peticiones sobre `wadceg/` para cartas no poseídas, se resuelve `emptyCode = cardIdToEmptyArtistMap[cId] || cId`, garantizando que `SelectThemePopup` siempre cargue la textura oficial del tema solicitado.
+4. **Resguardo en `createEmptyCardSmallViewParams`:**
+   * Se actualizó la ruta de descarga para que cualquier componente uGUI acceda a la silueta auténtica del tema.
+
+#### 4. Validación Visual Theme por Theme (Sign-Off QA en Emulador)
+Se realizaron pruebas visuales exhaustivas mediante capturas directas de pantalla vía ADB sobre el emulador BlueStacks (`127.0.0.1:5555`), confirmando la ausencia total de cruces de imágenes:
+
+* **LOONA `[ + + ]` (Grupo 1001) en `SelectThemePopup`:**
+  - **Hi High (1001):** Foto Hi High con manos en mejilla, emblema `(++)`, nombre "Heejin". Evidencia: [`qa_select_theme_fresh_page1.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_select_theme_fresh_page1.png).
+  - **HEAT (1002):** Foto HEAT con vela/leche, emblema `(++)`, nombre "Heejin" (`atd 1012`, exclusivo, sin Stylish). Evidencia: [`qa_scroll1_heat_stylish.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_scroll1_heat_stylish.png) y [`qa_scroll1_heat_card.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_scroll1_heat_card.png).
+  - **Stylish (1003):** Foto Stylish con rosa, emblema `(++)`, nombre "Heejin" (`atd 1023`, exclusivo, sin Perfect Love). Evidencias: [`qa_scroll1_heat_stylish.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_scroll1_heat_stylish.png) y [`qa_scroll1_stylish_card.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_scroll1_stylish_card.png).
+  - **Perfect Love (1005) y favOriTe (1006):** Ambos temas visualizados simultáneamente con sus respectivas siluetas canónicas oficiales completas (emblema `(++)` y nombre del integrante). Evidencia: [`qa_favorite_and_perfect_love.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_favorite_and_perfect_love.png).
+  - **You know you know (1007):** Silueta canónica oficial LE con cuello blanco y emblema `(++)`. Evidencia: [`qa_scroll3_themes.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_scroll3_themes.png).
+  - **Only you love (1008) y Make you mine (1009):** Siluetas canónicas oficiales LE con guiño/corazón y dos colitas sonriendo respectivamente. Evidencia: [`qa_scroll4_themes.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_scroll4_themes.png).
+* **Otros Grupos Validados en `SelectThemePopup`:**
+  - **`[ # ]` (Grupo 3001):** *So What* y *#* renderizan con su emblema oficial `(#)`. Evidencia: [`qa_group3001_themes.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_group3001_themes.png).
+  - **Solos (Kim Lip 12001):** *Eclipse* y *Twilight* renderizan con su emblema oficial solista y tipografía "Kim Lip". Evidencia: [`qa_group12001_themes.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_group12001_themes.png).
+  - **`[ Flip That ]` (Grupo 6001):** *Need U* y *Pale Blue Dot* renderizan con su emblema oficial circular de Flip That. Evidencia: [`qa_group6001_themes.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_group6001_themes.png).
+  - **`[ Max & Match ]` (Grupo 21001):** *Max & Match* y *Uncover* renderizan con emblema oficial y tipografía canónica. Evidencia: [`qa_group21001_themes.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_group21001_themes.png).
+
