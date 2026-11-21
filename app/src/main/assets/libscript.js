@@ -581,36 +581,16 @@ function initIl2Cpp(module) {
                 var inst = getLoadingIndicatorInstance();
                 if (!inst || inst.isNull()) return;
 
-                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3D04), "void", ["pointer", "bool", "pointer"]);
-                var setAlphaFn = new NativeFunction(baseAddr.add(0x258C2A8), "void", ["pointer", "float", "pointer"]);
+                // Ensure cacheBase (emblem container) is active
+                try {
+                    var cacheBase = inst.add(0x90).readPointer();
+                    if (!cacheBase.isNull()) {
+                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                        setActiveFn(cacheBase, 1, NULL);
+                    }
+                } catch (eCb) {}
 
-                // 1. Ensure LoadingIndicator GameObject is active
-                var liGo = getGoFn(inst, NULL);
-                if (!liGo.isNull()) setActiveFn(liGo, 1, NULL);
-
-                // 2. Ensure CanvasGroups have full opacity
-                var circleCg = inst.add(0x58).readPointer();
-                if (!circleCg.isNull()) setAlphaFn(circleCg, 1.0, NULL);
-                var shadowCg = inst.add(0x60).readPointer();
-                if (!shadowCg.isNull()) setAlphaFn(shadowCg, 1.0, NULL);
-
-                // 3. Ensure loading Image (rotating circle) is active & enabled
-                var loadingImg = inst.add(0x38).readPointer();
-                if (!loadingImg.isNull()) {
-                    setEnabledFn(loadingImg, 1, NULL);
-                    var lGo = getGoFn(loadingImg, NULL);
-                    if (!lGo.isNull()) setActiveFn(lGo, 1, NULL);
-                }
-
-                // 4. Ensure cacheBase (emblem container) is active
-                var cacheBase = inst.add(0x90).readPointer();
-                if (!cacheBase.isNull()) {
-                    setActiveFn(cacheBase, 1, NULL);
-                }
-
-                // 5. Dispatch native LoadingIndicator.Active()
+                // Dispatch native LoadingIndicator.Active()
                 var activeFn = new NativeFunction(baseAddr.add(0xB3BBB4), "void", []);
                 activeFn();
                 log("[⏳ LOADING] LoadingIndicator.Active() cleanly dispatched!");
@@ -3542,7 +3522,9 @@ function initIl2Cpp(module) {
                         var targetSid = args[1].toInt32();
                         log("[🎉 SCENE TRANSITION] Scene.SetStateOpenScene CALLED! -> Target SceneType: " + targetSid);
                         if (targetSid >= 3) {
-                            showLoadingIndicator();
+                            setTimeout(function () {
+                                showLoadingIndicator();
+                            }, 0);
                         }
                     }
                 });
