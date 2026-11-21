@@ -17871,11 +17871,24 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             try {
                                 var inst = getLoadingIndicatorInstance();
                                 if (inst && !inst.isNull()) {
-                                    var mcActive = new NativeFunction(baseAddr.add(0xD02334), "void", ["pointer", "pointer"]);
-                                    mcActive(inst, NULL);
-                                    var activeFn = new NativeFunction(baseAddr.add(0xB3BBB4), "void", []);
-                                    activeFn();
-                                    log("[💡 TEST] Activated and dispatched LoadingIndicator.Active!");
+                                    var slot = baseAddr.add(0x3116308).readPointer();
+                                    if (!slot.isNull()) {
+                                        var loadingClass = slot.readPointer();
+                                        if (!loadingClass.isNull()) {
+                                            var staticFields = loadingClass.add(0xB8).readPointer();
+                                            if (!staticFields.isNull()) {
+                                                staticFields.add(8).writeU8(0); // IsOne = false
+                                                staticFields.add(9).writeU8(0); // IsTwo = false
+                                            }
+                                        }
+                                    }
+                                    inst.add(0x88).writeU8(0); // WillHide = false
+                                    inst.add(0x8C).writeS32(0); // HideFrame = 0
+
+                                    // Direct call to FireShowIndicator
+                                    var fireShowFn = new NativeFunction(baseAddr.add(0xB3DD1C), "void", ["pointer", "bool", "pointer"]);
+                                    fireShowFn(inst, 0, NULL);
+                                    log("[💡 TEST] Invoked FireShowIndicator directly on inst: " + inst);
                                 }
                             } catch (eActLi) {
                                 log("[-] Error in activate_li: " + eActLi.message);
