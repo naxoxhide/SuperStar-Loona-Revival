@@ -6,6 +6,7 @@ Genera la base de datos normalizada para la documentación técnica y el visor v
 """
 
 import os
+import re
 import json
 import sys
 from PIL import Image
@@ -248,6 +249,11 @@ def main():
                 empty_l_rel = f"asiudgasg/asodhsg/sdhgauwehdnu/{a_code}_l.i.bytes.png"
                 empty_source_type = "artist_id_fallback"
                 empty_target_code = a_code
+
+            # Extraer el código numérico real del archivo empty resuelto en sdhgauwehdnu
+            m_code = re.search(r"/(\d+)_s\.i\.bytes", empty_s_rel)
+            if m_code:
+                empty_target_code = int(m_code.group(1))
 
             empty_s_abs = os.path.join(FILES_DIR, empty_s_rel)
             empty_l_abs = os.path.join(FILES_DIR, empty_l_rel)

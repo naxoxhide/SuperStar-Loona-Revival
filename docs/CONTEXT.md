@@ -4739,6 +4739,28 @@ A partir de la solicitud de Ignacio para aplicar las asociaciones documentadas e
 3. **Mantenimiento Estricto de Alcance:** No tocar ningún hook de gameplay, balance de audio ni pantallas ajenas.
 4. **Verificación Automatizada con Capturas ADB:** Batería de pruebas en `127.0.0.1:5555` usando `scene_cmd.txt` para validar visualmente la correspondencia 1:1 frente al catálogo web `docs/card_catalog_viewer.html`.
 
+### 3. Implementación y Validación Visual Exitosa (Resultados Finales)
+* **Corrección del Auditor (`tools/audit_themes_and_cards.py`):**
+  - Se identificó que `empty_target_code` tomaba `norm_card['code']` en lugar del ID numérico físico del archivo en `sdhgauwehdnu/`. Se incorporó extracción directa vía regex de la ruta resuelta (`/(\d+)_s\.i\.bytes`), resolviendo al 100% los 731 pares `theme_artist` con archivos existentes en disco (0 faltantes).
+* **Inyección en Frida (`app/src/main/assets/libscript.js` y `libscript.so`):**
+  - Se generó y ejecutó [`tools/apply_audited_card_theme_mappings.py`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/tools/apply_audited_card_theme_mappings.py) para inyectar la tabla íntegra de 731 pares `theme_artist` validados en `themeArtistEmptyMap`.
+  - En `loadLocalTexture2D` (línea 11143), se eliminó la re-búsqueda circular sobre `cardIdToEmptyArtistMap`, llamando directamente a `getOrCreateEmptyCardTexture(aCode, isLarge)` con el código extraído de la ruta.
+* **Despliegue en Caliente en Emulador:**
+  - Se transfirió el archivo a `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/libscript.js` (1.353.792 bytes), activándose automáticamente al reiniciar `com.dalcomsoft.sslo` gracias al cargador de Frida Gadget en `UnityPlayerActivity.java`.
+* **Resultados de Validación Visual Automatizada (Evidencia Gráfica):**
+  1. **Pop-up de Selección de Tema en Inventario (`SelectThemePopup`):**
+     - Capturas [`screen_theme_pop_after.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_theme_pop_after.png) y [`screen_theme_pop_scroll.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_theme_pop_scroll.png):
+     - **HEAT (1002):** Todos los slots vacíos muestran la silueta auténtica de HEAT (1023 HeeJin, 1024 HyunJin con corazón, YeoJin con manos en mejillas, etc.). El bug de mostrar el uniforme escolar de Hi High fue 100% erradicado.
+     - **Stylish (1003):** Muestra todas las siluetas auténticas de Stylish (HeeJin con vela, HyunJin con copa, etc.).
+     - **Hi High (1001):** Cartas poseídas (R50) conservan su fotografía en color y marco dorado sin ninguna alteración.
+  2. **Detalle de CardBook (`CardBookDetailPopup`):**
+     - Captura [`screen_cb_detail_heat_after.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_cb_detail_heat_after.png): Muestra la fila Normal Card de HEAT con las siluetas temáticas exactas.
+     - Capturas [`screen_cb_detail_scrolled.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_cb_detail_scrolled.png) y [`screen_cb_detail_scrolled2.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_cb_detail_scrolled2.png):
+       - En Stylish y Take Me High, la fila **Prism Card** reproduce exactamente las mismas siluetas y atuendos que la fila **Normal Card**, confirmando la paridad de siluetas solicitada por Ignacio.
+     - Capturas [`screen_cb_detail_heejin.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_cb_detail_heejin.png) y [`screen_cb_detail_heejin_scroll.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_cb_detail_heejin_scroll.png):
+       - Solistas (HeeJin 7001): Muestra su logotipo auténtico, y en el tema limitado *Oh my god yes*, las 3 tarjetas (Vocal, Dance, Rhythm) muestran sus poses auténticas temáticas tanto en Normal Card como en Prism Card, sin desbordamientos de arreglos ni colisiones visuales.
+
+
 
 
 
