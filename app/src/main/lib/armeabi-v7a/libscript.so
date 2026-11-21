@@ -581,6 +581,23 @@ function initIl2Cpp(module) {
                 var inst = getLoadingIndicatorInstance();
                 if (!inst || inst.isNull()) return;
 
+                // Reset WillHide and HideFrame so indicator remains visible during transition
+                inst.add(0x88).writeU8(0);
+                inst.add(0x8C).writeS32(0);
+
+                // Reset static IsOne and IsTwo flags
+                var slot = baseAddr.add(0x3116308).readPointer();
+                if (!slot.isNull()) {
+                    var loadingClass = slot.readPointer();
+                    if (!loadingClass.isNull()) {
+                        var staticFields = loadingClass.add(0xB8).readPointer();
+                        if (!staticFields.isNull()) {
+                            staticFields.add(8).writeU8(0);
+                            staticFields.add(9).writeU8(0);
+                        }
+                    }
+                }
+
                 // Ensure cacheBase (emblem container) is active
                 try {
                     var cacheBase = inst.add(0x90).readPointer();
@@ -590,10 +607,10 @@ function initIl2Cpp(module) {
                     }
                 } catch (eCb) {}
 
-                // Dispatch native LoadingIndicator.Active()
-                var activeFn = new NativeFunction(baseAddr.add(0xB3BBB4), "void", []);
-                activeFn();
-                log("[⏳ LOADING] LoadingIndicator.Active() cleanly dispatched!");
+                // Directly invoke FireShowIndicator(inst, false)
+                var fireShowFn = new NativeFunction(baseAddr.add(0xB3DD1C), "void", ["pointer", "bool", "pointer"]);
+                fireShowFn(inst, 0, NULL);
+                log("[⏳ LOADING] FireShowIndicator cleanly executed on inst: " + inst);
             } catch (eAct) {
                 log("[-] Error in showLoadingIndicator: " + eAct.message);
             } finally {
@@ -643,10 +660,10 @@ function initIl2Cpp(module) {
                             log("[⏳ LOADING] DontDestroyOnLoad called on Root GameObject: " + rootGo);
                         }
 
-                        // Elevate Canvas sortingOrder on ForegroundSystemCanvas to 32767
+                        // Elevate Canvas sortingOrder on ForegroundSystemCanvas to 32767 & set ScreenSpaceOverlay
                         try {
-                            var canvasType = getCanvasType();
-                            var getCompFn = new NativeFunction(baseAddr.add(0x1DB6B98), "pointer", ["pointer", "pointer", "pointer"]);
+                            var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                            var setRenderModeFn = new NativeFunction(baseAddr.add(0x258B988), "void", ["pointer", "int", "pointer"]);
                             var setOrderFn = new NativeFunction(baseAddr.add(0x258BC88), "void", ["pointer", "int", "pointer"]);
                             var setOverrideSortingFn = new NativeFunction(baseAddr.add(0x258BBF8), "void", ["pointer", "bool", "pointer"]);
 
@@ -655,12 +672,24 @@ function initIl2Cpp(module) {
                                 var p = getParentFn(pTf, NULL);
                                 if (p.isNull()) break;
                                 var pGo = getGoFn(p, NULL);
-                                if (!pGo.isNull() && canvasType && !canvasType.isNull()) {
-                                    var cv = getCompFn(pGo, canvasType, NULL);
-                                    if (!cv.isNull()) {
-                                        setOverrideSortingFn(cv, 1, NULL);
-                                        setOrderFn(cv, 32767, NULL);
-                                        log("[⏳ LOADING] Awake: Foreground Canvas sortingOrder set to 32767!");
+                                if (!pGo.isNull()) {
+                                    var pName = readIl2CppString(getNameFn(pGo, NULL));
+                                    if (pName === "ForegroundSystemCanvas") {
+                                        try {
+                                            var methodInfoSlot = baseAddr.add(0x3108808).readPointer();
+                                            var methodInfo = !methodInfoSlot.isNull() ? methodInfoSlot.readPointer() : NULL;
+                                            var getCanvasFn = new NativeFunction(baseAddr.add(0x10A5B30), "pointer", ["pointer", "pointer"]);
+                                            var cv = getCanvasFn(pGo, methodInfo);
+                                            if (cv && !cv.isNull()) {
+                                                setRenderModeFn(cv, 0, NULL); // RenderMode.ScreenSpaceOverlay = 0
+                                                setOverrideSortingFn(cv, 1, NULL);
+                                                setOrderFn(cv, 32767, NULL);
+                                                log("[⏳ LOADING] Awake: ForegroundSystemCanvas set to ScreenSpaceOverlay with sortingOrder=32767!");
+                                            }
+                                        } catch (eCvInst) {
+                                            log("[-] Error configuring ForegroundSystemCanvas: " + eCvInst.message);
+                                        }
+                                        break;
                                     }
                                 }
                                 pTf = p;
