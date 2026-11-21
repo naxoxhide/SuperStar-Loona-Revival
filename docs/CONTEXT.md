@@ -4505,5 +4505,22 @@ Se realizaron pruebas visuales exhaustivas mediante capturas directas de pantall
      - Ráfaga durante transición: [`qa_inven_to_lobby_burst2.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_inven_to_lobby_burst2.png).
    * **Dictamen Final QA:** APROBADO (*Sign-off* concedido sin observaciones ni anomalías de memoria/render).
 
+### 24.13. Análisis Forense y Supresión del Logo Corporativo de Dalcomsoft en LoadingIndicator
+
+1. **Investigación de Causa Raíz de la Superposición Visual:**
+   * **Evidencia Documentada:** En la captura suministrada ([media_1795259060420_266392ba.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/.user_uploaded/media_1795259060420_266392ba.png)), se identificó que el isotipo de caja y el rótulo "DALCOM SOFT" se proyectan directamente sobre el texto `LOOΠΔ` y el emblema de LOONA en el centro del rombo celeste.
+   * **Diagnóstico de la Jerarquía de GameObjects y Componentes uGUI:**
+     - En el prefab original de Unity, el contenedor `CacheBase` (`LoadingIndicator.cacheBase`, offset `0x90` / hijo `[6]`) posee preconfigurado su propio componente `UnityEngine.UI.Image` (`sp = 0x7640b6aab0`) con el isotipo oficial de Dalcomsoft.
+     - Su sub-objeto hijo `[6].GetChild(0) Image` aloja un segundo componente `UnityEngine.UI.Image` (`sp = 0x7640b6a9e0`), al cual se le asigna dinámicamente el sprite de LOONA (`1001.i.bytes`).
+     - Al invocar `applyLoonaEmblemToCacheBase(inst)`, se ejecutaba `SetActive(cbGo, 1)` y `SetActive(imgGo, 1)`. Al estar activos ambos GameObjects en la misma posición $(0, 0, 0)$ y con sendos componentes `Image` habilitados (`enabled = true`), el motor de Unity renderiza ambos elementos superpuestos.
+   * **Condición de Hoisting de `loadLocalTexture2D`:**
+     - La rutina `loadLocalTexture2D` residía en la línea 9916 de `libscript.js`, mientras que `getOrCreateLoadingEmblemSprite()` era invocada tempranamente en la línea 486 (`Awake` / `OnLoadEmblems`), generando un error en logcat (`loadLocalTexture2D is not defined`) que retardaba la creación del sprite hasta transiciones posteriores.
+
+2. **Arquitectura de Supresión y Neutralización:**
+   * **Neutralización de `CacheBase.Image`:** Obtener el componente `Image` propio de `CacheBase` (`cbGo`) mediante `GetComponent<Image>` y neutralizarlo explícitamente fijando `set_enabled(false)` (`0x1DB3CFC`) y `set_sprite(NULL)` (`0x1ECB61C`).
+   * **Neutralización Preventiva en Root `LoadingIndicator`:** Identificar y desactivar cualquier `Image` residual en el GameObject raíz que no corresponda al spinner rotatorio (`loading` en offset `0x38`).
+   * **Hoisting y Disponibilidad Temprana:** Mover la definición de `loadLocalTexture2D` para garantizar la creación inmediata de `emblemSprite` desde el arranque.
+   * **Preservación Estricta:** Mantener inalterados todos los demás componentes visuales del cargador nativo: el spinner rotatorio (`Loading`), el fondo geométrico con brillo (`Square`), los efectos de partículas (`smallParticle`) y el bloqueo de toques (`TouchLock`).
+
 
 
