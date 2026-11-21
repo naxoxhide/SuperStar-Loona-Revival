@@ -445,6 +445,141 @@ function initIl2Cpp(module) {
             log("[-] Error patching DebugControl.LogCallback: " + eLog.message);
         }
 
+        // ==========================================
+        // 🛡️ LOADING INDICATOR MANAGEMENT
+        // ==========================================
+        var cachedLoadingIndicatorInstance = NULL;
+
+        function getLoadingIndicatorInstance() {
+            try {
+                var slot = baseAddr.add(0x3116308).readPointer();
+                if (!slot.isNull()) {
+                    var loadingClass = slot.readPointer();
+                    if (!loadingClass.isNull()) {
+                        var staticFields = loadingClass.add(0xB8).readPointer();
+                        if (!staticFields.isNull()) {
+                            var curInst = staticFields.readPointer();
+                            if (!curInst.isNull()) {
+                                cachedLoadingIndicatorInstance = curInst;
+                                return curInst;
+                            } else if (cachedLoadingIndicatorInstance && !cachedLoadingIndicatorInstance.isNull()) {
+                                staticFields.writePointer(cachedLoadingIndicatorInstance);
+                                return cachedLoadingIndicatorInstance;
+                            }
+                        }
+                    }
+                }
+                // Fallback: search via UnityEngine.Object.FindObjectsOfType
+                try {
+                    var loadingClassObj = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view", "LoadingIndicator");
+                    if (loadingClassObj && !loadingClassObj.isNull()) {
+                        var classGetType = new NativeFunction(baseAddr.add(0x9C453C), "pointer", ["pointer"]);
+                        var typeGetObject = new NativeFunction(baseAddr.add(0x9C4FA4), "pointer", ["pointer"]);
+                        var sysType = typeGetObject(classGetType(loadingClassObj));
+                        var findObjectsFn = new NativeFunction(baseAddr.add(0x1812CB0), "pointer", ["pointer", "pointer"]);
+                        var arr = findObjectsFn(sysType, NULL);
+                        if (!arr.isNull() && arr.add(0x18).readU32() > 0) {
+                            var foundInst = arr.add(0x20).readPointer();
+                            cachedLoadingIndicatorInstance = foundInst;
+                            var stat = loadingClassObj.add(0xB8).readPointer();
+                            if (!stat.isNull()) stat.writePointer(foundInst);
+                            return foundInst;
+                        }
+                    }
+                } catch (eFind) {}
+            } catch (eLi) {
+                log("[-] Error in getLoadingIndicatorInstance: " + eLi.message);
+            }
+            return cachedLoadingIndicatorInstance;
+        }
+
+        function showLoadingIndicator() {
+            try {
+                var inst = getLoadingIndicatorInstance();
+                if (inst && !inst.isNull()) {
+                    var cacheBase = inst.add(0x90).readPointer();
+                    if (!cacheBase.isNull()) {
+                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                        setActiveFn(cacheBase, 1, NULL);
+                    }
+                }
+                var activeFn = new NativeFunction(baseAddr.add(0xB3BBB4), "void", []);
+                activeFn();
+                log("[⏳ LOADING] LoadingIndicator.Active() cleanly dispatched!");
+            } catch (eAct) {
+                log("[-] Error in showLoadingIndicator: " + eAct.message);
+            }
+        }
+
+        function hideLoadingIndicator() {
+            try {
+                var completeFn = new NativeFunction(baseAddr.add(0xB3E230), "void", []);
+                completeFn();
+                var completeTwoFn = new NativeFunction(baseAddr.add(0xB3E340), "void", []);
+                completeTwoFn();
+                log("[⏳ LOADING] LoadingIndicator.Complete() cleanly dispatched!");
+            } catch (eCmp) {
+                log("[-] Error in hideLoadingIndicator: " + eCmp.message);
+            }
+        }
+
+        // Capture instance on Awake and ensure DontDestroyOnLoad on Root GameObject
+        try {
+            Interceptor.attach(baseAddr.add(0xB3DB48), {
+                onEnter: function (args) {
+                    cachedLoadingIndicatorInstance = args[0];
+                    log("[⏳ LOADING] LoadingIndicator.Awake captured instance: " + cachedLoadingIndicatorInstance);
+                    try {
+                        var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                        var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
+                        var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                        var dontDestroyFn = new NativeFunction(baseAddr.add(0x1DC7FB4), "void", ["pointer", "pointer"]);
+
+                        var tf = getTfFn(args[0], NULL);
+                        var rootTf = tf;
+                        while (!rootTf.isNull()) {
+                            var p = getParentFn(rootTf, NULL);
+                            if (p.isNull()) break;
+                            rootTf = p;
+                        }
+                        var rootGo = getGoFn(rootTf, NULL);
+                        if (!rootGo.isNull()) {
+                            dontDestroyFn(rootGo, NULL);
+                            log("[⏳ LOADING] DontDestroyOnLoad called on Root GameObject: " + rootGo);
+                        }
+                    } catch (eDd) {
+                        log("[-] Error in DontDestroyOnLoad on LoadingIndicator: " + eDd.message);
+                    }
+                }
+            });
+        } catch (eLiAwake) {}
+
+        // Safeguard OnLoadEmblems MoveNext
+        try {
+            Interceptor.attach(baseAddr.add(0xB3E5EC), {
+                onEnter: function (args) {
+                    log("[⏳ LOADING] LoadingIndicator.OnLoadEmblems entered! Ensuring instance is ready...");
+                    getLoadingIndicatorInstance();
+                }
+            });
+            Interceptor.attach(baseAddr.add(0xE7463C), {
+                onEnter: function (args) {
+                    log("🔥 [LOADING CRASH CATCHER] Reached 0xE7463C! x0=" + this.context.x0 + " x19=" + this.context.x19 + " x20=" + this.context.x20 + " x21=" + this.context.x21 + " x22=" + this.context.x22 + " x24=" + this.context.x24 + " x25=" + this.context.x25);
+                }
+            });
+            Interceptor.attach(baseAddr.add(0xE74090), {
+                onEnter: function (args) {
+                    var inst = getLoadingIndicatorInstance();
+                    var d46 = args[0];
+                    if (!d46.isNull() && inst && !inst.isNull()) {
+                        d46.add(0x30).writePointer(inst);
+                        var state = d46.add(0x10).readS32();
+                        log("[⏳ LOADING] OnLoadEmblems MoveNext entered! state=" + state + " inst=" + inst);
+                    }
+                }
+            });
+        } catch (eOle) {}
+
         // Neutralize CardListCompare (0xF288A4) -> ret to prevent crash on non-1001 groups & 670x redundant comparison
         try {
             Memory.protect(baseAddr.add(0xF288A4), 4, "rwx");
@@ -3238,7 +3373,11 @@ function initIl2Cpp(module) {
                 });
                 Interceptor.attach(baseAddr.add(0xD5338C), {
                     onEnter: function (args) {
-                        log("[🎉 SCENE TRANSITION] Scene.SetStateOpenScene CALLED! -> Target SceneType: " + args[1].toInt32());
+                        var targetSid = args[1].toInt32();
+                        log("[🎉 SCENE TRANSITION] Scene.SetStateOpenScene CALLED! -> Target SceneType: " + targetSid);
+                        if (targetSid !== 2) {
+                            showLoadingIndicator();
+                        }
                     }
                 });
 
@@ -3481,6 +3620,7 @@ function initIl2Cpp(module) {
                             hasTriggeredLobbyTransition = true;
                             cachedTitleTexObj = null;
                             cachedTitleFileName = "";
+                            showLoadingIndicator();
                         }
                     }
                 });
@@ -13601,6 +13741,7 @@ function initIl2Cpp(module) {
                                     log("[-] Error in InventoryScene.OnOpen.onLeave: " + eOol.message);
                                 }
                             }
+                            hideLoadingIndicator();
                             log("[🗃️ INVENTORY SCENE] InventoryScene.OnOpen completed!");
                         }
                     });
@@ -17386,6 +17527,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 var setTabViewFn = new NativeFunction(baseAddr.add(0x11CF5BC), "int", ["pointer", "int", "pointer"]);
                                 setTabViewFn(sceneView, 0, NULL);
                             }
+                            hideLoadingIndicator();
+                            log("[📖 CARDBOOK] Deferred UI activation complete and LoadingIndicator hidden!");
                         } catch (eAct) {
                             log("[-] Error activating sceneView GameObjects: " + eAct.message);
                         }
@@ -17399,6 +17542,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     Interceptor.attach(baseAddr.add(0x11CEDE8), {
                         onEnter: function (args) {
                             log("[📖 CARDBOOK SCENE] CardBookScene.OnBack entered! Closing CardBook... returning to scene: " + cardBookPreviousSceneId);
+                            showLoadingIndicator();
                             try {
                                 var forceSetPrevSceneFn = new NativeFunction(baseAddr.add(0xD55938), "void", ["int", "pointer"]);
                                 forceSetPrevSceneFn(cardBookPreviousSceneId || 4, NULL);
@@ -17459,40 +17603,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     onLeave: function (retval) {
                         log("[🎉 LOBBY SCENE] LobbyScene.OnOpen completed!");
                         try {
-                            // Complete & Purge LoadingIndicator (0xB3E230, 0xB3E340, 0xB3DAE4)
-                            try {
-                                var indicatorComplete = new NativeFunction(baseAddr.add(0xB3E230), "void", []);
-                                indicatorComplete();
-                                var indicatorCompleteTwo = new NativeFunction(baseAddr.add(0xB3E340), "void", []);
-                                indicatorCompleteTwo();
-                                var indicatorPurge = new NativeFunction(baseAddr.add(0xB3DAE4), "void", []);
-                                indicatorPurge();
-                                log("[🎉 LOBBY SCENE] LoadingIndicator Complete, CompleteTwo & Purge called!");
-                            } catch (ie) {}
-
-                            // Deactivate LoadingIndicator GameObject completely
-                            try {
-                                var loadingClassSlot = baseAddr.add(0x3116308).readPointer();
-                                if (!loadingClassSlot.isNull()) {
-                                    var loadingClass = loadingClassSlot.readPointer();
-                                    if (!loadingClass.isNull()) {
-                                        var loadingStatic = loadingClass.add(0xB8).readPointer();
-                                        if (!loadingStatic.isNull()) {
-                                            var loadingInst = loadingStatic.readPointer();
-                                            if (!loadingInst.isNull()) {
-                                                var cacheBase = loadingInst.add(0x90).readPointer();
-                                                if (!cacheBase.isNull()) {
-                                                    var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int"]);
-                                                    setActiveFn(cacheBase, 0);
-                                                    log("[🛡️ LOBBY SCENE] Deactivated LoadingIndicator cacheBase GameObject!");
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } catch (le2) {
-                                log("[-] Error deactivating LoadingIndicator: " + le2.message);
-                            }
+                            // Complete LoadingIndicator cleanly without destructive purge
+                            hideLoadingIndicator();
 
                             // Activate Lobby UI and Video
                             if (!curLobbyInstance.isNull()) {
@@ -17590,13 +17702,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 log("[💰 RP CMD] Refreshed TopView RP from player_profile.json! New RP=" + getPlayerRP());
                             } catch (eRcmd) {}
                         } else if (cmdRaw === "hide_loading" || cmdRaw === "clear_loading") {
-                            try {
-                                var lcFn = new NativeFunction(baseAddr.add(0xB3E230), "void", ["pointer"]);
-                                lcFn(NULL);
-                                log("[🛡️ LOADING CMD] LoadingIndicator.Complete() dispatched!");
-                            } catch (eHl) {
-                                log("[-] Error in hide_loading: " + eHl.message);
-                            }
+                            hideLoadingIndicator();
                         } else if (cmdRaw === "title_login" || cmdRaw === "login") {
                             try {
                                 if (curScene && !curScene.isNull() && sceneId === 2) {
