@@ -566,72 +566,109 @@ function initIl2Cpp(module) {
 
                 var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
                 var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                var getChildCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
                 var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                 var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
                 var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
-                var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3D04), "void", ["pointer", "bool", "pointer"]);
+                var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
+                var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                var getSpriteFn = new NativeFunction(baseAddr.add(0x1ECB614), "pointer", ["pointer", "pointer"]);
 
                 var instTf = getTfFn(inst, NULL);
                 if (instTf.isNull()) return;
 
-                // Resolve Image component via GetComponent<Image>
+                // Resolve Image component via GetComponent<Image> using Method$UnityEngine.GameObject.GetComponent<Image>() (0x321D528)
                 var initMetadataFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
-                var slotImg = baseAddr.add(0x3103530).readPointer();
+                var slotImg = baseAddr.add(0x321D528);
                 initMetadataFn(slotImg);
                 var methodInfoImg = slotImg.readPointer();
                 var getCompImgFn = new NativeFunction(baseAddr.add(0x10B4898), "pointer", ["pointer", "pointer"]);
 
-                // 1. Neutralize any residual Image component on the root LoadingIndicator GameObject (excluding spinner at inst+0x38)
-                try {
-                    var instGo = getGoFn(instTf, NULL);
-                    if (instGo && !instGo.isNull()) {
-                        var instImg = getCompImgFn(instGo, methodInfoImg);
-                        var spinnerImg = inst.add(0x38).readPointer();
-                        if (instImg && !instImg.isNull() && instImg.toInt32() !== spinnerImg.toInt32()) {
-                            setSpriteFn(instImg, NULL, NULL);
-                            setEnabledFn(instImg, 0, NULL);
-                            log("[⏳ LOADING] Neutralized root residual Image on LoadingIndicator!");
+                var spinnerImg = inst.add(0x38).readPointer();
+
+                // Recursively scan all transforms under inst to locate any Image components
+                function scanAndNeutralizeImages(tf, path) {
+                    if (!tf || tf.isNull()) return;
+                    var go = getGoFn(tf, NULL);
+                    var name = !tf.isNull() ? readIl2CppString(getNameFn(tf, NULL)) : "null";
+                    var curPath = path + "/" + name;
+                    if (go && !go.isNull()) {
+                        var imgComp = getCompImgFn(go, methodInfoImg);
+                        if (imgComp && !imgComp.isNull()) {
+                            var sp = getSpriteFn(imgComp, NULL);
+                            var spName = (!sp.isNull()) ? readIl2CppString(getNameFn(sp, NULL)) : "null_sprite";
+                            var isSpinner = (spinnerImg && !spinnerImg.isNull() && imgComp.toInt32() === spinnerImg.toInt32());
+                            log("[🔍 SCAN_IMAGES] " + curPath + " -> Image: " + imgComp + " | Sprite: " + spName + " | isSpinner: " + isSpinner);
+                            // Replace Dalcomsoft logo on mainBody with LOONA emblem!
+                            if (spName === "00_common_LoadingIcon" || curPath.indexOf("mainBody") !== -1) {
+                                var emblemSprite = getOrCreateLoadingEmblemSprite();
+                                if (emblemSprite && !emblemSprite.isNull()) {
+                                    setSpriteFn(imgComp, emblemSprite, NULL);
+                                    setEnabledFn(imgComp, 1, NULL);
+                                    log("[⏳ LOADING] Replaced Dalcomsoft logo on " + curPath + " with LOONA emblem!");
+                                } else {
+                                    setSpriteFn(imgComp, NULL, NULL);
+                                    setEnabledFn(imgComp, 0, NULL);
+                                    log("[⏳ LOADING] Neutralized Dalcomsoft logo on: " + curPath);
+                                }
+                            }
                         }
                     }
-                } catch (eInstImg) {}
-
-                // 2. Resolve [6] CacheBase
-                var cbTf = getChildFn(instTf, 6, NULL); // [6] CacheBase
-                if (cbTf.isNull()) return;
-                var cbGo = getGoFn(cbTf, NULL);
-                if (!cbGo.isNull()) {
-                    setActiveFn(cbGo, 1, NULL);
-
-                    // 3. Neutralize Dalcomsoft logo on CacheBase's OWN Image component!
-                    try {
-                        var cbSelfImg = getCompImgFn(cbGo, methodInfoImg);
-                        if (cbSelfImg && !cbSelfImg.isNull()) {
-                            setSpriteFn(cbSelfImg, NULL, NULL);
-                            setEnabledFn(cbSelfImg, 0, NULL);
-                            log("[⏳ LOADING] Neutralized Dalcomsoft Image on CacheBase GameObject!");
-                        }
-                    } catch (eCbImg) {}
+                    var count = getChildCountFn(tf, NULL);
+                    for (var c = 0; c < count; c++) {
+                        var ch = getChildFn(tf, c, NULL);
+                        scanAndNeutralizeImages(ch, curPath);
+                    }
                 }
 
-                // 4. Resolve [0] Image child under CacheBase and apply LOONA emblem cleanly
-                var imgTf = getChildFn(cbTf, 0, NULL); // [0] Image
-                if (imgTf.isNull()) return;
-                var imgGo = getGoFn(imgTf, NULL);
-                if (imgGo.isNull()) return;
+                scanAndNeutralizeImages(instTf, "LoadingIndicator");
 
-                var cbImg = getCompImgFn(imgGo, methodInfoImg);
-                if (cbImg && !cbImg.isNull()) {
-                    var emblemSprite = getOrCreateLoadingEmblemSprite();
-                    if (emblemSprite && !emblemSprite.isNull()) {
-                        setSpriteFn(cbImg, emblemSprite, NULL);
-                        setEnabledFn(cbImg, 1, NULL);
-                        setActiveFn(imgGo, 1, NULL);
-                        log("[⏳ LOADING] LOONA emblem sprite cleanly applied to cacheBase/Image!");
+                // Resolve [6] CacheBase and ensure it is DEACTIVATED to prevent Dalcomsoft logo drawing
+                var cbTf = getChildFn(instTf, 6, NULL); // [6] CacheBase
+                if (cbTf && !cbTf.isNull()) {
+                    var cbGo = getGoFn(cbTf, NULL);
+                    if (!cbGo.isNull()) {
+                        setActiveFn(cbGo, 0, NULL);
+                        log("[⏳ LOADING] Force deactivated CacheBase GameObject!");
                     }
                 }
             } catch (eApp) {
                 log("[-] Error applying LOONA emblem: " + eApp.message);
             }
+        }
+
+        // Intercept Image.set_sprite (0x1ECB61C) to unconditionally suppress 00_common_LoadingIcon (Dalcomsoft logo)
+        try {
+            Interceptor.attach(baseAddr.add(0x1ECB61C), {
+                onEnter: function (args) {
+                    var sp = args[1];
+                    if (!sp.isNull()) {
+                        var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                        var spName = readIl2CppString(getNameFn(sp, NULL));
+                        if (spName === "00_common_LoadingIcon") {
+                            var loonaSprite = getOrCreateLoadingEmblemSprite();
+                            args[1] = (loonaSprite && !loonaSprite.isNull()) ? loonaSprite : NULL;
+                            log("[🛡️ DALCOM SUPPRESS] Intercepted 00_common_LoadingIcon -> replaced with LOONA emblem!");
+                        }
+                    }
+                }
+            });
+            log("[+] Interceptor.attach installed on Image.set_sprite (0x1ECB61C) for Dalcomsoft logo suppression!");
+        } catch (eSpInt) {
+            log("[-] Error intercepting Image.set_sprite: " + eSpInt.message);
+        }
+
+        // Attach to LoadingIndicator.FireShowIndicator (0xB3DD1C) to apply LOONA emblem on every display
+        try {
+            Interceptor.attach(baseAddr.add(0xB3DD1C), {
+                onEnter: function (args) {
+                    var inst = args[0];
+                    applyLoonaEmblemToCacheBase(inst);
+                }
+            });
+            log("[+] Interceptor.attach installed on LoadingIndicator.FireShowIndicator (0xB3DD1C)!");
+        } catch (eFsi) {
+            log("[-] Error attaching to FireShowIndicator: " + eFsi.message);
         }
 
         var isShowingLoading = false;
@@ -826,7 +863,7 @@ function initIl2Cpp(module) {
                             var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
                             var cacheBase = inst.add(0x90).readPointer();
                             if (!cacheBase.isNull()) {
-                                setActiveFn(cacheBase, 1, NULL);
+                                setActiveFn(cacheBase, 0, NULL);
                                 var goGetTfFn = new NativeFunction(baseAddr.add(0x1DBAD24), "pointer", ["pointer", "pointer"]);
                                 var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                                 var cbTf = goGetTfFn(cacheBase, NULL);
@@ -837,7 +874,7 @@ function initIl2Cpp(module) {
                                     for (var ci = 0; ci < cCount; ci++) {
                                         var cTf = getChildFn(cbTf, ci, NULL);
                                         var cGo = getGoFn(cTf, NULL);
-                                        if (!cGo.isNull()) setActiveFn(cGo, 1, NULL);
+                                        if (!cGo.isNull()) setActiveFn(cGo, 0, NULL);
                                     }
                                 }
                             }

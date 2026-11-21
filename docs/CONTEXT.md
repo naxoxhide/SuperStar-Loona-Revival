@@ -4522,5 +4522,40 @@ Se realizaron pruebas visuales exhaustivas mediante capturas directas de pantall
    * **Hoisting y Disponibilidad Temprana:** Mover la definición de `loadLocalTexture2D` para garantizar la creación inmediata de `emblemSprite` desde el arranque.
    * **Preservación Estricta:** Mantener inalterados todos los demás componentes visuales del cargador nativo: el spinner rotatorio (`Loading`), el fondo geométrico con brillo (`Square`), los efectos de partículas (`smallParticle`) y el bloqueo de toques (`TouchLock`).
 
+### 24.14. Supresión Definitiva de `00_common_LoadingIcon` (Dalcomsoft) y Reemplazo por Emblema Canónico de LOONA
+
+1. **Descubrimiento Forense de la Causa Raíz de Superposición:**
+   * **Travesía Exhaustiva del Árbol de UI (`SCAN_IMAGES`):**
+     Al escanear recursivamente los GameObjects y componentes `UnityEngine.UI.Image` bajo la jerarquía de `LoadingIndicator`, se determinó la asignación exacta de sprites en el prefab uGUI:
+     - `LoadingIndicator/TouchLock`: Aloja sprite `box` (bloqueo modal de toques).
+     - `LoadingIndicator/Blind`: Aloja sprite `box` (cortina oscura semitransparente).
+     - `LoadingIndicator/mainBody` (hijo index 2): **Aloja nativamente el sprite `00_common_LoadingIcon`**. Este componente `Image` es el responsable de proyectar el isotipo cúbico con las diagonales cruzadas y el rótulo corporativo "DALCOM SOFT".
+     - `LoadingIndicator/Square/outGlow`: Aloja sprite `00_common_L_content_bgGlory_circle` (halo de resplandor del rombo).
+     - `LoadingIndicator/Loading`: Aloja sprite `loading` (rueda giratoria / *spinner* en offset `0x38`).
+     - `LoadingIndicator/CacheBase` (hijo index 6 / offset `0x90`): Contenedor de caché Dalcomsoft que era activado redundantemente (`SetActive(cacheBase, 1)`) en la corrutina `<OnLoadEmblems>d__46.MoveNext`.
+   * **Mecanismo de Doble Renderizado:**
+     Al coexistir `mainBody` activo con el sprite corporativo `00_common_LoadingIcon` y activarse `CacheBase`, ambos elementos se proyectaban superpuestos en las coordenadas centrales $(0, 0, 0)$ dentro del rombo brillante.
+
+2. **Solución Arquitectónica Definitiva:**
+   * **Sustitución en `mainBody` (`00_common_LoadingIcon` $\to$ Emblema LOONA):**
+     En `applyLoonaEmblemToCacheBase`, se obtiene el componente `Image` de `mainBody` y se le asigna directamente el sprite oficial de LOONA (`1001.i.bytes` / `[+ +]`), habilitando `enabled = 1`.
+   * **Interceptación Dinámica en `Image.set_sprite` (`0x1ECB61C`):**
+     Se instaló un hook en `Image.set_sprite` que intercepta dinámicamente cualquier intento del motor de asignar `00_common_LoadingIcon` y lo redirige automáticamente al sprite oficial de LOONA (`getOrCreateLoadingEmblemSprite()`), impidiendo que el logotipo de Dalcomsoft vuelva a ser dibujado en cualquier instante o animación.
+   * **Enganche a `LoadingIndicator.FireShowIndicator` (`0xB3DD1C`):**
+     Se interceptó la llamada interna de presentación del cargador nativo (`FireShowIndicator`) para reaplicar deterministamente el emblema de LOONA en cada invocación del indicador de carga (`Active`, `ActiveWithSmooth`, `ActiveTwo`).
+   * **Desactivación Forzada de `CacheBase`:**
+     Se forzó `SetActive(cacheBase, 0)` tanto en la inicialización temprana (`Awake`) como en la terminación segura de la corrutina `<OnLoadEmblems>d__46.MoveNext`, eliminando cualquier dibujo residual.
+   * **Neutralización de `LoadingIndicator.SetupEmblems` (`0xB3E658`):**
+     Se parcheó la rutina nativa con `RET` (`c0 03 5f d6`) para evitar la reinicialización de emblemas ajenos de SM.
+
+3. **Validación Visual de Quality Gate (Senior QA Tester Sign-Off):**
+   * **Transición `Title` $\to$ `Lobby`:**
+     [`qa_final_clean_loading.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_final_clean_loading.png) y [`qa_loona_test1.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_loona_test1.png) certifican que el isotipo y rótulo "DALCOM SOFT" han desaparecido al 100%. En el centro del rombo celeste resplandeciente se proyecta únicamente el emblema blanco canónico de LOONA (`[+ +]`), con el spinner rotatorio y los destellos de partículas intactos.
+   * **Transición `Lobby` $\to$ `Inventory`:**
+     [`qa_loona_inven1.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_loona_inven1.png) y [`qa_loona_inven2.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_loona_inven2.png) confirman la apertura modal con el cargador limpio y la posterior carga íntegra de la colección de cartas [`qa_loona_inven_loaded.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_loona_inven_loaded.png).
+   * **Transición `Inventory` $\to$ `Lobby` (Retorno):**
+     [`qa_loona_back1.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_loona_back1.png) y [`qa_loona_back2.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_loona_back2.png) ratifican la estabilidad bidireccional y el cierre del cargador sin artefactos.
+   * **Dictamen Final:** APROBADO (*Sign-off* concedido. Criterio de aceptación 100% satisfecho).
+
 
 
