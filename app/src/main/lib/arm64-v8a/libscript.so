@@ -449,6 +449,55 @@ function initIl2Cpp(module) {
         // 🛡️ LOADING INDICATOR MANAGEMENT
         // ==========================================
         var cachedLoadingIndicatorInstance = NULL;
+        var loadedTextureCache = {};
+        var cachedLoadingSprite = null;
+        var cachedCanvasType = null;
+        var cachedImageType = null;
+
+        function getCanvasType() {
+            if (cachedCanvasType && !cachedCanvasType.isNull()) return cachedCanvasType;
+            try {
+                var k = getClass("UnityEngine.UIModule", "UnityEngine", "Canvas");
+                if (k && !k.isNull()) {
+                    var classGetType = new NativeFunction(baseAddr.add(0x9C453C), "pointer", ["pointer"]);
+                    var typeGetObject = new NativeFunction(baseAddr.add(0x9C4FA4), "pointer", ["pointer"]);
+                    cachedCanvasType = typeGetObject(classGetType(k));
+                }
+            } catch (e) {}
+            return cachedCanvasType;
+        }
+
+        function getImageType() {
+            if (cachedImageType && !cachedImageType.isNull()) return cachedImageType;
+            try {
+                var k = getClass("UnityEngine.UI", "UnityEngine.UI", "Image");
+                if (k && !k.isNull()) {
+                    var classGetType = new NativeFunction(baseAddr.add(0x9C453C), "pointer", ["pointer"]);
+                    var typeGetObject = new NativeFunction(baseAddr.add(0x9C4FA4), "pointer", ["pointer"]);
+                    cachedImageType = typeGetObject(classGetType(k));
+                }
+            } catch (e) {}
+            return cachedImageType;
+        }
+
+        function getOrCreateLoadingEmblemSprite() {
+            if (cachedLoadingSprite && !cachedLoadingSprite.isNull()) return cachedLoadingSprite;
+            try {
+                var tex = loadLocalTexture2D("asiudgasg/asodhsg/aweoijs/1001.i.bytes");
+                if (tex && !tex.isNull()) {
+                    var createSpriteFn = new NativeFunction(baseAddr.add(0x23E1268), "pointer", ["pointer"]);
+                    cachedLoadingSprite = createSpriteFn(tex);
+                    if (il2cpp_gchandle_new && !cachedLoadingSprite.isNull()) {
+                        il2cpp_gchandle_new(cachedLoadingSprite, 2);
+                    }
+                    log("[⏳ LOADING] LOONA emblem sprite created cleanly: " + cachedLoadingSprite);
+                    return cachedLoadingSprite;
+                }
+            } catch (eEmb) {
+                log("[-] Error creating loading emblem sprite: " + eEmb.message);
+            }
+            return NULL;
+        }
 
         function getLoadingIndicatorInstance() {
             try {
@@ -493,99 +542,18 @@ function initIl2Cpp(module) {
             return cachedLoadingIndicatorInstance;
         }
 
+        var isShowingLoading = false;
         function showLoadingIndicator() {
+            if (isShowingLoading) return;
+            isShowingLoading = true;
             try {
-                var inst = getLoadingIndicatorInstance();
-                if (!inst || inst.isNull()) return;
-
-                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
-                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3D04), "void", ["pointer", "bool", "pointer"]);
-
-                // 1. Ensure LoadingIndicator GameObject is active
-                var liGo = getGoFn(inst, NULL);
-                if (!liGo.isNull()) setActiveFn(liGo, 1, NULL);
-
-                // 2. Elevate parent Canvas (ForegroundSystemCanvas) sortingOrder to 32767 so it renders on top
-                try {
-                    var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
-                    var liTf = getTfFn(inst, NULL);
-                    var pTf = liTf;
-                    while (!pTf.isNull()) {
-                        var pGo = getGoFn(pTf, NULL);
-                        if (!pGo.isNull()) {
-                            setActiveFn(pGo, 1, NULL);
-                            var canvasMethodSlot = baseAddr.add(0x3142fc0).readPointer();
-                            if (!canvasMethodSlot.isNull()) {
-                                var getCanvasFn = new NativeFunction(baseAddr.add(0x10B4898), "pointer", ["pointer", "pointer"]);
-                                var canvasComp = getCanvasFn(pGo, canvasMethodSlot);
-                                if (!canvasComp.isNull()) {
-                                    var setSortingOrderFn = new NativeFunction(baseAddr.add(0x258BC88), "void", ["pointer", "int", "pointer"]);
-                                    setSortingOrderFn(canvasComp, 32767, NULL);
-                                }
-                            }
-                        }
-                        pTf = getParentFn(pTf, NULL);
-                    }
-                } catch (eCanvas) {}
-
-                // 3. Ensure all children of LoadingIndicator are active
-                try {
-                    var getChildCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
-                    var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
-                    var liTf = getTfFn(inst, NULL);
-                    var cc = getChildCountFn(liTf, NULL);
-                    for (var i = 0; i < cc; i++) {
-                        var cTf = getChildFn(liTf, i, NULL);
-                        var cGo = getGoFn(cTf, NULL);
-                        setActiveFn(cGo, 1, NULL);
-                    }
-                } catch (eCh) {}
-
-                // 4. Dispatch native LoadingIndicator.Active()
                 var activeFn = new NativeFunction(baseAddr.add(0xB3BBB4), "void", []);
                 activeFn();
-
-                // 5. Ensure full opacity on CanvasGroups and Loading image
-                try {
-                    var setAlphaFn = new NativeFunction(baseAddr.add(0x258C2A8), "void", ["pointer", "float", "pointer"]);
-                    var circleCg = inst.add(0x58).readPointer();
-                    if (!circleCg.isNull()) setAlphaFn(circleCg, 1.0, NULL);
-                    var shadowCg = inst.add(0x60).readPointer();
-                    if (!shadowCg.isNull()) setAlphaFn(shadowCg, 1.0, NULL);
-
-                    var loadingImg = inst.add(0x38).readPointer();
-                    if (!loadingImg.isNull()) {
-                        setEnabledFn(loadingImg, 1, NULL);
-                        loadingImg.add(0x20).writeFloat(1.0);
-                        loadingImg.add(0x24).writeFloat(1.0);
-                        loadingImg.add(0x28).writeFloat(1.0);
-                        loadingImg.add(0x2C).writeFloat(1.0);
-                    }
-                } catch (eOpac) {}
-
-                // 6. Ensure CacheBase and its Image child are active
-                try {
-                    var cacheBase = inst.add(0x90).readPointer();
-                    if (!cacheBase.isNull()) {
-                        setActiveFn(cacheBase, 1, NULL);
-                        var cbGoTfFn = new NativeFunction(baseAddr.add(0x1DBAF54), "pointer", ["pointer", "pointer"]);
-                        var cbTf = cbGoTfFn(cacheBase, NULL);
-                        if (!cbTf.isNull()) {
-                            var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
-                            var imgTf = getChildFn(cbTf, 0, NULL);
-                            if (!imgTf.isNull()) {
-                                var imgGo = getGoFn(imgTf, NULL);
-                                setActiveFn(imgGo, 1, NULL);
-                            }
-                        }
-                    }
-                } catch (eCb) {}
-
-                log("[⏳ LOADING] LoadingIndicator.Active() cleanly dispatched with sortingOrder 32767!");
+                log("[⏳ LOADING] LoadingIndicator.Active() cleanly dispatched!");
             } catch (eAct) {
                 log("[-] Error in showLoadingIndicator: " + eAct.message);
+            } finally {
+                isShowingLoading = false;
             }
         }
 
@@ -595,6 +563,11 @@ function initIl2Cpp(module) {
                 completeFn();
                 var completeTwoFn = new NativeFunction(baseAddr.add(0xB3E340), "void", []);
                 completeTwoFn();
+                var inst = getLoadingIndicatorInstance();
+                if (inst && !inst.isNull()) {
+                    inst.add(0x88).writeU8(1);
+                    inst.add(0x8C).writeS32(2);
+                }
                 log("[⏳ LOADING] LoadingIndicator.Complete() cleanly dispatched!");
             } catch (eCmp) {
                 log("[-] Error in hideLoadingIndicator: " + eCmp.message);
@@ -3446,13 +3419,14 @@ function initIl2Cpp(module) {
                     onEnter: function (args) {
                         log("[🚀 TITLE] TitleScene.SetStateNextScene entered on instance: " + args[0]);
                         globalTitleScene = args[0];
+                        showLoadingIndicator();
                     }
                 });
                 Interceptor.attach(baseAddr.add(0xD5338C), {
                     onEnter: function (args) {
                         var targetSid = args[1].toInt32();
                         log("[🎉 SCENE TRANSITION] Scene.SetStateOpenScene CALLED! -> Target SceneType: " + targetSid);
-                        if (targetSid !== 2) {
+                        if (targetSid >= 3) {
                             showLoadingIndicator();
                         }
                     }
@@ -3692,7 +3666,7 @@ function initIl2Cpp(module) {
                         var targetSid = args[0].toInt32();
                         log("[🎬 SCENE] SceneControl.OpenScene -> sceneId: " + targetSid);
                         globalSceneId = targetSid;
-                        if (targetSid !== 2) {
+                        if (targetSid >= 3) {
                             isAtTouchToStart = false;
                             hasTriggeredLobbyTransition = true;
                             cachedTitleTexObj = null;
@@ -9680,7 +9654,7 @@ function initIl2Cpp(module) {
 
 
                 // Native Texture2D loader with disk cache (available to cell views and SetCdnTexture)
-                var loadedTextureCache = {};
+                loadedTextureCache = loadedTextureCache || {};
 
                 // Dedicated pool for Empty Card textures (sdhgauwehdnu) - shared across all themes to prevent OOM
                 var emptyCardTexturePool = {};
