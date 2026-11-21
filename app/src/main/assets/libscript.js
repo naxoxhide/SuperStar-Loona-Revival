@@ -17913,22 +17913,43 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     var instTf = getTfFn(inst, NULL);
                                     var cc = !instTf.isNull() ? getChildCountFn(instTf, NULL) : 0;
                                     log("[🔍 DIAG_LOADING] inst childCount: " + cc);
+
+                                    // Check RectTransform or Transform localPosition and localScale
+                                    var getLocalPosFn = new NativeFunction(baseAddr.add(0x180DE48), "void", ["pointer", "pointer"]);
+                                    var getLocalScaleFn = new NativeFunction(baseAddr.add(0x181DFD8), "void", ["pointer", "pointer"]);
+                                    var v3Buf = Memory.alloc(16);
+
+                                    getLocalPosFn(instTf, v3Buf);
+                                    var ix = v3Buf.readFloat(), iy = v3Buf.add(4).readFloat(), iz = v3Buf.add(8).readFloat();
+                                    getLocalScaleFn(instTf, v3Buf);
+                                    var sx = v3Buf.readFloat(), sy = v3Buf.add(4).readFloat(), sz = v3Buf.add(8).readFloat();
+                                    log("[🔍 DIAG_LOADING POS/SCALE] inst pos=(" + ix + "," + iy + "," + iz + ") scale=(" + sx + "," + sy + "," + sz + ")");
+
                                     for (var i = 0; i < cc; i++) {
                                         var cTf = getChildFn(instTf, i, NULL);
                                         var cGo = getGoFn(cTf, NULL);
                                         var cName = !cGo.isNull() ? readIl2CppString(getNameFn(cGo, NULL)) : "null";
                                         var cSelf = !cGo.isNull() ? getActiveSelf(cGo, NULL) : -1;
                                         var cInH = !cGo.isNull() ? getActiveInH(cGo, NULL) : -1;
-                                        log("[🔍 DIAG_LOADING CHILD " + i + "] name=" + cName + " self=" + cSelf + " inH=" + cInH + " go=" + cGo);
-                                        var subCc = getChildCountFn(cTf, NULL);
-                                        for (var j = 0; j < subCc; j++) {
-                                            var sjTf = getChildFn(cTf, j, NULL);
-                                            var sjGo = getGoFn(sjTf, NULL);
-                                            var sjName = !sjGo.isNull() ? readIl2CppString(getNameFn(sjGo, NULL)) : "null";
-                                            var sjSelf = !sjGo.isNull() ? getActiveSelf(sjGo, NULL) : -1;
-                                            var sjInH = !sjGo.isNull() ? getActiveInH(sjGo, NULL) : -1;
-                                            log("    [SUB " + j + "] name=" + sjName + " self=" + sjSelf + " inH=" + sjInH + " go=" + sjGo);
-                                        }
+                                        getLocalPosFn(cTf, v3Buf);
+                                        var cx = v3Buf.readFloat(), cy = v3Buf.add(4).readFloat(), cz = v3Buf.add(8).readFloat();
+                                        getLocalScaleFn(cTf, v3Buf);
+                                        var csx = v3Buf.readFloat(), csy = v3Buf.add(4).readFloat(), csz = v3Buf.add(8).readFloat();
+                                        log("[🔍 DIAG_LOADING CHILD " + i + "] " + cName + " pos=(" + cx + "," + cy + "," + cz + ") scale=(" + csx + "," + csy + "," + csz + ")");
+                                    }
+
+                                    // Walk UP to root to find Canvas
+                                    var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
+                                    var pTf = instTf;
+                                    while (!pTf.isNull()) {
+                                        var pGo = getGoFn(pTf, NULL);
+                                        var pName = !pGo.isNull() ? readIl2CppString(getNameFn(pGo, NULL)) : "null";
+                                        getLocalPosFn(pTf, v3Buf);
+                                        var px = v3Buf.readFloat(), py = v3Buf.add(4).readFloat(), pz = v3Buf.add(8).readFloat();
+                                        getLocalScaleFn(pTf, v3Buf);
+                                        var psx = v3Buf.readFloat(), psy = v3Buf.add(4).readFloat(), psz = v3Buf.add(8).readFloat();
+                                        log("  [PARENT] " + pName + " pos=(" + px + "," + py + "," + pz + ") scale=(" + psx + "," + psy + "," + psz + ") go=" + pGo);
+                                        pTf = getParentFn(pTf, NULL);
                                     }
                                 }
                             } catch (eDld) {
