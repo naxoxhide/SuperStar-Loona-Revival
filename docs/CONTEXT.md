@@ -4718,6 +4718,28 @@ Se realizaron pruebas visuales exhaustivas mediante capturas directas de pantall
 3. **[data/theme_card_overrides.json](file:///Users/ignaciorojas/Documents/repos/sslo_apk/data/theme_card_overrides.json):**
    - Archivo de configuración para aplicar sobreescrituras inmediatas en caso de que Ignacio identifique alguna discordancia visual en fotos o membresías.
 
+---
+
+## 📅 Avance Técnico: Diagnóstico Forense y Arquitectura de Inyección en CardBook y Equip Theme (22/11/2026)
+
+### 1. Diagnóstico Forense de la Causa Raíz
+A partir de la solicitud de Ignacio para aplicar las asociaciones documentadas en **CardBook** y el pop-up de **Equip Theme**, se realizó una inspección visual y análisis estático/dinámico en memoria de `libil2cpp.so`:
+* **Discrepancia Masiva en `themeArtistEmptyMap` (587 de 731 erróneas):**
+  - En [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js) (línea 5579), la tabla `themeArtistEmptyMap` utilizaba un cálculo secuencial artificial.
+  - Esto provocaba que en el tema HEAT (1002), se usara el código 1012, que resolvía a la carta vacía de Hi High (1001).
+  - Como comprobación visual en vivo, las capturas de pantalla (`screen_theme_pop.png` y `screen_cb_heat.png`) demostraron que los slots vacíos de HEAT en el juego mostraban a las integrantes con el uniforme escolar blanco de Hi High en lugar de la silueta en atuendo naranja de HEAT (`targetCode: 1023..1033`).
+* **Doble Resolución Circular en `loadLocalTexture2D` (Línea 11143):**
+  - Al recibir una ruta de `sdhgauwehdnu/`, se ejecutaba nuevamente `cardIdToEmptyArtistMap[aCode]`. Dado que ese mapa traduce *card ID $\to$ empty code*, consultar un *empty code* en dicho diccionario reasignaba indebidamente códigos numéricos que coincidían con otros IDs de cartas.
+* **Mapeo de Pop-up Equip Theme (`SelectThemePopup`):**
+  - Al invocar `SelectThemeAssist.OpenSelectThemePopup` (`0x104EF80`), para slots no poseídos se recupera `cbCardItem` de `themeItem.CardList` y se pasa a `CardAssist.CreateCardSmallViewParam` (`0xABF1F0`), leyendo `cbCardItem.Data.get_SmallImagePath()` (`0xE43844`). Al estar nutrida dicha propiedad por la factoría defectuosa, el pop-up replicaba el error de tema.
+
+### 2. Estrategia de Solución
+1. **Reemplazo de `themeArtistEmptyMap`:** Sustituir la tabla por los 731 registros validados en `docs/audit_themes_and_cards.json`.
+2. **Corrección de Factoría de Texturas:** Suprimir la re-búsqueda en `loadLocalTexture2D` para archivos dentro de `sdhgauwehdnu/`, respetando directamente el código extraído de la ruta.
+3. **Mantenimiento Estricto de Alcance:** No tocar ningún hook de gameplay, balance de audio ni pantallas ajenas.
+4. **Verificación Automatizada con Capturas ADB:** Batería de pruebas en `127.0.0.1:5555` usando `scene_cmd.txt` para validar visualmente la correspondencia 1:1 frente al catálogo web `docs/card_catalog_viewer.html`.
+
+
 
 
 
