@@ -4455,3 +4455,31 @@ Se realizaron pruebas visuales exhaustivas mediante capturas directas de pantall
   - **`[ Flip That ]` (Grupo 6001):** *Need U* y *Pale Blue Dot* renderizan con su emblema oficial circular de Flip That. Evidencia: [`qa_group6001_themes.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_group6001_themes.png).
   - **`[ Max & Match ]` (Grupo 21001):** *Max & Match* y *Uncover* renderizan con emblema oficial y tipografía canónica. Evidencia: [`qa_group21001_themes.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_group21001_themes.png).
 
+### 24.12. Reactivación y Restauración Visual del LoadingIndicator Nativo (Dalcomsoft Engine)
+
+1. **Jerarquía y Estructura Visual del Pop-up:**
+   * **Ruta de Objetos en Escena:**
+     `Game` $\to$ `ForegroundSystemCanvas` $\to$ `Padding` $\to$ `LoadingIndicator`.
+   * **Sub-árbol Visual:**
+     - `LoadingIndicator` (MonoBehaviour / View en `0xB3DB48`).
+     - `[0] TouchLock`: bloqueo modal de toques de pantalla.
+     - `[1] Blind`: cortina semitransparente oscura de fondo.
+     - `[2] mainBody`: contenedor principal.
+     - `[3] smallParticle`: efectos de partículas.
+     - `[4] Square`: decorador geométrico con sub-efectos `outGlow` y `Particle System`.
+     - `[5] Loading`: componente `UnityEngine.UI.Image` (offset `0x38`) del círculo de rotación (*spinner*).
+     - `[6] CacheBase`: contenedor GameObject (`0x90`) con hijo único `[0] Image` que aloja el emblema central oficial de LOONA (`1001.i.bytes`).
+
+2. **Resolución Criptográfica y de Metadatos IL2CPP:**
+   * **Inicialización de Tokens en Runtime (`0xA43BE8`):**
+     Las ranuras de metadatos genéricos IL2CPP como `0x3108808` (`Dropdown.GetOrAddComponent<Canvas>`) y `0x3103530` (`GameObject.GetComponent<Image>`) contienen tokens no resueltos (`0xC0014EE9` / `0xA000A0AF`) hasta que se invoca `il2cpp_codegen_initialize_runtime_metadata` (`baseAddr + 0xA43BE8`). Se implementó la inicialización dinámica de slots antes de invocar los métodos genéricos compartidos (`0x10A5B30` y `0x10B4898`).
+   * **Configuración del Canvas:**
+     `ForegroundSystemCanvas` se configura en `RenderMode.ScreenSpaceOverlay` (`renderMode = 0`) con `overrideSorting = true` y `sortingOrder = 32767`, garantizando su proyección sobre cualquier cámara 3D o cortina `NextScene`.
+   * **Inyección de Emblema LOONA:**
+     Se resuelve `GetComponent<Image>` sobre `cacheBase.transform.GetChild(0).gameObject`, cargando la textura de `asiudgasg/asodhsg/aweoijs/1001.i.bytes` y asignándola al componente con `Image.set_sprite` (`0x1ECB61C`).
+
+3. **Ciclo de Vida de Transición de Escenas:**
+   * **Disparo en Apertura:** `Scene.SetStateOpenScene` (`0xD5338C`) y `SceneControl.OpenScene` (`0xD534BC`) para `targetSid >= 3` invocan `showLoadingIndicator()`, el cual resetea `WillHide = 0`, `HideFrame = 0`, `IsOne = 0`, `IsTwo = 0`, aplica el emblema y llama a `FireShowIndicator(inst, false)` (`0xB3DD1C`).
+   * **Cierre Suave:** `LobbyScene.OnOpen`, `InventoryScene.OnOpen` y `CardBookScene.OnOpen` despachan `LoadingIndicator.Complete()` (`0xB3E230`), iniciando el desvanecimiento sin desreferenciar la instancia `DontDestroyOnLoad`.
+
+

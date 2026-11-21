@@ -548,24 +548,36 @@ function initIl2Cpp(module) {
                 var cacheBase = inst.add(0x90).readPointer();
                 if (!cacheBase || cacheBase.isNull()) return;
 
-                var loadingImg = inst.add(0x38).readPointer();
-                if (!loadingImg || loadingImg.isNull()) return;
+                var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
+                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
 
-                var imgKlass = loadingImg.readPointer();
-                var classGetType = new NativeFunction(baseAddr.add(0x9C453C), "pointer", ["pointer"]);
-                var typeGetObject = new NativeFunction(baseAddr.add(0x9C4FA4), "pointer", ["pointer"]);
-                var imageSysType = typeGetObject(classGetType(imgKlass));
+                var cbTf = getTfFn(cacheBase, NULL);
+                if (cbTf.isNull()) return;
+                var imgTf = getChildFn(cbTf, 0, NULL);
+                if (imgTf.isNull()) return;
+                var imgGo = getGoFn(imgTf, NULL);
+                if (imgGo.isNull()) return;
 
-                var getCompInChildFn = new NativeFunction(baseAddr.add(0x1DB6CCC), "pointer", ["pointer", "pointer", "bool", "pointer"]);
-                var cbImg = getCompInChildFn(cacheBase, imageSysType, 1, NULL);
-                if (!cbImg.isNull()) {
+                // Resolve Image component via GetComponent<Image>
+                var initMetadataFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
+                var slotImg = baseAddr.add(0x3103530).readPointer();
+                initMetadataFn(slotImg);
+                var methodInfoImg = slotImg.readPointer();
+                var getCompImgFn = new NativeFunction(baseAddr.add(0x10B4898), "pointer", ["pointer", "pointer"]);
+                var cbImg = getCompImgFn(imgGo, methodInfoImg);
+
+                if (cbImg && !cbImg.isNull()) {
                     var emblemSprite = getOrCreateLoadingEmblemSprite();
                     if (emblemSprite && !emblemSprite.isNull()) {
                         var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
                         setSpriteFn(cbImg, emblemSprite, NULL);
                         var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3D04), "void", ["pointer", "bool", "pointer"]);
                         setEnabledFn(cbImg, 1, NULL);
-                        log("[⏳ LOADING] LOONA emblem sprite cleanly applied to cacheBase!");
+                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                        setActiveFn(imgGo, 1, NULL);
+                        setActiveFn(cacheBase, 1, NULL);
+                        log("[⏳ LOADING] LOONA emblem sprite cleanly applied to cacheBase/Image!");
                     }
                 }
             } catch (eApp) {
@@ -598,14 +610,12 @@ function initIl2Cpp(module) {
                     }
                 }
 
-                // Ensure cacheBase (emblem container) is active
-                try {
-                    var cacheBase = inst.add(0x90).readPointer();
-                    if (!cacheBase.isNull()) {
-                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                        setActiveFn(cacheBase, 1, NULL);
-                    }
-                } catch (eCb) {}
+                // Apply LOONA emblem to cacheBase
+                applyLoonaEmblemToCacheBase(inst);
+
+                // Ensure ManagedComponent.Active (0xD02334) is dispatched
+                var mcActiveFn = new NativeFunction(baseAddr.add(0xD02334), "void", ["pointer", "pointer"]);
+                mcActiveFn(inst, NULL);
 
                 // Directly invoke FireShowIndicator(inst, false)
                 var fireShowFn = new NativeFunction(baseAddr.add(0xB3DD1C), "void", ["pointer", "bool", "pointer"]);
@@ -663,9 +673,9 @@ function initIl2Cpp(module) {
                         // Elevate Canvas sortingOrder on ForegroundSystemCanvas to 32767 & set ScreenSpaceOverlay
                         try {
                             var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
-                            var setRenderModeFn = new NativeFunction(baseAddr.add(0x258B988), "void", ["pointer", "int", "pointer"]);
-                            var setOrderFn = new NativeFunction(baseAddr.add(0x258BC88), "void", ["pointer", "int", "pointer"]);
-                            var setOverrideSortingFn = new NativeFunction(baseAddr.add(0x258BBF8), "void", ["pointer", "bool", "pointer"]);
+                            var setRenderModeFn = new NativeFunction(baseAddr.add(0x258B988), "void", ["pointer", "int"]);
+                            var setOrderFn = new NativeFunction(baseAddr.add(0x258BC88), "void", ["pointer", "int"]);
+                            var setOverrideSortingFn = new NativeFunction(baseAddr.add(0x258BBF8), "void", ["pointer", "bool"]);
 
                             var pTf = tf;
                             while (!pTf.isNull()) {
@@ -676,14 +686,16 @@ function initIl2Cpp(module) {
                                     var pName = readIl2CppString(getNameFn(pGo, NULL));
                                     if (pName === "ForegroundSystemCanvas") {
                                         try {
-                                            var methodInfoSlot = baseAddr.add(0x3108808).readPointer();
-                                            var methodInfo = !methodInfoSlot.isNull() ? methodInfoSlot.readPointer() : NULL;
+                                            var initMetadataFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
+                                            var slot = baseAddr.add(0x3108808).readPointer();
+                                            initMetadataFn(slot);
+                                            var methodInfo = slot.readPointer();
                                             var getCanvasFn = new NativeFunction(baseAddr.add(0x10A5B30), "pointer", ["pointer", "pointer"]);
                                             var cv = getCanvasFn(pGo, methodInfo);
                                             if (cv && !cv.isNull()) {
-                                                setRenderModeFn(cv, 0, NULL); // RenderMode.ScreenSpaceOverlay = 0
-                                                setOverrideSortingFn(cv, 1, NULL);
-                                                setOrderFn(cv, 32767, NULL);
+                                                setRenderModeFn(cv, 0); // RenderMode.ScreenSpaceOverlay = 0
+                                                setOverrideSortingFn(cv, 1);
+                                                setOrderFn(cv, 32767);
                                                 log("[⏳ LOADING] Awake: ForegroundSystemCanvas set to ScreenSpaceOverlay with sortingOrder=32767!");
                                             }
                                         } catch (eCvInst) {
@@ -3565,9 +3577,7 @@ function initIl2Cpp(module) {
                         var targetSid = args[1].toInt32();
                         log("[🎉 SCENE TRANSITION] Scene.SetStateOpenScene CALLED! -> Target SceneType: " + targetSid);
                         if (targetSid >= 3) {
-                            setTimeout(function () {
-                                showLoadingIndicator();
-                            }, 0);
+                            showLoadingIndicator();
                         }
                     }
                 });
@@ -17885,7 +17895,14 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             }
                         }
 
-                        if (cmdRaw === "dismiss" || cmdRaw === "close_popups" || cmdRaw === "dismiss_popups") {
+                        if (cmdRaw.indexOf("eval:") === 0) {
+                            try {
+                                var jsCode = cmdRaw.substring(5).trim();
+                                log("[⚡ MAIN THREAD EVAL] " + eval(jsCode));
+                            } catch (eMev) {
+                                log("[-] Error in main thread eval: " + eMev.message);
+                            }
+                        } else if (cmdRaw === "dismiss" || cmdRaw === "close_popups" || cmdRaw === "dismiss_popups") {
                             log("[🛡️ POPUP CMD] Popups dismissed cleanly via Popup.CloseAll(0)!");
                         } else if (cmdRaw === "refresh_rp") {
                             try {
@@ -19449,14 +19466,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             if (content) {
                                 var cmdTrim = content.trim();
                                 if (cmdTrim.indexOf("eval:") === 0) {
-                                    var jsCode = cmdTrim.substring(5).trim();
-                                    log("[⚡ DIRECT EVAL] Executing: " + jsCode);
-                                    try {
-                                        var evalRes = eval(jsCode);
-                                        log("[⚡ DIRECT EVAL RESULT] " + evalRes);
-                                    } catch (eEv) {
-                                        log("[-] Error in direct eval: " + eEv.message);
-                                    }
+                                    pendingSceneCommand = cmdTrim;
+                                    log("[🚀 SCENE CMD QUEUED] Queued eval for Unity Main Thread");
                                 } else {
                                     cmdTrim = cmdTrim.replace(/['"]/g, '').trim();
                                     if (cmdTrim.length > 0) {
