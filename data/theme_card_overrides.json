@@ -1,0 +1,11 @@
+{
+  "$schema_description": "Diccionario de sobreescritura manual para corregir posibles desalineaciones de cartas o texturas.",
+  "card_overrides": {
+    "example_17013": {
+      "note": "Ejemplo de override para Olivia Hye si se reemplaza el fallback con un arte alternativo custom",
+      "overrideLargePath": "asiudgasg/asodhsg/wadceg/17013_l.i.bytes.png",
+      "overrideSmallPath": "asiudgasg/asodhsg/wadceg/17013_s.i.bytes.png"
+    }
+  },
+  "theme_overrides": {}
+}
