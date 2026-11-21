@@ -151,6 +151,9 @@ def main():
         }
 
         # Procesar cartas dentro del tema
+        # Mapear primero las cartas normales (type == 0) para vincular el cardEmpty correcto a cada miembro
+        normal_cards_by_artist = {c["artistID"]: c for c in t_cards if c.get("type", 0) == 0}
+
         for c in t_cards:
             c_code = c["code"]
             a_code = c.get("artistID")
@@ -209,18 +212,42 @@ def main():
                     pass
 
             # 2. IMÁGENES NO EQUIPADAS / EMPTY (sdhgauwehdnu/)
-            # Representan el slot vacío (cardEmpty / artistEmpty)
-            # Primero buscamos empty temático específico por cardCode; si no existe, empty canónico por artistCode
-            empty_target_code = c_code
-            empty_s_rel = f"asiudgasg/asodhsg/sdhgauwehdnu/{c_code}_s.i.bytes.png"
-            empty_l_rel = f"asiudgasg/asodhsg/sdhgauwehdnu/{c_code}_l.i.bytes.png"
-            empty_source_type = "theme_specific"
+            # Regla de Ignacio: Las cartas Prismas comparten exactamente el mismo cardEmpty que su carta normal en ese tema.
+            norm_card = normal_cards_by_artist.get(a_code, c)
+            empty_s_rel = None
+            empty_l_rel = None
+            empty_source_type = "theme_cdn"
+            empty_target_code = norm_card["code"]
 
-            if not os.path.exists(os.path.join(FILES_DIR, empty_s_rel)):
-                empty_target_code = a_code
+            # Intentar resolver vía URL _em.png del CDN para la carta normal de ese tema
+            norm_s_url = norm_card.get("cardImageSmall", "").split("?")[0]
+            norm_em_url = norm_s_url.replace(".png", "_em.png")
+            for k, v in usm.items():
+                if norm_em_url in k:
+                    empty_s_rel = "asiudgasg/" + v + ".png" if not v.endswith(".png") else "asiudgasg/" + v
+                    l_val = v.replace("_s.i.bytes", "_l.i.bytes")
+                    empty_l_rel = "asiudgasg/" + l_val + ".png" if not l_val.endswith(".png") else "asiudgasg/" + l_val
+                    empty_source_type = "theme_cdn"
+                    break
+
+            # Si no se encuentra vía CDN del tema, recurrir a emptyImageSmall canónico en atd.json
+            if not empty_s_rel or not os.path.exists(os.path.join(FILES_DIR, empty_s_rel)):
+                a_empty_s_url = a_info.get("emptyImageSmall", "")
+                if a_empty_s_url and a_empty_s_url in usm:
+                    v_s = usm[a_empty_s_url]
+                    empty_s_rel = "asiudgasg/" + v_s + ".png" if not v_s.endswith(".png") else "asiudgasg/" + v_s
+                    a_empty_l_url = a_info.get("emptyImageLarge", "")
+                    v_l = usm.get(a_empty_l_url, v_s.replace("_s.i.bytes", "_l.i.bytes"))
+                    empty_l_rel = "asiudgasg/" + v_l + ".png" if not v_l.endswith(".png") else "asiudgasg/" + v_l
+                    empty_source_type = "artist_canonical_atd"
+                    empty_target_code = a_code
+
+            # Fallback seguro por artistCode
+            if not empty_s_rel or not os.path.exists(os.path.join(FILES_DIR, empty_s_rel)):
                 empty_s_rel = f"asiudgasg/asodhsg/sdhgauwehdnu/{a_code}_s.i.bytes.png"
                 empty_l_rel = f"asiudgasg/asodhsg/sdhgauwehdnu/{a_code}_l.i.bytes.png"
-                empty_source_type = "artist_default"
+                empty_source_type = "artist_id_fallback"
+                empty_target_code = a_code
 
             empty_s_abs = os.path.join(FILES_DIR, empty_s_rel)
             empty_l_abs = os.path.join(FILES_DIR, empty_l_rel)
