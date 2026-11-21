@@ -136,6 +136,9 @@ def main():
         l_url = c.get("cardImageLarge")
         s_path = clean_path(usm.get(s_url, f"asodhsg/wadceg/{code}_s.i.bytes"))
         l_path = clean_path(usm.get(l_url, f"asodhsg/wadceg/{code}_l.i.bytes"))
+        # Fix CDN anomaly where Olivia Hye cards 17013-17018 pointed large image to _s
+        if code in [17013, 17014, 17015, 17016, 17017, 17018] or "_s." in l_path:
+            l_path = f"asiudgasg/asodhsg/wadceg/{code}_l.i.bytes"
 
         cards_dict[str(code)] = {
             "code": code,
