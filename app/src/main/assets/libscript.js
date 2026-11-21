@@ -17851,6 +17851,69 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             } catch (eRcmd) {}
                         } else if (cmdRaw === "hide_loading" || cmdRaw === "clear_loading") {
                             hideLoadingIndicator();
+                        } else if (cmdRaw === "show_loading") {
+                            showLoadingIndicator();
+                        } else if (cmdRaw === "diag_loading") {
+                            try {
+                                var inst = getLoadingIndicatorInstance();
+                                log("[🔍 DIAG_LOADING] inst: " + inst);
+                                if (inst && !inst.isNull()) {
+                                    var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                    var getActiveInH = new NativeFunction(baseAddr.add(0x1DBAE84), "bool", ["pointer", "pointer"]);
+                                    var getActiveSelf = new NativeFunction(baseAddr.add(0x1DBAE44), "bool", ["pointer", "pointer"]);
+                                    var getAlphaFn = new NativeFunction(baseAddr.add(0x258C268), "float", ["pointer", "pointer"]);
+                                    var getOrderFn = new NativeFunction(baseAddr.add(0x258BC48), "int", ["pointer", "pointer"]);
+                                    var getOverrideFn = new NativeFunction(baseAddr.add(0x258BBB8), "bool", ["pointer", "pointer"]);
+                                    var getRenderModeFn = new NativeFunction(baseAddr.add(0x258B948), "int", ["pointer", "pointer"]);
+                                    var getCamFn = new NativeFunction(baseAddr.add(0x258BA08), "pointer", ["pointer", "pointer"]);
+
+                                    var liGo = getGoFn(inst, NULL);
+                                    log("[🔍 DIAG_LOADING] liGo: " + liGo + " self: " + getActiveSelf(liGo, NULL) + " inH: " + getActiveInH(liGo, NULL));
+
+                                    var loadingImg = inst.add(0x38).readPointer();
+                                    log("[🔍 DIAG_LOADING] loadingImg: " + loadingImg);
+                                    if (!loadingImg.isNull()) {
+                                        var lGo = getGoFn(loadingImg, NULL);
+                                        log("[🔍 DIAG_LOADING] loadingGo: " + lGo + " self: " + getActiveSelf(lGo, NULL) + " inH: " + getActiveInH(lGo, NULL));
+                                    }
+
+                                    var cacheBase = inst.add(0x90).readPointer();
+                                    log("[🔍 DIAG_LOADING] cacheBase: " + cacheBase);
+                                    if (!cacheBase.isNull()) {
+                                        log("[🔍 DIAG_LOADING] cacheBase self: " + getActiveSelf(cacheBase, NULL) + " inH: " + getActiveInH(cacheBase, NULL));
+                                    }
+
+                                    var circleCg = inst.add(0x58).readPointer();
+                                    if (!circleCg.isNull()) {
+                                        log("[🔍 DIAG_LOADING] circleCanvasGroup alpha: " + getAlphaFn(circleCg, NULL));
+                                    }
+
+                                    // Check root Canvas
+                                    var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                    var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
+                                    var getCompFn = new NativeFunction(baseAddr.add(0x1DB6B14), "pointer", ["pointer", "pointer", "pointer"]);
+                                    var canvasKlass = getClass("UnityEngine.UIModule", "UnityEngine", "Canvas");
+                                    var classGetType = new NativeFunction(baseAddr.add(0x9C453C), "pointer", ["pointer"]);
+                                    var typeGetObject = new NativeFunction(baseAddr.add(0x9C4FA4), "pointer", ["pointer"]);
+                                    var canvasType = canvasKlass ? typeGetObject(classGetType(canvasKlass)) : NULL;
+
+                                    var pTf = getTfFn(inst, NULL);
+                                    while (!pTf.isNull()) {
+                                        var pGo = getGoFn(pTf, NULL);
+                                        if (!pGo.isNull() && canvasType && !canvasType.isNull()) {
+                                            var cv = getCompFn(pGo, canvasType, NULL);
+                                            if (!cv.isNull()) {
+                                                log("[🔍 DIAG_LOADING CANVAS] cv=" + cv + " order=" + getOrderFn(cv, NULL) + " override=" + getOverrideFn(cv, NULL) + " renderMode=" + getRenderModeFn(cv, NULL) + " cam=" + getCamFn(cv, NULL));
+                                            }
+                                        }
+                                        var p = getParentFn(pTf, NULL);
+                                        if (p.isNull()) break;
+                                        pTf = p;
+                                    }
+                                }
+                            } catch (eDld) {
+                                log("[-] Error in diag_loading: " + eDld.message);
+                            }
                         } else if (cmdRaw === "title_login" || cmdRaw === "login") {
                             try {
                                 if (curScene && !curScene.isNull() && sceneId === 2) {
