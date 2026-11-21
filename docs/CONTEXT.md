@@ -4690,14 +4690,15 @@ Se realizaron pruebas visuales exhaustivas mediante capturas directas de pantall
   - 5 Cartas de Material de intensificación (A, B, C, S, R en código 30001..30005).
 
 ### 2. Taxonomía de Variantes de Cartas (Equipada vs. No Equipada)
-* **Carta Equipada (Equipped):**
-  - **Uso:** Pedestales de `InventoryScene` (`isEquip = true`), ventana de detalle (`CardDetailView`, `CardBookDetailPopup`) y pantalla de juego.
-  - **Textura:** Alta resolución $226 \times 318$ px (`app/src/files/asiudgasg/asodhsg/wadceg/<cardId>_l.i.bytes.png`).
-  - **Composición:** Foto vertical del idol + marco de grado C/B/A/S/R (o marco LE correspondiente) + brillo holográfico si es Prisma + logo grande del tema (`agewfcbxhaa/<themeId>_l.i.bytes.png`).
-* **Carta No Equipada (Unequipped):**
-  - **Uso:** Cuadrícula de desplazamiento inferior de `InventoryScene` (`isEquip = false`), álbum de `CardBookScene` y estados bloqueados.
-  - **Textura:** Miniatura compacta $85 \times 120$ px (`app/src/files/asiudgasg/asodhsg/wadceg/<cardId>_s.i.bytes.png`).
-  - **Composición:** Recorte centrado en el rostro del idol + slot de artista vacío (`artistEmpty_s.i.bytes.png`) en caso de no poseer la carta + silueta/escala de grises.
+* **Cartas EQUIPADAS (`wadceg/`):**
+  - Ambas variantes contienen la fotografía real del idol y representan la carta en posesión:
+    - **Equipada (S)** ($85 \times 120$ px): Miniatura en la cuadrícula inferior de `InventoryScene` y en `CardBookScene` cuando la carta ha sido obtenida.
+    - **Equipada (L)** ($226 \times 318$ px): Imagen vertical en alta resolución utilizada en los pedestales superiores de `InventoryScene` (`isEquip = true`), en `CardDetailView`, `CardBookDetailPopup` y durante el gameplay.
+* **Cartas NO EQUIPADAS / EMPTY (`sdhgauwehdnu/`):**
+  - Ambas variantes representan el slot vacío / silueta (`cardEmpty` / `artistEmpty`, correspondientes a los archivos con sufijo `_em.png` en el CDN original):
+    - **No Equipada (S)** ($85 \times 120$ px): Miniatura de slot vacío en inventario o CardBook cuando el jugador no posee la carta.
+    - **No Equipada (L)** ($226 \times 318$ px): Imagen grande de slot vacío en pedestal de inventario cuando no hay carta asignada al slot.
+    - **Mapeo y Resolución:** Dalcomsoft utiliza empty temático específico (`<cardCode>_s/l`) en 676 cartas (principalmente LEs con diseño propio), y empty canónico por artista (`<artistCode>_s/l`) en las restantes 786 cartas, logrando una cobertura del 100% (1.462 / 1.462 cartas resueltas).
 
 ### 3. Hallazgos Forenses y Correcciones de Anomalías de Dalcomsoft
 * **Anomalía en Cartas 17013 a 17018 (Olivia Hye - Tema 17003):**
