@@ -522,18 +522,47 @@ function initIl2Cpp(module) {
             return cachedLoadingIndicatorInstance;
         }
 
-        var cachedLoonaWordmarkSprite = null;
+        var cachedLoonaDiamondSprite = null;
 
-        function getOrCreateLoonaWordmarkSprite() {
-            if (cachedLoonaWordmarkSprite && !cachedLoonaWordmarkSprite.isNull()) return cachedLoonaWordmarkSprite;
+        function getOrCreateLoonaDiamondSprite() {
+            if (cachedLoonaDiamondSprite && !cachedLoonaDiamondSprite.isNull()) return cachedLoonaDiamondSprite;
             try {
+                // 1. Search memory for native 00_common_LoadingIcon Sprite
+                try {
+                    var spriteClassObj = getClass("UnityEngine.CoreModule", "UnityEngine", "Sprite");
+                    if (spriteClassObj && !spriteClassObj.isNull()) {
+                        var classGetType = new NativeFunction(baseAddr.add(0x9C453C), "pointer", ["pointer"]);
+                        var typeGetObject = new NativeFunction(baseAddr.add(0x9C4FA4), "pointer", ["pointer"]);
+                        var sysType = typeGetObject(classGetType(spriteClassObj));
+                        var findObjectsAllFn = new NativeFunction(baseAddr.add(0x1812D90), "pointer", ["pointer", "pointer"]);
+                        var arr = findObjectsAllFn(sysType, NULL);
+                        if (!arr.isNull()) {
+                            var len = arr.add(0x18).readU32();
+                            var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                            for (var i = 0; i < len; i++) {
+                                var spPtr = arr.add(0x20 + i * Process.pointerSize).readPointer();
+                                if (!spPtr.isNull()) {
+                                    var sName = readIl2CppString(getNameFn(spPtr, NULL));
+                                    if (sName === "00_common_LoadingIcon") {
+                                        cachedLoonaDiamondSprite = spPtr;
+                                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(cachedLoonaDiamondSprite, 2);
+                                        log("[⏳ LOADING] Found native 00_common_LoadingIcon Sprite in memory: " + cachedLoonaDiamondSprite);
+                                        return cachedLoonaDiamondSprite;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (eFindSp) {}
+
+                // 2. Fallback: load from local PNG asset
                 var tex = null;
                 if (typeof loadLocalTexture2D === "function") {
-                    tex = loadLocalTexture2D("asiudgasg/loona_loading_logo.png");
+                    tex = loadLocalTexture2D("asiudgasg/00_common_LoadingIcon.png");
                 }
                 if (!tex || tex.isNull()) {
                     var fileReadAllBytesFn = new NativeFunction(baseAddr.add(0x1F0268C), "pointer", ["pointer", "pointer"]);
-                    var cPath = createIl2CppString("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/loona_loading_logo.png");
+                    var cPath = createIl2CppString("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/00_common_LoadingIcon.png");
                     var bytesObj = fileReadAllBytesFn(cPath, NULL);
                     if (bytesObj && !bytesObj.isNull()) {
                         var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
@@ -548,70 +577,24 @@ function initIl2Cpp(module) {
                 }
                 if (tex && !tex.isNull()) {
                     var createSpriteFn = new NativeFunction(baseAddr.add(0x23E1268), "pointer", ["pointer", "pointer"]);
-                    cachedLoonaWordmarkSprite = createSpriteFn(tex, NULL);
-                    if (il2cpp_gchandle_new && !cachedLoonaWordmarkSprite.isNull()) {
-                        il2cpp_gchandle_new(cachedLoonaWordmarkSprite, 2);
+                    cachedLoonaDiamondSprite = createSpriteFn(tex, NULL);
+                    if (il2cpp_gchandle_new && !cachedLoonaDiamondSprite.isNull()) {
+                        il2cpp_gchandle_new(cachedLoonaDiamondSprite, 2);
                     }
-                    log("[⏳ LOADING] LOONA wordmark sprite created cleanly: " + cachedLoonaWordmarkSprite);
-                    return cachedLoonaWordmarkSprite;
+                    try {
+                        var setNameFn = new NativeFunction(baseAddr.add(0x1DC7698), "void", ["pointer", "pointer", "pointer"]);
+                        setNameFn(cachedLoonaDiamondSprite, createIl2CppString("00_common_LoadingIcon"), NULL);
+                    } catch (eSn) {}
+                    log("[⏳ LOADING] LOONA diamond sprite created from disk cleanly: " + cachedLoonaDiamondSprite);
+                    return cachedLoonaDiamondSprite;
                 }
             } catch (eWm) {
-                log("[-] Error creating LOONA wordmark sprite: " + eWm.message);
+                log("[-] Error creating LOONA diamond sprite: " + eWm.message);
             }
             return NULL;
         }
 
-        function applyLoonaWordmarkToMainBody(inst) {
-            try {
-                if (!inst || inst.isNull()) return;
-
-                var getCompTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
-                var getGoTfFn = new NativeFunction(baseAddr.add(0x1DBAD24), "pointer", ["pointer", "pointer"]);
-                var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
-                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
-                var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
-                var setPreserveAspectFn = new NativeFunction(baseAddr.add(0x1ECBBB0), "void", ["pointer", "bool", "pointer"]);
-                var setNativeSizeFn = new NativeFunction(baseAddr.add(0x1ECCB18), "void", ["pointer", "pointer"]);
-
-                var instTf = NULL;
-                try { instTf = getCompTfFn(inst, NULL); } catch (eTf1) {}
-                if (!instTf || instTf.isNull()) {
-                    try { instTf = getGoTfFn(inst, NULL); } catch (eTf2) {}
-                }
-                if (!instTf || instTf.isNull()) return;
-
-                var initMetadataFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
-                var slotImg = baseAddr.add(0x321D528);
-                initMetadataFn(slotImg);
-                var methodInfoImg = slotImg.readPointer();
-                var getCompImgFn = new NativeFunction(baseAddr.add(0x10B4898), "pointer", ["pointer", "pointer"]);
-
-                var mbTf = getChildFn(instTf, 2, NULL); // [2] mainBody
-                if (mbTf && !mbTf.isNull()) {
-                    var mbGo = getGoFn(mbTf, NULL);
-                    if (mbGo && !mbGo.isNull()) {
-                        var mbImg = getCompImgFn(mbGo, methodInfoImg);
-                        if (mbImg && !mbImg.isNull()) {
-                            var loonaSprite = getOrCreateLoonaWordmarkSprite();
-                            if (loonaSprite && !loonaSprite.isNull()) {
-                                setSpriteFn(mbImg, loonaSprite, NULL);
-                                try { setPreserveAspectFn(mbImg, 1, NULL); } catch (ePa) {}
-                                try { setNativeSizeFn(mbImg, NULL); } catch (eNs) {}
-                                setEnabledFn(mbImg, 1, NULL);
-                                setActiveFn(mbGo, 1, NULL);
-                                log("[⏳ LOADING] Canonical LOONA wordmark cleanly applied to LoadingIndicator/mainBody!");
-                            }
-                        }
-                    }
-                }
-            } catch (eAmb) {
-                log("[-] Error applying LOONA wordmark to mainBody: " + eAmb.message);
-            }
-        }
-
-        function neutralizeDalcomsoftLogo(inst) {
+        function configureLoadingIndicator(inst) {
             try {
                 if (!inst || inst.isNull()) return;
 
@@ -622,69 +605,101 @@ function initIl2Cpp(module) {
                 var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                 var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
                 var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
+                var getSpriteFn = new NativeFunction(baseAddr.add(0x1ECB614), "pointer", ["pointer", "pointer"]);
                 var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
                 var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
-                var getSpriteFn = new NativeFunction(baseAddr.add(0x1ECB614), "pointer", ["pointer", "pointer"]);
+                var setPosFn = new NativeFunction(baseAddr.add(0x180DEE4), "void", ["pointer", "float", "float", "float", "pointer"]);
+                var setSizeDeltaFn = new NativeFunction(baseAddr.add(0x180E2B8), "void", ["pointer", "float", "float", "pointer"]);
+                var setPreserveAspectFn = new NativeFunction(baseAddr.add(0x1ECBBB0), "void", ["pointer", "bool", "pointer"]);
 
                 var instTf = NULL;
-                try {
-                    instTf = getCompTfFn(inst, NULL);
-                } catch (eTf1) {}
+                try { instTf = getCompTfFn(inst, NULL); } catch (eTf1) {}
                 if (!instTf || instTf.isNull()) {
-                    try {
-                        instTf = getGoTfFn(inst, NULL);
-                    } catch (eTf2) {}
+                    try { instTf = getGoTfFn(inst, NULL); } catch (eTf2) {}
                 }
                 if (!instTf || instTf.isNull()) return;
 
-                // Resolve Image component via GetComponent<Image> using Method$UnityEngine.GameObject.GetComponent<Image>() (0x321D528)
+                // 1. Center LoadingIndicator at (0,0,0)
+                setPosFn(instTf, 0.0, 0.0, 0.0, NULL);
+
+                // 2. Disable cacheBase permanently (inst + 0x90)
+                try {
+                    var cacheBase = inst.add(0x90).readPointer();
+                    if (!cacheBase.isNull()) {
+                        setActiveFn(cacheBase, 0, NULL);
+                    }
+                } catch (eCb) {}
+
+                // 3. Resolve Image component helper
                 var initMetadataFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
                 var slotImg = baseAddr.add(0x321D528);
                 initMetadataFn(slotImg);
                 var methodInfoImg = slotImg.readPointer();
                 var getCompImgFn = new NativeFunction(baseAddr.add(0x10B4898), "pointer", ["pointer", "pointer"]);
 
-                var spinnerImg = NULL;
-                try {
-                    var cachedLi = getLoadingIndicatorInstance();
-                    if (cachedLi && !cachedLi.isNull()) {
-                        spinnerImg = cachedLi.add(0x38).readPointer();
-                    }
-                } catch (eSpn) {}
+                // 4. Configure mainBody (child [2]) with official LOONA diamond
+                var mbTf = getChildFn(instTf, 2, NULL);
+                if (mbTf && !mbTf.isNull()) {
+                    var mbGo = getGoFn(mbTf, NULL);
+                    if (mbGo && !mbGo.isNull()) {
+                        setActiveFn(mbGo, 1, NULL);
+                        setPosFn(mbTf, 0.0, 0.0, 0.0, NULL);
+                        try { setSizeDeltaFn(mbTf, 108.0, 108.0, NULL); } catch (eSd) {}
 
-                // Recursively scan all transforms under inst to locate Dalcomsoft logo Image components
-                function scanAndNeutralizeImages(tf, path) {
+                        var mbImg = getCompImgFn(mbGo, methodInfoImg);
+                        if (mbImg && !mbImg.isNull()) {
+                            setEnabledFn(mbImg, 1, NULL);
+                            try { setPreserveAspectFn(mbImg, 1, NULL); } catch (ePa) {}
+                            var curSp = getSpriteFn(mbImg, NULL);
+                            var spName = (!curSp.isNull()) ? readIl2CppString(getNameFn(curSp, NULL)) : "";
+                            if (curSp.isNull() || spName !== "00_common_LoadingIcon") {
+                                var diamondSp = getOrCreateLoonaDiamondSprite();
+                                if (diamondSp && !diamondSp.isNull()) {
+                                    setSpriteFn(mbImg, diamondSp, NULL);
+                                    log("[⏳ LOADING] Applied 00_common_LoadingIcon diamond to mainBody!");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 5. Sanitize hierarchy: disable CacheBase and neutralize Dalcom emblems
+                function sanitizeHierarchy(tf) {
                     if (!tf || tf.isNull()) return;
                     var go = getGoFn(tf, NULL);
-                    var name = !tf.isNull() ? readIl2CppString(getNameFn(tf, NULL)) : "null";
-                    var curPath = path + "/" + name;
+                    var name = !tf.isNull() ? readIl2CppString(getNameFn(tf, NULL)) : "";
+                    if (name === "CacheBase") {
+                        if (go && !go.isNull()) setActiveFn(go, 0, NULL);
+                        return; // Do not recurse into CacheBase
+                    }
                     if (go && !go.isNull()) {
                         var imgComp = getCompImgFn(go, methodInfoImg);
                         if (imgComp && !imgComp.isNull()) {
                             var sp = getSpriteFn(imgComp, NULL);
-                            var spName = (!sp.isNull()) ? readIl2CppString(getNameFn(sp, NULL)) : "null_sprite";
-                            var isSpinner = (spinnerImg && !spinnerImg.isNull() && imgComp.toInt32() === spinnerImg.toInt32());
-                            // Suppress Dalcomsoft logo on any 00_common_LoadingIcon Image
-                            if (spName === "00_common_LoadingIcon") {
-                                setSpriteFn(imgComp, NULL, NULL);
-                                setEnabledFn(imgComp, 0, NULL);
-                                setActiveFn(go, 0, NULL);
-                                log("[⏳ LOADING] Neutralized Dalcomsoft logo on: " + curPath);
+                            if (!sp.isNull()) {
+                                var sName = readIl2CppString(getNameFn(sp, NULL));
+                                if (sName === "new_emblem" || sName === "logo_dalcom" || sName === "logo_partner") {
+                                    setSpriteFn(imgComp, NULL, NULL);
+                                    setEnabledFn(imgComp, 0, NULL);
+                                    setActiveFn(go, 0, NULL);
+                                    log("[⏳ LOADING] Neutralized Dalcom emblem: " + sName + " on " + name);
+                                }
                             }
                         }
                     }
                     var count = getChildCountFn(tf, NULL);
                     for (var c = 0; c < count; c++) {
-                        var ch = getChildFn(tf, c, NULL);
-                        scanAndNeutralizeImages(ch, curPath);
+                        sanitizeHierarchy(getChildFn(tf, c, NULL));
                     }
                 }
-
-                scanAndNeutralizeImages(instTf, "Root");
-                applyLoonaWordmarkToMainBody(inst);
-            } catch (eApp) {
-                log("[-] Error neutralizing Dalcomsoft logo: " + eApp.message);
+                sanitizeHierarchy(instTf);
+            } catch (eCfg) {
+                log("[-] Error in configureLoadingIndicator: " + eCfg.message);
             }
+        }
+
+        function neutralizeDalcomsoftLogo(inst) {
+            configureLoadingIndicator(inst);
         }
 
         // Neutralize Dalcomsoft logo in TitleView.ShowWaiting (0xB269A8)
@@ -695,7 +710,7 @@ function initIl2Cpp(module) {
                     if (!tv.isNull()) {
                         var wb = tv.add(0x128).readPointer();
                         if (wb && !wb.isNull()) {
-                            neutralizeDalcomsoftLogo(wb);
+                            configureLoadingIndicator(wb);
                         }
                     }
                 }
@@ -705,7 +720,7 @@ function initIl2Cpp(module) {
             log("[-] Error attaching to TitleView.ShowWaiting: " + eTvSw.message);
         }
 
-        // Intercept Image.set_sprite (0x1ECB61C) to unconditionally suppress 00_common_LoadingIcon (Dalcomsoft logo)
+        // Intercept Image.set_sprite (0x1ECB61C) to unconditionally suppress Dalcomsoft cube/logo
         try {
             Interceptor.attach(baseAddr.add(0x1ECB61C), {
                 onEnter: function (args) {
@@ -713,29 +728,53 @@ function initIl2Cpp(module) {
                     if (!sp.isNull()) {
                         var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
                         var spName = readIl2CppString(getNameFn(sp, NULL));
-                        if (spName === "00_common_LoadingIcon") {
+                        if (spName === "new_emblem" || spName === "logo_dalcom" || spName === "logo_partner") {
                             args[1] = NULL;
-                            log("[🛡️ DALCOM SUPPRESS] Intercepted 00_common_LoadingIcon -> nulled out!");
+                            log("[🛡️ DALCOM SUPPRESS] Intercepted " + spName + " -> nulled out!");
                         }
                     }
                 }
             });
-            log("[+] Interceptor.attach installed on Image.set_sprite (0x1ECB61C) for Dalcomsoft logo suppression!");
+            log("[+] Interceptor.attach installed on Image.set_sprite (0x1ECB61C) for Dalcomsoft suppression!");
         } catch (eSpInt) {
             log("[-] Error intercepting Image.set_sprite: " + eSpInt.message);
         }
 
-        // Attach to LoadingIndicator.FireShowIndicator (0xB3DD1C) to neutralize Dalcomsoft logo on every display
+        // Attach to LoadingIndicator display routines to guarantee LOONA diamond configuration on every display
         try {
-            Interceptor.attach(baseAddr.add(0xB3DD1C), {
+            Interceptor.attach(baseAddr.add(0xB3BBB4), { // LoadingIndicator.Active
                 onEnter: function (args) {
-                    var inst = args[0];
-                    neutralizeDalcomsoftLogo(inst);
+                    var inst = getLoadingIndicatorInstance();
+                    if (inst && !inst.isNull()) configureLoadingIndicator(inst);
                 }
             });
-            log("[+] Interceptor.attach installed on LoadingIndicator.FireShowIndicator (0xB3DD1C)!");
-        } catch (eFsi) {
-            log("[-] Error attaching to FireShowIndicator: " + eFsi.message);
+            Interceptor.attach(baseAddr.add(0xB3DEA4), { // LoadingIndicator.ActiveWithSmooth
+                onEnter: function (args) {
+                    var inst = getLoadingIndicatorInstance();
+                    if (inst && !inst.isNull()) configureLoadingIndicator(inst);
+                }
+            });
+            Interceptor.attach(baseAddr.add(0xB3E004), { // LoadingIndicator.ActiveTwo
+                onEnter: function (args) {
+                    var inst = getLoadingIndicatorInstance();
+                    if (inst && !inst.isNull()) configureLoadingIndicator(inst);
+                }
+            });
+            Interceptor.attach(baseAddr.add(0xB3DD1C), { // LoadingIndicator.FireShowIndicator
+                onEnter: function (args) {
+                    var inst = args[0];
+                    configureLoadingIndicator(inst);
+                }
+            });
+            Interceptor.attach(baseAddr.add(0xB3DD0C), { // LoadingIndicator.Show
+                onEnter: function (args) {
+                    var inst = args[0];
+                    configureLoadingIndicator(inst);
+                }
+            });
+            log("[+] Interceptor.attach installed on LoadingIndicator display routines!");
+        } catch (eLiDisp) {
+            log("[-] Error attaching to LoadingIndicator display routines: " + eLiDisp.message);
         }
 
         var isShowingLoading = false;
@@ -773,8 +812,8 @@ function initIl2Cpp(module) {
                     }
                 }
 
-                // Neutralize Dalcomsoft logo overlay
-                neutralizeDalcomsoftLogo(inst);
+                // Cleanly configure LoadingIndicator with LOONA diamond & suppress Dalcom emblems
+                configureLoadingIndicator(inst);
 
                 // Ensure ManagedComponent.Active (0xD02334) is dispatched
                 var mcActiveFn = new NativeFunction(baseAddr.add(0xD02334), "void", ["pointer", "pointer"]);
@@ -847,45 +886,6 @@ function initIl2Cpp(module) {
                             log("[⏳ LOADING] DontDestroyOnLoad called on Root GameObject: " + rootGo);
                         }
 
-                        // Elevate Canvas sortingOrder on ForegroundSystemCanvas to 32767 & set ScreenSpaceOverlay
-                        try {
-                            var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
-                            var setRenderModeFn = new NativeFunction(baseAddr.add(0x258B988), "void", ["pointer", "int"]);
-                            var setOrderFn = new NativeFunction(baseAddr.add(0x258BC88), "void", ["pointer", "int"]);
-                            var setOverrideSortingFn = new NativeFunction(baseAddr.add(0x258BBF8), "void", ["pointer", "bool"]);
-
-                            var pTf = tf;
-                            while (!pTf.isNull()) {
-                                var p = getParentFn(pTf, NULL);
-                                if (p.isNull()) break;
-                                var pGo = getGoFn(p, NULL);
-                                if (!pGo.isNull()) {
-                                    var pName = readIl2CppString(getNameFn(pGo, NULL));
-                                    if (pName === "ForegroundSystemCanvas") {
-                                        try {
-                                            var initMetadataFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
-                                            var slot = baseAddr.add(0x3108808).readPointer();
-                                            initMetadataFn(slot);
-                                            var methodInfo = slot.readPointer();
-                                            var getCanvasFn = new NativeFunction(baseAddr.add(0x10A5B30), "pointer", ["pointer", "pointer"]);
-                                            var cv = getCanvasFn(pGo, methodInfo);
-                                            if (cv && !cv.isNull()) {
-                                                setRenderModeFn(cv, 0); // RenderMode.ScreenSpaceOverlay = 0
-                                                setOverrideSortingFn(cv, 1);
-                                                setOrderFn(cv, 32767);
-                                                log("[⏳ LOADING] Awake: ForegroundSystemCanvas set to ScreenSpaceOverlay with sortingOrder=32767!");
-                                            }
-                                        } catch (eCvInst) {
-                                            log("[-] Error configuring ForegroundSystemCanvas: " + eCvInst.message);
-                                        }
-                                        break;
-                                    }
-                                }
-                                pTf = p;
-                            }
-                        } catch (eCv) {
-                            log("[-] Error elevating Canvas in Awake: " + eCv.message);
-                        }
                     } catch (eDd) {
                         log("[-] Error in DontDestroyOnLoad on LoadingIndicator: " + eDd.message);
                     }
@@ -922,47 +922,28 @@ function initIl2Cpp(module) {
         try {
             Interceptor.replace(baseAddr.add(0xE74090), new NativeCallback(function (d46) {
                 try {
-                    log("[⏳ LOADING] <OnLoadEmblems>d__46.MoveNext intercepted! Setting up native loading emblem.");
                     var inst = getLoadingIndicatorInstance();
                     if (inst && !inst.isNull()) {
                         d46.add(0x30).writePointer(inst);
-                        try {
-                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
-                            var cacheBase = inst.add(0x90).readPointer();
-                            if (!cacheBase.isNull()) {
-                                setActiveFn(cacheBase, 1, NULL);
-                                var goGetTfFn = new NativeFunction(baseAddr.add(0x1DBAD24), "pointer", ["pointer", "pointer"]);
-                                var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
-                                var cbTf = goGetTfFn(cacheBase, NULL);
-                                if (!cbTf.isNull()) {
-                                    var cbChildCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int", ["pointer", "pointer"]);
-                                    var cCount = cbChildCountFn(cbTf, NULL);
-                                    var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
-                                    for (var ci = 0; ci < cCount; ci++) {
-                                        var cTf = getChildFn(cbTf, ci, NULL);
-                                        var cGo = getGoFn(cTf, NULL);
-                                        if (!cGo.isNull()) setActiveFn(cGo, 1, NULL);
-                                    }
-                                }
-                            }
-                            // Invoke native SetupEmblems to build native emblems from loading.csv
-                            var setupFn = new NativeFunction(baseAddr.add(0xB3E658), "void", ["pointer", "pointer"]);
-                            setupFn(inst, NULL);
-                            log("[⏳ LOADING] Native LoadingIndicator.SetupEmblems() called!");
-                            // Neutralize Dalcomsoft logo overlay so only the native emblem shows
-                            neutralizeDalcomsoftLogo(inst);
-                        } catch (eSetup) {
-                            log("[-] Error in LoadingIndicator emblem setup: " + eSetup.message);
-                        }
+                        configureLoadingIndicator(inst);
                     }
                 } catch (eCor) {
                     log("[-] Error in OnLoadEmblems MoveNext: " + eCor.message);
                 }
-                return 0; // return false (coroutine finished!)
+                return 0; // return false (coroutine cleanly finished)
             }, "int", ["pointer"]));
             log("[+] Interceptor.replace installed on LoadingIndicator.<OnLoadEmblems>d__46.MoveNext (0xE74090)!");
         } catch (eOle) {
             log("[-] Error hooking OnLoadEmblems: " + eOle.message);
+        }
+
+        // Patch LoadingIndicator.SetupEmblems (0xB3E658) with RET to prevent building Dalcom emblem units
+        try {
+            Memory.protect(baseAddr.add(0xB3E658), 4, "rwx");
+            baseAddr.add(0xB3E658).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]); // ret
+            log("[🛡️ LOADING] Patched LoadingIndicator.SetupEmblems (0xB3E658) with RET!");
+        } catch (eSeRet) {
+            log("[-] Error patching SetupEmblems: " + eSeRet.message);
         }
 
         // Neutralize CardListCompare (0xF288A4) -> ret to prevent crash on non-1001 groups & 670x redundant comparison
