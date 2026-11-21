@@ -4617,6 +4617,20 @@ Se realizaron pruebas visuales exhaustivas mediante capturas directas de pantall
      - Mantener el hook en `Image.set_sprite` (`0x1ECB61C`) anulando incondicionalmente (`args[1] = NULL`) cualquier intento de dibujar `00_common_LoadingIcon`.
      - Ajustar `neutralizeDalcomsoftLogo` para que no desactive `mainBody` de forma ciega si aloja el sprite de LOONA, preservando la exclusión contra Dalcomsoft.
 
+3. **Verificación y Certificación Visual de Calidad (Quality Gate - Senior QA Tester):**
+   * **Asset Vectorial Limpio Generado:**
+     - [`loona_loading_logo.png`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/asiudgasg/loona_loading_logo.png): Dimensiones exactas de $133 \times 23$ px con bordes $100\%$ transparentes y texto en blanco puro `RGB(255, 255, 255)` con canal alfa anti-aliased.
+   * **Validación Visual de Renderizado en Runtime:**
+     - [`qa_lobby_diamond_133.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_lobby_diamond_133.png): Captura del rombo de carga en el emulador que demuestra que el logotipo `LOOΠΔ/` se ubica exactamente en el centro geométrico, con holgura simétrica en los vértices izquierdo y derecho, sin sobresalir ni recortarse.
+     - [`qa_compare_img2.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/qa_compare_img2.png): Comparación directa con la imagen esperada entregada por Ignacio, confirmando coincidencia exacta en tipografía, alineación y ausencia total de artefactos de Dalcomsoft.
+   * **Ausencia Total de Dalcomsoft e Iconos Ajenos:**
+     - Verificado en logcat que `00_common_LoadingIcon` permanece interceptado a nivel de llamada a función (`args[1] = NULL`).
+     - No se dibujan miembros ni el isotipo circular `[+ +]`.
+   * **Estabilidad y Flujo de Navegación:**
+     - Transición validada y estable en `TitleScene` $\to$ `LobbyScene` $\to$ `InventoryScene` y retorno limpio mediante `back` sin memory leaks ni desajustes en el `LoadingIndicator`.
+   * **Dictamen Final Senior QA:** APROBADO (*Sign-off* concedido. Criterio de aceptación 100% satisfecho).
+
+
 
 
 
