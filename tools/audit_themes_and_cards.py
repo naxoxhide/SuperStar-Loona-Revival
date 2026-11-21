@@ -14,6 +14,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "app/src/files/asiudgasg/sdisgkdc")
 FILES_DIR = os.path.join(BASE_DIR, "app/src/files")
 WADCEG_DIR = os.path.join(FILES_DIR, "asiudgasg/asodhsg/wadceg")
+SDHGAU_DIR = os.path.join(FILES_DIR, "asiudgasg/asodhsg/sdhgauwehdnu")
 AGEW_DIR = os.path.join(FILES_DIR, "asiudgasg/asodhsg/agewfcbxhaa")
 UHEX_DIR = os.path.join(FILES_DIR, "asiudgasg/asodhsg/aoeiwhslc/uhex")
 
@@ -163,19 +164,21 @@ def main():
             else:
                 audit_results["summary"]["normal_cards"] += 1
 
-            s_rel = f"asiudgasg/asodhsg/wadceg/{c_code}_s.i.bytes.png"
-            l_rel = f"asiudgasg/asodhsg/wadceg/{c_code}_l.i.bytes.png"
-            s_abs = os.path.join(FILES_DIR, s_rel)
-            l_abs = os.path.join(FILES_DIR, l_rel)
+            # 1. IMÁGENES EQUIPADAS (wadceg/)
+            # Ambas son versiones de la carta EQUIPADA (foto del idol) usadas según situación (S o L)
+            eq_s_rel = f"asiudgasg/asodhsg/wadceg/{c_code}_s.i.bytes.png"
+            eq_l_rel = f"asiudgasg/asodhsg/wadceg/{c_code}_l.i.bytes.png"
+            eq_s_abs = os.path.join(FILES_DIR, eq_s_rel)
+            eq_l_abs = os.path.join(FILES_DIR, eq_l_rel)
 
-            s_exists = os.path.exists(s_abs)
-            l_exists = os.path.exists(l_abs)
+            eq_s_exists = os.path.exists(eq_s_abs)
+            eq_l_exists = os.path.exists(eq_l_abs)
 
             was_upscaled = False
-            if not l_exists and s_exists:
-                was_upscaled = ensure_upscaled_fallback(s_abs, l_abs)
+            if not eq_l_exists and eq_s_exists:
+                was_upscaled = ensure_upscaled_fallback(eq_s_abs, eq_l_abs)
                 if was_upscaled:
-                    l_exists = True
+                    eq_l_exists = True
                     audit_results["summary"]["cards_upscaled_fallback"] += 1
                     audit_results["summary"]["anomalies"].append({
                         "cardCode": c_code,
@@ -184,24 +187,58 @@ def main():
                         "type": "Missing large card image in official Dalcom CDN, synthesized Lanczos fallback (226x318)"
                     })
 
-            if s_exists:
+            if eq_s_exists:
                 audit_results["summary"]["cards_with_small_img"] += 1
-            if l_exists:
+            if eq_l_exists:
                 audit_results["summary"]["cards_with_large_img"] += 1
 
-            # Extraer dimensiones reales
-            s_dim = None
-            l_dim = None
-            if s_exists:
+            # Extraer dimensiones de equipadas
+            eq_s_dim = None
+            eq_l_dim = None
+            if eq_s_exists:
                 try:
-                    with Image.open(s_abs) as im:
-                        s_dim = list(im.size)
+                    with Image.open(eq_s_abs) as im:
+                        eq_s_dim = list(im.size)
                 except Exception:
                     pass
-            if l_exists:
+            if eq_l_exists:
                 try:
-                    with Image.open(l_abs) as im:
-                        l_dim = list(im.size)
+                    with Image.open(eq_l_abs) as im:
+                        eq_l_dim = list(im.size)
+                except Exception:
+                    pass
+
+            # 2. IMÁGENES NO EQUIPADAS / EMPTY (sdhgauwehdnu/)
+            # Representan el slot vacío (cardEmpty / artistEmpty)
+            # Primero buscamos empty temático específico por cardCode; si no existe, empty canónico por artistCode
+            empty_target_code = c_code
+            empty_s_rel = f"asiudgasg/asodhsg/sdhgauwehdnu/{c_code}_s.i.bytes.png"
+            empty_l_rel = f"asiudgasg/asodhsg/sdhgauwehdnu/{c_code}_l.i.bytes.png"
+            empty_source_type = "theme_specific"
+
+            if not os.path.exists(os.path.join(FILES_DIR, empty_s_rel)):
+                empty_target_code = a_code
+                empty_s_rel = f"asiudgasg/asodhsg/sdhgauwehdnu/{a_code}_s.i.bytes.png"
+                empty_l_rel = f"asiudgasg/asodhsg/sdhgauwehdnu/{a_code}_l.i.bytes.png"
+                empty_source_type = "artist_default"
+
+            empty_s_abs = os.path.join(FILES_DIR, empty_s_rel)
+            empty_l_abs = os.path.join(FILES_DIR, empty_l_rel)
+            empty_s_exists = os.path.exists(empty_s_abs)
+            empty_l_exists = os.path.exists(empty_l_abs)
+
+            empty_s_dim = None
+            empty_l_dim = None
+            if empty_s_exists:
+                try:
+                    with Image.open(empty_s_abs) as im:
+                        empty_s_dim = list(im.size)
+                except Exception:
+                    pass
+            if empty_l_exists:
+                try:
+                    with Image.open(empty_l_abs) as im:
+                        empty_l_dim = list(im.size)
                 except Exception:
                     pass
 
@@ -211,18 +248,50 @@ def main():
                 "artistName": a_name,
                 "type": c_type,
                 "typeName": "Prism" if c_type == 1 else "Normal",
+                "equipped": {
+                    "small": {
+                        "path": eq_s_rel,
+                        "exists": eq_s_exists,
+                        "dimensions": eq_s_dim,
+                        "usage": "Equipada (S) / Miniatura Grid Inventario & CardBook obtenido"
+                    },
+                    "large": {
+                        "path": eq_l_rel,
+                        "exists": eq_l_exists,
+                        "dimensions": eq_l_dim,
+                        "isUpscaledFallback": was_upscaled,
+                        "usage": "Equipada (L) / Pedestal Inventario, CardDetailView, In-Game"
+                    }
+                },
+                "unequipped": {
+                    "sourceType": empty_source_type,
+                    "targetCode": empty_target_code,
+                    "small": {
+                        "path": empty_s_rel,
+                        "exists": empty_s_exists,
+                        "dimensions": empty_s_dim,
+                        "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
+                    },
+                    "large": {
+                        "path": empty_l_rel,
+                        "exists": empty_l_exists,
+                        "dimensions": empty_l_dim,
+                        "usage": "No Equipada (L) / Slot Vacío Pedestal (cardEmpty / artistEmpty)"
+                    }
+                },
+                # Mantenemos retrocompatibilidad con las claves previas
                 "smallImage": {
-                    "path": s_rel,
-                    "exists": s_exists,
-                    "dimensions": s_dim,
-                    "usage": "Carta No Equipada / Inventario Grid / CardBook miniatura"
+                    "path": eq_s_rel,
+                    "exists": eq_s_exists,
+                    "dimensions": eq_s_dim,
+                    "usage": "Equipada (S)"
                 },
                 "largeImage": {
-                    "path": l_rel,
-                    "exists": l_exists,
-                    "dimensions": l_dim,
+                    "path": eq_l_rel,
+                    "exists": eq_l_exists,
+                    "dimensions": eq_l_dim,
                     "isUpscaledFallback": was_upscaled,
-                    "usage": "Carta Equipada / Inventario Pedestal / CardBook Detail Popup"
+                    "usage": "Equipada (L)"
                 },
                 "rawCdnUrlSmall": c.get("cardImageSmall"),
                 "rawCdnUrlLarge": c.get("cardImageLarge")
