@@ -155,4 +155,33 @@ Para validar que las cartas usadas como material se descuentan exactamente del c
 4. **Validación de Cancelación:**
    * Al abrir modal y pulsar "Cancel" (`(680, 950)`), el contador y las cartas en inventario permanecen inalterados.
 
+---
+
+## 9. Protocolo de Validación Visual de Transiciones y Pop-up LoadingIndicator
+
+Para certificar que el indicador de carga nativo (`LoadingIndicator`) opera visualmente en cambios de escena con el emblema central LOONA y el círculo giratorio (*spinner*):
+
+1. **Inyección de Comandos de Diagnóstico:**
+   ```bash
+   # Inspección de jerarquía, canvas, posicionamiento y estados de activación
+   adb shell "echo diag_loading > /storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt"
+   
+   # Forzado de visualización modal del indicador
+   adb shell "echo show_loading > /storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt"
+   
+   # Ocultación suave / desactivación del indicador
+   adb shell "echo hide_loading > /storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/scene_cmd.txt"
+   ```
+
+2. **Ráfagas de Captura en Transiciones de Escena:**
+   * En transiciones clave (`Title` $\to$ `Lobby`, `Lobby` $\to$ `Inventory`, `Inventory` $\to$ `CardBook`), disparar toques táctiles acompañados de capturas de pantalla intermedias a $+0.2\text{s}$ y $+0.4\text{s}$:
+   ```bash
+   adb shell input tap <X> <Y> && sleep 0.2 && adb shell screencap -p /sdcard/trans_1.png && sleep 0.3 && adb shell screencap -p /sdcard/trans_2.png
+   ```
+
+3. **Criterios de Aceptación (Quality Gate):**
+   * El rombo celeste con el emblema oficial LOONA (`1001.i.bytes`) y el spinner en rotación deben proyectarse nítidamente en el centro $(960, 540)$ mediante `ForegroundSystemCanvas` (`ScreenSpaceOverlay`, `sortingOrder = 32767`).
+   * Al completar la carga de la escena destino, el modal debe desactivarse limpiamente vía `ManagedComponent.Inactive` (`0xD0235C`), sin desfasar las coordenadas espaciales $(0, 0, 0)$ de la vista.
+
+
 

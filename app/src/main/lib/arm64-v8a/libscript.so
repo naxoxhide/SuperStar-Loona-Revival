@@ -545,16 +545,20 @@ function initIl2Cpp(module) {
         function applyLoonaEmblemToCacheBase(inst) {
             try {
                 if (!inst || inst.isNull()) return;
-                var cacheBase = inst.add(0x90).readPointer();
-                if (!cacheBase || cacheBase.isNull()) return;
 
                 var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
                 var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
                 var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
 
-                var cbTf = getTfFn(cacheBase, NULL);
+                var instTf = getTfFn(inst, NULL);
+                if (instTf.isNull()) return;
+                var cbTf = getChildFn(instTf, 6, NULL); // [6] CacheBase
                 if (cbTf.isNull()) return;
-                var imgTf = getChildFn(cbTf, 0, NULL);
+                var cbGo = getGoFn(cbTf, NULL);
+                if (!cbGo.isNull()) setActiveFn(cbGo, 1, NULL);
+
+                var imgTf = getChildFn(cbTf, 0, NULL); // [0] Image
                 if (imgTf.isNull()) return;
                 var imgGo = getGoFn(imgTf, NULL);
                 if (imgGo.isNull()) return;
@@ -574,9 +578,7 @@ function initIl2Cpp(module) {
                         setSpriteFn(cbImg, emblemSprite, NULL);
                         var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3D04), "void", ["pointer", "bool", "pointer"]);
                         setEnabledFn(cbImg, 1, NULL);
-                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
                         setActiveFn(imgGo, 1, NULL);
-                        setActiveFn(cacheBase, 1, NULL);
                         log("[⏳ LOADING] LOONA emblem sprite cleanly applied to cacheBase/Image!");
                     }
                 }
@@ -592,6 +594,16 @@ function initIl2Cpp(module) {
             try {
                 var inst = getLoadingIndicatorInstance();
                 if (!inst || inst.isNull()) return;
+
+                // Reset localPosition to 0,0,0 so it centers inside ForegroundSystemCanvas/Padding
+                try {
+                    var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                    var setPosFn = new NativeFunction(baseAddr.add(0x180DEE4), "void", ["pointer", "float", "float", "float", "pointer"]);
+                    var instTf = getTfFn(inst, NULL);
+                    if (!instTf.isNull()) {
+                        setPosFn(instTf, 0.0, 0.0, 0.0, NULL);
+                    }
+                } catch (ePos) {}
 
                 // Reset WillHide and HideFrame so indicator remains visible during transition
                 inst.add(0x88).writeU8(0);
@@ -630,6 +642,17 @@ function initIl2Cpp(module) {
 
         function hideLoadingIndicator() {
             try {
+                var slot = baseAddr.add(0x3116308).readPointer();
+                if (!slot.isNull()) {
+                    var loadingClass = slot.readPointer();
+                    if (!loadingClass.isNull()) {
+                        var staticFields = loadingClass.add(0xB8).readPointer();
+                        if (!staticFields.isNull()) {
+                            staticFields.add(8).writeU8(0);
+                            staticFields.add(9).writeU8(0);
+                        }
+                    }
+                }
                 var completeFn = new NativeFunction(baseAddr.add(0xB3E230), "void", []);
                 completeFn();
                 var completeTwoFn = new NativeFunction(baseAddr.add(0xB3E340), "void", []);
@@ -638,8 +661,11 @@ function initIl2Cpp(module) {
                 if (inst && !inst.isNull()) {
                     inst.add(0x88).writeU8(1);
                     inst.add(0x8C).writeS32(2);
+                    // Use ManagedComponent.Inactive (0xD0235C) instead of Hide (which moved position offscreen)
+                    var mcInactiveFn = new NativeFunction(baseAddr.add(0xD0235C), "void", ["pointer", "pointer"]);
+                    mcInactiveFn(inst, NULL);
                 }
-                log("[⏳ LOADING] LoadingIndicator.Complete() cleanly dispatched!");
+                log("[⏳ LOADING] LoadingIndicator successfully completed and deactivated!");
             } catch (eCmp) {
                 log("[-] Error in hideLoadingIndicator: " + eCmp.message);
             }
@@ -716,14 +742,20 @@ function initIl2Cpp(module) {
                 onLeave: function (retval) {
                     try {
                         if (cachedLoadingIndicatorInstance && !cachedLoadingIndicatorInstance.isNull()) {
-                            // 1. Activate LoadingIndicator GameObject once on boot
-                            var mcActiveFn = new NativeFunction(baseAddr.add(0xD02334), "void", ["pointer", "pointer"]);
-                            mcActiveFn(cachedLoadingIndicatorInstance, NULL);
-                            log("[⏳ LOADING] Awake: ManagedComponent.Active called -> GameObject activated!");
+                            // 1. Reset localPosition to (0,0,0) so it's centered in ForegroundSystemCanvas/Padding
+                            try {
+                                var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
+                                var setPosFn = new NativeFunction(baseAddr.add(0x180DEE4), "void", ["pointer", "float", "float", "float", "pointer"]);
+                                var instTf = getTfFn(cachedLoadingIndicatorInstance, NULL);
+                                if (!instTf.isNull()) {
+                                    setPosFn(instTf, 0.0, 0.0, 0.0, NULL);
+                                }
+                            } catch (eAwPos) {}
 
-                            // 2. Hide initially until Active() is dispatched
-                            var mcHideFn = new NativeFunction(baseAddr.add(0xCEEA90), "void", ["pointer", "pointer"]);
-                            mcHideFn(cachedLoadingIndicatorInstance, NULL);
+                            // 2. Inactive initially until Active() is dispatched
+                            var mcInactiveFn = new NativeFunction(baseAddr.add(0xD0235C), "void", ["pointer", "pointer"]);
+                            mcInactiveFn(cachedLoadingIndicatorInstance, NULL);
+                            log("[⏳ LOADING] Awake: ManagedComponent.Inactive called -> cleanly idle at (0,0,0)!");
 
                             // 3. Apply LOONA emblem
                             applyLoonaEmblemToCacheBase(cachedLoadingIndicatorInstance);
@@ -12607,10 +12639,6 @@ function initIl2Cpp(module) {
                     0x11D446C, // CardBookView.RafreshTabMainNewMark -> ret
                     0x11D0914, // CardBookView.RefreshGroupNewMark -> ret
                     0xB98210,  // CardBookControl.GroupItem.ExtractTexturePath -> ret
-                    0xB3BBB4,  // IndicatorPopup.Active -> ret
-                    0xB3E230,  // IndicatorPopup.Deactive -> ret
-                    0xB3DEA4,  // IndicatorPopup.ActiveWithSmooth -> ret
-                    0xB3E004,  // IndicatorPopup.ActiveTwo -> ret
                     0xE4173C,  // CardBookScene.<OpenDetailPopup>b__4 (Close result callback) -> ret
                     0xE415E4   // CardBookScene.<OpenDetailPopup>b__3 (Receipt callback) -> ret
                 ];
