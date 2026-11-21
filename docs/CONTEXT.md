@@ -4668,6 +4668,55 @@ Se realizaron pruebas visuales exhaustivas mediante capturas directas de pantall
      - [`live_nav_frame_3.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/live_nav_frame_3.png): Captura de pantalla completa en plena transición de regreso de CardBook a Lobby, mostrando el indicador oficial de LOONA centrado y limpio.
    * **Dictamen Final Senior QA:** APROBADO (*Sign-off* concedido sin reservas).
 
+---
+
+## 🔍 Auditoría Forense y Mapeo Exhaustivo de Temas y Cartas (Normales y LE)
+
+**Fecha:** 22 de Noviembre, 2026  
+**Responsables:** Senior Reverse Engineer & UI/UX Developer  
+**Entregables:** [docs/THEMES_CARDS_MAPPING.md](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/THEMES_CARDS_MAPPING.md), [docs/card_catalog_viewer.html](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/card_catalog_viewer.html), [docs/audit_themes_and_cards.json](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/audit_themes_and_cards.json) y [data/theme_card_overrides.json](file:///Users/ignaciorojas/Documents/repos/sslo_apk/data/theme_card_overrides.json).
+
+### 1. Resumen de la Base de Datos Auditada
+- **21 Grupos Jugables:**
+  - 6 Eras de grupo completo: `[+ +]` (1001), `[x x]` (2001), `[#]` (3001), `[12:00]` (4001), `[&]` (5001), `[Flip That]` (6001).
+  - 11 Grupos Solistas: HeeJin (7001), HyunJin (8001), HaSeul (9001), YeoJin (10001), ViVi (11001), Kim Lip (12001), JinSoul (13001), Choerry (14001), Yves (15001), Go Won (16001), Olivia Hye (17001).
+  - 4 Subunidades: Love & Live (18001), Love & Evil (19001), Mix & Match (20001), Max & Match (21001).
+- **99 Temas Totales:**
+  - 31 Temas Normales (`limitedType: 0`) con marcos estándar de grado (C, B, A, S, R).
+  - 68 Temas Limited Edition (`limitedType > 0`) con marcos temáticos exclusivos vinculados a sus respectivos `themeTypeCode` (0 a 68 en `ttd.json`).
+- **1.467 Cartas Totales:**
+  - 731 Cartas Normales (`type: 0`).
+  - 731 Cartas Prismas (`type: 1`).
+  - 5 Cartas de Material de intensificación (A, B, C, S, R en código 30001..30005).
+
+### 2. Taxonomía de Variantes de Cartas (Equipada vs. No Equipada)
+* **Carta Equipada (Equipped):**
+  - **Uso:** Pedestales de `InventoryScene` (`isEquip = true`), ventana de detalle (`CardDetailView`, `CardBookDetailPopup`) y pantalla de juego.
+  - **Textura:** Alta resolución $226 \times 318$ px (`app/src/files/asiudgasg/asodhsg/wadceg/<cardId>_l.i.bytes.png`).
+  - **Composición:** Foto vertical del idol + marco de grado C/B/A/S/R (o marco LE correspondiente) + brillo holográfico si es Prisma + logo grande del tema (`agewfcbxhaa/<themeId>_l.i.bytes.png`).
+* **Carta No Equipada (Unequipped):**
+  - **Uso:** Cuadrícula de desplazamiento inferior de `InventoryScene` (`isEquip = false`), álbum de `CardBookScene` y estados bloqueados.
+  - **Textura:** Miniatura compacta $85 \times 120$ px (`app/src/files/asiudgasg/asodhsg/wadceg/<cardId>_s.i.bytes.png`).
+  - **Composición:** Recorte centrado en el rostro del idol + slot de artista vacío (`artistEmpty_s.i.bytes.png`) en caso de no poseer la carta + silueta/escala de grises.
+
+### 3. Hallazgos Forenses y Correcciones de Anomalías de Dalcomsoft
+* **Anomalía en Cartas 17013 a 17018 (Olivia Hye - Tema 17003):**
+  - En la base de datos oficial del CDN (`url_shared_map.json` y `cdd.json`), Dalcomsoft apuntó por error los enlaces de imágenes grandes (`c_l_oliviahye_v.png`, etc.) al archivo pequeño `17013_s.i.bytes`.
+  - Como resultado, la textura grande `_l` no existía físicamente en el juego original.
+  - **Solución implementada:** Se desarrolló un sintetizador en `tools/audit_themes_and_cards.py` que generó las imágenes grandes a $226 \times 318$ px mediante interpolación Lanczos de alta fidelidad, sincronizándolas tanto localmente en `wadceg/` como en el emulador Android vía `adb`.
+  - Se corrigió `app/src/main/assets/data/card_metadata_map.json` para que `largeImagePath` apunte formalmente a `_l.i.bytes`.
+
+### 4. Herramientas Generadas para Verificación Manual de Ignacio
+1. **[docs/THEMES_CARDS_MAPPING.md](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/THEMES_CARDS_MAPPING.md):**
+   - Catálogo técnico en formato Markdown con enlaces directos (`file:///...`) a cada textura de imagen Equipada y No Equipada de los 99 temas y 1.467 cartas.
+2. **[docs/card_catalog_viewer.html](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/card_catalog_viewer.html):**
+   - Aplicación web local autónoma (abre directamente en Safari/Chrome con `open docs/card_catalog_viewer.html`).
+   - Permite filtrar por Grupo/Era, Tipo de Tema (Normal / LE / Alertas), Tipo de Carta (Normal / Prisma) y búsqueda por texto.
+   - Presenta lado a lado la carta No Equipada ($85 \times 120$) frente a la carta Equipada ($226 \times 318$) para un chequeo visual manual rápido y cómodo.
+3. **[data/theme_card_overrides.json](file:///Users/ignaciorojas/Documents/repos/sslo_apk/data/theme_card_overrides.json):**
+   - Archivo de configuración para aplicar sobreescrituras inmediatas en caso de que Ignacio identifique alguna discordancia visual en fotos o membresías.
+
+
 
 
 
