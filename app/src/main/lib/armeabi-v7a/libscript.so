@@ -483,7 +483,25 @@ function initIl2Cpp(module) {
         function getOrCreateLoadingEmblemSprite() {
             if (cachedLoadingSprite && !cachedLoadingSprite.isNull()) return cachedLoadingSprite;
             try {
-                var tex = loadLocalTexture2D("asiudgasg/asodhsg/aweoijs/1001.i.bytes");
+                var tex = null;
+                if (typeof loadLocalTexture2D === "function") {
+                    tex = loadLocalTexture2D("asiudgasg/asodhsg/aweoijs/1001.i.bytes");
+                }
+                if (!tex || tex.isNull()) {
+                    var fileReadAllBytesFn = new NativeFunction(baseAddr.add(0x1F0268C), "pointer", ["pointer", "pointer"]);
+                    var cPath = createIl2CppString("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/aweoijs/1001.i.bytes");
+                    var bytesObj = fileReadAllBytesFn(cPath, NULL);
+                    if (bytesObj && !bytesObj.isNull()) {
+                        var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
+                        tex = il2cpp_object_new(tex2dClass);
+                        var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
+                        texCtorFn(tex, 2, 2, NULL);
+                        var loadImageFn = new NativeFunction(baseAddr.add(0x25B3E90), "int", ["pointer", "pointer"]);
+                        loadImageFn(tex, bytesObj);
+                        var applyFn = new NativeFunction(baseAddr.add(0x181BBAC), "void", ["pointer"]);
+                        applyFn(tex);
+                    }
+                }
                 if (tex && !tex.isNull()) {
                     var createSpriteFn = new NativeFunction(baseAddr.add(0x23E1268), "pointer", ["pointer", "pointer"]);
                     cachedLoadingSprite = createSpriteFn(tex, NULL);
@@ -550,18 +568,11 @@ function initIl2Cpp(module) {
                 var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int", "pointer"]);
                 var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                 var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool", "pointer"]);
+                var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
+                var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3D04), "void", ["pointer", "bool", "pointer"]);
 
                 var instTf = getTfFn(inst, NULL);
                 if (instTf.isNull()) return;
-                var cbTf = getChildFn(instTf, 6, NULL); // [6] CacheBase
-                if (cbTf.isNull()) return;
-                var cbGo = getGoFn(cbTf, NULL);
-                if (!cbGo.isNull()) setActiveFn(cbGo, 1, NULL);
-
-                var imgTf = getChildFn(cbTf, 0, NULL); // [0] Image
-                if (imgTf.isNull()) return;
-                var imgGo = getGoFn(imgTf, NULL);
-                if (imgGo.isNull()) return;
 
                 // Resolve Image component via GetComponent<Image>
                 var initMetadataFn = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
@@ -569,14 +580,50 @@ function initIl2Cpp(module) {
                 initMetadataFn(slotImg);
                 var methodInfoImg = slotImg.readPointer();
                 var getCompImgFn = new NativeFunction(baseAddr.add(0x10B4898), "pointer", ["pointer", "pointer"]);
-                var cbImg = getCompImgFn(imgGo, methodInfoImg);
 
+                // 1. Neutralize any residual Image component on the root LoadingIndicator GameObject (excluding spinner at inst+0x38)
+                try {
+                    var instGo = getGoFn(instTf, NULL);
+                    if (instGo && !instGo.isNull()) {
+                        var instImg = getCompImgFn(instGo, methodInfoImg);
+                        var spinnerImg = inst.add(0x38).readPointer();
+                        if (instImg && !instImg.isNull() && instImg.toInt32() !== spinnerImg.toInt32()) {
+                            setSpriteFn(instImg, NULL, NULL);
+                            setEnabledFn(instImg, 0, NULL);
+                            log("[⏳ LOADING] Neutralized root residual Image on LoadingIndicator!");
+                        }
+                    }
+                } catch (eInstImg) {}
+
+                // 2. Resolve [6] CacheBase
+                var cbTf = getChildFn(instTf, 6, NULL); // [6] CacheBase
+                if (cbTf.isNull()) return;
+                var cbGo = getGoFn(cbTf, NULL);
+                if (!cbGo.isNull()) {
+                    setActiveFn(cbGo, 1, NULL);
+
+                    // 3. Neutralize Dalcomsoft logo on CacheBase's OWN Image component!
+                    try {
+                        var cbSelfImg = getCompImgFn(cbGo, methodInfoImg);
+                        if (cbSelfImg && !cbSelfImg.isNull()) {
+                            setSpriteFn(cbSelfImg, NULL, NULL);
+                            setEnabledFn(cbSelfImg, 0, NULL);
+                            log("[⏳ LOADING] Neutralized Dalcomsoft Image on CacheBase GameObject!");
+                        }
+                    } catch (eCbImg) {}
+                }
+
+                // 4. Resolve [0] Image child under CacheBase and apply LOONA emblem cleanly
+                var imgTf = getChildFn(cbTf, 0, NULL); // [0] Image
+                if (imgTf.isNull()) return;
+                var imgGo = getGoFn(imgTf, NULL);
+                if (imgGo.isNull()) return;
+
+                var cbImg = getCompImgFn(imgGo, methodInfoImg);
                 if (cbImg && !cbImg.isNull()) {
                     var emblemSprite = getOrCreateLoadingEmblemSprite();
                     if (emblemSprite && !emblemSprite.isNull()) {
-                        var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
                         setSpriteFn(cbImg, emblemSprite, NULL);
-                        var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3D04), "void", ["pointer", "bool", "pointer"]);
                         setEnabledFn(cbImg, 1, NULL);
                         setActiveFn(imgGo, 1, NULL);
                         log("[⏳ LOADING] LOONA emblem sprite cleanly applied to cacheBase/Image!");
@@ -795,11 +842,9 @@ function initIl2Cpp(module) {
                                 }
                             }
                             applyLoonaEmblemToCacheBase(inst);
-                            var setupFn = new NativeFunction(baseAddr.add(0xB3E658), "void", ["pointer", "pointer"]);
-                            setupFn(inst, NULL);
-                            log("[⏳ LOADING] LoadingIndicator.SetupEmblems() called!");
+                            log("[⏳ LOADING] LoadingIndicator emblem initialized cleanly with LOONA!");
                         } catch (eSetup) {
-                            log("[-] Error in SetupEmblems: " + eSetup.message);
+                            log("[-] Error in LoadingIndicator emblem setup: " + eSetup.message);
                         }
                     }
                 } catch (eCor) {
