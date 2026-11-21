@@ -17867,6 +17867,19 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             hideLoadingIndicator();
                         } else if (cmdRaw === "show_loading") {
                             showLoadingIndicator();
+                        } else if (cmdRaw === "activate_li") {
+                            try {
+                                var inst = getLoadingIndicatorInstance();
+                                if (inst && !inst.isNull()) {
+                                    var mcActive = new NativeFunction(baseAddr.add(0xD02334), "void", ["pointer", "pointer"]);
+                                    mcActive(inst, NULL);
+                                    var activeFn = new NativeFunction(baseAddr.add(0xB3BBB4), "void", []);
+                                    activeFn();
+                                    log("[💡 TEST] Activated and dispatched LoadingIndicator.Active!");
+                                }
+                            } catch (eActLi) {
+                                log("[-] Error in activate_li: " + eActLi.message);
+                            }
                         } else if (cmdRaw === "diag_loading") {
                             try {
                                 var inst = getLoadingIndicatorInstance();
@@ -17905,7 +17918,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     // Check root Canvas
                                     var getTfFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
                                     var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
-                                    var getCompFn = new NativeFunction(baseAddr.add(0x1DB6B14), "pointer", ["pointer", "pointer", "pointer"]);
+                                    var getCompFn = new NativeFunction(baseAddr.add(0x1DB6B98), "pointer", ["pointer", "pointer", "pointer"]);
                                     var canvasKlass = getClass("UnityEngine.UIModule", "UnityEngine", "Canvas");
                                     var classGetType = new NativeFunction(baseAddr.add(0x9C453C), "pointer", ["pointer"]);
                                     var typeGetObject = new NativeFunction(baseAddr.add(0x9C4FA4), "pointer", ["pointer"]);
