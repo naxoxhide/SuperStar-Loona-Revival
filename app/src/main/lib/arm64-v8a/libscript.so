@@ -674,8 +674,22 @@ function initIl2Cpp(module) {
                 },
                 onLeave: function (retval) {
                     try {
-                        applyLoonaEmblemToCacheBase(cachedLoadingIndicatorInstance);
-                    } catch (eAppAwake) {}
+                        if (cachedLoadingIndicatorInstance && !cachedLoadingIndicatorInstance.isNull()) {
+                            // 1. Activate LoadingIndicator GameObject once on boot
+                            var mcActiveFn = new NativeFunction(baseAddr.add(0xD02334), "void", ["pointer", "pointer"]);
+                            mcActiveFn(cachedLoadingIndicatorInstance, NULL);
+                            log("[⏳ LOADING] Awake: ManagedComponent.Active called -> GameObject activated!");
+
+                            // 2. Hide initially until Active() is dispatched
+                            var mcHideFn = new NativeFunction(baseAddr.add(0xCEEA90), "void", ["pointer", "pointer"]);
+                            mcHideFn(cachedLoadingIndicatorInstance, NULL);
+
+                            // 3. Apply LOONA emblem
+                            applyLoonaEmblemToCacheBase(cachedLoadingIndicatorInstance);
+                        }
+                    } catch (eAppAwake) {
+                        log("[-] Error in LoadingIndicator.Awake onLeave: " + eAppAwake.message);
+                    }
                 }
             });
         } catch (eLiAwake) {}
