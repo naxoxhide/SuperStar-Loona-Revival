@@ -17940,15 +17940,30 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                                     // Walk UP to root to find Canvas
                                     var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
+                                    var getCompFn = new NativeFunction(baseAddr.add(0x1DB6B98), "pointer", ["pointer", "pointer", "pointer"]);
+                                    var canvasType = getCanvasType();
+                                    var getOrderFn = new NativeFunction(baseAddr.add(0x258BC48), "int", ["pointer", "pointer"]);
+                                    var getOverrideFn = new NativeFunction(baseAddr.add(0x258BBB8), "bool", ["pointer", "pointer"]);
+                                    var getRenderModeFn = new NativeFunction(baseAddr.add(0x258B948), "int", ["pointer", "pointer"]);
+                                    var getCamFn = new NativeFunction(baseAddr.add(0x258BA08), "pointer", ["pointer", "pointer"]);
+                                    var getEnabledFn = new NativeFunction(baseAddr.add(0x1DB3D44), "bool", ["pointer", "pointer"]);
+
                                     var pTf = instTf;
                                     while (!pTf.isNull()) {
                                         var pGo = getGoFn(pTf, NULL);
                                         var pName = !pGo.isNull() ? readIl2CppString(getNameFn(pGo, NULL)) : "null";
-                                        getLocalPosFn(pTf, v3Buf);
-                                        var px = v3Buf.readFloat(), py = v3Buf.add(4).readFloat(), pz = v3Buf.add(8).readFloat();
-                                        getLocalScaleFn(pTf, v3Buf);
-                                        var psx = v3Buf.readFloat(), psy = v3Buf.add(4).readFloat(), psz = v3Buf.add(8).readFloat();
-                                        log("  [PARENT] " + pName + " pos=(" + px + "," + py + "," + pz + ") scale=(" + psx + "," + psy + "," + psz + ") go=" + pGo);
+                                        var pAct = !pGo.isNull() ? getActiveSelf(pGo, NULL) : -1;
+                                        var pInH = !pGo.isNull() ? getActiveInH(pGo, NULL) : -1;
+                                        var cvInfo = "no-canvas";
+                                        if (!pGo.isNull() && canvasType && !canvasType.isNull()) {
+                                            try {
+                                                var cv = getCompFn(pGo, canvasType, NULL);
+                                                if (!cv.isNull()) {
+                                                    cvInfo = "Canvas[en=" + getEnabledFn(cv, NULL) + " order=" + getOrderFn(cv, NULL) + " over=" + getOverrideFn(cv, NULL) + " rm=" + getRenderModeFn(cv, NULL) + " cam=" + getCamFn(cv, NULL) + "]";
+                                                }
+                                            } catch (eCv2) { cvInfo = "cv-err:" + eCv2.message; }
+                                        }
+                                        log("  [PARENT] " + pName + " self=" + pAct + " inH=" + pInH + " " + cvInfo + " go=" + pGo);
                                         pTf = getParentFn(pTf, NULL);
                                     }
                                 }
