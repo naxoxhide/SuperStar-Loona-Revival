@@ -4759,6 +4759,9 @@ A partir de la solicitud de Ignacio para aplicar las asociaciones documentadas e
        - En Stylish y Take Me High, la fila **Prism Card** reproduce exactamente las mismas siluetas y atuendos que la fila **Normal Card**, confirmando la paridad de siluetas solicitada por Ignacio.
      - Capturas [`screen_cb_detail_heejin.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_cb_detail_heejin.png) y [`screen_cb_detail_heejin_scroll.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_cb_detail_heejin_scroll.png):
        - Solistas (HeeJin 7001): Muestra su logotipo auténtico, y en el tema limitado *Oh my god yes*, las 3 tarjetas (Vocal, Dance, Rhythm) muestran sus poses auténticas temáticas tanto en Normal Card como en Prism Card, sin desbordamientos de arreglos ni colisiones visuales.
+* **Sincronización con Repositorio Remoto:**
+  - Se realizó el push de todos los commits acumulados en la rama `feat/card-ui` hacia `origin/feat/card-ui` (hasta el commit `eed0a163`), garantizando respaldo y paridad total en GitHub.
+
 
 
 
