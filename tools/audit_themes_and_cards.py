@@ -25,6 +25,10 @@ PLAYABLE_GROUPS = (
     + [18001, 19001, 20001, 21001]
 )
 
+SOLOIST_LE_CARDS = set(range(7013, 7016))
+for a in range(8001, 18001, 1000):
+    SOLOIST_LE_CARDS.update(range(a + 12, a + 15))
+
 def load_json(filename):
     path = os.path.join(DATA_DIR, filename)
     with open(path, "r", encoding="utf-8") as f:
@@ -220,18 +224,47 @@ def main():
             empty_source_type = "theme_cdn"
             empty_target_code = norm_card["code"]
 
-            # Intentar resolver vía URL _em.png del CDN para la carta normal de ese tema
+            # 2a. Si es una carta solista LE sintetizada
+            if norm_card["code"] in SOLOIST_LE_CARDS:
+                direct_s = f"asiudgasg/asodhsg/sdhgauwehdnu/{norm_card['code']}_s.i.bytes.png"
+                direct_l = f"asiudgasg/asodhsg/sdhgauwehdnu/{norm_card['code']}_l.i.bytes.png"
+                if os.path.exists(os.path.join(FILES_DIR, direct_s)):
+                    empty_s_rel = direct_s
+                    empty_l_rel = direct_l
+                    empty_source_type = "theme_direct_sdhgau"
+                    empty_target_code = norm_card["code"]
+
+            # 2b. Intentar resolver vía URL _em.png del CDN para la carta normal de ese tema
             norm_s_url = norm_card.get("cardImageSmall", "").split("?")[0]
             norm_em_url = norm_s_url.replace(".png", "_em.png")
-            for k, v in usm.items():
-                if norm_em_url in k:
-                    empty_s_rel = "asiudgasg/" + v + ".png" if not v.endswith(".png") else "asiudgasg/" + v
-                    l_val = v.replace("_s.i.bytes", "_l.i.bytes")
-                    empty_l_rel = "asiudgasg/" + l_val + ".png" if not l_val.endswith(".png") else "asiudgasg/" + l_val
-                    empty_source_type = "theme_cdn"
-                    break
+            if not empty_s_rel:
+                for k, v in usm.items():
+                    if norm_em_url in k:
+                        empty_s_rel = "asiudgasg/" + v + ".png" if not v.endswith(".png") else "asiudgasg/" + v
+                        l_val = v.replace("_s.i.bytes", "_l.i.bytes")
+                        empty_l_rel = "asiudgasg/" + l_val + ".png" if not l_val.endswith(".png") else "asiudgasg/" + l_val
+                        empty_source_type = "theme_cdn"
+                        break
 
-            # Si no se encuentra vía CDN del tema, recurrir a emptyImageSmall canónico en atd.json
+            # 2c. Si no coincide la URL completa, buscar por nombre de archivo con filtro de contexto
+            if not empty_s_rel or not os.path.exists(os.path.join(FILES_DIR, empty_s_rel)):
+                em_filename = os.path.basename(norm_em_url)
+                variants = [em_filename]
+                if "am1_heejin" in em_filename:
+                    variants.append(em_filename.replace("am1_heejin", "am_heejin1"))
+                url_folder = os.path.basename(os.path.dirname(norm_s_url))
+                for var_fn in variants:
+                    for k, v in usm.items():
+                        if var_fn in k and (url_folder in k or "cardempty" in k.lower() or "221006" in k):
+                            empty_s_rel = "asiudgasg/" + v + ".png" if not v.endswith(".png") else "asiudgasg/" + v
+                            l_val = v.replace("_s.i.bytes", "_l.i.bytes")
+                            empty_l_rel = "asiudgasg/" + l_val + ".png" if not l_val.endswith(".png") else "asiudgasg/" + l_val
+                            empty_source_type = "theme_cdn_filename"
+                            break
+                    if empty_s_rel and os.path.exists(os.path.join(FILES_DIR, empty_s_rel)):
+                        break
+
+            # 2d. Si no se encuentra vía CDN del tema, recurrir a emptyImageSmall canónico en atd.json
             if not empty_s_rel or not os.path.exists(os.path.join(FILES_DIR, empty_s_rel)):
                 a_empty_s_url = a_info.get("emptyImageSmall", "")
                 if a_empty_s_url and a_empty_s_url in usm:

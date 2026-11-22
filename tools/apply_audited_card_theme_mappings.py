@@ -51,12 +51,19 @@ def main():
                                     tex = getOrCreateEmptyCardTexture(aCode, matchEmpty[2] === "l");
                                 }"""
 
-    assert old_empty_lookup in content, "old_empty_lookup not found in libscript.js"
-    content = content.replace(old_empty_lookup, new_empty_lookup, 1)
-    print("[2/2] Fixed sdhgauwehdnu texture handler to prevent redundant lookup.")
+    if old_empty_lookup in content:
+        content = content.replace(old_empty_lookup, new_empty_lookup, 1)
+        print("[2/2] Fixed sdhgauwehdnu texture handler to prevent redundant lookup.")
+    else:
+        print("[2/2] sdhgauwehdnu texture handler already patched.")
 
     with open("app/src/main/assets/libscript.js", "w", encoding="utf-8") as f:
         f.write(content)
+
+    # Also synchronize libscript.so
+    import shutil
+    shutil.copyfile("app/src/main/assets/libscript.js", "app/src/main/lib/arm64-v8a/libscript.so")
+    print("Successfully synchronized app/src/main/lib/arm64-v8a/libscript.so!")
 
     print("Successfully updated app/src/main/assets/libscript.js!")
 

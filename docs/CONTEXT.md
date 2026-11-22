@@ -6,6 +6,55 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### 🔬 CHECKPOINT 28 — Reconstrucción y Síntesis Forense de Siluetas Vacías (EmptyCards) para Temas Solistas LE y Corrección Integral en CardBook, Inventario y Equip Theme (2026-11-23)
+
+**Investigación técnica, diagnóstico forense y resolución integral de asignaciones:**
+
+1. **Diagnóstico Forense de Causas Raíz de Siluetas Desalineadas:**
+   - **Evidencia Visual:** El usuario aportó capturas demostrando que en los 11 temas solistas Limited Edition (**7003 VIVID MIX, 8003 Baby Cat, 9003 Hasuli, 10003 Kong, 11003 ViVi WAY, 12003 Queen Lip, 13003 Jindori, 14003 Cherry, 15003 Baby Apple, 16003 My Fairy, 17003 Olivia Honey**), las ranuras de cartas no poseídas (`cardEmpty`) mostraban las siluetas correspondientes al Tema 1 (atuendos escolares/debut) en vez de reflejar la sesión fotográfica propia de cada evento LE.
+   - **Causa Raíz en CDN Dalcomsoft:** En la campaña publicitaria webview original, Dalcomsoft subió al CDN los marcos LE y las fotos equipadas (`wadceg/`), pero omitió por completo subir los archivos `_em.png` en `sdhgauwehdnu/` para dichos temas LE. En consecuencia, el auditor y el lookup caían en el fallback canónico del artista (`artist_canonical_atd`), asignando la silueta base de Theme 1.
+   - **Anatomía Forense Oficial de las Empty Cards:** Se comprobó que una silueta oficial Dalcomsoft se compone de 3 capas superpuestas:
+     1. Textura base de la integrante (`wadceg/`) convertida a escala de grises y multiplicada por un factor de luminancia de ~0.58.
+     2. Emblema caligráfico oficial de la artista en la esquina superior izquierda (`asodhsg/aweoijs/{artistCode}.i.bytes.png`, altura 24 px).
+     3. Rótulo identificador de posición en la esquina inferior derecha (`asodhsg/vhydigygvd/{posCode}.i.bytes.png`, $100 \times 18$ px).
+   - **Inconsistencia en Cartas Prism:** Se identificó que las cartas Prism no equipadas estaban recibiendo siluetas de temas dispares; la regla oficial de Dalcomsoft estipula que una carta Prism vacía debe proyectar la misma silueta que su contraparte Normal no poseída.
+
+2. **Pipeline de Generación y Síntesis Oficial (`tools/generate_soloist_empty_cards.py`):**
+   - Se diseñó y ejecutó [`tools/generate_soloist_empty_cards.py`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/tools/generate_soloist_empty_cards.py), sintetizando 66 texturas oficiales:
+     * 33 texturas grandes ($226 \times 318$ px, sufijo `.i.bytes`) para CardBook / Equip Theme.
+     * 33 texturas pequeñas ($85 \times 120$ px, sufijo `_s.i.bytes`) para miniaturas de inventario.
+     * Rangos cubiertos: `7013..7015` (HeeJin), `8013..8015` (HyunJin), `9013..9015` (HaSeul), `10013..10015` (YeoJin), `11013..11015` (ViVi), `12013..12015` (Kim Lip), `13013..13015` (JinSoul), `14013..14015` (Choerry), `15013..15015` (Yves), `16013..16015` (Go Won), `17013..17015` (Olivia Hye).
+   - Assets desplegados en `app/src/files/asiudgasg/asodhsg/sdhgauwehdnu/` y sincronizados en el emulador vía archivo tar a `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/sdhgauwehdnu/` con symlinks `.png -> .bytes`.
+
+3. **Corrección de Auditor y Anomalías Grupales (`tools/audit_themes_and_cards.py`):**
+   - Resueltas discrepancias históricas en rutas CDN:
+     * **Theme 3002 (Oh Yes I Am):** HeeJin mapeada a `3011` (desacoplada de `3021`).
+     * **Theme 5002 (Be Honest):** Cartas asignadas a la serie oficial `5012..5022` (`c_s_behonest_...`).
+     * **Theme 11001 (ViVi):** Slot 3 vinculado a `c_s_vivi_03_em.png` (`11003`).
+   - Mapeo unificado para Prism: Las ranuras Prism no equipadas ahora comparten exactamente la misma silueta que la carta Normal correspondiente.
+   - Regenerados [`docs/audit_themes_and_cards.json`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/audit_themes_and_cards.json), [`docs/THEMES_CARDS_MAPPING.md`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/THEMES_CARDS_MAPPING.md) y [`docs/card_catalog_viewer.html`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/card_catalog_viewer.html) (servidor activo en puerto 8088).
+
+4. **Inyección en Frida Gadget Runtime (`libscript.js` y `libscript.so`):**
+   - Se ejecutó [`tools/apply_audited_card_theme_mappings.py`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/tools/apply_audited_card_theme_mappings.py), actualizando `themeArtistEmptyMap` en [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js) y sincronizando [`app/src/main/lib/arm64-v8a/libscript.so`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/lib/arm64-v8a/libscript.so).
+   - Verificada la sintaxis completa con `node -c app/src/main/assets/libscript.js` (0 errores).
+
+5. **Matriz de Verificación y Control de Calidad (Quality Gate ADB):**
+   - **`CardBookDetailPopup` (HeeJin - Theme 7003 VIVID MIX):**
+     * Siluetas verificadas: Atuendo veraniego con corazón en mano (Vocal), pincel/paleta (Dance) y sonrisa (Rhythm), tanto en Normal Card como en Prism Card.
+     * Captura de evidencia: [`screen_cb_heejin_vividmix_full.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_cb_heejin_vividmix_full.png).
+   - **`CardBookDetailPopup` (HyunJin - Theme 8003 Baby Cat):**
+     * Siluetas verificadas: Blusa floral con lazo al cuello para Normal Card y Prism Card.
+     * Captura de evidencia: [`screen_cb_hyunjin_babycat_full.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_cb_hyunjin_babycat_full.png).
+   - **`CardBookDetailPopup` (Olivia Hye - Theme 17003 Olivia Honey):**
+     * Siluetas verificadas: Camisa oscura con corbata blanca y cabeza inclinada para Normal Card y Prism Card.
+     * Captura de evidencia: [`screen_cb_oliviahye_honey_full.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_cb_oliviahye_honey_full.png).
+   - **`InventoryScene` e Invocación de `SelectThemePopup` (Equip Theme):**
+     * Verificada la apertura interactiva de `SelectThemePopup` sin excepción nula en `InventoryScene`.
+     * Validado el renderizado en temas grupales (HEAT) y en temas solistas (VIVID MIX y Oh my god yes), comprobando que las ranuras no equipadas renderizan sus correspondientes siluetas auténticas con caligrafía de artista y rótulos de posición.
+     * Capturas de evidencia: [`screen_equip_theme_popup.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_equip_theme_popup.png) y [`screen_inven_heejin_equip_theme_vividmix.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_inven_heejin_equip_theme_vividmix.png).
+
+---
+
 ### 🔬 CHECKPOINT 27 — Análisis Forense, Desensamblado ARM64 y Arquitectura de Restauración Integral para la Pestaña Group en `CardBookScene` (`CardBookGroupView` y `CardBookDetailPopup`) (2026-11-11)
 
 **Investigación técnica, desensamblado ARM64 y diagnóstico de causa raíz:**

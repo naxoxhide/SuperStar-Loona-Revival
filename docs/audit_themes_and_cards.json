@@ -25383,7 +25383,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3001,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3001_s.i.bytes.png",
@@ -25454,7 +25454,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3001,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3001_s.i.bytes.png",
@@ -25525,7 +25525,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3002,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3002_s.i.bytes.png",
@@ -25596,7 +25596,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3002,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3002_s.i.bytes.png",
@@ -25667,7 +25667,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3003,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3003_s.i.bytes.png",
@@ -25738,7 +25738,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3003,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3003_s.i.bytes.png",
@@ -25809,7 +25809,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3004,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3004_s.i.bytes.png",
@@ -25880,7 +25880,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3004,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3004_s.i.bytes.png",
@@ -25951,7 +25951,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3005,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3005_s.i.bytes.png",
@@ -26022,7 +26022,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3005,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3005_s.i.bytes.png",
@@ -26093,7 +26093,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3006,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3006_s.i.bytes.png",
@@ -26164,7 +26164,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3006,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3006_s.i.bytes.png",
@@ -26235,7 +26235,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3007,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3007_s.i.bytes.png",
@@ -26306,7 +26306,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3007,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3007_s.i.bytes.png",
@@ -26377,7 +26377,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3008,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3008_s.i.bytes.png",
@@ -26448,7 +26448,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3008,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3008_s.i.bytes.png",
@@ -26519,7 +26519,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3009,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3009_s.i.bytes.png",
@@ -26590,7 +26590,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3009,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3009_s.i.bytes.png",
@@ -26661,7 +26661,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3010,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3010_s.i.bytes.png",
@@ -26732,7 +26732,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 3010,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/3010_s.i.bytes.png",
@@ -26823,10 +26823,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 3001,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 3011,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/3001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/3011_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -26835,7 +26835,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/3001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/3011_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -26894,10 +26894,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 3001,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 3011,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/3001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/3011_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -26906,7 +26906,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/3001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/3011_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -55783,10 +55783,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5001,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5012,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5012_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -55795,7 +55795,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5012_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -55854,10 +55854,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5001,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5012,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5012_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -55866,7 +55866,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5012_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -55925,10 +55925,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5002,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -55937,7 +55937,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -55996,10 +55996,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5002,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -56008,7 +56008,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -56067,10 +56067,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5003,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -56079,7 +56079,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -56138,10 +56138,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5003,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -56150,7 +56150,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -56209,10 +56209,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5004,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5004_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -56221,7 +56221,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5004_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -56280,10 +56280,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5004,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5004_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -56292,7 +56292,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5004_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -56351,10 +56351,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5005,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5016,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5005_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5016_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -56363,7 +56363,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5005_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5016_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -56422,10 +56422,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5005,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5016,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5005_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5016_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -56434,7 +56434,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5005_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5016_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -56493,10 +56493,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5006,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5017,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5006_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5017_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -56505,7 +56505,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5006_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5017_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -56564,10 +56564,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5006,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5017,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5006_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5017_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -56576,7 +56576,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5006_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5017_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -56635,10 +56635,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5007,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5018,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5007_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5018_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -56647,7 +56647,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5007_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5018_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -56706,10 +56706,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5007,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5018,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5007_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5018_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -56718,7 +56718,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5007_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5018_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -56777,10 +56777,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5008,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5019,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5008_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5019_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -56789,7 +56789,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5008_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5019_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -56848,10 +56848,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5008,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5019,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5008_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5019_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -56860,7 +56860,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5008_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5019_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -56919,10 +56919,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5009,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5020,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5009_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5020_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -56931,7 +56931,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5009_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5020_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -56990,10 +56990,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5009,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5020,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5009_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5020_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -57002,7 +57002,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5009_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5020_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -57061,10 +57061,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5010,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5021,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5010_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5021_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -57073,7 +57073,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5010_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5021_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -57132,10 +57132,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5010,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5021,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5010_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5021_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -57144,7 +57144,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5010_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5021_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -57203,10 +57203,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5011,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5022,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5011_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5022_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -57215,7 +57215,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5011_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5022_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -57274,10 +57274,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 5011,
+                "sourceType": "theme_cdn_filename",
+                "targetCode": 5022,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5011_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5022_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -57286,7 +57286,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5011_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/5022_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -86751,10 +86751,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 7001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 7013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -86763,7 +86763,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -86822,10 +86822,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 7001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 7013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -86834,7 +86834,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -86893,10 +86893,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 7002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 7014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -86905,7 +86905,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -86964,10 +86964,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 7002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 7014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -86976,7 +86976,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -87035,10 +87035,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 7003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 7015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -87047,7 +87047,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -87106,10 +87106,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 7003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 7015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -87118,7 +87118,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/7015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -88098,10 +88098,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 8001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 8013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -88110,7 +88110,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -88169,10 +88169,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 8001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 8013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -88181,7 +88181,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -88240,10 +88240,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 8002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 8014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -88252,7 +88252,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -88311,10 +88311,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 8002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 8014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -88323,7 +88323,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -88382,10 +88382,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 8003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 8015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -88394,7 +88394,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -88453,10 +88453,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 8003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 8015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -88465,7 +88465,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/8015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -89445,10 +89445,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 9001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 9013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -89457,7 +89457,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -89516,10 +89516,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 9001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 9013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -89528,7 +89528,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -89587,10 +89587,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 9002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 9014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -89599,7 +89599,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -89658,10 +89658,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 9002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 9014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -89670,7 +89670,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -89729,10 +89729,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 9003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 9015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -89741,7 +89741,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -89800,10 +89800,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 9003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 9015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -89812,7 +89812,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/9015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -90792,10 +90792,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 10001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 10013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -90804,7 +90804,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -90863,10 +90863,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 10001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 10013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -90875,7 +90875,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -90934,10 +90934,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 10002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 10014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -90946,7 +90946,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -91005,10 +91005,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 10002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 10014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -91017,7 +91017,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -91076,10 +91076,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 10003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 10015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -91088,7 +91088,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -91147,10 +91147,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 10003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 10015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -91159,7 +91159,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/10015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -91531,7 +91531,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 11003,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/11003_s.i.bytes.png",
@@ -91602,7 +91602,7 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
+                "sourceType": "theme_cdn_filename",
                 "targetCode": 11003,
                 "small": {
                   "path": "asiudgasg/asodhsg/sdhgauwehdnu/11003_s.i.bytes.png",
@@ -92139,10 +92139,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 11001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 11013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -92151,7 +92151,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -92210,10 +92210,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 11001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 11013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -92222,7 +92222,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -92281,10 +92281,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 11002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 11014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -92293,7 +92293,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -92352,10 +92352,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 11002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 11014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -92364,7 +92364,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -92423,10 +92423,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 11003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 11015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -92435,7 +92435,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -92494,10 +92494,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 11003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 11015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -92506,7 +92506,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/11015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -93486,10 +93486,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 12001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 12013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -93498,7 +93498,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -93557,10 +93557,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 12001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 12013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -93569,7 +93569,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -93628,10 +93628,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 12002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 12014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -93640,7 +93640,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -93699,10 +93699,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 12002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 12014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -93711,7 +93711,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -93770,10 +93770,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 12003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 12015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -93782,7 +93782,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -93841,10 +93841,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 12003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 12015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -93853,7 +93853,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/12015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -94833,10 +94833,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 13001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 13013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -94845,7 +94845,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -94904,10 +94904,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 13001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 13013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -94916,7 +94916,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -94975,10 +94975,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 13002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 13014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -94987,7 +94987,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -95046,10 +95046,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 13002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 13014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -95058,7 +95058,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -95117,10 +95117,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 13003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 13015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -95129,7 +95129,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -95188,10 +95188,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 13003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 13015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -95200,7 +95200,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/13015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -96180,10 +96180,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 14001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 14013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -96192,7 +96192,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -96251,10 +96251,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 14001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 14013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -96263,7 +96263,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -96322,10 +96322,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 14002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 14014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -96334,7 +96334,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -96393,10 +96393,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 14002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 14014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -96405,7 +96405,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -96464,10 +96464,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 14003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 14015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -96476,7 +96476,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -96535,10 +96535,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 14003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 14015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -96547,7 +96547,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/14015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -97527,10 +97527,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 15001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 15013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -97539,7 +97539,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -97598,10 +97598,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 15001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 15013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -97610,7 +97610,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -97669,10 +97669,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 15002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 15014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -97681,7 +97681,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -97740,10 +97740,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 15002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 15014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -97752,7 +97752,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -97811,10 +97811,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 15003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 15015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -97823,7 +97823,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -97882,10 +97882,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 15003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 15015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -97894,7 +97894,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/15015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -98874,10 +98874,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 16001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 16013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -98886,7 +98886,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -98945,10 +98945,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 16001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 16013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -98957,7 +98957,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -99016,10 +99016,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 16002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 16014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -99028,7 +99028,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -99087,10 +99087,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 16002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 16014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -99099,7 +99099,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -99158,10 +99158,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 16003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 16015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -99170,7 +99170,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -99229,10 +99229,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 16003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 16015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -99241,7 +99241,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/16015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -100221,10 +100221,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 17001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 17013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -100233,7 +100233,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -100292,10 +100292,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 17001,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 17013,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17001_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17013_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -100304,7 +100304,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17001_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17013_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -100363,10 +100363,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 17002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 17014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -100375,7 +100375,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -100434,10 +100434,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 17002,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 17014,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17002_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17014_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -100446,7 +100446,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17002_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17014_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -100505,10 +100505,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 17003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 17015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -100517,7 +100517,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
@@ -100576,10 +100576,10 @@
                 }
               },
               "unequipped": {
-                "sourceType": "artist_canonical_atd",
-                "targetCode": 17003,
+                "sourceType": "theme_direct_sdhgau",
+                "targetCode": 17015,
                 "small": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17003_s.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17015_s.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     85,
@@ -100588,7 +100588,7 @@
                   "usage": "No Equipada (S) / Slot Vacío Miniatura (cardEmpty / artistEmpty)"
                 },
                 "large": {
-                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17003_l.i.bytes.png",
+                  "path": "asiudgasg/asodhsg/sdhgauwehdnu/17015_l.i.bytes.png",
                   "exists": true,
                   "dimensions": [
                     226,
