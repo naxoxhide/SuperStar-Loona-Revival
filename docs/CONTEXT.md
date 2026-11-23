@@ -4865,6 +4865,54 @@ A partir de la solicitud de Ignacio para aplicar las asociaciones documentadas e
 * **Sincronización con Repositorio Remoto:**
   - Se realizó el push de todos los commits acumulados en la rama `feat/card-ui` hacia `origin/feat/card-ui` (hasta el commit `eed0a163`), garantizando respaldo y paridad total en GitHub.
 
+---
+
+### 🛡️ CHECKPOINT 30 — Restauración Definitiva Offline de Live Theme Book (Scene 12), Navegación Bidireccional y Suite de 7 Shields Hardware ARM64 Anticaída (2026-11-23)
+
+#### 1. Contexto y Directiva del Usuario (Ignacio)
+* **Objetivo:** Restaurar completamente y de forma auténtica la escena `LiveThemeBookScene` (Scene 12) en modo 100% offline, garantizando estabilidad absoluta del motor Unity / IL2CPP y navegación bidireccional fluida con `CardBookScene` (Scene 5).
+* **Directiva Específica de Ignacio:**
+  > "Antes de proceder con el plan, respecto al punto El reproductor MP4 de Unity (AVPro) requiere conexión de red para streamear, ya que como no existen vídeos puedes dejar el botón de Watch the moving photo pero que no llame a ninguna función solo este el botón para mantener la UI,a futuro decidiré si implementar completamente lo del vídeo. Luego que hagas este ajuste inicia con el plan"
+* **Resolución:** El botón `▶ Live Theme` / *"Watch the moving photo"* en la vista de detalle de cartas se conservó al 100% en la interfaz visual, pero sus listeners fueron neutralizados con stubs seguros que registran `[🎨 LIVE THEME] LiveThemeBookView.OnLiveMode clicked -> no-op per Ignacio's preference`, sin peticiones de red ni llamadas a AVPro.
+
+#### 2. Hallazgos Forenses y Causa Raíz de Bloqueos y Crashes
+1. **Causa de Pantalla Vacía en `LiveThemeBookScene`:**
+   - La subrutina `SetStateWaitDone` (RVA `0xC2C9E4`) tenía un parche previo que llamaba por error a `LiveThemeBookView.Hide()` (`0xC2FBDC`) en `0xC2CA48`. Al corregirse para llamar a `LiveThemeBookView.Show()` (`0xC2FC94`), la vista de Live Theme Book y su panel de 11 cartas de LOONA aparecieron inmediatamente con renderizado auténtico y 9.774 colores únicos.
+2. **Punteros Envenenados por el Asignador Scudo en Android 13:**
+   - Al destruirse GameObjects o componentes en transiciones de escenas previas, Scudo sobrescribe las cabeceras de memoria con punteros reciclados (`0xb4000000474d0000` / `0xb4000000f7aa0000`).
+   - Cuando subsistemas del motor Unity intentan dereferenciar interfaces (`LayoutRebuilder`), continuar corrutinas muertas (`SetupCoroutine`), escanear objetos en recolección de basura (`Boehm GC`) o realizar raycasts de toque de pantalla (`Graphic.Raycast` -> `Class::Init`), se producían crashes fatales `SIGSEGV` con `fault addr 0x...012a`, `0x...012c`, `0x...0008` y `0x...0132`.
+3. **Fallo de Vtable en Navegación `<` (Back):**
+   - El delegate de UI `<OnOpen>b__5_0` en `0xC2F1F4` fue compilado por IL2CPP como una llamada virtual a través del slot 9 de la vtable (`[klass, #0x1c8]`), pero en runtime dicho slot era nulo, causando un salto ciego `br x2` a `pc = 0x0`. Se reemplazó por un salto directo incondicional a `LiveThemeBookScene.OnBack` (`0xC2BDE8`), eliminando la dereferencia nula.
+4. **Firma Errónea en Despacho de `OpenScene`:**
+   - Los handlers `LiveThemeBookView.OnExit`, `LiveThemeBookScene.OnExit` y `LiveThemeBookView.OnCardBook` intentaban llamar a `SceneControl.OpenScene` (`0xD534BC`) con 4 parámetros en lugar de los 3 que requiere la firma ARM64 (`int sceneId, void* callback, void* changing`), provocando `access violation accessing 0x0`. Al normalizarse la signatura nativa a 3 argumentos, la transición a `CardBookScene` (Scene 5) se ejecuta limpiamente.
+
+#### 3. Arquitectura Defensiva: Suite de 7 Shields Hardware ARM64
+Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Scudo, se implementó una serie de trampolines en el code cave `0xD61FA0 - 0xD620C0` de `libil2cpp.so`:
+1. **`[🛡️ ON_LAYOUT SHIELD]`** (`Scene.Open`, RVA `0xD52E50` -> cave `0xD61FA0`):
+   - `cbz x2, #8; br x2; ret`. Protege contra slot nulo en vtable durante la llamada a `OnLayout`.
+2. **`[🛡️ LAYOUT_REBUILDER SHIELD]`** (`LayoutRebuilder.MarkLayoutForRebuild`, RVA `0x1EDAFC0` -> cave `0xD61FB0`):
+   - `lsl x11, x8, #8; lsr x11, x11, #40; cmp x11, #0x10; b.lo #0x1EDAFC4`. Filtra punteros envenenados por Scudo (`0xb4...`) antes de chequear la interfaz `ILayoutElement`.
+3. **`[🛡️ STRIP_BEHAVIOURS SHIELD]`** (`LayoutRebuilder.<StripDisabledBehavioursFromList>b__10_0`, RVA `0x21AC130` -> cave `0xD61FD8`):
+   - Valida `e->klass`. Si es un puntero inválido de Scudo, salta a `mov w8, #1; b #0x21AC160`, eliminando el componente destruido de la lista `List<Component>` antes de las 4 fases de layout (`b__12_0..3`).
+4. **`[🛡️ COROUTINE SHIELD]`** (`SetupCoroutine.InvokeMoveNext`, RVA `0x1815E54` -> cave `0xD62000`):
+   - Valida `enumerator->klass`. Si es inválido, escribe `strb wzr, [x20]` (retorna `false`) y retorna limpiamente, permitiendo a Unity purgar la corrutina muerta sin crashear.
+5. **`[🛡️ ACTION_INVOKE SHIELD]`** (`Action<int, object>.Invoke`, RVA `0x18ED718` -> cave `0xD62040`):
+   - `cbz x24, #8; blr x24; b #0x18ED720`. Protege cualquier delegate con `method_ptr == 0`, neutralizando crashes por listeners no inicializados.
+6. **`[🛡️ BOEHM_GC SHIELD]`** (`Boehm GC Object Scanner`, RVA `0x9F89A4` -> cave `0xD62050`):
+   - Valida `x0` (puntero a objeto) y `x2` (`klass`). Si el puntero contiene etiquetas de Scudo o es menor a `0x10`, retorna inmediatamente con `ret`, evitando que el recolector de basura de Boehm dereferencie memoria liberada durante escaneos conservadores.
+7. **`[🛡️ CLASS_INIT SHIELD]`** (`Class::Init`, RVA `0x9EA96C` -> cave `0xD62090`):
+   - Valida `x0` (`klass`) antes de dereferenciar `[x0, #0x132]`. Si el puntero es nulo o tagged de Scudo, retorna de forma segura `false` (`mov w0, wzr; ret`). Neutraliza universalmente caídas en `Graphic.Raycast`, `GraphicRaycaster.Raycast`, `EventSystem.RaycastAll` y comprobaciones `is`/`as`.
+8. **`[🛡️ ON_BACK SHIELD]`** (`LiveThemeBookScene.<OnOpen>b__5_0`, RVA `0xC2F1F4`):
+   - Salto directo incondicional `b #0xC2BDE8` a `LiveThemeBookScene.OnBack`, bypassando la vtable defectuosa y garantizando el cierre seguro de la vista de detalle.
+
+#### 4. Evidencia Visual y Verificación en Dispositivo Real (BlueStacks)
+* **Live Theme Book Grid (Scene 12):**
+  - Captura [`screen_livetheme_restored2.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_livetheme_restored2.png): Renderizado nítido del panel izquierdo de LOONA (11 miembros) y banner temático auténtico.
+* **Detalle de Carta de HeeJin (Card 1):**
+  - Capturas [`screen_livetheme_card_detail.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_livetheme_card_detail.png) y [`screen_detail_success.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_detail_success.png): Retrato en alta resolución de HeeJin con marco holográfico animado, conmutadores *"Equip Live Theme"* y *"Background Live Theme"*, botón *"▶ Live Theme"* conservado como no-op seguro y subtítulo *"Fresher Edition"*.
+* **Navegación Fluida hacia CardBook (Scene 5):**
+  - Captura [`screen_returned_to_cardbook.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_returned_to_cardbook.png): Retorno perfecto e interactivo a `CardBookScene` al tocar el botón `X` de salida.
+
 
 
 

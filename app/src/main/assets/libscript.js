@@ -13352,6 +13352,13 @@ function initIl2Cpp(module) {
                         baseAddr.add(0xC2B3B0).writeU32(0x94001239);
                         log("[🛡️ ON_OPEN SHIELD] Patched LiveThemeBookScene.OnOpen virtual calls to direct safe branches!");
 
+                        // Patch <OnOpen>b__5_0 (0xC2F1F4) from vtable slot 9 dispatch to direct branch to LiveThemeBookScene.OnBack (0xC2BDE8)
+                        Memory.protect(baseAddr.add(0xC2F1F4), 16, "rwx");
+                        baseAddr.add(0xC2F1F4).writeU32(0x17FFF2FD); // b #0xC2BDE8
+                        baseAddr.add(0xC2F1F8).writeU32(0xD503201F); // nop
+                        baseAddr.add(0xC2F1FC).writeU32(0xD503201F); // nop
+                        log("[🛡️ ON_BACK SHIELD] Patched <OnOpen>b__5_0 (0xC2F1F4) to direct branch to LiveThemeBookScene.OnBack (0xC2BDE8)!");
+
                         // Patch SetStateWaitDone (0xC2C9E4) virtual call to direct LiveThemeBookView.Show:
                         // 0xC2CA48: mov x1, xzr (0xAA1F03E1)
                         // 0xC2CA4C: bl #0xC2FC94 (0x94000C92)
@@ -13451,6 +13458,48 @@ function initIl2Cpp(module) {
                         baseAddr.add(0x18ED718).writeU32(0x17D1D24A); // b #0xD62040
                         baseAddr.add(0x18ED71C).writeU32(0xD503201F); // nop
                         log("[🛡️ ACTION_INVOKE SHIELD] Patched Action<int, object>.Invoke to safe non-null guard!");
+
+                        // Shield 6: Boehm GC Object Scanner (0x9F89A4) - defend against Scudo tagged pointers in dead objects
+                        Memory.protect(baseAddr.add(0xD62050), 64, "rwx");
+                        baseAddr.add(0xD62050).writeU32(0xB40001E0); // cbz x0, #0xD6208C
+                        baseAddr.add(0xD62054).writeU32(0xD378DC0B); // lsl x11, x0, #8
+                        baseAddr.add(0xD62058).writeU32(0xD368FD6B); // lsr x11, x11, #40
+                        baseAddr.add(0xD6205C).writeU32(0xF100417F); // cmp x11, #0x10
+                        baseAddr.add(0xD62060).writeU32(0x54000163); // b.lo #0xD6208C
+                        baseAddr.add(0xD62064).writeU32(0xF9400008); // ldr x8, [x0]
+                        baseAddr.add(0xD62068).writeU32(0x927FF902); // and x2, x8, #0xfffffffffffffffe
+                        baseAddr.add(0xD6206C).writeU32(0xB4000102); // cbz x2, #0xD6208C
+                        baseAddr.add(0xD62070).writeU32(0xD378DC4B); // lsl x11, x2, #8
+                        baseAddr.add(0xD62074).writeU32(0xD368FD6B); // lsr x11, x11, #40
+                        baseAddr.add(0xD62078).writeU32(0xF100417F); // cmp x11, #0x10
+                        baseAddr.add(0xD6207C).writeU32(0x54000083); // b.lo #0xD6208C
+                        baseAddr.add(0xD62080).writeU32(0xAA0103E3); // mov x3, x1
+                        baseAddr.add(0xD62084).writeU32(0x39402048); // ldrb w8, [x2, #8]
+                        baseAddr.add(0xD62088).writeU32(0x17F25A4B); // b #0x9F89B4
+                        baseAddr.add(0xD6208C).writeU32(0xD65F03C0); // ret
+                        Memory.protect(baseAddr.add(0x9F89A4), 16, "rwx");
+                        baseAddr.add(0x9F89A4).writeU32(0x140DA5AB); // b #0xD62050
+                        baseAddr.add(0x9F89A8).writeU32(0xD503201F); // nop
+                        baseAddr.add(0x9F89AC).writeU32(0xD503201F); // nop
+                        baseAddr.add(0x9F89B0).writeU32(0xD503201F); // nop
+                        log("[🛡️ BOEHM_GC SHIELD] Patched GC object scanner (0x9F89A4) to safe Scudo-filtered trampoline!");
+
+                        // Shield 7: Class::Init (0x9EA96C) - universal shield against Scudo tagged pointers in Graphic.Raycast / type checks
+                        Memory.protect(baseAddr.add(0xD62090), 40, "rwx");
+                        baseAddr.add(0xD62090).writeU32(0xB4000100); // cbz x0, #0xD620B0
+                        baseAddr.add(0xD62094).writeU32(0xD378DC08); // lsl x8, x0, #8
+                        baseAddr.add(0xD62098).writeU32(0xD368FD08); // lsr x8, x8, #40
+                        baseAddr.add(0xD6209C).writeU32(0xF100411F); // cmp x8, #0x10
+                        baseAddr.add(0xD620A0).writeU32(0x54000083); // b.lo #0xD620B0
+                        baseAddr.add(0xD620A4).writeU32(0xD10103FF); // sub sp, sp, #0x40
+                        baseAddr.add(0xD620A8).writeU32(0xA90157F6); // stp x22, x21, [sp, #0x10]
+                        baseAddr.add(0xD620AC).writeU32(0x17F22232); // b #0x9EA974
+                        baseAddr.add(0xD620B0).writeU32(0x2A1F03E0); // mov w0, wzr
+                        baseAddr.add(0xD620B4).writeU32(0xD65F03C0); // ret
+                        Memory.protect(baseAddr.add(0x9EA96C), 8, "rwx");
+                        baseAddr.add(0x9EA96C).writeU32(0x140DDDC9); // b #0xD62090
+                        baseAddr.add(0x9EA970).writeU32(0xD503201F); // nop
+                        log("[🛡️ CLASS_INIT SHIELD] Patched Class::Init (0x9EA96C) to safe Scudo-filtered trampoline!");
                     } catch (eOnOpen) {
                         log("[-] Error patching LiveThemeBookScene virtual calls: " + eOnOpen.message);
                     }
@@ -13547,8 +13596,8 @@ function initIl2Cpp(module) {
                     Interceptor.replace(baseAddr.add(0xC2FF50), new NativeCallback(function (viewPtr, goPtr, methodInfo) {
                         log("[📖 LIVE THEME VIEW] LiveThemeBookView.OnCardBook triggered, returning to CardBookScene (5)...");
                         try {
-                            var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
-                            openSceneFn(5, NULL, NULL, NULL);
+                            var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
+                            openSceneFn(5, NULL, NULL);
                         } catch (eCb) {
                             log("[-] Error in LiveThemeBookView.OnCardBook: " + eCb.message);
                         }
@@ -13559,8 +13608,8 @@ function initIl2Cpp(module) {
                     Interceptor.replace(baseAddr.add(0xC2CBBC), new NativeCallback(function (thisPtr, methodInfo) {
                         log("[🔙 LIVE THEME] OnExit triggered, returning to CardBookScene (5)...");
                         try {
-                            var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
-                            openSceneFn(5, NULL, NULL, NULL);
+                            var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
+                            openSceneFn(5, NULL, NULL);
                         } catch (eOe) {
                             log("[-] Error in LiveThemeBookScene.OnExit: " + eOe.message);
                         }
@@ -13570,8 +13619,8 @@ function initIl2Cpp(module) {
                     Interceptor.replace(baseAddr.add(0xC2FE30), new NativeCallback(function (viewPtr, goPtr, methodInfo) {
                         log("[🔙 LIVE THEME VIEW] LiveThemeBookView.OnExit triggered, returning to CardBookScene (5)...");
                         try {
-                            var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
-                            openSceneFn(5, NULL, NULL, NULL);
+                            var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
+                            openSceneFn(5, NULL, NULL);
                         } catch (eOe) {
                             log("[-] Error in LiveThemeBookView.OnExit: " + eOe.message);
                         }
