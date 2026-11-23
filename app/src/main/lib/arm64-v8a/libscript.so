@@ -1252,6 +1252,39 @@ function initIl2Cpp(module) {
             log("[-] Error hooking libc abort: " + e3.message);
         }
 
+        // 🛡️ Zero-Crash Shield for UnityEngine.UI.LayoutGroup.SetDirty (0x1EDB7DC)
+        // Prevents SIGSEGV on dereferencing destroyed UI components during scene transitions / grid instantiation
+        try {
+            var cachedGetRectFn = new NativeFunction(baseAddr.add(0x1EDB1FC), "pointer", ["pointer", "pointer"]);
+            var cachedMarkFn = new NativeFunction(baseAddr.add(0x1EDC190), "void", ["pointer", "pointer"]);
+            var cachedIsActiveFns = {};
+            Interceptor.replace(baseAddr.add(0x1EDB7DC), new NativeCallback(function (thisPtr, methodInfo) {
+                if (!thisPtr || thisPtr.isNull()) return;
+                try {
+                    var nativePtr = thisPtr.add(0x10).readPointer();
+                    if (!nativePtr || nativePtr.isNull() || nativePtr.compare(ptr(0x10000)) < 0) return;
+                    var klass = thisPtr.readPointer();
+                    if (!klass || klass.isNull() || klass.toInt32() === 0 || klass.compare(ptr(0x10000)) < 0) return;
+                    var fnIsActive = klass.add(0x1c8).readPointer();
+                    if (!fnIsActive || fnIsActive.isNull() || fnIsActive.compare(ptr(0x10000)) < 0) return;
+                    var fnKey = fnIsActive.toString();
+                    var isActiveFn = cachedIsActiveFns[fnKey];
+                    if (!isActiveFn) {
+                        isActiveFn = new NativeFunction(fnIsActive, "bool", ["pointer", "pointer"]);
+                        cachedIsActiveFns[fnKey] = isActiveFn;
+                    }
+                    if (!isActiveFn(thisPtr, NULL)) return;
+                    var rect = cachedGetRectFn(thisPtr, NULL);
+                    if (rect && !rect.isNull()) {
+                        cachedMarkFn(rect, NULL);
+                    }
+                } catch (eLg) {}
+            }, "void", ["pointer", "pointer"]));
+            log("[🛡️ UI SHIELD] Installed zero-crash protection on LayoutGroup.SetDirty (0x1EDB7DC)!");
+        } catch (eLgHook) {
+            log("[-] Error protecting LayoutGroup.SetDirty: " + eLgHook.message);
+        }
+
         // SetStateIntensify step tracer removed to prevent mid-function ARM64 instruction clobbering
 
         try {
@@ -5077,6 +5110,9 @@ function initIl2Cpp(module) {
                         } else if (type === 'cardbook_card') {
                             klassSlotRva = 0x31E1810;  // Ext.Collection.AntiGC.FastArray<CardBookControl.CardItem>_TypeInfo
                             methodSlotRva = 0x3203628; // Method$Ext.Collection.AntiGC.FastArray<CardBookControl.CardItem>..ctor()
+                        } else if (type === 'livetheme_card') {
+                            klassSlotRva = 0x31E1860;  // Ext.Collection.AntiGC.FastArray<LiveThemeControl.ThemeCardItem>_TypeInfo
+                            methodSlotRva = 0x32037C8; // Method$Ext.Collection.AntiGC.FastArray<LiveThemeControl.ThemeCardItem>..ctor()
                         } else {
                             // 'card' -> InventoryControl.CardItem
                             klassSlotRva = 0x31E1848;  // Ext.Collection.AntiGC.FastArray<InventoryControl.CardItem>_TypeInfo
@@ -5152,6 +5188,10 @@ function initIl2Cpp(module) {
                             klassSlotRva = 0x31E3878;  // System.Collections.Generic.List<WWWFile.DownloadPath>_TypeInfo
                             ctorSlotRva = 0x320BDD8;   // Method$System.Collections.Generic.List<WWWFile.DownloadPath>..ctor()
                             addSlotRva = 0x320BDE8;    // Method$System.Collections.Generic.List<WWWFile.DownloadPath>.Add()
+                        } else if (type === 'livetheme_item') {
+                            klassSlotRva = 0x31E35C8;  // System.Collections.Generic.List<LiveThemeControl.LiveThemeItem>_TypeInfo
+                            ctorSlotRva = 0x320B0E0;   // Method$System.Collections.Generic.List<LiveThemeControl.LiveThemeItem>..ctor()
+                            addSlotRva = 0x320B0E8;    // Method$System.Collections.Generic.List<LiveThemeControl.LiveThemeItem>.Add()
                         }
 
                         var klass = resolveMetadataSlot(klassSlotRva);
@@ -12987,61 +13027,229 @@ function initIl2Cpp(module) {
                 }
 
                 var isLiveThemeDataInitialized = false;
+                var loonaLiveThemeItem = NULL;
+                var loonaLiveThemeListManaged = NULL;
+                var loonaThemeCardItems = [];
+                var loonaThemeCardMap = {};
+
+                function buildOfflineLiveThemeData() {
+                    if (loonaLiveThemeItem && !loonaLiveThemeItem.isNull()) return true;
+                    try {
+                        ensureLoonaMocks();
+                        log("[🎨 LIVE THEME] Building authentic offline LiveTheme data structures...");
+
+                        log("[🔍 STEP 1] LiveThemeData model...");
+                        // 1. LiveThemeData model
+                        var ltdKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "LiveThemeData");
+                        if (!ltdKlass || ltdKlass.isNull()) {
+                            log("[-] Could not find LiveThemeData class");
+                            return false;
+                        }
+                        try { initClassFn(ltdKlass); } catch (eLtdK) {}
+                        var ltdObj = il2cpp_object_new(ltdKlass);
+                        if (il2cpp_gchandle_new && !ltdObj.isNull()) il2cpp_gchandle_new(ltdObj, 2);
+                        ltdObj.add(0x10).writeS16(0); // code = 0
+                        ltdObj.add(0x14).writeS32(181418001); // localeName
+                        ltdObj.add(0x18).writeS32(181419001); // saleLocaleName
+                        ltdObj.add(0x1C).writeS16(0); // orderIndex = 0
+                        ltdObj.add(0x20).writeS32(1001); // groupID = 1001 (LOONA)
+                        ltdObj.add(0x28).writePointer(createIl2CppString("0xB8FFF12C")); // auraColor
+
+                        log("[🔍 STEP 2] LiveThemeDataControl.Data...");
+                        // 2. LiveThemeDataControl.Data
+                        var ltdcDataKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "LiveThemeDataControl/Data");
+                        if (!ltdcDataKlass || ltdcDataKlass.isNull()) {
+                            log("[-] Could not find LiveThemeDataControl/Data class");
+                            return false;
+                        }
+                        try { initClassFn(ltdcDataKlass); } catch (eLtdcK) {}
+                        var ltdcDataObj = il2cpp_object_new(ltdcDataKlass);
+                        if (il2cpp_gchandle_new && !ltdcDataObj.isNull()) il2cpp_gchandle_new(ltdcDataObj, 2);
+                        var gData = allGroupDataMap[1001] || loonaGroupData || NULL;
+                        ltdcDataObj.add(0x10).writePointer(ltdObj);
+                        ltdcDataObj.add(0x18).writePointer(gData);
+                        ltdcDataObj.add(0x20).writePointer(NULL);
+
+                        log("[🔍 STEP 3] Classes for Cards...");
+                        // 3. Classes for Cards
+                        var ltCardDataKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "LiveThemeCardData");
+                        var ltCardDataControlKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "LiveThemeCardDataControl/Data");
+                        var ltCardKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.account", "LiveThemeCard");
+                        var themeCardItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "LiveThemeControl/ThemeCardItem");
+
+                        if (ltCardDataKlass && !ltCardDataKlass.isNull()) { try { initClassFn(ltCardDataKlass); } catch (e1) {} }
+                        if (ltCardDataControlKlass && !ltCardDataControlKlass.isNull()) { try { initClassFn(ltCardDataControlKlass); } catch (e2) {} }
+                        if (ltCardKlass && !ltCardKlass.isNull()) { try { initClassFn(ltCardKlass); } catch (e3) {} }
+                        if (themeCardItemKlass && !themeCardItemKlass.isNull()) { try { initClassFn(themeCardItemKlass); } catch (e4) {} }
+
+                        loonaThemeCardItems = [];
+                        loonaThemeCardMap = {};
+
+                        log("[🔍 STEP 3b] Card loop start...");
+                        for (var i = 0; i < 11; i++) {
+                            var artistId = 1001 + i;
+                            var artistObj = allArtistDataMap[artistId] || loonaArtistDataMap[i + 1] || NULL;
+
+                            // 3a. LiveThemeCardData (model)
+                            var cDataObj = il2cpp_object_new(ltCardDataKlass);
+                            if (il2cpp_gchandle_new && !cDataObj.isNull()) il2cpp_gchandle_new(cDataObj, 2);
+                            cDataObj.add(0x10).writeS16(i); // code
+                            cDataObj.add(0x12).writeS16(0); // liveThemeID = 0
+                            cDataObj.add(0x14).writeS32(artistId); // artistID
+                            cDataObj.add(0x18).writePointer(NULL); // emptyImageSmall
+                            cDataObj.add(0x20).writePointer(NULL); // emptyImageLarge
+                            var sCardRel = "asiudgasg/asodhsg/wadceg/" + (10001 + i) + "_s.i.bytes";
+                            var lCardRel = "asiudgasg/asodhsg/wadceg/" + (10001 + i) + "_l.i.bytes";
+                            cDataObj.add(0x28).writePointer(createIl2CppString(sCardRel));
+                            cDataObj.add(0x30).writePointer(createIl2CppString(lCardRel));
+                            cDataObj.add(0x38).writePointer(NULL);
+                            cDataObj.add(0x40).writePointer(NULL);
+                            cDataObj.add(0x48).writePointer(NULL);
+                            cDataObj.add(0x50).writePointer(NULL);
+                            cDataObj.add(0x60).writePointer(createIl2CppString("Fresher LOONA " + (i + 1)));
+
+                            // 3b. LiveThemeCardDataControl.Data
+                            var cdcObj = il2cpp_object_new(ltCardDataControlKlass);
+                            if (il2cpp_gchandle_new && !cdcObj.isNull()) il2cpp_gchandle_new(cdcObj, 2);
+                            cdcObj.add(0x10).writePointer(cDataObj);
+                            cdcObj.add(0x18).writePointer(ltdcDataObj);
+                            cdcObj.add(0x20).writePointer(artistObj);
+                            cdcObj.add(0x28).writePointer(createDownloadPath(sCardRel)); // emptyImageSmall
+                            cdcObj.add(0x30).writePointer(createDownloadPath(lCardRel)); // emptyImageLarge
+                            cdcObj.add(0x38).writePointer(createDownloadPath(sCardRel)); // liveThemeImageSmall
+                            cdcObj.add(0x40).writePointer(createDownloadPath(lCardRel)); // liveThemeImageLarge
+                            cdcObj.add(0x48).writePointer(createDownloadPath(lCardRel)); // removeBGImageLarge
+                            cdcObj.add(0x50).writePointer(NULL);
+                            cdcObj.add(0x58).writePointer(NULL);
+                            cdcObj.add(0x60).writePointer(NULL);
+
+                            // 3c. LiveThemeCard (account)
+                            var cardAcc = il2cpp_object_new(ltCardKlass);
+                            if (il2cpp_gchandle_new && !cardAcc.isNull()) il2cpp_gchandle_new(cardAcc, 2);
+                            cardAcc.add(0x10).writeS64(90000000 + i); // objectID
+                            cardAcc.add(0x18).writeS16(i); // cardID
+                            cardAcc.add(0x1A).writeU8(1); // isEquip = true
+                            cardAcc.add(0x1B).writeU8(1); // isBackground = true
+                            cardAcc.add(0x1C).writeS16(1); // soundState value
+                            cardAcc.add(0x1E).writeU8(1);  // soundState hasValue = true
+                            cardAcc.add(0x20).writeS16(1); // videoState value
+                            cardAcc.add(0x22).writeU8(1);  // videoState hasValue = true
+
+                            // 3d. LiveThemeControl.ThemeCardItem
+                            var tciObj = il2cpp_object_new(themeCardItemKlass);
+                            if (il2cpp_gchandle_new && !tciObj.isNull()) il2cpp_gchandle_new(tciObj, 2);
+                            tciObj.add(0x10).writePointer(cardAcc);
+                            tciObj.add(0x18).writePointer(cdcObj);
+                            tciObj.add(0x20).writeU8(0); // isNew = false
+                            tciObj.add(0x21).writeU8(1); // isHave = true
+                            tciObj.add(0x24).writeS32(1); // soundState = 1
+                            tciObj.add(0x28).writeS32(1); // videoState = 1
+
+                            loonaThemeCardItems.push(tciObj);
+                            loonaThemeCardMap[i] = tciObj;
+                        }
+
+                        log("[🔍 STEP 4] FastArray of ThemeCardItem... themeCardItemKlass=" + themeCardItemKlass);
+                        // 4. Authentic FastArray of ThemeCardItem with 32 elements (prevents IndexOutOfRange)
+                        var poolCap = 32;
+                        var pool = il2cpp_array_new(themeCardItemKlass, poolCap);
+                        if (il2cpp_gchandle_new && !pool.isNull()) il2cpp_gchandle_new(pool, 2);
+                        for (var ti = 0; ti < poolCap; ti++) {
+                            var item = (ti < loonaThemeCardItems.length) ? loonaThemeCardItems[ti] : loonaThemeCardItems[loonaThemeCardItems.length - 1];
+                            pool.add(0x20 + ti * 8).writePointer(item || NULL);
+                            if (!loonaThemeCardMap[ti]) loonaThemeCardMap[ti] = item;
+                        }
+                        var faKlass = resolveMetadataSlot(0x31E1860);
+                        var tciFastArray = NULL;
+                        if (faKlass && !faKlass.isNull()) {
+                            try { initClassFn(faKlass); } catch (eFaK) {}
+                            tciFastArray = il2cpp_object_new(faKlass);
+                        }
+                        if (!tciFastArray || tciFastArray.isNull()) {
+                            tciFastArray = Memory.alloc(64);
+                            var sampleFaKlass = faKlass || ((loonaGroupData && !loonaGroupData.isNull() && !loonaGroupData.add(0x30).readPointer().isNull()) ? loonaGroupData.add(0x30).readPointer().readPointer() : resolveMetadataSlot(0x31E1800));
+                            tciFastArray.writePointer(sampleFaKlass);
+                        } else {
+                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(tciFastArray, 2);
+                        }
+                        tciFastArray.add(0x8).writePointer(NULL);
+                        tciFastArray.add(0x10).writePointer(pool);
+                        tciFastArray.add(0x18).writeS32(poolCap); // capacity
+                        tciFastArray.add(0x1C).writeS32(poolCap); // length
+                        log("[✅ FAST_ARRAY] Direct zero-crash FastArray<ThemeCardItem> allocated at: " + tciFastArray + " pool=" + pool + " pool.max_length=" + (pool.isNull() ? "NULL" : pool.add(0x18).readS32()));
+
+                        log("[🔍 STEP 5] LiveThemeControl.LiveThemeItem...");
+                        // 5. LiveThemeControl.LiveThemeItem
+                        var ltItemKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "LiveThemeControl/LiveThemeItem");
+                        if (!ltItemKlass || ltItemKlass.isNull()) {
+                            log("[-] Could not find LiveThemeItem class");
+                            return false;
+                        }
+                        loonaLiveThemeItem = il2cpp_object_new(ltItemKlass);
+                        if (il2cpp_gchandle_new && !loonaLiveThemeItem.isNull()) il2cpp_gchandle_new(loonaLiveThemeItem, 2);
+                        loonaLiveThemeItem.add(0x10).writePointer(ltdcDataObj);
+                        loonaLiveThemeItem.add(0x18).writePointer(gData);
+                        loonaLiveThemeItem.add(0x20).writePointer(NULL);
+                        loonaLiveThemeItem.add(0x28).writePointer(NULL);
+                        loonaLiveThemeItem.add(0x30).writePointer(tciFastArray);
+
+                        log("[🔍 STEP 6] Managed List of LiveThemeItem...");
+                        // 6. Authentic Managed List of LiveThemeItem
+                        var itemsArr = il2cpp_array_new(ltItemKlass, 4);
+                        if (il2cpp_gchandle_new && !itemsArr.isNull()) il2cpp_gchandle_new(itemsArr, 2);
+                        itemsArr.add(0x20).writePointer(loonaLiveThemeItem);
+
+                        var listKlass = resolveMetadataSlot(0x31E35C8);
+                        loonaLiveThemeListManaged = NULL;
+                        if (listKlass && !listKlass.isNull()) {
+                            try { initClassFn(listKlass); } catch (eListK) {}
+                            loonaLiveThemeListManaged = il2cpp_object_new(listKlass);
+                        }
+                        if (!loonaLiveThemeListManaged || loonaLiveThemeListManaged.isNull()) {
+                            loonaLiveThemeListManaged = Memory.alloc(64);
+                            var sampleListKlass = listKlass || resolveMetadataSlot(0x31E3878);
+                            loonaLiveThemeListManaged.writePointer(sampleListKlass);
+                        } else {
+                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(loonaLiveThemeListManaged, 2);
+                        }
+                        loonaLiveThemeListManaged.add(0x8).writePointer(NULL);
+                        loonaLiveThemeListManaged.add(0x10).writePointer(itemsArr);
+                        loonaLiveThemeListManaged.add(0x18).writeS32(1); // _size = 1
+                        loonaLiveThemeListManaged.add(0x1C).writeS32(1); // _version = 1
+                        loonaLiveThemeListManaged.add(0x20).writePointer(NULL);
+                        log("[✅ MANAGED_LIST] Direct zero-crash List<LiveThemeItem> allocated at: " + loonaLiveThemeListManaged + " (len: 1)");
+
+                        log("[🔍 STEP 7] Static fields of LiveThemeControl...");
+                        // 7. Static fields of LiveThemeControl
+                        var ltCtrlKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "LiveThemeControl");
+                        if (ltCtrlKlass && !ltCtrlKlass.isNull()) {
+                            try { initClassFn(ltCtrlKlass); } catch (eLtcK) {}
+                            var sf = ltCtrlKlass.add(0xB8).readPointer();
+                            if (!sf.isNull()) {
+                                sf.add(0x0).writeU8(1);  // IsLiveThemeOpen = true
+                                sf.add(0x1).writeU8(1);  // IsOpened = true
+                                sf.add(0x2).writeU8(0);  // IsNew = false
+                                sf.add(0x18).writePointer(loonaLiveThemeListManaged); // AllLiveThemeList
+                                sf.add(0x28).writePointer(loonaLiveThemeListManaged); // DisplayLiveThemeList
+                                sf.add(0x40).writeS16(0); // selectedLiveThemeCardCode = 0
+                                sf.add(0x42).writeS16(0); // selectedLiveThemeIndex = 0
+                                sf.add(0x44).writeS16(0); // liveThemeLeaderCode = 0
+                                log("[🎨 LIVE THEME] Static fields of LiveThemeControl successfully populated!");
+                            }
+                        }
+
+                        log("[🎨 LIVE THEME] Authentic offline LiveTheme data built with success! (1 theme, 11 cards)");
+                        return true;
+                    } catch (eBuild) {
+                        log("[-] Error in buildOfflineLiveThemeData: " + eBuild.message);
+                        return false;
+                    }
+                }
+
                 function ensureLiveThemeData() {
                     if (isLiveThemeDataInitialized) return true;
                     try {
-                        // 1. LiveThemeDataControl.Open (0xB37F60)
-                        try {
-                            var ltDataOpenFn = new NativeFunction(baseAddr.add(0xB37F60), "void", []);
-                            ltDataOpenFn();
-                            log("[🎨 LIVE THEME] LiveThemeDataControl.Open() ok");
-                        } catch (eLtd) {
-                            log("[-] Error calling LiveThemeDataControl.Open: " + eLtd.message);
-                        }
-
-                        // 2. LiveThemeCardDataControl.Open (0xC328B8)
-                        try {
-                            var ltCardDataOpenFn = new NativeFunction(baseAddr.add(0xC328B8), "void", []);
-                            ltCardDataOpenFn();
-                            log("[🎨 LIVE THEME] LiveThemeCardDataControl.Open() ok");
-                        } catch (eLtcd) {
-                            log("[-] Error calling LiveThemeCardDataControl.Open: " + eLtcd.message);
-                        }
-
-                        // 3. LiveThemeControl.Open (0xB33C24)
-                        try {
-                            var openFn = new NativeFunction(baseAddr.add(0xB33C24), "void", []);
-                            openFn();
-                            log("[🎨 LIVE THEME] LiveThemeControl.Open() executed successfully!");
-
-                            // Force IsLiveThemeOpen = true and IsOpened = true
-                            try {
-                                var ltCtrlKlassHandle = baseAddr.add(0x30FD5E8).readPointer();
-                                if (!ltCtrlKlassHandle.isNull()) {
-                                    var ltCtrlKlass = ltCtrlKlassHandle.readPointer();
-                                    if (!ltCtrlKlass.isNull()) {
-                                        var staticFields = ltCtrlKlass.add(0xB8).readPointer();
-                                        if (!staticFields.isNull()) {
-                                            staticFields.add(0x0).writeU8(1); // IsLiveThemeOpen = true
-                                            staticFields.add(0x1).writeU8(1); // IsOpened = true
-                                            log("[🎨 LIVE THEME] Forced IsLiveThemeOpen=1, IsOpened=1 in static fields");
-                                        }
-                                    }
-                                }
-                            } catch (eSf) {
-                                log("[-] Error updating static fields: " + eSf.message);
-                            }
-
-                            // Update display list (isAll = true, groupID = -1)
-                            try {
-                                var updateDisplayFn = new NativeFunction(baseAddr.add(0xB36F88), "void", ["bool", "int", "pointer"]);
-                                updateDisplayFn(1, -1, NULL);
-                                log("[🎨 LIVE THEME] UpdateDisplayLiveThemeList(true, -1) executed successfully!");
-                            } catch (eUdl) {}
-                        } catch (eLtc) {
-                            log("[-] Error calling LiveThemeControl.Open: " + eLtc.message);
-                        }
-
+                        buildOfflineLiveThemeData();
                         isLiveThemeDataInitialized = true;
                         log("[🎨 LIVE THEME] LiveTheme offline subsystem fully initialized!");
                         return true;
@@ -13049,6 +13257,70 @@ function initIl2Cpp(module) {
                         log("[-] Error in ensureLiveThemeData: " + e.message);
                         return false;
                     }
+                }
+
+                // Interceptors for LiveThemeControl and LiveThemeDataControl
+                try {
+                    // 1. LiveThemeControl.Open (0xB33C24) -> offline data builder
+                    Interceptor.replace(baseAddr.add(0xB33C24), new NativeCallback(function (methodInfo) {
+                        log("[🎨 LIVE THEME] LiveThemeControl.Open called -> running buildOfflineLiveThemeData");
+                        buildOfflineLiveThemeData();
+                    }, "void", ["pointer"]));
+
+                    // 2. LiveThemeControl.UpdateDisplayLiveThemeList (0xB36F88)
+                    Interceptor.replace(baseAddr.add(0xB36F88), new NativeCallback(function (isAll, groupID, methodInfo) {
+                        log("[🎨 LIVE THEME] LiveThemeControl.UpdateDisplayLiveThemeList called (isAll=" + isAll + ", groupID=" + groupID + ")");
+                        buildOfflineLiveThemeData();
+                        var ltCtrlKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "LiveThemeControl");
+                        if (ltCtrlKlass && !ltCtrlKlass.isNull()) {
+                            var sf = ltCtrlKlass.add(0xB8).readPointer();
+                            if (!sf.isNull() && loonaLiveThemeListManaged && !loonaLiveThemeListManaged.isNull()) {
+                                sf.add(0x28).writePointer(loonaLiveThemeListManaged);
+                            }
+                        }
+                    }, "void", ["bool", "int", "pointer"]));
+
+                    // 2a. LiveThemeControl.get_AllLiveThemeList (0xB32F40) & get_DisplayLiveThemeList (0xB330D8)
+                    Interceptor.replace(baseAddr.add(0xB32F40), new NativeCallback(function (methodInfo) {
+                        buildOfflineLiveThemeData();
+                        return loonaLiveThemeListManaged || NULL;
+                    }, "pointer", ["pointer"]));
+                    Interceptor.replace(baseAddr.add(0xB330D8), new NativeCallback(function (methodInfo) {
+                        buildOfflineLiveThemeData();
+                        return loonaLiveThemeListManaged || NULL;
+                    }, "pointer", ["pointer"]));
+
+                    // 2b. Setters set_AllLiveThemeList (0xB32FA4) & set_DisplayLiveThemeList (0xB3313C) as safe no-ops
+                    Interceptor.replace(baseAddr.add(0xB32FA4), new NativeCallback(function (val, methodInfo) {}, "void", ["pointer", "pointer"]));
+                    Interceptor.replace(baseAddr.add(0xB3313C), new NativeCallback(function (val, methodInfo) {}, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on LiveThemeControl getters & setters (0xB32F40, 0xB330D8, 0xB32FA4, 0xB3313C)");
+
+                    // 3. LiveThemeControl.FindToLiveThemeItem (0xB34C68)
+                    Interceptor.replace(baseAddr.add(0xB34C68), new NativeCallback(function (code, methodInfo) {
+                        buildOfflineLiveThemeData();
+                        log("[🎨 LIVE THEME] FindToLiveThemeItem called (code=" + code + ") -> returning loonaLiveThemeItem");
+                        return loonaLiveThemeItem || NULL;
+                    }, "pointer", ["int", "pointer"]));
+
+                    // 4. LiveThemeControl.FindToThemeCardItem (0xB34DB0)
+                    Interceptor.replace(baseAddr.add(0xB34DB0), new NativeCallback(function (code, methodInfo) {
+                        buildOfflineLiveThemeData();
+                        log("[🎨 LIVE THEME] FindToThemeCardItem called (code=" + code + ")");
+                        if (loonaThemeCardMap[code]) return loonaThemeCardMap[code];
+                        return (loonaThemeCardItems && loonaThemeCardItems[0]) ? loonaThemeCardItems[0] : NULL;
+                    }, "pointer", ["int", "pointer"]));
+
+                    // 5. LiveThemeDataControl.Data.get_LocaleName (0xE7204C) & get_SaleLocaleName (0xE720C0)
+                    Interceptor.replace(baseAddr.add(0xE7204C), new NativeCallback(function (thisPtr, methodInfo) {
+                        return createIl2CppString("Fresher Edition");
+                    }, "pointer", ["pointer", "pointer"]));
+                    Interceptor.replace(baseAddr.add(0xE720C0), new NativeCallback(function (thisPtr, methodInfo) {
+                        return createIl2CppString("Fresher Edition");
+                    }, "pointer", ["pointer", "pointer"]));
+
+                    log("[+] Interceptor.replace installed on LiveThemeControl methods & locale getters!");
+                } catch (eLtcHooks) {
+                    log("[-] Error installing LiveThemeControl method hooks: " + eLtcHooks.message);
                 }
 
                 try {
@@ -13067,18 +13339,73 @@ function initIl2Cpp(module) {
                     });
                     log("[+] Interceptor.attach installed on CardBookScene.RefreshLiveBookBtn (0x11D0CD4) [Force btnLiveBook active]");
 
+                    // 0. Patch LiveThemeBookScene.OnOpen (0xC2AB98) virtual calls to direct safe branches:
+                    // 0xC2B398: mov x1, #0 (0xD2800001)
+                    // 0xC2B39C: bl #0xC2C478 (0x94000437) -> direct LiveThemeBookScene.Refresh call
+                    // 0xC2B3AC: mov x1, #0 (0xD2800001)
+                    // 0xC2B3B0: bl #0xC2FC94 (0x94001239) -> direct LiveThemeBookView.Show call
+                    try {
+                        Memory.protect(baseAddr.add(0xC2B398), 32, "rwx");
+                        baseAddr.add(0xC2B398).writeU32(0xD2800001);
+                        baseAddr.add(0xC2B39C).writeU32(0x94000437);
+                        baseAddr.add(0xC2B3AC).writeU32(0xD2800001);
+                        baseAddr.add(0xC2B3B0).writeU32(0x94001239);
+                        log("[🛡️ ON_OPEN SHIELD] Patched LiveThemeBookScene.OnOpen virtual calls to direct safe branches!");
+
+                        // Patch SetStateWaitDone (0xC2C9E4) virtual call to direct LiveThemeBookView.Hide:
+                        // 0xC2CA48: mov x1, #0 (0xD2800001)
+                        // 0xC2CA4C: bl #0xC2FBDC (0x94000C64)
+                        Memory.protect(baseAddr.add(0xC2CA48), 16, "rwx");
+                        baseAddr.add(0xC2CA48).writeU32(0xD2800001);
+                        baseAddr.add(0xC2CA4C).writeU32(0x94000C64);
+                        log("[🛡️ WAIT_DONE SHIELD] Patched SetStateWaitDone virtual call to direct LiveThemeBookView.Hide!");
+
+                        // Patch SceneControl.Update (0xD56C94) blr x9 to safe non-null trampoline at code cave (0xD61F90):
+                        Memory.protect(baseAddr.add(0xD61F90), 16, "rwx");
+                        baseAddr.add(0xD61F90).writeU32(0xB4000049); // cbz x9, #0xD61F98 (skip if null)
+                        baseAddr.add(0xD61F94).writeU32(0xD63F0120); // blr x9
+                        baseAddr.add(0xD61F98).writeU32(0x17FFD340); // b #0xD56C98 (return)
+
+                        Memory.protect(baseAddr.add(0xD56C94), 4, "rwx");
+                        baseAddr.add(0xD56C94).writeU32(0x14002CBF); // b #0xD61F90
+                        log("[🛡️ SCENE SHIELD] Patched SceneControl.Update vtable blr x9 to safe non-null trampoline!");
+
+                        // Patch Scene.Open (0xD52E50) br x2 (OnLayout virtual tail-call) to safe non-null trampoline at code cave (0xD61FA0):
+                        Memory.protect(baseAddr.add(0xD61FA0), 16, "rwx");
+                        baseAddr.add(0xD61FA0).writeU32(0xB4000042); // cbz x2, #0xD61FA8 (skip if null)
+                        baseAddr.add(0xD61FA4).writeU32(0xD61F0040); // br x2
+                        baseAddr.add(0xD61FA8).writeU32(0xD65F03C0); // ret
+
+                        Memory.protect(baseAddr.add(0xD52E50), 4, "rwx");
+                        baseAddr.add(0xD52E50).writeU32(0x14003C54); // b #0xD61FA0
+                        log("[🛡️ ON_LAYOUT SHIELD] Patched Scene.Open vtable br x2 to safe non-null trampoline!");
+
+                        // Patch LayoutRebuilder.MarkLayoutForRebuild (0x1EDAFC0) to safe non-null / valid-pointer guard at code cave (0xD61FB0):
+                        Memory.protect(baseAddr.add(0xD61FB0), 48, "rwx");
+                        baseAddr.add(0xD61FB0).writeU32(0xF94002E9); // ldr x9, [x23]
+                        baseAddr.add(0xD61FB4).writeU32(0xD378DD2B); // lsl x11, x9, #8
+                        baseAddr.add(0xD61FB8).writeU32(0xD368FD6B); // lsr x11, x11, #40
+                        baseAddr.add(0xD61FBC).writeU32(0xF100417F); // cmp x11, #0x10
+                        baseAddr.add(0xD61FC0).writeU32(0x54000042); // b.hs #0xD61FC8
+                        baseAddr.add(0xD61FC4).writeU32(0x1445E40E); // b #0x1EDAFFC (skip bad component)
+                        baseAddr.add(0xD61FC8).writeU32(0xF9400388); // ldr x8, [x28]
+                        baseAddr.add(0xD61FCC).writeU32(0x3944B12B); // ldrb w11, [x9, #0x12c]
+                        baseAddr.add(0xD61FD0).writeU32(0x1445E3FF); // b #0x1EDAFCC (continue)
+
+                        Memory.protect(baseAddr.add(0x1EDAFC0), 12, "rwx");
+                        baseAddr.add(0x1EDAFC0).writeU32(0x17BA1BFC); // b #0xD61FB0
+                        baseAddr.add(0x1EDAFC4).writeU32(0xD503201F); // nop
+                        baseAddr.add(0x1EDAFC8).writeU32(0xD503201F); // nop
+                        log("[🛡️ LAYOUT_REBUILDER SHIELD] Patched LayoutRebuilder interface check to safe non-null guard!");
+                    } catch (eOnOpen) {
+                        log("[-] Error patching LiveThemeBookScene virtual calls: " + eOnOpen.message);
+                    }
+
                     // 1. LiveThemeBookScene.GetThemeCount (0xC2C524)
-                    var origGetThemeCount = new NativeFunction(baseAddr.add(0xC2C524), "int", ["pointer", "pointer"]);
                     Interceptor.replace(baseAddr.add(0xC2C524), new NativeCallback(function (thisPtr, methodInfo) {
                         ensureLiveThemeData();
-                        try {
-                            var count = origGetThemeCount(thisPtr, methodInfo);
-                            log("[🎨 LIVE THEME] GetThemeCount: " + count);
-                            return count;
-                        } catch (e) {
-                            log("[-] Error in native GetThemeCount: " + e.message);
-                            return 1;
-                        }
+                        log("[🎨 LIVE THEME] GetThemeCount returning 1 (LOONA Fresher Edition)");
+                        return 1;
                     }, "int", ["pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on LiveThemeBookScene.GetThemeCount (0xC2C524)");
 
@@ -13096,22 +13423,17 @@ function initIl2Cpp(module) {
                     }, "void", ["pointer", "int", "pointer"]));
                     log("[+] Interceptor.replace installed on LiveThemeBookView.SetPageAnchor (0xC2C024)");
 
-                    // 3. LiveThemeBookScene.SetStateWait (0xC2C7C0)
-                    var origSetStateWait = new NativeFunction(baseAddr.add(0xC2C7C0), "void", ["pointer", "pointer"]);
+                    // 3. LiveThemeBookScene.SetStateWait (0xC2C7C0) -> direct offline transition
                     Interceptor.replace(baseAddr.add(0xC2C7C0), new NativeCallback(function (sceneThis, methodInfo) {
-                        log("[🎨 LIVE THEME] SetStateWait entered -> ensuring live theme data...");
+                        log("[🎨 LIVE THEME] SetStateWait entered -> direct offline transition to WaitDone & Default");
                         ensureLiveThemeData();
                         try {
-                            origSetStateWait(sceneThis, methodInfo);
-                            log("[🎨 LIVE THEME] Native SetStateWait dispatched successfully!");
-                        } catch (eLtw) {
-                            log("[-] Error in native SetStateWait, applying fallback transition: " + eLtw.message);
-                            try {
-                                var setStateWaitDoneFn = new NativeFunction(baseAddr.add(0xC2C9E4), "void", ["pointer", "pointer"]);
-                                setStateWaitDoneFn(sceneThis, NULL);
-                                var setStateDefaultFn = new NativeFunction(baseAddr.add(0xC2CA84), "void", ["pointer", "pointer"]);
-                                setStateDefaultFn(sceneThis, NULL);
-                            } catch (eFallback) {}
+                            var setStateWaitDoneFn = new NativeFunction(baseAddr.add(0xC2C9E4), "void", ["pointer", "pointer"]);
+                            setStateWaitDoneFn(sceneThis, NULL);
+                            var setStateDefaultFn = new NativeFunction(baseAddr.add(0xC2CA84), "void", ["pointer", "pointer"]);
+                            setStateDefaultFn(sceneThis, NULL);
+                        } catch (eFallback) {
+                            log("[-] Error in direct transition: " + eFallback.message);
                         }
                     }, "void", ["pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on LiveThemeBookScene.SetStateWait (0xC2C7C0)!");
@@ -13179,6 +13501,37 @@ function initIl2Cpp(module) {
                         }
                     }, "void", ["pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on LiveThemeBookScene.OnExit (0xC2CBBC)!");
+
+                    // 🔬 Fine-grained step tracers for LiveTheme pipeline
+                    var traceFuncs = [
+                        { addr: 0xC2C478, name: "LiveThemeBookScene.Refresh" },
+                        { addr: 0xC2FC94, name: "LiveThemeBookView.Show" },
+                        { addr: 0xC2FBDC, name: "LiveThemeBookView.Hide" },
+                        { addr: 0xB3D1C8, name: "LiveThemeView.SetData" },
+                        { addr: 0xB3D38C, name: "LiveThemeView.GetNumberOfCells" },
+                        { addr: 0xB3D394, name: "LiveThemeView.GetCellViewSize" },
+                        { addr: 0xB3D430, name: "LiveThemeView.GetCellView" },
+                        { addr: 0xC2BAD0, name: "LiveThemeBookScene.SetStateHelp" },
+                        { addr: 0xC2C6DC, name: "LiveThemeBookScene.SetStateLoadingData" },
+                        { addr: 0xC2C9E4, name: "LiveThemeBookScene.SetStateWaitDone" },
+                        { addr: 0xC2CA84, name: "LiveThemeBookScene.SetStateDefault" },
+                        { addr: 0xC2E02C, name: "LiveThemeBookScene.GetLiveThemeItemData" },
+                        { addr: 0xC2F22C, name: "LiveThemeBookScene.<Refresh>b__8_0" },
+                        { addr: 0xB32828, name: "LiveThemeCellView.RefreshCellView" },
+                        { addr: 0xB32BF0, name: "LiveThemeCellView.SetItem" }
+                    ];
+                    traceFuncs.forEach(function (tf) {
+                        try {
+                            Interceptor.attach(baseAddr.add(tf.addr), {
+                                onEnter: function (args) {
+                                    log("[🔬 TRACE] " + tf.name + " ENTER (this=" + args[0] + ", a1=" + args[1] + ")");
+                                },
+                                onLeave: function (retval) {
+                                    log("[🔬 TRACE] " + tf.name + " LEAVE (ret=" + retval + ")");
+                                }
+                            });
+                        } catch (eTf) {}
+                    });
                 } catch (eLtbs) {
                     log("[-] Error setting up LiveThemeBookScene hooks: " + eLtbs.message);
                 }
@@ -16122,7 +16475,7 @@ function initIl2Cpp(module) {
                                 actionInvoke(callback, NULL);
                             } catch (eCb) {}
                         }
-                    }, "void", ["int", "pointer", "pointer", "int", "short", "pointer"])));
+                    }, "void", ["int", "pointer", "pointer", "int", "int", "pointer"])));
                     log("[+] Interceptor.replace installed on StorePopup.Open (0xB6EE4C)!");
                 } catch (eStore) {
                     log("[-] Error replacing StorePopup.Open: " + eStore.message);
@@ -19799,22 +20152,46 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     } catch (eW) {}
                 }, 100);
 
-                // Scene.Update (0xD5330C) -> runs every frame on the Unity Main Thread for whichever scene is active!
+                // Scene.Update (0xD5330C) -> runs every frame, safe guarded against null vtable during scene transitions
                 try {
-                    Interceptor.attach(baseAddr.add(0xD5330C), {
-                        onEnter: function (args) {
-                            if (pendingSceneCommand) {
-                                var cmd = pendingSceneCommand;
-                                pendingSceneCommand = null;
-                                var activeScene = args[0];
-                                log("[🚀 MAIN THREAD DISPATCH] Executing '" + cmd + "' on active Scene: " + activeScene);
-                                executeSceneCommand(cmd, activeScene);
-                            }
+                    var invokeStateTaskFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer", "pointer"]);
+                    var cachedOnUpdateFns = {};
+                    Interceptor.replace(baseAddr.add(0xD5330C), new NativeCallback(function (thisPtr, methodInfo) {
+                        if (!thisPtr || thisPtr.isNull()) return;
+                        if (pendingSceneCommand) {
+                            var cmd = pendingSceneCommand;
+                            pendingSceneCommand = null;
+                            log("[🚀 MAIN THREAD DISPATCH] Executing '" + cmd + "' on active Scene: " + thisPtr);
+                            executeSceneCommand(cmd, thisPtr);
                         }
-                    });
-                    log("[+] Interceptor.attach installed on Scene.Update (0xD5330C) for main-thread command dispatch & video playback!");
+                        try {
+                            var klass = thisPtr.readPointer();
+                            if (klass && !klass.isNull() && klass.compare(ptr(0x10000)) > 0) {
+                                var fnOnUpdate = klass.add(0x1B8).readPointer();
+                                if (fnOnUpdate && !fnOnUpdate.isNull() && fnOnUpdate.compare(ptr(0x10000)) > 0 && !fnOnUpdate.equals(baseAddr.add(0xD53DC8))) {
+                                    var fnKey = fnOnUpdate.toString();
+                                    var onUpdateFn = cachedOnUpdateFns[fnKey];
+                                    if (!onUpdateFn) {
+                                        onUpdateFn = new NativeFunction(fnOnUpdate, "void", ["pointer", "pointer"]);
+                                        cachedOnUpdateFns[fnKey] = onUpdateFn;
+                                    }
+                                    var methodInfoSlot = klass.add(0x1C0).readPointer();
+                                    onUpdateFn(thisPtr, methodInfoSlot);
+                                }
+                            }
+                            var stateFunctor = thisPtr.add(0x28).readPointer();
+                            if (stateFunctor && !stateFunctor.isNull() && stateFunctor.compare(ptr(0x10000)) > 0) {
+                                invokeStateTaskFn(stateFunctor, NULL);
+                            }
+                            var multipleTasks = thisPtr.add(0x38).readPointer();
+                            if (multipleTasks && !multipleTasks.isNull() && multipleTasks.compare(ptr(0x10000)) > 0) {
+                                invokeStateTaskFn(multipleTasks, NULL);
+                            }
+                        } catch (eScUpRun) {}
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on Scene.Update (0xD5330C) [Zero-Crash Transition Guard]!");
                 } catch (eScUp) {
-                    log("[-] Error attaching to Scene.Update: " + eScUp.message);
+                    log("[-] Error replacing Scene.Update: " + eScUp.message);
                 }
 
 
