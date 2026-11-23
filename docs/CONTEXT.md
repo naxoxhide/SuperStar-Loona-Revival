@@ -5081,6 +5081,34 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
 #### 5. Control de Calidad (Quality Gate Sign-off)
 * **Senior QA Tester Sign-off:** Aprobado al 100%. Las siluetas canónicas `emptyCards` para todos los 99 temas y 21 grupos quedan restauradas sin contaminaciones de uniformes escolares. La visualización de cartas obtenidas y equipadas en `SelectThemePopup` funciona con total precisión visual, reactividad y soporte standalone offline garantizado.
 
+---
+
+### Módulo: Restauración de Card Information (`CardInfoPopup`) y Card Portrait View (`CardPortraitPopup`)
+
+#### 1. Diagnóstico e Ingeniería Inversa
+* **Entradas Identificadas:**
+  1. `InventoryScene`: Al tocar una carta y presionar el botón `(i) Information` (`InvenCardMainView.OnInfo` RVA `0xF22A34` -> `InventoryScene.OnInfo` RVA `0x10565D0`).
+  2. `CardBookScene`: Al tocar una carta en el visor de colección (`CardBookScene.<OpenDetailPopup>b__2` RVA `0xE41830`).
+  3. `SelectThemePopup`: Al tocar una carta en el listado de temas (`SelectThemeAssist.<OpenSelectThemePopup>b__2` RVA `0xBF538C`).
+  4. `InventoryScene` (Tarjeta Principal): Al tocar directamente el retrato principal de la carta (`InventoryScene.OnSelectCardPortraitView` RVA `0x1059C34` y `OnEquipCardPortraitView` RVA `0x105A154`).
+* **Componentes IL2CPP:**
+  - `Custom/Popup_Card_Info` (`CardInfoPopup`, RVA `0x137F360`, TypeDefIndex `11707`).
+  - `CardInfoPopup.Params` (TypeDefIndex `11706`): `artistHeader` (0x80), `artist` (0x88), `birthdayHeader` (0x90), `birthday` (0x98), `debutDayHeader` (0xA0), `debutDay` (0xA8), `debutWorkHeader` (0xB0), `debutWork` (0xB8), `cardLargeParam` (0x78).
+  - `Custom/Popup_Card_PortraitView` (`CardPortraitPopup`, RVA `0x138EEBC`, TypeDefIndex `11718`).
+  - `InstallZoomUpCardAssist.Open` (RVA `0xF1BA54`), `CompleteCallback.Invoke` (RVA `0xB51E5C`).
+  - `CardControl.Data.IsExistZoomUpCard` (RVA `0xE43E0C`).
+* **Causas Raíz:**
+  1. *Falta de Strings de Localización:* `LanguageControl.GetString` no poseía los códigos `0x030116C2` a `0x030116C8`, dejando en blanco el título y cabeceras.
+  2. *Metadatos Biográficos en Blanco:* `ArtistControl.Data` (`get_Birthday` RVA `0xEBB480`, `get_Debut` RVA `0xEBB6A4`, `get_DebutAlbum` RVA `0xEBB718`) llamaban a códigos no presentes en offline.
+  3. *Bloqueo de Descarga y Notice Erróneo:* `InstallZoomUpCardAssist` requería descarga online, retornaba falso y disparaba `Popup_Notice_1Btn`. La línea 2423 de `libscript.js` sobrescribía cualquier notice con `"Rhythm Points are insufficient."`.
+
+#### 2. Decisiones Arquitectónicas
+* Incorporación de códigos `0x030116C2`..`0x030116C8` en `offlineLocaleStrings`.
+* Mapeo biográfico de las integrantes de LOONA en `ArtistControl.Data` indexado por nombre (`HeeJin`, `HyunJin`, `HaSeul`, `YeoJin`, `ViVi`, `Kim Lip`, `JinSoul`, `Choerry`, `Yves`, `Go Won`, `Olivia Hye`).
+* Bypass directo de `InstallZoomUpCardAssist.Open` invocando `CompleteCallback(1)` inmediatamente y forzando `CardControl.Data.IsExistZoomUpCard` a retornar `1`.
+* Corrección quirúrgica del hook de `System/Popup_Notice_1Btn` para preservar títulos y mensajes preexistentes.
+
+
 
 
 
