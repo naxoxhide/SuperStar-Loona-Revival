@@ -2423,15 +2423,43 @@ function initIl2Cpp(module) {
                         } else if ((this.pName === "System/Popup_Notice_1Btn" || this.pName === "System/Popup_Notice_2Btn") && !args[1].isNull()) {
                             var pParams = args[1];
                             try {
-                                pParams.add(0x18).writePointer(createIl2CppString("Notice"));
-                                pParams.add(0x20).writePointer(createIl2CppString("Rhythm Points are insufficient."));
-                                pParams.add(0x48).writePointer(createIl2CppString("OK"));
+                                var curTitle = pParams.add(0x18).readPointer();
+                                if (curTitle.isNull()) {
+                                    pParams.add(0x18).writePointer(createIl2CppString("Notice"));
+                                }
+                                var curMsg = pParams.add(0x20).readPointer();
+                                if (curMsg.isNull()) {
+                                    pParams.add(0x20).writePointer(createIl2CppString("Notice"));
+                                }
+                                var curOk = pParams.add(0x48).readPointer();
+                                if (curOk.isNull()) {
+                                    pParams.add(0x48).writePointer(createIl2CppString("OK"));
+                                }
                                 pParams.add(0x58).writeU8(1); // useBlind = true
                                 pParams.add(0x59).writeU8(1); // useBtnX = true
                                 pParams.add(0x5A).writeU8(0); // hideScene = false (keeps background scene visible)
-                                log("[✨ NOTICE PARAMS] Successfully configured " + this.pName + " with Title, Message, and OK button!");
+                                log("[✨ NOTICE PARAMS] Configured " + this.pName + " safely preserving existing texts!");
                             } catch (eParamN) {
                                 log("[-] Error injecting Popup_Notice params: " + eParamN.message);
+                            }
+                        } else if (this.pName === "Custom/Popup_Card_Info" && !args[1].isNull()) {
+                            var pParams = args[1];
+                            try {
+                                var curT = pParams.add(0x18).readPointer();
+                                if (curT.isNull()) pParams.add(0x18).writePointer(createIl2CppString("Card Information"));
+                                var curB = pParams.add(0x48).readPointer();
+                                if (curB.isNull()) pParams.add(0x48).writePointer(createIl2CppString("OK"));
+                                var curAh = pParams.add(0x80).readPointer();
+                                if (curAh.isNull()) pParams.add(0x80).writePointer(createIl2CppString("Artist"));
+                                var curBh = pParams.add(0x90).readPointer();
+                                if (curBh.isNull()) pParams.add(0x90).writePointer(createIl2CppString("Birthday"));
+                                var curDh = pParams.add(0xA0).readPointer();
+                                if (curDh.isNull()) pParams.add(0xA0).writePointer(createIl2CppString("Debut Date"));
+                                var curWh = pParams.add(0xB0).readPointer();
+                                if (curWh.isNull()) pParams.add(0xB0).writePointer(createIl2CppString("Debut Album"));
+                                log("[✨ CARD_INFO PARAMS] Custom/Popup_Card_Info parameters verified and safeguarded!");
+                            } catch (eCi) {
+                                log("[-] Error inspecting CardInfoPopup params: " + eCi.message);
                             }
                         }
                     }
@@ -5984,7 +6012,74 @@ function initIl2Cpp(module) {
                         if (!ad.isNull()) return ad.add(0x18).readS32();
                         return 1001;
                     }, "int", ["pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on ArtistControl.Data getters!");
+
+                    var loonaArtistBioMap = {
+                        "HeeJin": { birthday: "2000.10.19", debut: "2016.10.05", debutAlbum: "HeeJin" },
+                        "HyunJin": { birthday: "2000.11.15", debut: "2016.11.17", debutAlbum: "HyunJin" },
+                        "HaSeul": { birthday: "1997.08.18", debut: "2016.12.15", debutAlbum: "HaSeul" },
+                        "YeoJin": { birthday: "2002.11.11", debut: "2017.01.16", debutAlbum: "YeoJin" },
+                        "ViVi": { birthday: "1996.12.09", debut: "2017.04.17", debutAlbum: "ViVi" },
+                        "Kim Lip": { birthday: "1999.02.10", debut: "2017.05.23", debutAlbum: "Kim Lip" },
+                        "JinSoul": { birthday: "1997.06.13", debut: "2017.06.26", debutAlbum: "JinSoul" },
+                        "Choerry": { birthday: "2001.06.04", debut: "2017.07.28", debutAlbum: "Choerry" },
+                        "Yves": { birthday: "1997.05.24", debut: "2017.11.28", debutAlbum: "Yves" },
+                        "Chuu": { birthday: "1999.10.20", debut: "2017.12.28", debutAlbum: "Chuu" },
+                        "Go Won": { birthday: "2000.11.19", debut: "2018.01.30", debutAlbum: "Go Won" },
+                        "Olivia Hye": { birthday: "2001.11.13", debut: "2018.03.30", debutAlbum: "Olivia Hye" }
+                    };
+
+                    function getArtistBio(thisPtr) {
+                        var ad = getArtistModel(thisPtr);
+                        var name = "";
+                        if (!ad.isNull()) {
+                            var strPtr = ad.add(0x88).readPointer();
+                            if (!strPtr.isNull()) name = readIl2CppString(strPtr);
+                            if (!name) {
+                                var ac = ad.add(0x10).readS32();
+                                var aMeta = getArtistMetadata(ac);
+                                if (aMeta && aMeta.name) name = aMeta.name;
+                            }
+                        }
+                        if (name && loonaArtistBioMap[name]) {
+                            return loonaArtistBioMap[name];
+                        }
+                        return { birthday: "2001.11.13", debut: "2018.03.30", debutAlbum: "Olivia Hye" };
+                    }
+
+                    Interceptor.replace(baseAddr.add(0xEBB480), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        var bio = getArtistBio(thisPtr);
+                        return createIl2CppString(bio.birthday);
+                    }, "pointer", ["pointer", "pointer"])));
+
+                    Interceptor.replace(baseAddr.add(0xEBB6A4), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        var bio = getArtistBio(thisPtr);
+                        return createIl2CppString(bio.debut);
+                    }, "pointer", ["pointer", "pointer"])));
+
+                    Interceptor.replace(baseAddr.add(0xEBB718), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        var bio = getArtistBio(thisPtr);
+                        return createIl2CppString(bio.debutAlbum);
+                    }, "pointer", ["pointer", "pointer"])));
+
+                    // Bypass CardControl.Data.IsExistZoomUpCard (0xE43E0C) -> return 1
+                    Interceptor.replace(baseAddr.add(0xE43E0C), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        return 1;
+                    }, "int", ["pointer", "pointer"])));
+
+                    // Bypass InstallZoomUpCardAssist.Open (0xF1BA54) -> invoke callback(1) immediately
+                    Interceptor.replace(baseAddr.add(0xF1BA54), keepCb(new NativeCallback(function (data, callback, methodInfo) {
+                        log("[🔍 ZOOM_ASSIST] InstallZoomUpCardAssist.Open intercepted! Invoking CompleteCallback(1)...");
+                        if (!callback.isNull()) {
+                            try {
+                                var invokeFn = new NativeFunction(baseAddr.add(0xB51E5C), "void", ["pointer", "bool", "pointer"]);
+                                invokeFn(callback, 1, NULL);
+                            } catch (eInv) {
+                                log("[-] Error invoking CompleteCallback: " + eInv.message);
+                            }
+                        }
+                    }, "void", ["pointer", "pointer", "pointer"])));
+
+                    log("[+] Interceptor.replace installed on ArtistControl.Data getters & ZoomUpCardAssist!");
                 } catch (eAcg) {
                     log("[-] Error replacing ArtistControl.Data getters: " + eAcg.message);
                 }
@@ -14527,7 +14622,14 @@ function initIl2Cpp(module) {
                         0x399AD3A: "Rhythm Points are insufficient.",
                         0x399B121: "OK",
                         0x399B509: "Cancel",
-                        0x263EC8F: "Equip"
+                        0x263EC8F: "Equip",
+                        0x30116C2: "Card Information",
+                        0x30116C3: "Card Information",
+                        0x30116C4: "OK",
+                        0x30116C5: "Artist",
+                        0x30116C6: "Birthday",
+                        0x30116C7: "Debut Date",
+                        0x30116C8: "Debut Album"
                     };
 
                     Interceptor.attach(baseAddr.add(0xCF1064), {
