@@ -12943,48 +12943,127 @@ function initIl2Cpp(module) {
                     log("[-] Error installing CardBook UI fixes: " + eCbUi.message);
                 }
 
-                // --- LiveThemeBookScene & LiveThemeControl Offline Stabilization ---
-                try {
-                    // 1. LiveThemeBookScene.GetThemeCount (0xC2C524) -> safely return 0
-                    Interceptor.replace(baseAddr.add(0xC2C524), new NativeCallback(function (thisPtr, methodInfo) {
-                        return 0;
-                    }, "int", ["pointer", "pointer"]));
-                    log("[+] Interceptor.replace installed on LiveThemeBookScene.GetThemeCount (0xC2C524) -> 0");
-
-                    // 2. LiveThemeBookView.SetPageAnchor (0xC2C024) -> safe no-op to prevent NullReferenceException on empty scroller
-                    Interceptor.replace(baseAddr.add(0xC2C024), new NativeCallback(function (thisPtr, pageType, methodInfo) {
-                        log("[🎨 LIVE THEME] SetPageAnchor called (type: " + pageType + ") -> safe no-op");
-                    }, "void", ["pointer", "int", "pointer"]));
-                    log("[+] Interceptor.replace installed on LiveThemeBookView.SetPageAnchor (0xC2C024) -> no-op");
-
-                    // 3. LiveThemeBookScene.SetStateWait (0xC2C7C0) -> Immediate offline transition to SetStateWaitDone
-                    Interceptor.replace(baseAddr.add(0xC2C7C0), new NativeCallback(function (sceneThis, methodInfo) {
-                        log("[🎨 LIVE THEME] SetStateWait entered -> executing instant offline transition!");
+                // --- LiveThemeBookScene & LiveThemeControl Offline Stabilization & Activation ---
+                var isLiveThemeDataInitialized = false;
+                function ensureLiveThemeData() {
+                    if (isLiveThemeDataInitialized) return true;
+                    try {
+                        // 1. LiveThemeDataControl.Open (0xB37F60)
                         try {
-                            var fadeCompleteFn = new NativeFunction(baseAddr.add(0xB3E230), "void", ["pointer"]);
-                            fadeCompleteFn(NULL);
+                            var ltDataOpenFn = new NativeFunction(baseAddr.add(0xB37F60), "void", []);
+                            ltDataOpenFn();
+                        } catch (eLtd) {
+                            log("[-] Error calling LiveThemeDataControl.Open: " + eLtd.message);
+                        }
 
-                            var setStateWaitDoneFn = new NativeFunction(baseAddr.add(0xC2C9E4), "void", ["pointer", "pointer"]);
-                            setStateWaitDoneFn(sceneThis, NULL);
+                        // 2. LiveThemeCardDataControl.Open (0xC328B8)
+                        try {
+                            var ltCardDataOpenFn = new NativeFunction(baseAddr.add(0xC328B8), "void", []);
+                            ltCardDataOpenFn();
+                        } catch (eLtcd) {
+                            log("[-] Error calling LiveThemeCardDataControl.Open: " + eLtcd.message);
+                        }
 
-                            // Collect and Show Canvases on sceneView if not already shown
-                            var sceneView = sceneThis.add(0x48).readPointer();
-                            if (!sceneView.isNull()) {
-                                try {
-                                    var colFn = new NativeFunction(baseAddr.add(0xD58C88), "void", ["pointer", "pointer"]);
-                                    colFn(sceneView, NULL);
-                                    var showFn = new NativeFunction(baseAddr.add(0xD47D00), "void", ["pointer", "pointer"]);
-                                    showFn(sceneView, NULL);
-                                } catch (eShw) {}
+                        // 3. LiveThemeControl.Open (0xB33C24) & Force IsLiveThemeOpen = 1
+                        try {
+                            var ltCtrlKlassPtr = baseAddr.add(0x30FD5E8).readPointer();
+                            if (!ltCtrlKlassPtr.isNull()) {
+                                var runtimeClassInit = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
+                                runtimeClassInit(ltCtrlKlassPtr);
+
+                                var staticFields = ltCtrlKlassPtr.add(0xB8).readPointer();
+                                if (!staticFields.isNull()) {
+                                    staticFields.add(0x0).writeU8(1); // IsLiveThemeOpen = true
+                                    var isOpened = staticFields.add(0x1).readU8();
+                                    if (isOpened === 0) {
+                                        var openFn = new NativeFunction(baseAddr.add(0xB33C24), "void", []);
+                                        openFn();
+                                        log("[🎨 LIVE THEME] LiveThemeControl.Open() executed successfully!");
+                                    }
+                                    // Update display list (isAll = true, groupID = -1)
+                                    try {
+                                        var updateDisplayFn = new NativeFunction(baseAddr.add(0xB36F88), "void", ["bool", "int", "pointer"]);
+                                        updateDisplayFn(1, -1, NULL);
+                                        log("[🎨 LIVE THEME] UpdateDisplayLiveThemeList(true, -1) executed successfully!");
+                                    } catch (eUdl) {}
+
+                                    staticFields.add(0x0).writeU8(1); // Force IsLiveThemeOpen = true
+                                }
                             }
+                        } catch (eLtc) {
+                            log("[-] Error calling LiveThemeControl.Open: " + eLtc.message);
+                        }
 
-                            // Ensure state 4 (SetStateDefault)
+                        isLiveThemeDataInitialized = true;
+                        log("[🎨 LIVE THEME] LiveTheme offline subsystem fully initialized!");
+                        return true;
+                    } catch (e) {
+                        log("[-] Error in ensureLiveThemeData: " + e.message);
+                        return false;
+                    }
+                }
+
+                try {
+                    // Force button btnLiveBook in CardBookScene to be visible & active (0x11D0CD4)
+                    Interceptor.attach(baseAddr.add(0x11D0CD4), {
+                        onEnter: function (args) {
+                            ensureLiveThemeData();
+                            var objPtr = args[1];
+                            if (objPtr && !objPtr.isNull()) {
+                                try {
+                                    var setActiveFn = new NativeFunction(baseAddr.add(0x241DFB8), "void", ["pointer", "bool", "pointer"]);
+                                    setActiveFn(objPtr, 1, NULL);
+                                } catch (eAct) {}
+                            }
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on CardBookScene.RefreshLiveBookBtn (0x11D0CD4) [Force btnLiveBook active]");
+
+                    // 1. LiveThemeBookScene.GetThemeCount (0xC2C524)
+                    var origGetThemeCount = new NativeFunction(baseAddr.add(0xC2C524), "int", ["pointer", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xC2C524), new NativeCallback(function (thisPtr, methodInfo) {
+                        ensureLiveThemeData();
+                        try {
+                            var count = origGetThemeCount(thisPtr, methodInfo);
+                            log("[🎨 LIVE THEME] GetThemeCount: " + count);
+                            return count;
+                        } catch (e) {
+                            log("[-] Error in native GetThemeCount: " + e.message);
+                            return 1;
+                        }
+                    }, "int", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on LiveThemeBookScene.GetThemeCount (0xC2C524)");
+
+                    // 2. LiveThemeBookView.SetPageAnchor (0xC2C024) -> safe call
+                    var origSetPageAnchor = new NativeFunction(baseAddr.add(0xC2C024), "void", ["pointer", "int", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xC2C024), new NativeCallback(function (thisPtr, pageType, methodInfo) {
+                        try {
+                            var themeView = thisPtr.add(0x78).readPointer();
+                            if (!themeView.isNull()) {
+                                origSetPageAnchor(thisPtr, pageType, methodInfo);
+                            }
+                        } catch (e) {
+                            log("[-] SetPageAnchor safe catch: " + e.message);
+                        }
+                    }, "void", ["pointer", "int", "pointer"]));
+                    log("[+] Interceptor.replace installed on LiveThemeBookView.SetPageAnchor (0xC2C024)");
+
+                    // 3. LiveThemeBookScene.SetStateWait (0xC2C7C0)
+                    var origSetStateWait = new NativeFunction(baseAddr.add(0xC2C7C0), "void", ["pointer", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xC2C7C0), new NativeCallback(function (sceneThis, methodInfo) {
+                        log("[🎨 LIVE THEME] SetStateWait entered -> ensuring live theme data...");
+                        ensureLiveThemeData();
+                        try {
+                            origSetStateWait(sceneThis, methodInfo);
+                            log("[🎨 LIVE THEME] Native SetStateWait dispatched successfully!");
+                        } catch (eLtw) {
+                            log("[-] Error in native SetStateWait, applying fallback transition: " + eLtw.message);
                             try {
+                                var setStateWaitDoneFn = new NativeFunction(baseAddr.add(0xC2C9E4), "void", ["pointer", "pointer"]);
+                                setStateWaitDoneFn(sceneThis, NULL);
                                 var setStateDefaultFn = new NativeFunction(baseAddr.add(0xC2CA84), "void", ["pointer", "pointer"]);
                                 setStateDefaultFn(sceneThis, NULL);
-                            } catch (eSsd) {}
-                        } catch (eLtw) {
-                            log("[-] Error in LiveThemeBookScene.SetStateWait: " + eLtw.message);
+                            } catch (eFallback) {}
                         }
                     }, "void", ["pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on LiveThemeBookScene.SetStateWait (0xC2C7C0)!");
@@ -12995,36 +13074,58 @@ function initIl2Cpp(module) {
                     }, "void", ["pointer"]));
                     log("[+] Interceptor.replace installed on LiveThemeControl.HideNewMark (0xB363B8) -> no-op");
 
-                    // 5. LiveThemeBookScene.OnBack (0xC2BDE8) -> cleanly return to CardBookScene (5)
+                    // 5. Watch Mode ('Watch the moving photo') Interception (Per Ignacio's Directive):
+                    // Keep the button visible in UI, but make click handler a safe NO-OP (no video player/stream)
+                    Interceptor.replace(baseAddr.add(0xC2D410), new NativeCallback(function (sceneThis, methodInfo) {
+                        log("[🎨 LIVE THEME] 'Watch the moving photo' (LiveThemeBookScene.OnLiveMode) clicked -> no-op per Ignacio's preference (keeping button in UI without video streaming)");
+                    }, "void", ["pointer", "pointer"]));
+                    Interceptor.replace(baseAddr.add(0xC30010), new NativeCallback(function (viewThis, goPtr, methodInfo) {
+                        log("[🎨 LIVE THEME] LiveThemeBookView.OnLiveMode clicked -> no-op per Ignacio's preference");
+                    }, "void", ["pointer", "pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on OnLiveMode (0xC2D410 & 0xC30010) [Watch Mode no-op UI preservation]");
+
+                    // 6. LiveThemeBookScene.OnBack (0xC2BDE8) -> Handle hierarchy:
+                    // If in state 5 (LiveThemeDetail / Artist Page), return to state 4 (Default / Theme Page).
+                    // If in state 4 (Default), return to CardBookScene (5).
                     Interceptor.replace(baseAddr.add(0xC2BDE8), new NativeCallback(function (thisPtr, methodInfo) {
-                        log("[🔙 LIVE THEME] OnBack triggered, returning to CardBookScene (5)...");
                         try {
-                            var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
-                            openSceneFn(5, NULL, NULL);
+                            var currentState = thisPtr.add(0x24).readS32();
+                            log("[🔙 LIVE THEME] OnBack triggered (currentState=" + currentState + ")");
+                            if (currentState === 5) { // LiveThemeDetail -> return to Theme Page (state 4)
+                                var setStateDefaultFn = new NativeFunction(baseAddr.add(0xC2CA84), "void", ["pointer", "pointer"]);
+                                setStateDefaultFn(thisPtr, NULL);
+                            } else {
+                                var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                                openSceneFn(5, NULL, NULL, NULL);
+                            }
                         } catch (eOb) {
                             log("[-] Error in LiveThemeBookScene.OnBack: " + eOb.message);
+                            try {
+                                var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                                openSceneFn(5, NULL, NULL, NULL);
+                            } catch (eFallbackBack) {}
                         }
                     }, "void", ["pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on LiveThemeBookScene.OnBack (0xC2BDE8)!");
 
-                    // 6. LiveThemeBookScene.OnCardBook (0xC2D094) -> cleanly return to CardBookScene (5)
+                    // 7. LiveThemeBookScene.OnCardBook (0xC2D094) -> cleanly return to CardBookScene (5)
                     Interceptor.replace(baseAddr.add(0xC2D094), new NativeCallback(function (thisPtr, methodInfo) {
                         log("[🔙 LIVE THEME] OnCardBook triggered, returning to CardBookScene (5)...");
                         try {
-                            var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
-                            openSceneFn(5, NULL, NULL);
+                            var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                            openSceneFn(5, NULL, NULL, NULL);
                         } catch (eCb) {
                             log("[-] Error in LiveThemeBookScene.OnCardBook: " + eCb.message);
                         }
                     }, "void", ["pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on LiveThemeBookScene.OnCardBook (0xC2D094)!");
 
-                    // 7. LiveThemeBookScene.OnExit (0xC2CBBC) -> cleanly return to CardBookScene (5)
+                    // 8. LiveThemeBookScene.OnExit (0xC2CBBC) -> cleanly return to CardBookScene (5)
                     Interceptor.replace(baseAddr.add(0xC2CBBC), new NativeCallback(function (thisPtr, methodInfo) {
                         log("[🔙 LIVE THEME] OnExit triggered, returning to CardBookScene (5)...");
                         try {
-                            var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer"]);
-                            openSceneFn(5, NULL, NULL);
+                            var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                            openSceneFn(5, NULL, NULL, NULL);
                         } catch (eOe) {
                             log("[-] Error in LiveThemeBookScene.OnExit: " + eOe.message);
                         }
@@ -18220,6 +18321,15 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 openSceneFn(5, NULL, NULL, NULL);
                             } catch (eGcb) {
                                 log("[-] Error in go_cardbook: " + eGcb.message);
+                            }
+                        } else if (cmdRaw === "go_livetheme" || cmdRaw === "livetheme" || cmdRaw === "lt" || cmdRaw === "live") {
+                            try {
+                                log("[🚀 SCENE CMD] Opening LiveThemeBookScene (12)...");
+                                try { ensureLiveThemeData(); } catch (eElt) {}
+                                var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
+                                openSceneFn(12, NULL, NULL, NULL);
+                            } catch (eGlt) {
+                                log("[-] Error in go_livetheme: " + eGlt.message);
                             }
                         } else if (cmdRaw === "cb:main" || cmdRaw === "tab:main") {
                             var targetScene = (activeCardBookSceneInstance && !activeCardBookSceneInstance.isNull()) ? activeCardBookSceneInstance : curScene;
