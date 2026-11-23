@@ -53,6 +53,11 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
    - Es totalmente factible activar la escena en BlueStacks y, posteriormente, configurar un Live Theme personalizado para LOONA.
    - Plan detallado documentado en el artefacto `plan_live_theme_restoration.md`.
 
+7. **Directiva de Ignacio sobre 'Watch the moving photo' (Preservación de UI sin Dependencias de Red):**
+   - El usuario solicitó mantener visible el botón *"Watch the moving photo"* en la UI para conservar la fidelidad visual de la pantalla de artista.
+   - Para evitar dependencias con el reproductor MP4 AVPro y streaming de video inexistente, su manejador nativo (`LiveThemeBookScene.OnLiveMode` / `LiveThemeBookView.OnLiveMode`) se intercepta como un **no-op** inerte.
+   - La implementación completa de videos queda aplazada para una decisión futura.
+
 ---
 
 ### 🔬 CHECKPOINT 28 — Reconstrucción y Síntesis Forense de Siluetas Vacías (EmptyCards) para Temas Solistas LE y Corrección Integral en CardBook, Inventario y Equip Theme (2026-11-23)
