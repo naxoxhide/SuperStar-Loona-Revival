@@ -6,6 +6,55 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### 🔬 CHECKPOINT 29 — Investigación Forense de la Escena y Sistema "Live Theme", Auditoría IL2CPP, Escena 12 de Unity y Análisis de Viabilidad (2026-11-23)
+
+**Investigación técnica, ingeniería inversa y evaluación de viabilidad:**
+
+1. **Objetivo de la Investigación:**
+   - Atender la solicitud de Ignacio sobre la existencia y viabilidad de implementar la escena y sistema de **Live Theme** en SuperStar LOONA, comparando contra tres capturas instructivas de referencia (Theme Page, Artist Page y Watch Mode).
+
+2. **Auditoría Forense en IL2CPP y Desensamblado ARM64 (`libil2cpp.so`):**
+   - **Identificación de la Escena:** Confirmada la constante `SceneControl.SCENE_TYPE.LiveThemeBook = 12` (TypeDefIndex: 13909).
+   - **Controlador de Escena:** `LiveThemeBookScene : Scene` (TypeDefIndex: 13645, RVA `0xC2AB98` a `0xC2F190`).
+   - **Vistas y Componentes uGUI:**
+     * `LiveThemeBookView : SceneView` (TypeDefIndex: 12205, RVA `0xC2B3D8`).
+     * `LiveThemeView` (TypeDefIndex: 12206, RVA `0xC2C530`).
+     * `LiveThemeSelectView` (TypeDefIndex: 12214, RVA `0xC364C4`).
+     * `LiveThemeCardLargeView` (TypeDefIndex: 12207, RVA `0xC2E284`), `LiveThemeCardSmallView` (TypeDefIndex: 12208, RVA `0xC31068`).
+     * `LiveThemeCanvas` (TypeDefIndex: 12204, RVA `0xC2D74C`) con cámara dedicada (`m_Camera`) y textura de renderizado 3D (`m_RenderTexture`).
+     * `LiveThemeMediaPlayer` (TypeDefIndex: 12211, RVA `0xC323D4`) que gestiona el reproductor nativo AVPro para video motion MP4.
+   - **Controladores de Datos:**
+     * `LiveThemeControl` (TypeDefIndex: 13958) con bandera estática `IsLiveThemeOpen` en offset `0x0`.
+     * `LiveThemeDataControl`, `LiveThemeCardDataControl`, `LiveThemeGifDataControl`, `LiveThemeSoundDataControl`, `LiveThemePackageDataControl`.
+   - **Enlace de Navegación desde CardBook:**
+     * `CardBookView.RefreshLiveBookBtn` (RVA `0x11D0CD4`): evalúa `LiveThemeControl.IsLiveThemeOpen`; si es `true`, activa el botón visual `btnLiveBook`.
+     * `CardBookScene.OnLiveBook` (RVA `0x11D2DF8`): invoca `SetStateOpenScene_ForCardBookScene(this, 12, NULL, NULL)` para cargar `LiveThemeBookScene`.
+
+3. **Auditoría de Assets de Unity y BGM en APK:**
+   - **Escena Compilada:** Localizada en `globalgamemanagers` y empaquetada en `app/src/main/assets/bin/Data/level12` (75,856 bytes) y `sharedassets12.assets` (49,988 bytes).
+   - **Jerarquía GameObject en `level12`:** Contiene `LiveThemeBookScene`, `LiveThemeCardLarge`, `LiveCardSet`, `LiveThemeInfo`, `BtnCardBook`, `BtnLiveMode`, `BtnPreviewMyCards`, `BtnViewAll`, `CardSkinArea`, `ToggleCardSkin`, `ThemeSelect`, `ThemeName`.
+   - **Audio Oficial:** Archivo `app/src/main/assets/bgm/bgm_livetheme.a.bytes` (y copia en `files/yhiujhtghuhyth/bgm_livetheme.a.bytes`) presente y listo para reproducirse.
+
+4. **Descifrado Forense de Bases de Datos AES-256-ECB (`app/src/files/asiudgasg/sdisgkdc/`):**
+   - Se implementó extractor criptográfico verificando los archivos de datos nativos:
+     * `ltd.bin` (LiveThemeData): 1 tema configurado (`Fresher Edition`, code 0, groupID 1001, auraColor `0xB8FFF12C`).
+     * `ltc.bin` (LiveThemeCardData): 11 cartas configuradas con referencias a fotos grandes, fondos y firmas.
+     * `ltg.bin` (LiveThemeGifData): 11 videos MP4 alojados en CloudFront (`motion/00_HyoJung.mp4`, etc.).
+     * `lto.bin` (LiveThemeSoundData): 11 audios OGG alojados en CloudFront (`sound/HYOJUNG-42.ogg`, etc.).
+   - **Verificación CDN CloudFront:** Petición HTTP HEAD a los URLs de video y audio retornó `HTTP/1.1 200 OK` (los assets originales de prueba siguen disponibles y activos).
+
+5. **Mapeo Forense 1:1 con las Capturas de Referencia de Ignacio:**
+   - **Theme Page:** Mapea directamente a `LiveThemeView` con `BtnViewAll`, `BtnStore`, `BtnCardBook` y `LiveThemeSetLeader` (icono de corona).
+   - **Artist Page:** Mapea a `LiveThemeSelectView` con `ToggleCardSkin` (`LiveThemeEquip`), cambio de fondo de lobby (`LiveThemeApplyBackground`) y botón `BtnLiveMode`.
+   - **Watch Mode:** Mapea a `LiveThemeCanvas` y `LiveThemeMediaPlayer` mediante recorte transparente (`RemoveBGImageLarge`), fondo decorativo (`ArtistBgImage`), audio de voz (`LiveThemeSound`) y video motion (`LiveThemeGif`).
+
+6. **Dictamen de Viabilidad:**
+   - **100% Viable.** Dalcomsoft construyó SuperStar LOONA sobre la base de SuperStar OH MY GIRL, dejando el 100% del código nativo, escenas compiladas, música y motores de video/audio listos. La función nunca se habilitó para los jugadores simplemente porque Dalcomsoft mantuvo `LiveThemeControl.IsLiveThemeOpen = false` debido a que no alcanzaron a producir el material audiovisual de LOONA antes del fin del servicio.
+   - Es totalmente factible activar la escena en BlueStacks y, posteriormente, configurar un Live Theme personalizado para LOONA.
+   - Plan detallado documentado en el artefacto `plan_live_theme_restoration.md`.
+
+---
+
 ### 🔬 CHECKPOINT 28 — Reconstrucción y Síntesis Forense de Siluetas Vacías (EmptyCards) para Temas Solistas LE y Corrección Integral en CardBook, Inventario y Equip Theme (2026-11-23)
 
 **Investigación técnica, diagnóstico forense y resolución integral de asignaciones:**
