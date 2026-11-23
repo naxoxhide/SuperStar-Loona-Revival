@@ -12944,6 +12944,48 @@ function initIl2Cpp(module) {
                 }
 
                 // --- LiveThemeBookScene & LiveThemeControl Offline Stabilization & Activation ---
+                try {
+                    // Exact step tracer for LiveThemeControl.Open
+                    var openStepAddrs = [0xB33C24, 0xB33C3C, 0xB33C48, 0xB33C54, 0xB33C60, 0xB33C68, 0xB33C7C, 0xB33C80, 0xB33C84, 0xB33CA4, 0xB33CCC, 0xB33CD8, 0xB33CE8, 0xB33D0C, 0xB33D10, 0xB33D44];
+                    openStepAddrs.forEach(function (off) {
+                        try {
+                            Interceptor.attach(baseAddr.add(off), {
+                                onEnter: function () {
+                                    log("[🔬 STEP] LiveThemeControl.Open offset: 0x" + off.toString(16).toUpperCase());
+                                }
+                            });
+                        } catch (eStep) {}
+                    });
+                } catch (eTr) {}
+
+                try {
+                    // Diagnostic hook on OpenLiveThemeCard (0xB340D0)
+                    Interceptor.attach(baseAddr.add(0xB340D0), {
+                        onEnter: function (args) {
+                            log("[🎨 DIAG] LiveThemeControl.OpenLiveThemeCard (0xB340D0) ENTER");
+                        },
+                        onLeave: function (retval) {
+                            log("[🎨 DIAG] LiveThemeControl.OpenLiveThemeCard (0xB340D0) LEAVE");
+                        }
+                    });
+                    // Diagnostic hook on OpenLiveTheme (0xB34584)
+                    Interceptor.attach(baseAddr.add(0xB34584), {
+                        onEnter: function (args) {
+                            log("[🎨 DIAG] LiveThemeControl.OpenLiveTheme (0xB34584) ENTER");
+                        },
+                        onLeave: function (retval) {
+                            log("[🎨 DIAG] LiveThemeControl.OpenLiveTheme (0xB34584) LEAVE");
+                        }
+                    });
+                    // Neutralize InventoryControl.SetLiveThemeData (0xF29ABC) to prevent null ref crash during LiveThemeControl.Open
+                    Interceptor.replace(baseAddr.add(0xF29ABC), new NativeCallback(function (methodInfo) {
+                        log("[🎨 LIVE THEME] InventoryControl.SetLiveThemeData (0xF29ABC) bypassed cleanly");
+                    }, "void", ["pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryControl.SetLiveThemeData (0xF29ABC) -> no-op");
+                } catch (eStd) {
+                    log("[-] Error replacing SetLiveThemeData: " + eStd.message);
+                }
+
                 var isLiveThemeDataInitialized = false;
                 function ensureLiveThemeData() {
                     if (isLiveThemeDataInitialized) return true;
@@ -12952,6 +12994,7 @@ function initIl2Cpp(module) {
                         try {
                             var ltDataOpenFn = new NativeFunction(baseAddr.add(0xB37F60), "void", []);
                             ltDataOpenFn();
+                            log("[🎨 LIVE THEME] LiveThemeDataControl.Open() ok");
                         } catch (eLtd) {
                             log("[-] Error calling LiveThemeDataControl.Open: " + eLtd.message);
                         }
@@ -12960,36 +13003,41 @@ function initIl2Cpp(module) {
                         try {
                             var ltCardDataOpenFn = new NativeFunction(baseAddr.add(0xC328B8), "void", []);
                             ltCardDataOpenFn();
+                            log("[🎨 LIVE THEME] LiveThemeCardDataControl.Open() ok");
                         } catch (eLtcd) {
                             log("[-] Error calling LiveThemeCardDataControl.Open: " + eLtcd.message);
                         }
 
-                        // 3. LiveThemeControl.Open (0xB33C24) & Force IsLiveThemeOpen = 1
+                        // 3. LiveThemeControl.Open (0xB33C24)
                         try {
-                            var ltCtrlKlassPtr = baseAddr.add(0x30FD5E8).readPointer();
-                            if (!ltCtrlKlassPtr.isNull()) {
-                                var runtimeClassInit = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
-                                runtimeClassInit(ltCtrlKlassPtr);
+                            var openFn = new NativeFunction(baseAddr.add(0xB33C24), "void", []);
+                            openFn();
+                            log("[🎨 LIVE THEME] LiveThemeControl.Open() executed successfully!");
 
-                                var staticFields = ltCtrlKlassPtr.add(0xB8).readPointer();
-                                if (!staticFields.isNull()) {
-                                    staticFields.add(0x0).writeU8(1); // IsLiveThemeOpen = true
-                                    var isOpened = staticFields.add(0x1).readU8();
-                                    if (isOpened === 0) {
-                                        var openFn = new NativeFunction(baseAddr.add(0xB33C24), "void", []);
-                                        openFn();
-                                        log("[🎨 LIVE THEME] LiveThemeControl.Open() executed successfully!");
+                            // Force IsLiveThemeOpen = true and IsOpened = true
+                            try {
+                                var ltCtrlKlassHandle = baseAddr.add(0x30FD5E8).readPointer();
+                                if (!ltCtrlKlassHandle.isNull()) {
+                                    var ltCtrlKlass = ltCtrlKlassHandle.readPointer();
+                                    if (!ltCtrlKlass.isNull()) {
+                                        var staticFields = ltCtrlKlass.add(0xB8).readPointer();
+                                        if (!staticFields.isNull()) {
+                                            staticFields.add(0x0).writeU8(1); // IsLiveThemeOpen = true
+                                            staticFields.add(0x1).writeU8(1); // IsOpened = true
+                                            log("[🎨 LIVE THEME] Forced IsLiveThemeOpen=1, IsOpened=1 in static fields");
+                                        }
                                     }
-                                    // Update display list (isAll = true, groupID = -1)
-                                    try {
-                                        var updateDisplayFn = new NativeFunction(baseAddr.add(0xB36F88), "void", ["bool", "int", "pointer"]);
-                                        updateDisplayFn(1, -1, NULL);
-                                        log("[🎨 LIVE THEME] UpdateDisplayLiveThemeList(true, -1) executed successfully!");
-                                    } catch (eUdl) {}
-
-                                    staticFields.add(0x0).writeU8(1); // Force IsLiveThemeOpen = true
                                 }
+                            } catch (eSf) {
+                                log("[-] Error updating static fields: " + eSf.message);
                             }
+
+                            // Update display list (isAll = true, groupID = -1)
+                            try {
+                                var updateDisplayFn = new NativeFunction(baseAddr.add(0xB36F88), "void", ["bool", "int", "pointer"]);
+                                updateDisplayFn(1, -1, NULL);
+                                log("[🎨 LIVE THEME] UpdateDisplayLiveThemeList(true, -1) executed successfully!");
+                            } catch (eUdl) {}
                         } catch (eLtc) {
                             log("[-] Error calling LiveThemeControl.Open: " + eLtc.message);
                         }
