@@ -2457,7 +2457,10 @@ function initIl2Cpp(module) {
                                 if (curDh.isNull()) pParams.add(0xA0).writePointer(createIl2CppString("Debut Date"));
                                 var curWh = pParams.add(0xB0).readPointer();
                                 if (curWh.isNull()) pParams.add(0xB0).writePointer(createIl2CppString("Debut Album"));
-                                log("[✨ CARD_INFO PARAMS] Custom/Popup_Card_Info parameters verified and safeguarded!");
+                                pParams.add(0x58).writeU8(1); // useBlind = true
+                                pParams.add(0x5A).writeU8(0); // hideScene = false
+                                pParams.add(0x64).writeU8(1); // foremost = true
+                                log("[✨ CARD_INFO PARAMS] Custom/Popup_Card_Info parameters verified, foremost=1, blind=1 safeguarded!");
                             } catch (eCi) {
                                 log("[-] Error inspecting CardInfoPopup params: " + eCi.message);
                             }
@@ -18328,6 +18331,68 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         log("[+] Interceptor.attach installed on CardPortraitPopup.OnBuild (0x138EEBC)!");
                     } catch (ePort) {
                         log("[-] Error attaching CardPortraitPopup.OnBuild: " + ePort.message);
+                    }
+
+                    // CardInfoPopup.OnBuild (0x137F360) -> Ensure clean CardLargeView rendering (suppress obscuring overlays)
+                    try {
+                        Interceptor.attach(baseAddr.add(0x137F360), {
+                            onEnter: function(args) {
+                                this.pop = args[0];
+                            },
+                            onLeave: function(retval) {
+                                try {
+                                    if (!this.pop || this.pop.isNull()) return;
+                                    var card = this.pop.add(0x110).readPointer();
+                                    if (card.isNull()) return;
+
+                                    var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                    var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+
+                                    // Deactivate obscuring card overlays: background (0xF8), themeName (0xE8), emblem (0xE0), artistName (0xF0)
+                                    var bg = card.add(0xF8).readPointer();
+                                    if (!bg.isNull()) { var bgGo = getGoFn(bg, NULL); if (!bgGo.isNull()) setActiveFn(bgGo, 0, NULL); }
+                                    var tn = card.add(0xE8).readPointer();
+                                    if (!tn.isNull()) { var tnGo = getGoFn(tn, NULL); if (!tnGo.isNull()) setActiveFn(tnGo, 0, NULL); }
+                                    var emb = card.add(0xE0).readPointer();
+                                    if (!emb.isNull()) { var embGo = getGoFn(emb, NULL); if (!embGo.isNull()) setActiveFn(embGo, 0, NULL); }
+                                    var an = card.add(0xF0).readPointer();
+                                    if (!an.isNull()) { var anGo = getGoFn(an, NULL); if (!anGo.isNull()) setActiveFn(anGo, 0, NULL); }
+
+                                    // Ensure photo and tier frame are properly loaded & active via applyCardLargeVisuals
+                                    var p = this.pop.add(0x38).readPointer();
+                                    if (!p.isNull()) {
+                                        var clParam = p.add(0x78).readPointer();
+                                        if (!clParam.isNull()) {
+                                            var tier = clParam.add(0x3C).readS32();
+                                            var isPrism = (clParam.add(0x20).readU8() === 1);
+                                            var lvl = clParam.add(0x48).readS32();
+                                            var cId = 1001;
+                                            try {
+                                                var photoPath = clParam.add(0x10).readPointer();
+                                                if (!photoPath.isNull()) {
+                                                    var fpPtr = photoPath.add(0x18).readPointer();
+                                                    if (!fpPtr.isNull()) {
+                                                        var len = fpPtr.add(0x10).readS32();
+                                                        if (len > 0) {
+                                                            var str = fpPtr.add(0x14).readUtf16String(len);
+                                                            var m = str.match(/(\d+)/);
+                                                            if (m) cId = parseInt(m[1], 10);
+                                                        }
+                                                    }
+                                                }
+                                            } catch (eCid) {}
+                                            applyCardLargeVisuals(card, cId, tier, isPrism, lvl);
+                                            log("[✨ CARD_INFO_POPUP] CardInfoPopup CardLargeView rendered cleanly for cId=" + cId + ", tier=" + tier + ", lvl=" + lvl);
+                                        }
+                                    }
+                                } catch (eLeave) {
+                                    log("[-] Error in CardInfoPopup.OnBuild onLeave: " + eLeave.message);
+                                }
+                            }
+                        });
+                        log("[+] Interceptor.attach installed on CardInfoPopup.OnBuild (0x137F360)!");
+                    } catch (eCiPop) {
+                        log("[-] Error attaching CardInfoPopup.OnBuild: " + eCiPop.message);
                     }
 
                     // IntensifyAssist.OnResultSucceed (0xF1D078) -> Replace native implementation to prevent null derefs on unpopulated network DTOs
