@@ -6066,6 +6066,21 @@ function initIl2Cpp(module) {
                         return 1;
                     }, "int", ["pointer", "pointer"])));
 
+                    // CardControl.Data.get_ZoomUpImageOn (0xE43DD4) -> return 0 (no separate _z files, show high-res CardLargeView)
+                    Interceptor.replace(baseAddr.add(0xE43DD4), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        return 0;
+                    }, "int", ["pointer", "pointer"])));
+
+                    // CardControl.Data.get_ZoomUpVideoOn (0xE42064) -> return 0
+                    Interceptor.replace(baseAddr.add(0xE42064), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        return 0;
+                    }, "int", ["pointer", "pointer"])));
+
+                    // CardControl.Data.get_ZoomUpVideoPreviewOn (0xE43DF0) -> return 0
+                    Interceptor.replace(baseAddr.add(0xE43DF0), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        return 0;
+                    }, "int", ["pointer", "pointer"])));
+
                     // Bypass InstallZoomUpCardAssist.Open (0xF1BA54) -> invoke callback(1) immediately
                     Interceptor.replace(baseAddr.add(0xF1BA54), keepCb(new NativeCallback(function (data, callback, methodInfo) {
                         log("[🔍 ZOOM_ASSIST] InstallZoomUpCardAssist.Open intercepted! Invoking CompleteCallback(1)...");
@@ -14629,7 +14644,8 @@ function initIl2Cpp(module) {
                         0x30116C5: "Artist",
                         0x30116C6: "Birthday",
                         0x30116C7: "Debut Date",
-                        0x30116C8: "Debut Album"
+                        0x30116C8: "Debut Album",
+                        0x6CB9086: "Close"
                     };
 
                     Interceptor.attach(baseAddr.add(0xCF1064), {
@@ -18244,6 +18260,74 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         log("[+] Interceptor.attach installed on Popup.Close (0x114247C)!");
                     } catch (ePopCls) {
                         log("[-] Error attaching Popup.Close: " + ePopCls.message);
+                    }
+
+                    // CardPortraitPopup.OnBuild (0x138EEBC) -> Ensure full resolution card display in Portrait View
+                    try {
+                        Interceptor.attach(baseAddr.add(0x138EEBC), {
+                            onEnter: function(args) {
+                                this.pop = args[0];
+                                try {
+                                    var p = this.pop.add(0x38).readPointer();
+                                    if (!p.isNull()) {
+                                        // Force secondImgPath (0xB8) to NULL so it falls back to this.card (CardLargeView)
+                                        p.add(0xB8).writePointer(NULL);
+                                    }
+                                } catch (eEnter) {}
+                            },
+                            onLeave: function(retval) {
+                                try {
+                                    if (!this.pop || this.pop.isNull()) return;
+                                    var card = this.pop.add(0x110).readPointer();
+                                    if (card.isNull()) return;
+
+                                    var p = this.pop.add(0x38).readPointer();
+                                    if (!p.isNull()) {
+                                        var clParam = p.add(0x78).readPointer();
+                                        if (!clParam.isNull()) {
+                                            var tier = clParam.add(0x3C).readS32();
+                                            var isPrism = (clParam.add(0x20).readU8() === 1);
+                                            var lvl = clParam.add(0x48).readS32();
+                                            var cId = 1001;
+                                            try {
+                                                var photoPath = clParam.add(0x10).readPointer();
+                                                if (!photoPath.isNull()) {
+                                                    var fpPtr = photoPath.add(0x18).readPointer();
+                                                    if (!fpPtr.isNull()) {
+                                                        var len = fpPtr.add(0x10).readS32();
+                                                        if (len > 0) {
+                                                            var str = fpPtr.add(0x14).readUtf16String(len);
+                                                            var m = str.match(/(\d+)/);
+                                                            if (m) cId = parseInt(m[1], 10);
+                                                        }
+                                                    }
+                                                }
+                                            } catch (eCid) {}
+                                            applyCardLargeVisuals(card, cId, tier, isPrism, lvl);
+
+                                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
+                                            var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
+                                            var cardGo = getGoFn(card, NULL);
+                                            if (!cardGo.isNull()) setActiveFn(cardGo, 1, NULL);
+
+                                            // Hide zoomObj container (0x138)
+                                            var zoomObj = this.pop.add(0x138).readPointer();
+                                            if (!zoomObj.isNull()) {
+                                                var zGo = getGoFn(zoomObj, NULL);
+                                                if (!zGo.isNull()) setActiveFn(zGo, 0, NULL);
+                                            }
+
+                                            log("[✨ PORTRAIT_POPUP] CardPortraitPopup CardLargeView rendered for cId=" + cId + ", tier=" + tier + ", lvl=" + lvl);
+                                        }
+                                    }
+                                } catch (eLeave) {
+                                    log("[-] Error in CardPortraitPopup.OnBuild onLeave: " + eLeave.message);
+                                }
+                            }
+                        });
+                        log("[+] Interceptor.attach installed on CardPortraitPopup.OnBuild (0x138EEBC)!");
+                    } catch (ePort) {
+                        log("[-] Error attaching CardPortraitPopup.OnBuild: " + ePort.message);
                     }
 
                     // IntensifyAssist.OnResultSucceed (0xF1D078) -> Replace native implementation to prevent null derefs on unpopulated network DTOs
