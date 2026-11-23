@@ -4913,6 +4913,29 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
 * **Navegación Fluida hacia CardBook (Scene 5):**
   - Captura [`screen_returned_to_cardbook.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_returned_to_cardbook.png): Retorno perfecto e interactivo a `CardBookScene` al tocar el botón `X` de salida.
 
+---
+
+### 🛡️ CHECKPOINT 31 — Diagnóstico y Formulación de Plan para Errores Visuales en CardBook Collection (Scene 5) (2026-11-23)
+
+#### 1. Contexto y Requerimiento de Ignacio
+* **Solicitud de Ignacio:**
+  > `/plan revisa la escena de cardbook collection, esta presentando errores visuales en la UI , ve el estado actual e investiga que esta causando estos errores visuales. No modifiques nada más solo corrige los problemas visuales que esta tendiendo el collect book, realiza test visuales para validar que quedo nuevamente en funcionamiento`
+* **Directiva:** Diagnóstico exhaustivo del fallo visual, formulación de plan de corrección quirúrgica (sin modificar nada ajeno al Collect Book) y validación visual estricta mediante pruebas gráficas.
+
+#### 2. Hallazgos Técnicos y Diagnóstico de Causa Raíz
+1. **Evidencia Visual del Error:**
+   - En `CardBookMainView`, la barra de pestañas superior (`ButtonGroup`) mostraba el botón `[ Collection ]` desplazado a la izquierda con texto truncado/superpuesto, mientras que el botón `[ Group ]` se encontraba completamente colapsado/invisible.
+   - En la barra lateral izquierda, los 3 botones contenidos en `BtnGride` (`Shop`, `My Card Book`, `ALL THEMES COLLECTION`) no se posicionaban correctamente; el botón de temas quedaba desplazado detrás del panel central.
+2. **Causa Raíz Identificada:**
+   - En commit `4a52944e`, el hook sobre `UnityEngine.UI.LayoutGroup.SetDirty` (`0x1EDB7DC`) invocaba incorrectamente `0x1EDC190` (`LayoutGroup.DelayedSetDirty`, que crea un `IEnumerator`) en lugar de `LayoutRebuilder.MarkLayoutForRebuild` (`0x1EDACD8`). Al suprimir el recálculo nativo de layouts, los contenedores `HorizontalLayoutGroup` y `GridLayoutGroup` no actualizaban las posiciones de sus hijos en la UI de CardBook.
+   - Además, la desactivación de `SetStateWait` en `CardBookScene` para acelerar la carga offline provocaba que `SceneView.ShowCanvases()` se ejecutara antes de un ciclo completo de reconstrucción de layout.
+3. **Validación Experimental en Runtime:**
+   - La invocación controlada de `LayoutRebuilder.ForceRebuildLayoutImmediate` (`0x1EDC5A8`) sobre `buttonGroupT` y `btnGrideT` restauró inmediatamente la interfaz a un estado 1:1 idéntico a la línea base de referencia ([`screen_after_rebuild.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_after_rebuild.png)).
+
+#### 3. Plan Registrado
+* Documentado en el artefacto [`cardbook_visual_fix_plan.md`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/cardbook_visual_fix_plan.md) pendiente de aprobación de Ignacio antes de la fase de ejecución.
+
+
 
 
 
