@@ -1254,9 +1254,10 @@ function initIl2Cpp(module) {
 
         // 🛡️ Zero-Crash Shield for UnityEngine.UI.LayoutGroup.SetDirty (0x1EDB7DC)
         // Prevents SIGSEGV on dereferencing destroyed UI components during scene transitions / grid instantiation
+        // Correctly calls LayoutRebuilder.MarkLayoutForRebuild (0x1EDACD8) instead of DelayedSetDirty (0x1EDC190)
         try {
             var cachedGetRectFn = new NativeFunction(baseAddr.add(0x1EDB1FC), "pointer", ["pointer", "pointer"]);
-            var cachedMarkFn = new NativeFunction(baseAddr.add(0x1EDC190), "void", ["pointer", "pointer"]);
+            var cachedMarkFn = new NativeFunction(baseAddr.add(0x1EDACD8), "void", ["pointer", "pointer"]);
             var cachedIsActiveFns = {};
             Interceptor.replace(baseAddr.add(0x1EDB7DC), new NativeCallback(function (thisPtr, methodInfo) {
                 if (!thisPtr || thisPtr.isNull()) return;
@@ -1280,7 +1281,7 @@ function initIl2Cpp(module) {
                     }
                 } catch (eLg) {}
             }, "void", ["pointer", "pointer"]));
-            log("[🛡️ UI SHIELD] Installed zero-crash protection on LayoutGroup.SetDirty (0x1EDB7DC)!");
+            log("[🛡️ UI SHIELD] Installed zero-crash protection on LayoutGroup.SetDirty (0x1EDB7DC) with genuine MarkLayoutForRebuild (0x1EDACD8)!");
         } catch (eLgHook) {
             log("[-] Error protecting LayoutGroup.SetDirty: " + eLgHook.message);
         }
@@ -18516,6 +18517,38 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 var setTabViewFn = new NativeFunction(baseAddr.add(0x11CF5BC), "int", ["pointer", "int", "pointer"]);
                                 setTabViewFn(sceneView, 0, NULL);
                             }
+
+                            // 🛡️ Deterministic UI Layout Rebuild for CardBook tabs & sidebar
+                            try {
+                                var forceRebuildFn = new NativeFunction(baseAddr.add(0x1EDC5A8), "void", ["pointer", "pointer"]);
+                                var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
+                                if (!tabMain.isNull()) {
+                                    var tabMainBtn = tabMain.add(0x10).readPointer();
+                                    if (!tabMainBtn.isNull()) {
+                                        var tabMainT = tabMainBtn.add(0x18).readPointer();
+                                        if (!tabMainT.isNull()) {
+                                            var buttonGroupT = getParentFn(tabMainT, NULL);
+                                            if (!buttonGroupT.isNull()) {
+                                                forceRebuildFn(buttonGroupT, NULL);
+                                            }
+                                        }
+                                    }
+                                }
+                                var btnInv = sceneView.add(0xC8).readPointer();
+                                if (!btnInv.isNull()) {
+                                    var btnInvT = btnInv.add(0x18).readPointer();
+                                    if (!btnInvT.isNull()) {
+                                        var btnGrideT = getParentFn(btnInvT, NULL);
+                                        if (!btnGrideT.isNull()) {
+                                            forceRebuildFn(btnGrideT, NULL);
+                                        }
+                                    }
+                                }
+                                log("[📖 CARDBOOK] Forced immediate layout rebuild for ButtonGroup and BtnGride!");
+                            } catch (eReb) {
+                                log("[-] Error forcing CardBook layout rebuild: " + eReb.message);
+                            }
+
                             hideLoadingIndicator();
                             log("[📖 CARDBOOK] Deferred UI activation complete and LoadingIndicator hidden!");
                         } catch (eAct) {
