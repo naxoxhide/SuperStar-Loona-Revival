@@ -4961,6 +4961,33 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
 #### 3. Control de Calidad (Quality Gate Sign-off)
 * **Senior QA Tester Sign-off:** Aprobado al 100%. Las anomalías visuales en Collect Book han quedado totalmente solventadas y verificadas en BlueStacks sin introducir efectos colaterales.
 
+---
+
+### 🛡️ CHECKPOINT 33 — Diagnóstico Forense y Plan de Resolución para la Pantalla de Carga Persistente en Live Theme Book (`LiveThemeBookScene`, SceneId: 12) (2026-11-23)
+
+#### 1. Foco y Alcance de la Tarea
+* **Solicitud de Ignacio:** Investigar por qué al hacer clic desde el Collect Book (Scene 5) al botón "My Card Book" (`BtnLiveTheme`), la escena `LiveThemeBookScene` (Scene 12) queda congelada con la UI de carga constante (`LoadingIndicator`), impidiendo interactuar con los elementos del Live Theme Book.
+* **Restricciones:** No modificar nada ajeno al problema reportado, preservar el entorno standalone offline 100% y validar con pruebas visuales.
+
+#### 2. Diagnóstico Técnico y Causa Raíz Comprobada
+1. **Flujo de Carga de Escena en Dalcomsoft Engine:**
+   - Al pulsar el botón `My Card Book` en `CardBookScene`, se ejecuta `CardBookScene.OnLiveBook` (RVA `0x11D2DF8`), el cual despacha `SceneControl.OpenScene(12)`.
+   - Durante la transición asíncrona hacia Scene 12, el motor activa globalmente el indicador modal de espera mediante `LoadingIndicator.Active()` (RVA `0xB3BBB4`), instanciándolo en un Canvas de alta prioridad (`sortingOrder` elevado) que absorbe todos los eventos táctiles (`GraphicRaycaster`).
+2. **Omisión en la Transición Offline de `LiveThemeBookScene`:**
+   - En el flujo online nativo, `LiveThemeBookScene.SetStateWait` espera la respuesta del servidor antes de llamar a `WaitDone` y ocultar el indicador.
+   - En el hook offline de [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L13530-L13543), se interceptó `LiveThemeBookScene.SetStateWait` (RVA `0xC2C7C0`) para despachar sincrónicamente `setStateWaitDoneFn` (RVA `0xC2C9E4`) y `setStateDefaultFn` (RVA `0xC2CA84`).
+   - **Omisión Crítica:** A diferencia de `InventoryScene` (Línea 14734), `activateCardBookUI` (Línea 18552) y `LobbyScene` (Línea 18629), en este interceptor **se omitió por completo la llamada a `hideLoadingIndicator()`**.
+   - En consecuencia, aunque la interfaz de `LiveThemeBookScene` se renderiza completamente detrás, el rombo de carga permanece girando eternamente en el centro de la pantalla, interceptando y bloqueando todos los toques sobre las integrantes, temas y botones.
+
+#### 3. Validación Experimental en Memoria
+* **Reproducción:** Con la escena bloqueada con el rombo de carga ([`screen_reproduced.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_reproduced.png)), se despachó el comando `hide_loading` a través de Frida runtime.
+* **Resultado Inmediato:** El rombo se ocultó instantáneamente ([`screen_after_hide_loading.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_after_hide_loading.png)).
+* **Comprobación Táctil:** Inmediatamente después, el toque táctil sobre la carta 1 (HeeJin, coordenadas `280 400`) respondió con total fluidez, desplegando la vista de detalle de artista ([`screen_detail_card1.png`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/screen_detail_card1.png)).
+
+#### 4. Plan Registrado
+* Documentado formalmente en el artefacto [`livetheme_loading_fix_plan.md`](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/livetheme_loading_fix_plan.md) para revisión y aprobación de Ignacio.
+
+
 
 
 
