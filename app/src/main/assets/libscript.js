@@ -13536,8 +13536,10 @@ function initIl2Cpp(module) {
                             setStateWaitDoneFn(sceneThis, NULL);
                             var setStateDefaultFn = new NativeFunction(baseAddr.add(0xC2CA84), "void", ["pointer", "pointer"]);
                             setStateDefaultFn(sceneThis, NULL);
+                            hideLoadingIndicator();
                         } catch (eFallback) {
                             log("[-] Error in direct transition: " + eFallback.message);
+                            hideLoadingIndicator();
                         }
                     }, "void", ["pointer", "pointer"]));
                     log("[+] Interceptor.replace installed on LiveThemeBookScene.SetStateWait (0xC2C7C0)!");
@@ -13568,6 +13570,26 @@ function initIl2Cpp(module) {
                             if (currentState === 5) { // LiveThemeDetail -> return to Theme Page (state 4)
                                 var setStateDefaultFn = new NativeFunction(baseAddr.add(0xC2CA84), "void", ["pointer", "pointer"]);
                                 setStateDefaultFn(thisPtr, NULL);
+                                try {
+                                    var sv = thisPtr.add(0x48).readPointer();
+                                    if (!sv.isNull()) {
+                                        var tsv = sv.add(0x80).readPointer();
+                                        if (!tsv.isNull()) {
+                                            var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer"]);
+                                            var setActFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "bool"]);
+                                            setActFn(getGoFn(tsv), 0);
+                                        }
+                                        var tv = sv.add(0x78).readPointer();
+                                        if (!tv.isNull()) {
+                                            var showTvFn = new NativeFunction(baseAddr.add(0xB3D088), "void", ["pointer", "pointer"]);
+                                            showTvFn(tv, NULL);
+                                        }
+                                        var setAnchorFn = new NativeFunction(baseAddr.add(0xC2C024), "void", ["pointer", "int", "pointer"]);
+                                        setAnchorFn(sv, 0, NULL);
+                                    }
+                                } catch (eRetTheme) {
+                                    log("[-] Error returning to Theme Page: " + eRetTheme.message);
+                                }
                             } else {
                                 var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
                                 openSceneFn(5, NULL, NULL, NULL);
