@@ -2464,6 +2464,16 @@ function initIl2Cpp(module) {
                             } catch (eCi) {
                                 log("[-] Error inspecting CardInfoPopup params: " + eCi.message);
                             }
+                        } else if (this.pName === "Custom/Popup_Card_PortraitView" && !args[1].isNull()) {
+                            var pParams = args[1];
+                            try {
+                                pParams.add(0x58).writeU8(1); // useBlind = true
+                                pParams.add(0x5A).writeU8(0); // hideScene = false
+                                pParams.add(0x64).writeU8(1); // foremost = true
+                                log("[✨ PORTRAIT PARAMS] Custom/Popup_Card_PortraitView parameters verified, foremost=1, blind=1 safeguarded!");
+                            } catch (ePortParam) {
+                                log("[-] Error inspecting CardPortraitPopup params: " + ePortParam.message);
+                            }
                         }
                     }
                 });
@@ -7329,14 +7339,19 @@ function initIl2Cpp(module) {
                         var setAsLastSiblingFn = new NativeFunction(baseAddr.add(0x181ED70), "void", ["pointer", "pointer"]);
                         var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
 
-                        // 1. Deactivate background (0xF8 in CardLargeView) to prevent solid card back from obscuring photo
+                        // 1. Deactivate obscuring overlays (background 0xF8, themeName 0xE8, emblem 0xE0, artistName 0xF0, backgroundAnim 0x100)
                         try {
                             var bg = card.add(0xF8).readPointer();
-                            if (!bg.isNull()) {
-                                var bgGo = getGoFn(bg, NULL);
-                                if (!bgGo.isNull()) setActiveFn(bgGo, 0, NULL);
-                            }
-                        } catch (eBg) {}
+                            if (!bg.isNull()) { var bgGo = getGoFn(bg, NULL); if (!bgGo.isNull()) setActiveFn(bgGo, 0, NULL); }
+                            var tn = card.add(0xE8).readPointer();
+                            if (!tn.isNull()) { var tnGo = getGoFn(tn, NULL); if (!tnGo.isNull()) setActiveFn(tnGo, 0, NULL); }
+                            var emb = card.add(0xE0).readPointer();
+                            if (!emb.isNull()) { var embGo = getGoFn(emb, NULL); if (!embGo.isNull()) setActiveFn(embGo, 0, NULL); }
+                            var an = card.add(0xF0).readPointer();
+                            if (!an.isNull()) { var anGo = getGoFn(an, NULL); if (!anGo.isNull()) setActiveFn(anGo, 0, NULL); }
+                            var bgAnim = card.add(0x100).readPointer();
+                            if (!bgAnim.isNull()) { var bgaGo = getGoFn(bgAnim, NULL); if (!bgaGo.isNull()) setActiveFn(bgaGo, 0, NULL); }
+                        } catch (eOverlays) {}
 
                         // 2. Deactivate prism / limited effects if not prism
                         try {
@@ -18313,11 +18328,16 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                             var cardGo = getGoFn(card, NULL);
                                             if (!cardGo.isNull()) setActiveFn(cardGo, 1, NULL);
 
-                                            // Hide zoomObj container (0x138)
+                                            // Hide zoomObj container (0x138) and secondPhoto (0x120)
                                             var zoomObj = this.pop.add(0x138).readPointer();
                                             if (!zoomObj.isNull()) {
                                                 var zGo = getGoFn(zoomObj, NULL);
                                                 if (!zGo.isNull()) setActiveFn(zGo, 0, NULL);
+                                            }
+                                            var secPhoto = this.pop.add(0x120).readPointer();
+                                            if (!secPhoto.isNull()) {
+                                                var secGo = getGoFn(secPhoto, NULL);
+                                                if (!secGo.isNull()) setActiveFn(secGo, 0, NULL);
                                             }
 
                                             log("[✨ PORTRAIT_POPUP] CardPortraitPopup CardLargeView rendered for cId=" + cId + ", tier=" + tier + ", lvl=" + lvl);

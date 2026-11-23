@@ -6,6 +6,58 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### 🔬 CHECKPOINT 30 — Restauración Integral de Card Information (`CardInfoPopup`) y Vista de Retrato (`CardPortraitPopup`) en Todas las Áreas del Juego (2026-11-24)
+
+**Restauración técnica, desensamblado IL2CPP, metadatos LOONA y validación visual:**
+
+1. **Objetivo y Alcance:**
+   - Reactivar y poner en funcionamiento óptimo la pantalla de información de cartas (`Custom/Popup_Card_Info`, `CardInfoPopup`) y la vista ampliada de retrato horizontal (`Custom/Popup_Card_PortraitView`, `CardPortraitPopup`), garantizando su operatividad offline y acceso fluido desde todas las áreas del juego (`InventoryScene`, `CardBookScene`, catálogo de temas).
+
+2. **Áreas de Acceso Integradas y Verificadas:**
+   - **`InventoryScene` (SceneId 4):**
+     * Desde la vista de inspección de carta (con botones `Information`, `Unequip`, `Level Up`), el botón `Information` (coordenadas `1200, 400`) abre `CardInfoPopup` con la carta seleccionada.
+     * Al tocar directamente el retrato grande de la carta en el panel lateral izquierdo (`230, 500`), se invoca de inmediato `InvenCardSelectView.OnCardLargePortraitView` (RVA `0xF230C0`), abriendo `CardPortraitPopup` a pantalla completa.
+   - **`CardBookScene` (SceneId 5):**
+     * En `CardBookDetailPopup` (vista de colección por temas, p. ej. LOONA `+ +`), tocar cualquier carta del catálogo (p. ej. HeeJin en `640, 440`) abre `CardInfoPopup` proyectando la carta en grado R99 con sus datos biográficos.
+   - **`CardInfoPopup`:**
+     * Al presionar la carta o el botón de lupa `(🔍)` (`410, 665`), el evento `CardInfoPopup.OnClickCard` (RVA `0x137F584`) abre la vista de retrato ampliada `CardPortraitPopup`.
+
+3. **Arquitectura Criptográfica, IL2CPP y Hooks Implementados (`libscript.js`):**
+   - **Enrutamiento y Z-Order Nativo (`ViewControl.OpenPopup`, RVA `0xAAA0D0`):**
+     * Para `Custom/Popup_Card_Info`: inyección en `pParams` de `foremost = true` (`pParams + 0x64 = 1`), `useBlind = true` (`pParams + 0x58 = 1`) y `hideScene = false` (`pParams + 0x5A = 0`). Garantiza que el popup se empariente a `PopupRoot.Instance.foremostCanvasTrans`, superponiéndose limpiamente a scrollers y máscaras stencil. Se salvaguardan las cabeceras localizadas (`0x18`, `0x48`, `0x80`, `0x90`, `0xA0`, `0xB0`).
+     * Para `Custom/Popup_Card_PortraitView`: inyección de `foremost = true` (`0x64 = 1`), `useBlind = true` (`0x58 = 1`) y `hideScene = false` (`0x5A = 0`).
+   - **Desactivación Universal de Overlays Parásitos (`applyCardLargeVisuals`):**
+     * En el motor de dibujado central de `CardLargeView`, se desactiva explícitamente la visibilidad de los 5 componentes nativos que proyectaban siluetas y logos grises sobre la foto en CardBook: `background` (`0xF8`), `themeName` (`0xE8`), `emblem` (`0xE0`), `artistName` (`0xF0`) y `backgroundAnim` (`0x100`).
+   - **Interceptores de Construcción de Popups:**
+     * `CardInfoPopup.OnBuild` (RVA `0x137F360`): Hook que oculta los overlays de `card` (`0x110`) y asegura el renderizado nítido mediante `applyCardLargeVisuals`.
+     * `CardPortraitPopup.OnBuild` (RVA `0x138EEBC`):
+       * `onEnter`: fuerce a `NULL` de `secondImgPath` (`p + 0xB8 = NULL`), evitando la búsqueda y descarga de archivos de zoom inexistentes (`_z.i.bytes`) y encauzando la ejecución al pipeline nativo de `CardLargeView`.
+       * `onLeave`: desactiva `secondPhoto` (`0x120`) y el contenedor `zoomObj` (`0x138`), activa `card` (`0x110`) y ejecuta `applyCardLargeVisuals`.
+   - **Bypass de Descargas de Zoom:**
+     * `CardPortraitAssist.CheckDownloadAndInstall` (RVA `0xE43DD4` $\rightarrow$ `0`), `InstallZoomUpCardAssist.Open` (RVA `0xF1BA54` $\rightarrow$ no-op), y métodos de verificación en RVA `0xE42064` y `0xE43DF0` devuelven `0`.
+   - **Metadatos Biográficos de LOONA (`ArtistControl.Data`):**
+     * Cumpleaños (`get_Birthday`, RVA `0xEBB480`), Debut (`get_Debut`, RVA `0xEBB6A4`) y Álbum de Debut (`get_DebutAlbum`, RVA `0xEBB718`) interceptados con la base de datos histórica oficial de las 12 integrantes (HeeJin, HyunJin, HaSeul, YeoJin, ViVi, Kim Lip, JinSoul, Choerry, Yves, Chuu, Go Won, Olivia Hye).
+   - **Localización Offline Dalcomsoft (`offlineLocaleStrings`):**
+     * `0x030116C2: "Card Information"`, `0x030116C3: "OK"`, `0x030116C5: "Artist"`, `0x030116C6: "Birthday"`, `0x030116C7: "Debut Date"`, `0x030116C8: "Debut Album"`, `0x06CB9086: "Close"`.
+
+4. **Validaciones Visuales y Evidencia en BlueStacks (`127.0.0.1:5555`):**
+   - **Prueba 1 — `CardInfoPopup` desde `InventoryScene`:**
+     * Captura: [test_card_info_popup_preview.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/test_card_info_popup_preview.png).
+     * Muestra a HeeJin R50 con marco dorado, partículas, botón de lupa `(🔍)`, botón `OK` y textos biográficos exactos.
+   - **Prueba 2 — `CardPortraitPopup` desde `CardInfoPopup`:**
+     * Captura: [test_card_portrait_popup_preview.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/test_card_portrait_popup_preview.png).
+     * Muestra el retrato horizontal de alta resolución de HeeJin R50, botón `Close` en el lateral derecho y botón `X` superior izquierdo.
+   - **Prueba 3 — `CardPortraitPopup` directo desde Inventario:**
+     * Captura: [test_direct_portrait_preview.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/test_direct_portrait_preview.png).
+     * Apertura fluida tocando el retrato lateral izquierdo en la inspección de cartas.
+   - **Prueba 4 — `CardInfoPopup` y `CardPortraitPopup` en `CardBookScene`:**
+     * Captura Info: [cardbook_info_heejin_preview.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/cardbook_info_heejin_preview.png).
+     * Captura Portrait: [cardbook_portrait_heejin_preview.png](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/cardbook_portrait_heejin_preview.png).
+     * Retrato horizontal 100% limpio en modo R99, sin sobreposiciones de silueta ni distorsiones de texturas de álbum.
+   - Cierres sin errores y retorno coherente a las pantallas anteriores tras pulsar `OK` o `Close`.
+
+---
+
 ### 🔬 CHECKPOINT 29 — Investigación Forense de la Escena y Sistema "Live Theme", Auditoría IL2CPP, Escena 12 de Unity y Análisis de Viabilidad (2026-11-23)
 
 **Investigación técnica, ingeniería inversa y evaluación de viabilidad:**

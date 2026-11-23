@@ -156,3 +156,22 @@ Esta skill define los pasos estándar y flujos de trabajo para analizar, desensa
   - El modal oficial `System/Popup_Notice_1Btn` requiere los códigos de localización Dalcomsoft: `0x399A569` (*"Notice"*), `0x399AD3A` (*"Rhythm Points are insufficient."*), y `0x399B121` (*"OK"*).
   - Al pulsar "OK", el callback `InventoryScene.<OnIntensifyTry>b__1` (RVA `0xB5B3E8`) intenta abrir la tienda en línea llamando a `StorePopup.Open` (RVA `0xB6EE4C`).
   - **Interceptor de Seguridad:** Reemplazar `StorePopup.Open` (RVA `0xB6EE4C`) con un stub que absorbe la apertura en modo offline y llama al callback de retorno de forma segura, evitando el crash por falta de conexión y preservando la integridad del inventario.
+
+### 12. Restauración de CardInfoPopup (`Custom/Popup_Card_Info`) y CardPortraitPopup (`Custom/Popup_Card_PortraitView`)
+* **Enrutamiento Z-Order y Blind (`ViewControl.OpenPopup` @ RVA `0xAAA0D0`):**
+  - Escribir `pParams.add(0x64).writeU8(1)` (`foremost = true`) y `pParams.add(0x58).writeU8(1)` (`useBlind = true`) tanto para `Custom/Popup_Card_Info` como para `Custom/Popup_Card_PortraitView`.
+  - Asegura que `Popup.Load` empariente las ventanas a `PopupRoot.Instance.foremostCanvasTrans`, garantizando prioridad absoluta sobre listas con `EnhancedScroller` y máscaras stencil.
+* **Pipeline de Renderizado Limpio en `CardLargeView` (`applyCardLargeVisuals`):**
+  - Desactivar componentes que generan siluetas o capas superpuestas en el prefab de `CardLargeView`:
+    * `background` (`0xF8`): Imagen trasera que oculta el retrato.
+    * `themeName` (`0xE8`): Nombre de tema superpuesto.
+    * `emblem` (`0xE0`): Logotipo del álbum superpuesto.
+    * `artistName` (`0xF0`): Firma o texto de la integrante.
+    * `backgroundAnim` (`0x100`): Animación de fondo decorativo.
+* **Bypass de Descargas de Zoom en `CardPortraitPopup` (RVA `0x138EEBC`):**
+  - En `onEnter`, forzar `pParams.add(0xB8).writePointer(NULL)` (`secondImgPath = null`), omitiendo la búsqueda de archivos `_z.i.bytes` inexistentes en el paquete offline.
+  - En `onLeave`, ocultar `zoomObj` (`0x138`) y `secondPhoto` (`0x120`), activando el `CardLargeView` (`0x110`) mediante `applyCardLargeVisuals`.
+  - Forzar retorno `0` en `0xE43DD4` y no-op en `InstallZoomUpCardAssist.Open` (`0xF1BA54`).
+* **Metadatos y Localización Offline:**
+  - `ArtistControl.Data`: `get_Birthday` (RVA `0xEBB480`), `get_Debut` (RVA `0xEBB6A4`), `get_DebutAlbum` (RVA `0xEBB718`) alimentados con datos biográficos LOONA.
+  - Cadenas en `offlineLocaleStrings`: `0x30116C2` ("Card Information"), `0x30116C3` ("OK"), `0x30116C5` ("Artist"), `0x30116C6` ("Birthday"), `0x30116C7` ("Debut Date"), `0x30116C8` ("Debut Album"), `0x6CB9086` ("Close").
