@@ -5179,6 +5179,16 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
   - `qa_returned_group_tab.png`: Al pulsar `[X]` en `CardBookDetailPopup`, la cuadrícula de temas del `Group` tab se restaura al 100% (diferencia de círculos = `0.0`).
   - No-regresión en la escena de PowerUp (`InvenCardIntensifyView`) verificada exitosamente.
 
+### 🎮 Investigación Bug: Referencia Errónea al Pulsar Cartas Equipadas Fuera de `[+ +]` en Inventario (2026-11-24)
+* **Incidente:** En `InventoryScene` (`SceneId = 4`), al cambiar a cualquier grupo distinto de `[+ +]` (p. ej. `[x x]` página `2/21`, tema `Butterfly`) y tocar una carta equipada para ver su detalle / Power Up (`Level Up`), se abre erróneamente la carta equipada del miembro equivalente de `[+ +]` (`Hi High`, p. ej. `cardID=1001` en vez de `cardID=2001`).
+* **Causa Raíz Identificada:**
+  1. `InventoryScene.OnGroupCard` (`0x105BDE0`, [libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L7969)) calculaba `targetArtistId = 1001 + slotIndex`, ignorando `currentSelectedGroupCode` y `getGroupMetadata(gCode).artistCodes`, y usaba `loonaArtistDataMap[slotIndex + 1]`.
+  2. `safeSetStateMain` (`0x1053FB0`), `InventoryScene.OnCardItem` (`0x105CEE8`), `triggerSafeOnIntensify` (`0x105A97C`) y `executeRecommend` calculaban `loonaArtistDataMap[memberIdx]` (solo `1..11`) en lugar de `allArtistDataMap[meta.artistID]`.
+  3. `safeGetSelectViewData` (`0x10572AC`) y `safeRefreshInvenCardSelectView` (`0xF22C34`) usaban mapas limitados (`artistNamesMap` `1001..1011`, `themeNamesMap` `1001..1009`) y `"LOONA"` fijo en lugar de `getGroupMetadata`, `getArtistMetadata` y `getThemeMetadata`.
+  4. Los getters de `CardControl.Data` (`0xE43284` `get_GroupCode`, `0xE432A0` `get_ArtistCode`, `0xE432BC` `get_ThemeCode`) retornaban `1001` fijo o aplicaban `% 11` en lugar de leer `CardData` (`0x70`, `0x74`, `0x30`).
+* **Plan Propuesto:** [inventory_group_card_reference_fix_plan.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inventory_group_card_reference_fix_plan.md). Pendiente de aprobación del usuario.
+
+
 
 
 
