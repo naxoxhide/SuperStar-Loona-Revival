@@ -1742,7 +1742,18 @@ function initIl2Cpp(module) {
                 try {
                     var profile = loadPlayerProfile();
                     if (profile && profile.rhythmPoint !== undefined) {
-                        return profile.rhythmPoint;
+                        return parseInt(profile.rhythmPoint, 10) || 0;
+                    }
+                } catch (e) {}
+                return 0;
+            }
+
+            function getPlayerDiamond() {
+                try {
+                    var profile = loadPlayerProfile();
+                    if (profile && profile.diamond !== undefined && profile.diamond !== null) {
+                        var val = parseInt(profile.diamond, 10);
+                        return isNaN(val) ? 0 : val;
                     }
                 } catch (e) {}
                 return 0;
@@ -1782,6 +1793,7 @@ function initIl2Cpp(module) {
                             log("[💰 TOPVIEW RP REFRESHED] TopView RP updated in real-time to: " + valToSet);
                         }
                     }
+                    refreshTopViewAll();
                 } catch (e) {
                     log("[-] Error refreshing TopView RP: " + e.message);
                 }
@@ -1991,22 +2003,26 @@ function initIl2Cpp(module) {
                     playerObj.add(0x48).writeInt(parseInt(profile.cardInvenMax) || 200);
 
                     // diamond: int at 0x4C, freeDiamond: int at 0x50
-                    playerObj.add(0x4C).writeInt(profile.diamond !== undefined ? (parseInt(profile.diamond) || 10000) : 10000);
+                    var parsedDiamond = parseInt(profile.diamond, 10);
+                    playerObj.add(0x4C).writeInt((profile.diamond !== undefined && profile.diamond !== null && !isNaN(parsedDiamond)) ? parsedDiamond : 10000);
                     playerObj.add(0x50).writeInt(0);
 
                     // rhythmPoint: int at 0x54, freeRhythmPoint: int at 0x58
-                    playerObj.add(0x54).writeInt(profile.rhythmPoint !== undefined ? (parseInt(profile.rhythmPoint) || 100000) : 100000);
+                    var parsedRp = parseInt(profile.rhythmPoint, 10);
+                    playerObj.add(0x54).writeInt((profile.rhythmPoint !== undefined && profile.rhythmPoint !== null && !isNaN(parsedRp)) ? parsedRp : 100000);
                     playerObj.add(0x58).writeInt(0);
 
                     // headphone: int at 0x5C, freeHeadphone: int at 0x60
-                    playerObj.add(0x5C).writeInt(profile.headphone !== undefined ? (parseInt(profile.headphone) || 50) : 50);
+                    var parsedHp = parseInt(profile.headphone, 10);
+                    playerObj.add(0x5C).writeInt((profile.headphone !== undefined && profile.headphone !== null && !isNaN(parsedHp)) ? parsedHp : 50);
                     playerObj.add(0x60).writeInt(0);
 
                     // nicknameChanger: int at 0x64
                     playerObj.add(0x64).writeInt(0);
 
                     // dalcomCoin: int at 0x70, freeDalcomCoin: int at 0x74
-                    playerObj.add(0x70).writeInt(profile.dalcomCoin !== undefined ? (parseInt(profile.dalcomCoin) || 5000) : 5000);
+                    var parsedDc = parseInt(profile.dalcomCoin, 10);
+                    playerObj.add(0x70).writeInt((profile.dalcomCoin !== undefined && profile.dalcomCoin !== null && !isNaN(parsedDc)) ? parsedDc : 5000);
                     playerObj.add(0x74).writeInt(0);
 
                     // Pin playerObj so Unity GC never collects it
@@ -2122,10 +2138,10 @@ function initIl2Cpp(module) {
                     }, "void", ["int", "pointer"]));
                 } catch (ePcs) {}
                 try {
-                    // Diamonds
-                    Interceptor.replace(baseAddr.add(0xAB1658), keepCb(new NativeCallback(function (methodInfo) { return 100000; }, "int", ["pointer"])));
-                    Interceptor.replace(baseAddr.add(0xAB1470), keepCb(new NativeCallback(function (methodInfo) { return 100000; }, "int", ["pointer"])));
-                    Interceptor.replace(baseAddr.add(0xAB1840), keepCb(new NativeCallback(function (methodInfo) { return 200000; }, "int", ["pointer"])));
+                    // Diamonds - Dynamic standalone offline balance
+                    Interceptor.replace(baseAddr.add(0xAB1658), keepCb(new NativeCallback(function (methodInfo) { return getPlayerDiamond(); }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB1470), keepCb(new NativeCallback(function (methodInfo) { return 0; }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB1840), keepCb(new NativeCallback(function (methodInfo) { return getPlayerDiamond(); }, "int", ["pointer"])));
                     Interceptor.replace(baseAddr.add(0xAB1960), keepCb(new NativeCallback(function (amount, methodInfo) { return 1; }, "int", ["int", "pointer"])));
                     // Rhythm Points (RP) - Dynamic standalone offline balance
                     Interceptor.replace(baseAddr.add(0xAB1094), keepCb(new NativeCallback(function (methodInfo) { 
@@ -2412,13 +2428,29 @@ function initIl2Cpp(module) {
                         } else if ((this.pName === "Custom/Popup_Card_Intensify" || this.pName === "Custom/Popup_Card_Intensify_R") && !args[1].isNull()) {
                             var pParams = args[1];
                             try {
-                                pParams.add(0x18).writePointer(createIl2CppString("Power Up"));
+                                var isRParam = (pParams.add(0xB8).readU8() === 1);
+                                var isMaxParam = (pParams.add(0xB9).readU8() === 1);
+                                try {
+                                    var scParams = pParams.add(0xC0).readPointer();
+                                    if (!scParams.isNull()) {
+                                        var scGr = scParams.add(0x3C).readS32();
+                                        var scLvl = scParams.add(0x48).readS32();
+                                        isRParam = (scGr === 4);
+                                        isMaxParam = (!isRParam && scLvl >= 5);
+                                        pParams.add(0xB8).writeU8(isRParam ? 1 : 0);
+                                        pParams.add(0xB9).writeU8(isMaxParam ? 1 : 0);
+                                    }
+                                } catch (eScP) {}
+                                var titleTxt = isMaxParam ? "Upgrade" : (isRParam ? "Level Up" : "Power Up");
+                                pParams.add(0x18).writePointer(createIl2CppString(titleTxt));
                                 pParams.add(0x48).writePointer(createIl2CppString("OK"));
+                                pParams.add(0x78).writePointer(createIl2CppString("Level Up"));
+                                pParams.add(0x80).writePointer(createIl2CppString("Upgrade"));
                                 pParams.add(0x88).writePointer(createIl2CppString("Power Up"));
                                 pParams.add(0x90).writePointer(createIl2CppString("Next"));
                                 pParams.add(0xA8).writePointer(createIl2CppString("powerupsuccess"));
                                 pParams.add(0xB0).writePointer(createIl2CppString("powerupfail"));
-                                log("[✨ INTENSIFY PARAMS] Injected title='Power Up', okText='OK', nextText='Next', powerupText='Power Up', soundSucceed='powerupsuccess', soundFailed='powerupfail' into CardIntensifyPopup.Params!");
+                                log("[✨ INTENSIFY PARAMS] Configured CardIntensifyPopup.Params: title='" + titleTxt + "', isRCard=" + isRParam + ", isMaxLevel=" + isMaxParam);
                             } catch (eIntParam) {
                                 log("[-] Error injecting CardIntensifyPopup.Params: " + eIntParam.message);
                             }
@@ -4820,35 +4852,70 @@ function initIl2Cpp(module) {
                 // 📊 CARD STATS (cbd.json) & METADATA (cdd.json, tmd.json) ENGINE
                 // =========================================================================
                 var cbdCache = null;
+                var cbdByCode = null;
                 var cidCache = null;
+                var cidByCode = null;
                 var cgdCache = null;
                 var csdCache = null;
+                var csdByCode = null;
+
+                function getMaxCardLevel(grade) {
+                    return (parseInt(grade, 10) === 4) ? 50 : 5;
+                }
+
+                function getIntensifyCode(grade, level) {
+                    var gr = parseInt(grade, 10);
+                    if (isNaN(gr) || gr < 0) gr = 0;
+                    if (gr > 4) gr = 4;
+                    var maxLvl = getMaxCardLevel(gr);
+                    var lvl = parseInt(level, 10);
+                    if (isNaN(lvl) || lvl < 1) lvl = 1;
+                    if (lvl > maxLvl) lvl = maxLvl;
+                    return (gr < 4) ? (gr * 5 + (lvl - 1)) : (20 + (lvl - 1));
+                }
+
+                function objIdKey(val) {
+                    return (val === null || val === undefined) ? "0" : val.toString();
+                }
+
+                function indexTableByCode(arr) {
+                    var map = {};
+                    if (Array.isArray(arr)) {
+                        for (var i = 0; i < arr.length; i++) {
+                            var entry = arr[i];
+                            if (entry && entry.code !== undefined) map[entry.code] = entry;
+                        }
+                    }
+                    return map;
+                }
 
                 function loadOfflineCardDataTables() {
                     if (!cbdCache) {
                         try {
-                            var rawCbd = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/cbd.json") ||
-                                         readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/cbd.json");
+                            var rawCbd = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/cbd.json") ||
+                                         readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/cbd.json");
                             if (rawCbd) {
                                 cbdCache = JSON.parse(rawCbd);
+                                cbdByCode = indexTableByCode(cbdCache);
                                 log("[📊 CBD] Loaded cbd.json: " + cbdCache.length + " card balance levels cached!");
                             }
                         } catch (eCbd) { log("[-] Error loading cbd.json: " + eCbd.message); }
                     }
                     if (!cidCache) {
                         try {
-                            var rawCid = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/cid.json") ||
-                                         readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/cid.json");
+                            var rawCid = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/cid.json") ||
+                                         readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/cid.json");
                             if (rawCid) {
                                 cidCache = JSON.parse(rawCid);
+                                cidByCode = indexTableByCode(cidCache);
                                 log("[📊 CID] Loaded cid.json: " + cidCache.length + " intensify matrix entries cached!");
                             }
                         } catch (eCid) { log("[-] Error loading cid.json: " + eCid.message); }
                     }
                     if (!cgdCache) {
                         try {
-                            var rawCgd = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/cgd.json") ||
-                                         readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/cgd.json");
+                            var rawCgd = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/cgd.json") ||
+                                         readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/cgd.json");
                             if (rawCgd) {
                                 cgdCache = JSON.parse(rawCgd);
                                 log("[📊 CGD] Loaded cgd.json: " + cgdCache.length + " card grade bonus entries cached!");
@@ -4857,10 +4924,11 @@ function initIl2Cpp(module) {
                     }
                     if (!csdCache) {
                         try {
-                            var rawCsd = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/csd.json") ||
-                                         readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/csd.json");
+                            var rawCsd = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/csd.json") ||
+                                         readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/csd.json");
                             if (rawCsd) {
                                 csdCache = JSON.parse(rawCsd);
+                                csdByCode = indexTableByCode(csdCache);
                                 log("[📊 CSD] Loaded csd.json: " + csdCache.length + " card sell entries cached!");
                             }
                         } catch (eCsd) {}
@@ -4869,14 +4937,14 @@ function initIl2Cpp(module) {
 
                 function getCardBaseStats(grade, level, isPrism) {
                     loadOfflineCardDataTables();
-                    level = Math.max(1, parseInt(level, 10) || 1);
                     grade = parseInt(grade, 10) || 0;
-                    var code = (grade < 4) ? (grade * 5 + Math.min(4, level - 1)) : (20 + Math.min(98, level - 1));
+                    level = Math.max(1, Math.min(getMaxCardLevel(grade), parseInt(level, 10) || 1));
+                    var code = getIntensifyCode(grade, level);
 
                     var score = 100;
                     var energy = 100;
-                    if (cbdCache && cbdCache[code]) {
-                        var item = cbdCache[code];
+                    var item = (cbdByCode && cbdByCode[code]) || (cbdCache && cbdCache[code]) || null;
+                    if (item) {
                         score = item.minScore + (isPrism ? (item.prizmScore || 10) : 0);
                         energy = item.minEnergy || 100;
                     } else {
@@ -4893,24 +4961,48 @@ function initIl2Cpp(module) {
 
                 function getIntensifyPriceAndRate(targetGrade, targetLevel, matGrade, matLevel) {
                     loadOfflineCardDataTables();
-                    targetLevel = Math.max(1, parseInt(targetLevel, 10) || 1);
                     targetGrade = parseInt(targetGrade, 10) || 0;
-                    matLevel = Math.max(1, parseInt(matLevel, 10) || 1);
+                    targetLevel = Math.max(1, Math.min(getMaxCardLevel(targetGrade), parseInt(targetLevel, 10) || 1));
                     matGrade = parseInt(matGrade, 10) || 0;
+                    matLevel = Math.max(1, Math.min(getMaxCardLevel(matGrade), parseInt(matLevel, 10) || 1));
 
-                    var targetCode = (targetGrade < 4) ? (targetGrade * 5 + Math.min(4, targetLevel - 1)) : (20 + Math.min(98, targetLevel - 1));
+                    var isTargetUpgrade = (targetGrade < 4 && targetLevel >= 5);
+                    if (targetGrade === 4 && targetLevel >= 50) {
+                        return { rate: 0.0, price: 0, isUpgrade: false, disabled: true };
+                    }
+
+                    var targetCode = getIntensifyCode(targetGrade, targetLevel);
                     var gradeLetters = ["C", "B", "A", "S", "R"];
                     var matKey = (gradeLetters[matGrade] || "C") + matLevel;
                     var priceKey = matKey + "Price";
 
-                    var rate = 70.0;
-                    var price = 100;
+                    var rate = isTargetUpgrade ? 100.0 : 70.0;
+                    var price = isTargetUpgrade ? ([2500, 5000, 10000, 20000][targetGrade] || 2500) : 100;
+                    var isUpgrade = isTargetUpgrade;
+                    var disabled = false;
 
-                    if (cidCache && cidCache[targetCode]) {
-                        var row = cidCache[targetCode];
-                        if (row[matKey] !== undefined && row[matKey] >= 0) rate = row[matKey];
-                        if (row[priceKey] !== undefined && row[priceKey] > 0) price = row[priceKey];
-                    } else {
+                    var row = (cidByCode && cidByCode[targetCode]) || (cidCache && cidCache[targetCode]) || null;
+                    if (row) {
+                        var rawRate = row[matKey];
+                        var rawPrice = row[priceKey];
+                        if (rawRate !== undefined) {
+                            if (rawRate === -1.0) {
+                                // Dalcomsoft sentinel -1.0 means guaranteed Upgrade (100%)
+                                rate = 100.0;
+                                isUpgrade = true;
+                            } else if (rawRate <= -2.0) {
+                                // Dalcomsoft sentinel -2.0 means disabled / max level exceeded
+                                rate = 0.0;
+                                price = 0;
+                                disabled = true;
+                            } else if (rawRate >= 0) {
+                                rate = rawRate;
+                            }
+                        }
+                        if (!disabled && rawPrice !== undefined && rawPrice > 0) {
+                            price = rawPrice;
+                        }
+                    } else if (!isTargetUpgrade) {
                         // Fallback pricing and rate by grade comparison
                         var basePrices = [93, 110, 131, 154, 176];
                         price = (basePrices[targetGrade] || 100) + (targetLevel - 1) * 2;
@@ -4918,16 +5010,17 @@ function initIl2Cpp(module) {
                         else if (matGrade === targetGrade) rate = 70.0;
                         else rate = Math.max(10.0, 30.0 - (targetGrade - matGrade) * 10.0);
                     }
-                    return { rate: rate, price: price };
+                    return { rate: rate, price: price, isUpgrade: isUpgrade, disabled: disabled };
                 }
 
                 function getCardSellPrice(grade) {
                     loadOfflineCardDataTables();
                     var gr = parseInt(grade, 10) || 0;
-                    if (csdCache && csdCache[gr] && csdCache[gr].price) {
-                        return csdCache[gr].price;
+                    var entry = (csdByCode && csdByCode[gr]) || (csdCache && csdCache[gr]) || null;
+                    if (entry && entry.price) {
+                        return entry.price;
                     }
-                    var defaultSellPrices = [200, 400, 600, 800, 1200];
+                    var defaultSellPrices = [200, 600, 1200, 1800, 2400];
                     return defaultSellPrices[gr] || 200;
                 }
 
@@ -5745,7 +5838,7 @@ function initIl2Cpp(module) {
                             thisPtr.add(0x10).writePointer(accountPtr); // <Raw>k__BackingField
                             var ccd = getOrCreateCardControlData(cardId);
                             thisPtr.add(0x18).writePointer(ccd || NULL); // <Card>k__BackingField
-                            var fCode = (grade < 4) ? (grade * 5 + Math.min(4, level - 1)) : (20 + Math.min(98, level - 1));
+                            var fCode = getIntensifyCode(grade, level);
                             thisPtr.add(0x20).writeS16(fCode); // <IntensifyCode>
                             thisPtr.add(0x24).writeU32(0x3F800000); // <CardGradeBonusValue> = 1.0f
                             thisPtr.add(0x28).writeS32(100); // <SellPrice>
@@ -6287,26 +6380,8 @@ function initIl2Cpp(module) {
                     } catch (e) {}
                 });
 
-                // Patch InventoryScene.OnIntensifyTry tbz branch at 0x105BBD4 to NOP
-                try {
-                    Memory.patchCode(baseAddr.add(0x105BBD4), 4, function (code) {
-                        code.writeByteArray([0x1f, 0x20, 0x03, 0xd5]); // NOP
-                    });
-                    log("[🛡️ INIT] Patched InventoryScene.OnIntensifyTry branch at 0x105BBD4 to NOP!");
-                } catch (eNop) {}
-
-                // Patch InventoryScene.OnIntensifyTry null btnBoxSprites dereferences at 0x105BC4C and 0x105BC6C
-                try {
-                    Memory.patchCode(baseAddr.add(0x105BC4C), 20, function (code) {
-                        // stur xzr, [x29, #-0x30]; b #0x14; nop; nop; nop
-                        code.writeByteArray([0xbf, 0x03, 0x1d, 0xf8, 0x05, 0x00, 0x00, 0x14, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5]);
-                    });
-                    Memory.patchCode(baseAddr.add(0x105BC6C), 20, function (code) {
-                        // stur xzr, [x29, #-0x28]; b #0x14; nop; nop; nop
-                        code.writeByteArray([0xbf, 0x83, 0x1d, 0xf8, 0x05, 0x00, 0x00, 0x14, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5]);
-                    });
-                    log("[🛡️ INIT] Patched InventoryScene.OnIntensifyTry null btnBoxSprites guards at 0x105BC4C & 0x105BC6C!");
-                } catch (eBbsNop) {}
+                // Note: Do not blindly clobber 0x105BC4C/0x105BC6C (btnBoxSprites) so official ratingupSprite/powerupSprite stay intact when btnBoxSprites exists.
+                // Null-safety is enforced on OnIntensifyTry entry instead.
 
                 // Patch CardIntensifyPopup.OnClickOverride at 0x1384128 (tbnz -> NOP) to allow dismissing / advancing results
                 try {
@@ -6667,7 +6742,7 @@ function initIl2Cpp(module) {
                         p.add(0x3C).writeS32(grade);
                         p.add(0x40).writeU8(grade === 4 ? 1 : 0);
                         p.add(0x41).writeU8(0);
-                        p.add(0x44).writeS32(grade === 4 ? 99 : 5);
+                        p.add(0x44).writeS32(getMaxCardLevel(grade));
                         p.add(0x48).writeS32(level);
                         p.add(0x4C).writeU8(0);
                         p.add(0x4E).writeS16(0);
@@ -7057,7 +7132,7 @@ function initIl2Cpp(module) {
                                 var gr = raw.add(0x24).readS32();
                                 var lvl = raw.add(0x1C).readS16();
                                 isR = (gr === 4);
-                                isMax = (isR && lvl >= 99) || (!isR && lvl >= 5);
+                                isMax = (lvl >= getMaxCardLevel(gr));
                                 isEq = (raw.add(0x28).readU8() === 1);
                             }
                         }
@@ -7903,6 +7978,24 @@ function initIl2Cpp(module) {
                             if (curState === 8) {
                                 // STATE.Intensify -> Material Card toggle
                                 log("[⚡ ON_CARD_ITEM_INTENSIFY] Material card clicked: " + clickedCardItem);
+                                var targetCardPtr = sceneThis.add(0x88).readPointer();
+                                if (targetCardPtr.isNull()) targetCardPtr = sceneThis.add(0x98).readPointer();
+                                var tObjId = 0, tGr = 0, tLvl = 1, tArtId = 0;
+                                if (!targetCardPtr.isNull()) {
+                                    var tRawPtr = targetCardPtr.add(0x10).readPointer();
+                                    if (!tRawPtr.isNull()) {
+                                        tObjId = tRawPtr.add(0x10).readS64();
+                                        tGr = tRawPtr.add(0x24).readS32();
+                                        tLvl = tRawPtr.add(0x1C).readS16();
+                                        var tCardId = tRawPtr.add(0x20).readS32();
+                                        var tCardMeta = getCardMetadata(tCardId);
+                                        tArtId = tCardMeta ? tCardMeta.artistID : 0;
+                                    }
+                                }
+                                var isTargetRMax = (tGr === 4 && tLvl >= getMaxCardLevel(4));
+                                var isUpgradeMode = (tGr < 4 && tLvl >= 5);
+                                var maxMatSlots = isTargetRMax ? 0 : (isUpgradeMode ? 1 : 5);
+
                                 var isRegistered = false;
                                 var matListPtr = sceneThis.add(0xA0).readPointer();
                                 if (!matListPtr.isNull()) {
@@ -7921,20 +8014,37 @@ function initIl2Cpp(module) {
                                     var unregFn = new NativeFunction(baseAddr.add(0x1058A04), "void", ["pointer", "pointer"]);
                                     unregFn(sceneThis, clickedCardItem);
                                 } else {
+                                    if (isTargetRMax) {
+                                        log("[⚠️ ON_CARD_ITEM_INTENSIFY] Target card is already R50 MAX!");
+                                        return;
+                                    }
                                     var matList = sceneThis.add(0xA0).readPointer();
                                     var curCount = (!matList.isNull()) ? matList.add(0x18).readS32() : 0;
-                                    if (curCount >= 5) {
-                                        log("[⚠️ ON_CARD_ITEM_INTENSIFY] Material slots full (5/5)!");
+                                    if (curCount >= maxMatSlots) {
+                                        log("[⚠️ ON_CARD_ITEM_INTENSIFY] Material slots full (" + curCount + "/" + maxMatSlots + ")!");
                                         return;
                                     }
                                     var clickedRaw = clickedCardItem.add(0x10).readPointer();
                                     if (!clickedRaw.isNull()) {
-                                        var cId = clickedRaw.add(0x20).readS32();
-                                        var ccd = getOrCreateCardControlData(cId);
-                                        clickedCardItem.add(0x18).writePointer(ccd || NULL);
+                                        var clkObjId = clickedRaw.add(0x10).readS64();
+                                        var clkEq = (clickedRaw.add(0x28).readU8() !== 0);
+                                        var clkLk = (clickedRaw.add(0x29).readU8() !== 0);
+                                        if (clickedCardItem.equals(targetCardPtr) || objIdKey(clkObjId) === objIdKey(tObjId) || clkEq || clkLk) {
+                                            log("[⚠️ ON_CARD_ITEM_INTENSIFY] Card is target/equipped/locked and cannot be used as material!");
+                                            return;
+                                        }
+                                        var clkCId = clickedRaw.add(0x20).readS32();
+                                        var clkMeta = getCardMetadata(clkCId);
+                                        var clkArtId = clkMeta ? clkMeta.artistID : 0;
                                         var gr = clickedRaw.add(0x24).readS32();
                                         var lvl = clickedRaw.add(0x1C).readS16();
-                                        var fCode = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
+                                        if (isUpgradeMode && (clkArtId !== tArtId || gr !== tGr || lvl < 5)) {
+                                            log("[⚠️ ON_CARD_ITEM_INTENSIFY] Ineligible Upgrade material (cId=" + clkCId + ", gr=" + gr + ", lvl=" + lvl + ", art=" + clkArtId + " vs " + tArtId + ")");
+                                            return;
+                                        }
+                                        var ccd = getOrCreateCardControlData(clkCId);
+                                        clickedCardItem.add(0x18).writePointer(ccd || NULL);
+                                        var fCode = getIntensifyCode(gr, lvl);
                                         clickedCardItem.add(0x20).writeS16(fCode);
                                     }
                                     log("[⚡ ON_CARD_ITEM_INTENSIFY] Registering material card: " + clickedCardItem);
@@ -8881,6 +8991,8 @@ function initIl2Cpp(module) {
                 };
                 var restoreDefaultDisplayCardList = applyOfflineSortAndFilter;
 
+                var offlineMaterialSortActive = false;
+
                 // Populates displayCardList with eligible material cards when in Intensify view (extractType = 2)
                 var populateMaterialDisplayCardList = function(sceneThis) {
                     try {
@@ -8893,65 +9005,105 @@ function initIl2Cpp(module) {
                         var targetObjId = 0;
                         var targetGrade = 0;
                         var targetLevel = 1;
+                        var targetCardId = 0;
                         var targetArtistCode = 0;
                         if (!selCard.isNull()) {
                             var raw = selCard.add(0x10).readPointer();
                             if (!raw.isNull()) {
                                 targetObjId = raw.add(0x10).readS64();
+                                targetCardId = raw.add(0x20).readS32();
                                 targetGrade = raw.add(0x24).readS32();
                                 targetLevel = raw.add(0x1C).readS16();
-                                targetArtistCode = raw.add(0x18).readS32();
+                                var targetMeta = getCardMetadata(targetCardId);
+                                targetArtistCode = targetMeta ? targetMeta.artistID : 0;
                             }
                         }
 
-                        var isMaxLevel = (targetGrade === 4) ? (targetLevel >= 99) : (targetLevel >= 5);
-                        log("[⚡ MATERIAL LIST] Populating materials for target ObjId=" + targetObjId + ", Grade=" + targetGrade + ", Lvl=" + targetLevel + ", isMaxLevel=" + isMaxLevel);
+                        var targetObjKey = objIdKey(targetObjId);
+                        var isRMax = (targetGrade === 4 && targetLevel >= getMaxCardLevel(4));
+                        var isUpgradeMode = (targetGrade < 4 && targetLevel >= 5);
+                        var isMaxLevel = (targetLevel >= getMaxCardLevel(targetGrade));
+                        log("[⚡ MATERIAL LIST] Populating materials for target ObjId=" + targetObjKey + ", CardId=" + targetCardId + ", Art=" + targetArtistCode + ", Grade=" + targetGrade + ", Lvl=" + targetLevel + ", isUpgrade=" + isUpgradeMode + ", isRMax=" + isRMax);
 
                         var eligible = [];
-                        for (var i = 0; i < loonaCardItems.length; i++) {
-                            var item = loonaCardItems[i];
-                            if (!item || item.isNull() || item.equals(selCard)) continue;
-                            var raw = item.add(0x10).readPointer();
-                            if (!raw || raw.isNull()) continue;
+                        if (!isRMax) {
+                            for (var i = 0; i < loonaCardItems.length; i++) {
+                                var item = loonaCardItems[i];
+                                if (!item || item.isNull() || item.equals(selCard)) continue;
+                                var raw = item.add(0x10).readPointer();
+                                if (!raw || raw.isNull()) continue;
 
-                            var objId = raw.add(0x10).readS64();
-                            if (objId === targetObjId) continue;
+                                var objId = raw.add(0x10).readS64();
+                                if (objIdKey(objId) === targetObjKey) continue;
 
-                            var isEquip = (raw.add(0x28).readU8() !== 0);
-                            var isLock = (raw.add(0x29).readU8() !== 0);
-                            if (isEquip || isLock) continue;
+                                var isEquip = (raw.add(0x28).readU8() !== 0);
+                                var isLock = (raw.add(0x29).readU8() !== 0);
+                                if (isEquip || isLock) continue;
 
-                            var grade = raw.add(0x24).readS32();
-                            var level = raw.add(0x1C).readS16();
-                            var artistCode = raw.add(0x18).readS32();
+                                var isPrismMat = (raw.add(0x2A).readU8() === 1);
+                                if (offlineFilterPrism && !isPrismMat) continue;
 
-                            // Ensure valid IntensifyCode on cardItem
-                            var fCode = (grade < 4) ? (grade * 5 + Math.min(4, level - 1)) : (20 + Math.min(98, level - 1));
-                            item.add(0x20).writeS16(fCode);
+                                var cId = raw.add(0x20).readS32();
+                                var cMeta = getCardMetadata(cId);
+                                var artistCode = cMeta ? cMeta.artistID : 0;
+                                var grade = raw.add(0x24).readS32();
+                                var level = raw.add(0x1C).readS16();
 
-                            if (isMaxLevel) {
-                                var reqMax = (grade === 4) ? 99 : 5;
-                                if (artistCode === targetArtistCode && grade === targetGrade && level >= reqMax) {
+                                // Ensure valid CardControl.Data backing and IntensifyCode on cardItem
+                                var ccd = getOrCreateCardControlData(cId);
+                                item.add(0x18).writePointer(ccd || NULL);
+                                var fCode = getIntensifyCode(grade, level);
+                                item.add(0x20).writeS16(fCode);
+
+                                if (isUpgradeMode) {
+                                    if (artistCode === targetArtistCode && grade === targetGrade && level >= 5) {
+                                        eligible.push(item);
+                                    }
+                                } else {
                                     eligible.push(item);
                                 }
-                            } else {
-                                eligible.push(item);
                             }
                         }
 
-                        // Sort eligible: Lowest grade first (C=0, B=1, A=2, S=3, R=4), then lowest level
+                        // Sort eligible: default LowGrade first (C -> B -> A -> S -> R), or respect user's explicit sort inside Material mode
+                        var matSortMode = offlineMaterialSortActive ? offlineSortType : 0;
                         eligible.sort(function(a, b) {
                             var rawA = a.add(0x10).readPointer();
                             var rawB = b.add(0x10).readPointer();
+                            var objIdA = rawA.add(0x10).readS64();
+                            var objIdB = rawB.add(0x10).readS64();
+                            var cIdA = rawA.add(0x20).readS32();
+                            var cIdB = rawB.add(0x20).readS32();
                             var gA = rawA.add(0x24).readS32();
                             var gB = rawB.add(0x24).readS32();
-                            if (gA !== gB) return gA - gB;
                             var lA = rawA.add(0x1C).readS16();
                             var lB = rawB.add(0x1C).readS16();
-                            return lA - lB;
+
+                            if (matSortMode === 2) {
+                                if (objIdA.compare(objIdB) !== 0) return objIdB.compare(objIdA);
+                                return cIdA - cIdB;
+                            }
+                            if (offlineFilterGroup) {
+                                var metaA = getCardMetadata(cIdA);
+                                var metaB = getCardMetadata(cIdB);
+                                var grpA = (metaA && (metaA.groupID || metaA.group)) ? (metaA.groupID || metaA.group) : 1001;
+                                var grpB = (metaB && (metaB.groupID || metaB.group)) ? (metaB.groupID || metaB.group) : 1001;
+                                if (grpA !== grpB) return grpA - grpB;
+                                var artA = (metaA && metaA.artistID) ? metaA.artistID : cIdA;
+                                var artB = (metaB && metaB.artistID) ? metaB.artistID : cIdB;
+                                if (artA !== artB) return artA - artB;
+                            }
+                            if (matSortMode === 1) {
+                                if (gA !== gB) return gB - gA;
+                                if (lA !== lB) return lB - lA;
+                                return cIdA - cIdB;
+                            }
+                            if (gA !== gB) return gA - gB;
+                            if (lA !== lB) return lA - lB;
+                            return cIdA - cIdB;
                         });
 
-                        log("[⚡ MATERIAL LIST] Found " + eligible.length + " eligible material cards (sorted LowGrade first)!");
+                        log("[⚡ MATERIAL LIST] Found " + eligible.length + " eligible material cards (matSortMode=" + matSortMode + ")!");
 
                         var listItems = ensureListBuffer(dclPtr, Math.max(eligible.length, 64));
                         for (var j = 0; j < eligible.length; j++) {
@@ -9107,20 +9259,23 @@ function initIl2Cpp(module) {
                         var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
                         var setEnabledFn = new NativeFunction(baseAddr.add(0x1DB3CFC), "void", ["pointer", "int", "pointer"]);
 
-                        var isMaxLevel = (tGrade === 4) ? (tLvl >= 99) : (tLvl >= 5);
+                        var isMaxLevel = (tLvl >= getMaxCardLevel(tGrade));
+                        var isUpgradeMode = (tGrade < 4 && isMaxLevel);
+                        var isRMax = (tGrade === 4 && isMaxLevel);
 
                         // 1. Header text (intensifyView + 0x38)
                         var headerTextObj = intensifyView.add(0x38).readPointer();
                         if (!headerTextObj.isNull()) {
-                            try { setTextFn(headerTextObj, createIl2CppString("Material Card"), NULL); } catch (eHdr) {}
+                            try { setTextFn(headerTextObj, createIl2CppString(isUpgradeMode ? "Upgrade Material" : "Material Card"), NULL); } catch (eHdr) {}
                         }
 
                         // 2. Probability Header text (intensifyView + 0x48)
                         var probHdrObj = intensifyView.add(0x48).readPointer();
                         if (!probHdrObj.isNull()) {
                             try {
-                                var pHdrStr = (isMaxLevel && tGrade < 4) ? "Upgrade Success Chance: " :
-                                              (tGrade === 4) ? "Power Up Success Chance: " : "Power Up Success Chance: ";
+                                var pHdrStr = isRMax ? "MAX Level Reached: " :
+                                              isUpgradeMode ? "Upgrade Success Chance: " :
+                                              (tGrade === 4) ? "Level Up Success Chance: " : "Power Up Success Chance: ";
                                 setTextFn(probHdrObj, createIl2CppString(pHdrStr), NULL);
                             } catch (ePh) {}
                         }
@@ -9145,15 +9300,16 @@ function initIl2Cpp(module) {
                                 var cId = raw.add(0x20).readS32();
                                 var gr = raw.add(0x24).readS32();
                                 var lvl = raw.add(0x1C).readS16();
+                                var isMatPrism = (raw.add(0x2A).readU8() === 1);
 
                                 var info = getIntensifyPriceAndRate(tGrade, tLvl, gr, lvl);
                                 totalPrice += info.price;
                                 var singleRate = Math.min(100.0, Math.max(0.0, info.rate)) / 100.0;
                                 failureProbProduct *= (1.0 - singleRate);
 
-                                // Refresh CardSmallView via createMockSmallCardParams
+                                // Refresh CardSmallView via createMockSmallCardParams with real isPrism flag
                                 try {
-                                    var cardParam = createMockSmallCardParams(cId, gr, lvl, false);
+                                    var cardParam = createMockSmallCardParams(cId, gr, lvl, isMatPrism);
                                     if (cardParam && !cardParam.isNull()) {
                                         cardRefreshFn(cardSmall, cardParam, NULL);
                                     }
@@ -9231,7 +9387,11 @@ function initIl2Cpp(module) {
                                         var afGo = getGameObjectFn(artistFlowName, NULL);
                                         if (!afGo.isNull()) setActiveFn(afGo, 1, NULL);
                                         var cMeta = getCardMetadata(cId);
-                                        var mArtistName = (cMeta && cMeta.artistID && artistNamesMap[cMeta.artistID]) ? artistNamesMap[cMeta.artistID] : "LOONA";
+                                        var mAId = (cMeta && cMeta.artistID) ? cMeta.artistID : 0;
+                                        var mArtistMeta = (mAId > 0) ? getArtistMetadata(mAId) : null;
+                                        var mArtistName = (mArtistMeta && mArtistMeta.name && mArtistMeta.name !== ("Artist " + mAId))
+                                            ? mArtistMeta.name
+                                            : (artistNamesMap[mAId] || "LOONA");
                                         setFlowTextFn(artistFlowName, createIl2CppString(mArtistName), NULL);
                                     } catch (eAf) {}
                                 }
@@ -9242,14 +9402,14 @@ function initIl2Cpp(module) {
                                     var eGo = getGameObjectFn(emptyImg, NULL);
                                     if (!eGo.isNull()) setActiveFn(eGo, 0, NULL);
                                 }
-                                if (!enabledGo.isNull()) setActiveFn(enabledGo, 1, NULL);
+                                if (!enabledGo.isNull()) setActiveFn(enabledGo, 0, NULL);
                                 if (!cardSmall.isNull()) {
                                     var csGo = getGameObjectFn(cardSmall, NULL);
                                     if (!csGo.isNull()) setActiveFn(csGo, 1, NULL);
                                 }
-                                log("[🏛️ PEDESTAL " + i + "] Filled with CardID=" + cId + ", Gr=" + gr + ", Lvl=" + lvl + " (Rate=" + info.rate.toFixed(1) + "%, Price=" + info.price + " RP)");
+                                log("[🏛️ PEDESTAL " + i + "] Filled with CardID=" + cId + ", Gr=" + gr + ", Lvl=" + lvl + ", Prism=" + isMatPrism + " (Rate=" + info.rate.toFixed(1) + "%, Price=" + info.price + " RP)");
                             } else {
-                                var isSlotAvail = (!isMaxLevel || i === 0);
+                                var isSlotAvail = !isRMax && (!isUpgradeMode || i === 0);
                                 if (!mountGo.isNull()) setActiveFn(mountGo, 0, NULL);
                                 if (!effectGo.isNull()) setActiveFn(effectGo, 0, NULL);
                                 if (!enabledGo.isNull()) setActiveFn(enabledGo, isSlotAvail ? 1 : 0, NULL);
@@ -9270,7 +9430,7 @@ function initIl2Cpp(module) {
                                             setAnchoredPosFn(eRect, 0.0, 0.0, NULL);
                                         }
                                     } catch (eERect) {}
-                                    // Official SUPER STAR LOONA watermark texture styling
+                                    // Official SUPER STAR LOONA watermark texture styling (dimmed if slot unavailable)
                                     try {
                                         var setSpriteFn = new NativeFunction(baseAddr.add(0x1ECB61C), "void", ["pointer", "pointer", "pointer"]);
                                         var wmSprite = getWatermarkSprite();
@@ -9279,7 +9439,7 @@ function initIl2Cpp(module) {
                                             emptyImg.add(0x20).writeFloat(1.0);
                                             emptyImg.add(0x24).writeFloat(1.0);
                                             emptyImg.add(0x28).writeFloat(1.0);
-                                            emptyImg.add(0x2C).writeFloat(1.0);
+                                            emptyImg.add(0x2C).writeFloat(isSlotAvail ? 1.0 : 0.35);
                                         } else {
                                             // Transparent fallback to prevent opaque white box if sprite is unavailable
                                             emptyImg.add(0x2C).writeFloat(0.0);
@@ -9293,9 +9453,6 @@ function initIl2Cpp(module) {
                                         log("[-] Error setting pedestal watermark: " + eEmpCol.message);
                                     }
                                 }
-                                if (!enabledGo.isNull()) {
-                                    setActiveFn(enabledGo, 0, NULL);
-                                }
                                 if (!cardSmall.isNull()) {
                                     var csGo = getGameObjectFn(cardSmall, NULL);
                                     if (!csGo.isNull()) setActiveFn(csGo, 0, NULL);
@@ -9303,10 +9460,16 @@ function initIl2Cpp(module) {
                             }
                         }
 
-                        var totalProbRate = (regCards.length > 0) ? (1.0 - failureProbProduct) * 100.0 : 0.0;
+                        var totalProbRate = (regCards.length > 0) ? (isUpgradeMode ? 100.0 : (1.0 - failureProbProduct) * 100.0) : 0.0;
                         var probLabel = "Normal";
                         var probColor = { r: 0.96, g: 0.64, b: 0.38, a: 1.0 }; // Amber
-                        if (totalProbRate >= 50.0) {
+                        if (isRMax) {
+                            probLabel = "MAX";
+                            probColor = { r: 0.88, g: 0.19, b: 0.47, a: 1.0 };
+                        } else if (isUpgradeMode && regCards.length > 0) {
+                            probLabel = "100%";
+                            probColor = { r: 0.88, g: 0.19, b: 0.47, a: 1.0 };
+                        } else if (totalProbRate >= 50.0) {
                             probLabel = "High";
                             probColor = { r: 0.88, g: 0.19, b: 0.47, a: 1.0 }; // Magenta / Pink (#E03177)
                         } else if (totalProbRate >= 25.0) {
@@ -9319,10 +9482,10 @@ function initIl2Cpp(module) {
 
                         var probTextObj = intensifyView.add(0x50).readPointer();
                         if (!probTextObj.isNull()) {
-                            var pStr = (regCards.length > 0) ? probLabel : "-";
+                            var pStr = (isRMax || regCards.length > 0) ? probLabel : "-";
                             setTextFn(probTextObj, createIl2CppString(pStr), NULL);
                             try {
-                                if (regCards.length > 0) {
+                                if (isRMax || regCards.length > 0) {
                                     probTextObj.add(0x20).writeFloat(probColor.r);
                                     probTextObj.add(0x24).writeFloat(probColor.g);
                                     probTextObj.add(0x28).writeFloat(probColor.b);
@@ -9359,20 +9522,21 @@ function initIl2Cpp(module) {
 
                         var formattedPrice = (totalPrice > 0) ? totalPrice.toLocaleString("en-US") : "0";
                         var il2cppPriceStr = createIl2CppString(formattedPrice);
-                        var tryActionLabel = (isMaxLevel && tGrade < 4) ? "UPGRADE" : "TRY";
+                        var tryActionLabel = isRMax ? "MAX" : (isUpgradeMode ? "UPGRADE" : "TRY");
                         var il2cppTryLabel = createIl2CppString(tryActionLabel);
+                        var canTry = (!isRMax && regCards.length > 0);
 
                         if (!btnTry.isNull()) {
                             try { setBtnTextFn(btnTry, il2cppTryLabel, NULL); } catch (eBtL) {}
                             try { setPriceFn(btnTry, il2cppPriceStr, NULL); } catch (ePt) {}
                             var tryGo = btnTry.add(0x10).readPointer();
-                            if (!tryGo.isNull()) setActiveFn(tryGo, (regCards.length > 0) ? 1 : 0, NULL);
+                            if (!tryGo.isNull()) setActiveFn(tryGo, canTry ? 1 : 0, NULL);
                         }
                         if (!btnDisable.isNull()) {
                             try { setBtnTextFn(btnDisable, il2cppTryLabel, NULL); } catch (eBdL) {}
                             try { setPriceFn(btnDisable, il2cppPriceStr, NULL); } catch (ePd) {}
                             var disGo = btnDisable.add(0x10).readPointer();
-                            if (!disGo.isNull()) setActiveFn(disGo, (regCards.length === 0) ? 1 : 0, NULL);
+                            if (!disGo.isNull()) setActiveFn(disGo, canTry ? 0 : 1, NULL);
                         }
 
                         // Write to InventoryScene fields for native OnIntensifyTry / IntensifyAssist
@@ -9403,6 +9567,7 @@ function initIl2Cpp(module) {
                         log("[⚡ ON_INTENSIFY] Starting safe offline intensify mode transition on scene: " + sceneThis);
                         if (!sceneThis || sceneThis.isNull()) return;
                         activeInventorySceneInstance = sceneThis;
+                        offlineMaterialSortActive = false;
                         ensureInventoryLists(sceneThis);
 
                         var tCard = sceneThis.add(0x88).readPointer();
@@ -9414,16 +9579,17 @@ function initIl2Cpp(module) {
                         sceneThis.add(0x88).writePointer(tCard);
                         sceneThis.add(0x98).writePointer(tCard);
 
+                        var cId = 1001, gr = 0, lvl = 1;
                         var isPrismTarget = false;
                         var raw = tCard.add(0x10).readPointer();
                         if (!raw.isNull()) {
-                            var cId = raw.add(0x20).readS32();
+                            cId = raw.add(0x20).readS32();
                             var ccd = getOrCreateCardControlData(cId);
                             tCard.add(0x18).writePointer(ccd || NULL);
-                            var gr = raw.add(0x24).readS32();
-                            var lvl = raw.add(0x1C).readS16();
+                            gr = raw.add(0x24).readS32();
+                            lvl = raw.add(0x1C).readS16();
                             isPrismTarget = (raw.add(0x2A).readU8() === 1);
-                            var code = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
+                            var code = getIntensifyCode(gr, lvl);
                             tCard.add(0x20).writeS16(code);
                             var meta = getCardMetadata(cId);
                             var artistData = resolveArtistDataForCard(meta, cId);
@@ -9458,7 +9624,7 @@ function initIl2Cpp(module) {
                         if (!sceneView.isNull()) {
                             safeShowIntensifyLayout(sceneView);
 
-                            // Apply large card visuals & golden frame to selectView.card (left target card)
+                            // Apply large card visuals & tier frame/level to selectView.card (left target card)
                             var selectView = sceneView.add(0x48).readPointer();
                             if (!selectView.isNull()) {
                                 var sCard = selectView.add(0x38).readPointer();
@@ -9473,12 +9639,12 @@ function initIl2Cpp(module) {
                                             }
                                         } catch (eNum) {}
                                     }
-                                    log("[🖼️ INTENSIFY TARGET] Applied large card visuals to selectView.card for cId=" + cId + " gr=" + gr + " lvl=" + lvl);
+                                    log("[🖼️ INTENSIFY TARGET] Applied large card visuals to selectView.card for cId=" + cId + " gr=" + gr + " lvl=" + lvl + " prism=" + isPrismTarget);
                                 }
                             }
                         }
 
-                        // Refresh Intensify View (empty pedestals, TRY disabled, RP 0)
+                        // Refresh Intensify View (5 pedestals, probability, RP price)
                         safeRefreshIntensifyView(sceneThis);
 
                         // Populate bottom material card list
@@ -9489,11 +9655,11 @@ function initIl2Cpp(module) {
                     }
                 };
 
-                // Smart recommend material selection: picks up to N (default 5) lowest grade cards and calls RegistMaterialCardItem
+                // Smart recommend material selection: picks up to N (1 for Upgrade, default 5 for Power Up) lowest grade eligible cards
                 var executeRecommend = function(sceneThis, maxCountOverride) {
                     try {
-                        var targetMax = (typeof maxCountOverride === 'number' && maxCountOverride > 0) ? maxCountOverride : 5;
-                        log("[⚡ RECOMMEND EXEC] Starting smart recommend material selection (targetMax=" + targetMax + ")...");
+                        var requestedMax = (typeof maxCountOverride === 'number' && maxCountOverride > 0) ? maxCountOverride : 5;
+                        log("[⚡ RECOMMEND EXEC] Starting smart recommend material selection...");
                         if (!sceneThis || sceneThis.isNull()) return;
 
                         // 1. Clear existing materials
@@ -9510,53 +9676,61 @@ function initIl2Cpp(module) {
                         var targetObjId = 0;
                         var targetGrade = 0;
                         var targetLevel = 1;
+                        var targetCardId = 0;
                         var targetArtistCode = 0;
+                        var tMeta = null;
                         if (!targetCard.isNull()) {
                             var rawT = targetCard.add(0x10).readPointer();
                             if (!rawT.isNull()) {
                                 targetObjId = rawT.add(0x10).readS64();
                                 targetGrade = rawT.add(0x24).readS32();
                                 targetLevel = rawT.add(0x1C).readS16();
-                                var tCardId = rawT.add(0x20).readS32();
-                                var tMeta = getCardMetadata(tCardId);
+                                targetCardId = rawT.add(0x20).readS32();
+                                tMeta = getCardMetadata(targetCardId);
                                 targetArtistCode = tMeta ? tMeta.artistID : 0;
                             }
                         }
-                        var isMaxLevel = (targetGrade === 4) ? (targetLevel >= 99) : (targetLevel >= 5);
+                        var targetObjKey = objIdKey(targetObjId);
+                        var isRMax = (targetGrade === 4 && targetLevel >= getMaxCardLevel(4));
+                        var isUpgradeMode = (targetGrade < 4 && targetLevel >= 5);
+                        var targetMax = isRMax ? 0 : (isUpgradeMode ? 1 : requestedMax);
 
                         // 3. Find candidates from loonaCardItems
                         var candidates = [];
-                        for (var i = 0; i < loonaCardItems.length; i++) {
-                            var item = loonaCardItems[i];
-                            if (!item || item.isNull() || item.equals(targetCard)) continue;
-                            var raw = item.add(0x10).readPointer();
-                            if (!raw || raw.isNull()) continue;
+                        if (!isRMax) {
+                            for (var i = 0; i < loonaCardItems.length; i++) {
+                                var item = loonaCardItems[i];
+                                if (!item || item.isNull() || item.equals(targetCard)) continue;
+                                var raw = item.add(0x10).readPointer();
+                                if (!raw || raw.isNull()) continue;
 
-                            var objId = raw.add(0x10).readS64();
-                            if (objId === targetObjId) continue;
-                            var isEq = (raw.add(0x28).readU8() !== 0);
-                            var isLk = (raw.add(0x29).readU8() !== 0);
-                            if (isEq || isLk) continue;
+                                var objId = raw.add(0x10).readS64();
+                                if (objIdKey(objId) === targetObjKey) continue;
+                                var isEq = (raw.add(0x28).readU8() !== 0);
+                                var isLk = (raw.add(0x29).readU8() !== 0);
+                                if (isEq || isLk) continue;
 
-                            var gr = raw.add(0x24).readS32();
-                            var lvl = raw.add(0x1C).readS16();
-                            var cId = raw.add(0x20).readS32();
-                            var cMeta = getCardMetadata(cId);
-                            var art = cMeta ? cMeta.artistID : 0;
+                                var gr = raw.add(0x24).readS32();
+                                var lvl = raw.add(0x1C).readS16();
+                                var cId = raw.add(0x20).readS32();
+                                var cMeta = getCardMetadata(cId);
+                                var art = cMeta ? cMeta.artistID : 0;
+                                var rateInfo = getIntensifyPriceAndRate(targetGrade, targetLevel, gr, lvl);
+                                if (rateInfo.disabled) continue;
 
-                            // Ensure valid IntensifyCode and Card backing field
-                            var fCode = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
-                            item.add(0x20).writeS16(fCode);
-                            var ccd = getOrCreateCardControlData(cId);
-                            item.add(0x18).writePointer(ccd || NULL);
+                                // Ensure valid IntensifyCode and Card backing field
+                                var fCode = getIntensifyCode(gr, lvl);
+                                item.add(0x20).writeS16(fCode);
+                                var ccd = getOrCreateCardControlData(cId);
+                                item.add(0x18).writePointer(ccd || NULL);
 
-                            if (isMaxLevel) {
-                                var reqMax = (gr === 4) ? 99 : 5;
-                                if (art === targetArtistCode && gr === targetGrade && lvl >= reqMax) {
+                                if (isUpgradeMode) {
+                                    if (art === targetArtistCode && gr === targetGrade && lvl >= 5) {
+                                        candidates.push(item);
+                                    }
+                                } else {
                                     candidates.push(item);
                                 }
-                            } else {
-                                candidates.push(item);
                             }
                         }
 
@@ -9581,16 +9755,14 @@ function initIl2Cpp(module) {
                                 var tCardId2 = rawT2.add(0x20).readS32();
                                 var tCcd2 = getOrCreateCardControlData(tCardId2);
                                 targetCard.add(0x18).writePointer(tCcd2 || NULL);
-                                var tCode2 = (targetGrade < 4) ? (targetGrade * 5 + Math.min(4, targetLevel - 1)) : (20 + Math.min(98, targetLevel - 1));
+                                var tCode2 = getIntensifyCode(targetGrade, targetLevel);
                                 targetCard.add(0x20).writeS16(tCode2);
                             }
                         }
-                        var curArt = sceneThis.add(0x80).readPointer();
-                        if (curArt.isNull() && targetArtistCode > 0) {
-                            var resolvedArt = allArtistDataMap[targetArtistCode] || loonaArtistDataMap[targetArtistCode] || NULL;
+                        if (targetCardId > 0) {
+                            var resolvedArt = resolveArtistDataForCard(tMeta, targetCardId);
                             if (resolvedArt && !resolvedArt.isNull()) {
                                 sceneThis.add(0x80).writePointer(resolvedArt);
-                                log("[⚡ RECOMMEND] Set scene.selectedArtistData to artist " + targetArtistCode);
                             }
                         }
 
@@ -9605,7 +9777,7 @@ function initIl2Cpp(module) {
                             cand.add(0x18).writePointer(candCcd || NULL);
                             var cGr = cRaw.add(0x24).readS32();
                             var cLvl = cRaw.add(0x1C).readS16();
-                            var cCode = (cGr < 4) ? (cGr * 5 + Math.min(4, cLvl - 1)) : (20 + Math.min(98, cLvl - 1));
+                            var cCode = getIntensifyCode(cGr, cLvl);
                             cand.add(0x20).writeS16(cCode);
                             regFn(sceneThis, cand);
                             log("[⚡ RECOMMEND] Added material card #" + (p + 1) + ": ObjId=" + cRaw.add(0x10).readS64() + ", Grade=" + cGr + ", Level=" + cLvl + ", Code=" + cCode);
@@ -9626,7 +9798,7 @@ function initIl2Cpp(module) {
                                         mItem.add(0x18).writePointer(mccd || NULL);
                                         var mgr = mRaw.add(0x24).readS32();
                                         var mlvl = mRaw.add(0x1C).readS16();
-                                        var mfCode = (mgr < 4) ? (mgr * 5 + Math.min(4, mlvl - 1)) : (20 + Math.min(98, mlvl - 1));
+                                        var mfCode = getIntensifyCode(mgr, mlvl);
                                         mItem.add(0x20).writeS16(mfCode);
                                     }
                                 }
@@ -10033,8 +10205,17 @@ function initIl2Cpp(module) {
                         log("[🔙 ON_BACK] handleInventoryBack entered! state=" + curState);
 
                         if (curState === 8) { // STATE.Intensify (8)
-                            log("[🔙 ON_BACK] Returning from Intensify view (8) to STATE.Main (6)...");
+                            var wasFromEquip = (sceneThis.add(0xBE).readU8() === 1);
+                            if (wasFromEquip) {
+                                var prevSel = sceneThis.add(0x98).readPointer();
+                                if (!prevSel.isNull()) sceneThis.add(0x88).writePointer(prevSel);
+                                sceneThis.add(0xBE).writeU8(0);
+                                log("[🔙 ON_BACK] Returning from Equipped Intensify (8) -> STATE.Main (6) with preSelectedCardItem restored!");
+                            } else {
+                                log("[🔙 ON_BACK] Returning from Intensify view (8) to STATE.Main (6)...");
+                            }
                             safeSetStateMain(sceneThis, false);
+                            refreshInventoryHeaderView();
                             return;
                         }
 
@@ -10814,7 +10995,7 @@ function initIl2Cpp(module) {
                         log("[-] Error replacing get_IsRCard: " + eIrc.message);
                     }
 
-                    // get_IsMaxLevel (0xB52408) - R cards maxLevel is 99 in Dalcomsoft engine
+                    // get_IsMaxLevel (0xB52408) - R cards maxLevel is 50 in SuperStar LOONA (per cid.json/cbd.json)
                     try {
                         Interceptor.replace(baseAddr.add(0xB52408), keepCb(new NativeCallback(function(thisPtr) {
                             try {
@@ -10823,7 +11004,7 @@ function initIl2Cpp(module) {
                                 if (!raw || raw.isNull()) return 0;
                                 var gr = raw.add(0x24).readS32();
                                 var lvl = raw.add(0x1C).readS16();
-                                var maxLvl = (gr === 4) ? 99 : 5;
+                                var maxLvl = getMaxCardLevel(gr);
                                 return (lvl >= maxLvl) ? 1 : 0;
                             } catch (e) { return 0; }
                         }, "bool", ["pointer"])));
@@ -11046,19 +11227,24 @@ function initIl2Cpp(module) {
                             }
 
                             var isR = (gr === 4);
-                            var isMax = (isR && lvl >= 50) || (!isR && lvl >= 5);
+                            var isMax = (lvl >= getMaxCardLevel(gr));
 
                             var meta = getCardMetadata(cId);
+                            var gId = (meta && (meta.groupID || meta.group)) ? (meta.groupID || meta.group) : (currentSelectedGroupCode || 1001);
                             var aId = (meta && meta.artistID) ? meta.artistID : 1001;
                             var tId = (meta && meta.theme) ? meta.theme : 1001;
 
-                            var aName = artistNamesMap[aId] || "HeeJin";
-                            var tName = themeNamesMap[tId] || "Hi High";
+                            var gMetaObj = getGroupMetadata(gId);
+                            var aMetaObj = getArtistMetadata(aId);
+                            var tMetaObj = getThemeMetadata(tId);
+                            var gName = (gMetaObj && gMetaObj.name) ? gMetaObj.name : "LOONA";
+                            var aName = (aMetaObj && aMetaObj.name && aMetaObj.name !== ("Artist " + aId)) ? aMetaObj.name : (artistNamesMap[aId] || "HeeJin");
+                            var tName = (tMetaObj && tMetaObj.name && tMetaObj.name !== ("Theme " + tId)) ? tMetaObj.name : (themeNamesMap[tId] || "Hi High");
 
                             // Large card params
                             var cardParams = createMockLargeCardParams(cId, gr, lvl, isPrism);
                             p.add(0x10).writePointer(cardParams || NULL);
-                            p.add(0x18).writePointer(createIl2CppString("LOONA"));
+                            p.add(0x18).writePointer(createIl2CppString(gName));
                             p.add(0x20).writePointer(createIl2CppString(aName));
 
                             // Stat params (0xABFCD0)
@@ -11101,14 +11287,21 @@ function initIl2Cpp(module) {
 
                             p.add(0x50).writePointer(createIl2CppString("Equip"));
                             p.add(0x58).writePointer(createIl2CppString("Cancel"));
-                            p.add(0x60).writeU8(0); // isLeader
+                            var eqProf = null;
+                            try { eqProf = loadPlayerProfile(); } catch (ePfEq) {}
+                            var eqObjId = (!cardItem.isNull() && !cardItem.add(0x10).readPointer().isNull()) ? cardItem.add(0x10).readPointer().add(0x10).readS64() : 0;
+                            var isEqLeader = false;
+                            if (eqProf && eqProf.leaderCard !== undefined && eqProf.leaderCard !== null) {
+                                isEqLeader = (eqProf.leaderCard === cId || (eqObjId !== 0 && objIdKey(eqProf.leaderCard) === objIdKey(eqObjId)));
+                            }
+                            p.add(0x60).writeU8(isEqLeader ? 1 : 0); // isLeader
                             p.add(0x61).writeU8(isLk ? 1 : 0);
                             p.add(0x62).writeU8(isR ? 1 : 0);
                             p.add(0x63).writeU8(isMax ? 1 : 0);
                             p.add(0x64).writeU8(isEq ? 1 : 0);
                             p.add(0x68).writePointer(createIl2CppString("MAX"));
                             p.add(0x70).writePointer(createIl2CppString("Level Up"));
-                            p.add(0x78).writePointer(createIl2CppString("Level Up"));
+                            p.add(0x78).writePointer(createIl2CppString("Upgrade"));
                             p.add(0x80).writePointer(createIl2CppString("Power Up"));
 
                             // Read ratingupSprite / powerupSprite from sceneView.btnBoxSprites if available
@@ -11175,8 +11368,9 @@ function initIl2Cpp(module) {
                                     }
                                 } catch (eEqCid) {}
                                 var eqGr = cardParams.add(0x3C).readS32();
+                                var eqLvl = cardParams.add(0x48).readS32();
                                 var eqPrism = (cardParams.add(0x20).readU8() === 1);
-                                applyCardLargeVisuals(card, eqCid, eqGr, eqPrism);
+                                applyCardLargeVisuals(card, eqCid, eqGr, eqPrism, eqLvl);
                             }
 
                             // 2. groupName (0x40)
@@ -11245,7 +11439,10 @@ function initIl2Cpp(module) {
                             var setBtnTextFn = new NativeFunction(baseAddr.add(0xE9B7B0), "void", ["pointer", "pointer", "pointer"]);
                             if (!btnEquip.isNull()) setBtnTextFn(btnEquip, createIl2CppString("Equip"), NULL);
                             // Note: btnCancel is an icon button ('X'), do not call set_Text on it to avoid black box graphic corruption
-                            if (!btnIntensify.isNull()) setBtnTextFn(btnIntensify, createIl2CppString("Level Up"), NULL);
+                            var eqIsR = (p.add(0x62).readU8() === 1);
+                            var eqIsMax = (p.add(0x63).readU8() === 1);
+                            var eqBtnLabel = eqIsR ? (eqIsMax ? "MAX" : "Level Up") : (eqIsMax ? "Upgrade" : "Power Up");
+                            if (!btnIntensify.isNull()) setBtnTextFn(btnIntensify, createIl2CppString(eqBtnLabel), NULL);
 
                             var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                             var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
@@ -16147,85 +16344,44 @@ function initIl2Cpp(module) {
                 }
 
 
-                // InventoryScene.SetStateIntensify (0x1056BCC) -> Full safe offline replace
+                // InventoryScene.SetStateIntensify (0x1056BCC) -> Delegate directly to shared triggerSafeOnIntensify (fixes artist/prism/level sync)
                 try {
                     Interceptor.replace(baseAddr.add(0x1056BCC), new NativeCallback(function(sceneThis, isReload, isUpdate, method) {
                         log("[⚡ SetStateIntensify REPLACE] isReload=" + isReload + ", isUpdate=" + isUpdate + ", scene=" + sceneThis);
-                        try {
-                            if (!sceneThis || sceneThis.isNull()) return;
-                            activeInventorySceneInstance = sceneThis;
-                            ensureInventoryLists(sceneThis);
-                            sceneThis.add(0x24).writeS32(8); // STATE.Intensify
-
-                            // Ensure target card and artist
-                            var tCard = sceneThis.add(0x88).readPointer();
-                            if (tCard.isNull()) tCard = sceneThis.add(0x98).readPointer();
-                            if (!tCard.isNull()) {
-                                sceneThis.add(0x88).writePointer(tCard);
-                                sceneThis.add(0x98).writePointer(tCard);
-                                var tRaw = tCard.add(0x10).readPointer();
-                                if (!tRaw.isNull()) {
-                                    var tcId = tRaw.add(0x20).readS32();
-                                    var tCcd = getOrCreateCardControlData(tcId);
-                                    tCard.add(0x18).writePointer(tCcd || NULL);
-                                    var tGr = tRaw.add(0x24).readS32();
-                                    var tLvl = tRaw.add(0x1C).readS16();
-                                    var tCode = (tGr < 4) ? (tGr * 5 + Math.min(4, tLvl - 1)) : (20 + Math.min(98, tLvl - 1));
-                                    tCard.add(0x20).writeS16(tCode);
-
-                                    var artMeta = getCardMetadata(tcId);
-                                    var artId = artMeta ? artMeta.artistID : 0;
-                                    if (artId > 0 && loonaArtistDataMap[artId]) {
-                                        sceneThis.add(0x80).writePointer(loonaArtistDataMap[artId]);
-                                    }
-                                }
-                            }
-
-                            if (sceneThis.add(0xA8).readDouble() === 0.0) {
-                                sceneThis.add(0xA8).writeDouble(1.0);
-                            }
-                            if (sceneThis.add(0xB0).readDouble() === 0.0) {
-                                sceneThis.add(0xB0).writeDouble(1.0);
-                            }
-
-                            // Show Intensify Layout
-                            var sceneView = sceneThis.add(0x48).readPointer();
-                            if (!sceneView.isNull()) {
-                                safeShowIntensifyLayout(sceneView);
-
-                                // Apply large card visuals & golden frame to selectView.card (left target card)
-                                var selectView = sceneView.add(0x48).readPointer();
-                                if (!selectView.isNull()) {
-                                    var sCard = selectView.add(0x38).readPointer();
-                                    if (!sCard.isNull()) {
-                                        applyCardLargeVisuals(sCard, tcId, tGr, false);
-                                        if (tGr === 4) {
-                                            try {
-                                                var numLevel = sCard.add(0x80).readPointer();
-                                                if (!numLevel.isNull()) {
-                                                    var setValFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "uint32", "pointer"]);
-                                                    setValFn(numLevel, tLvl, NULL);
-                                                }
-                                            } catch (eNum) {}
-                                        }
-                                        log("[🖼️ INTENSIFY TARGET] Applied large card visuals to selectView.card for cId=" + tcId + " gr=" + tGr + " lvl=" + tLvl);
-                                    }
-                                }
-                            }
-
-                            // Refresh Intensify View (5 pedestals, probability, RP price, button states)
-                            safeRefreshIntensifyView(sceneThis);
-
-                            // Populate bottom material card list
-                            populateMaterialDisplayCardList(sceneThis);
-                            log("[🎉 SetStateIntensify REPLACE] Successfully updated intensify view & material list!");
-                        } catch (eSsi) {
-                            log("[-] Error in replaced SetStateIntensify: " + eSsi.message);
-                        }
+                        triggerSafeOnIntensify(sceneThis);
                     }, "void", ["pointer", "int", "int", "pointer"]));
                     log("[+] Interceptor.replace installed on InventoryScene.SetStateIntensify (0x1056BCC)!");
                 } catch (eSsi) {
                     log("[-] Error replacing InventoryScene.SetStateIntensify: " + eSsi.message);
+                }
+
+                // InventoryScene.OnEquipCardIntensify (0x105AB68) -> Safe swap & entry into intensify mode from STATE.Equip
+                try {
+                    Interceptor.replace(baseAddr.add(0x105AB68), new NativeCallback(function(sceneThis, methodInfo) {
+                        log("[⚡ ON_EQUIP_CARD_INTENSIFY] Intercepted on scene=" + sceneThis);
+                        try {
+                            if (!sceneThis || sceneThis.isNull()) return;
+                            var eqCard = sceneThis.add(0x90).readPointer();
+                            if (eqCard.isNull()) {
+                                log("[-] OnEquipCardIntensify: equippedCardItem is null!");
+                                return;
+                            }
+                            try {
+                                var playSoundFn = new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"]);
+                                playSoundFn(createIl2CppString("btn_touch"), NULL);
+                            } catch (eSnd) {}
+                            var prevSel = sceneThis.add(0x88).readPointer();
+                            sceneThis.add(0x98).writePointer(prevSel); // preSelectedCardItem
+                            sceneThis.add(0x88).writePointer(eqCard);  // selectedCardItem
+                            sceneThis.add(0xBE).writeU8(1);            // isChangeSelectedCardItem = true
+                            triggerSafeOnIntensify(sceneThis);
+                        } catch (eEci) {
+                            log("[-] Error in OnEquipCardIntensify: " + eEci.message);
+                        }
+                    }, "void", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on InventoryScene.OnEquipCardIntensify (0x105AB68)!");
+                } catch (eEciHook) {
+                    log("[-] Error hooking InventoryScene.OnEquipCardIntensify: " + eEciHook.message);
                 }
 
                 // =========================================================================
@@ -16334,15 +16490,21 @@ function initIl2Cpp(module) {
                     }
 
                     var targetObjId = rawObj.add(0x10).readS64();
+                    var targetObjKey = objIdKey(targetObjId);
                     var energy = rawObj.add(0x18).readS16();
                     var score = rawObj.add(0x1A).readS16();
                     var level = rawObj.add(0x1C).readS16();
                     var cardId = rawObj.add(0x20).readS32();
                     var grade = rawObj.add(0x24).readS32();
                     var isPrism = (rawObj.add(0x2A).readU8() !== 0);
-                    var maxLevel = (grade === 4) ? 99 : 5;
+                    var maxLevel = getMaxCardLevel(grade);
 
-                    log("[⚡ INTENSIFY] Target Card: ID=" + cardId + " (ObjectID=" + targetObjId + "), Grade=" + grade + ", Level=" + level + "/" + maxLevel + ", Score=" + score + ", Energy=" + energy);
+                    log("[⚡ INTENSIFY] Target Card: ID=" + cardId + " (ObjectID=" + targetObjKey + "), Grade=" + grade + ", Level=" + level + "/" + maxLevel + ", Score=" + score + ", Energy=" + energy);
+
+                    if (grade === 4 && level >= maxLevel) {
+                        log("[⚠️ INTENSIFY] Target card is already R50 MAX!");
+                        return false;
+                    }
 
                     var matCount = 0;
                     var matItemsArr = NULL;
@@ -16470,23 +16632,33 @@ function initIl2Cpp(module) {
                     var newStats = getCardBaseStats(currentGrade, currentLvl, isPrism);
                     log("[⚡ STATS] Result Grade=" + currentGrade + " Level=" + currentLvl + " (Successes: " + successes + "/" + materials.length + ") | Score=" + newStats.score + ", Energy=" + newStats.energy + " | Total Cost: " + totalCost + " RP");
 
+                    // Validate RP before mutating memory/profile
+                    var profile = loadPlayerProfile();
+                    if (profile && profile.rhythmPoint !== undefined && profile.rhythmPoint < totalCost) {
+                        log("[⚠️ RP] Insufficient RP for handleOfflineIntensify! Need=" + totalCost + ", Have=" + profile.rhythmPoint);
+                        try {
+                            var openShortageFn = new NativeFunction(baseAddr.add(0xAC1FD0), "void", ["pointer"]);
+                            openShortageFn(NULL);
+                        } catch (eShp) {}
+                        return false;
+                    }
+
                     // Update target card in memory
                     rawObj.add(0x18).writeS16(newStats.energy);
                     rawObj.add(0x1A).writeS16(newStats.score);
                     rawObj.add(0x1C).writeS16(currentLvl);
                     rawObj.add(0x24).writeS32(currentGrade);
 
-                    var newTargetCode = (currentGrade < 4) ? (currentGrade * 5 + Math.min(4, currentLvl - 1)) : (20 + Math.min(98, currentLvl - 1));
+                    var newTargetCode = getIntensifyCode(currentGrade, currentLvl);
                     cardItem.add(0x20).writeS16(newTargetCode);
 
                     // Update player_profile.json
                     var consumedIds = {};
                     for (var k = 0; k < materials.length; k++) {
-                        consumedIds[materials[k].objId] = true;
+                        consumedIds[objIdKey(materials[k].objId)] = true;
                     }
 
                     try {
-                        var profile = loadPlayerProfile();
                         if (profile) {
                             if (profile.rhythmPoint !== undefined) {
                                 profile.rhythmPoint = Math.max(0, profile.rhythmPoint - totalCost);
@@ -16495,20 +16667,24 @@ function initIl2Cpp(module) {
                             if (profile.inventoryCards && Array.isArray(profile.inventoryCards)) {
                                 for (var c = 0; c < profile.inventoryCards.length; c++) {
                                     var cardEntry = profile.inventoryCards[c];
-                                    if (cardEntry.objectID === targetObjId || cardEntry.cardID === cardId) {
+                                    var matchByObj = (targetObjKey !== "0" && objIdKey(cardEntry.objectID) === targetObjKey);
+                                    var matchFallback = (targetObjKey === "0" && cardEntry.cardID === cardId);
+                                    if (matchByObj || matchFallback) {
                                         cardEntry.grade = currentGrade;
                                         cardEntry.level = currentLvl;
                                         cardEntry.score = newStats.score;
                                         cardEntry.energy = newStats.energy;
+                                        break;
                                     }
                                 }
                                 profile.inventoryCards = profile.inventoryCards.filter(function(cardItemJson) {
-                                    return !consumedIds[cardItemJson.objectID];
+                                    return !consumedIds[objIdKey(cardItemJson.objectID)];
                                 });
                                 log("[💾 PROFILE] Consumed " + materials.length + " material cards from inventory. Remaining: " + profile.inventoryCards.length);
                             }
                             savePlayerProfile(profile);
                             setupUserControl(profile);
+                            refreshTopViewRhythmPoint(profile.rhythmPoint);
                         }
                     } catch (eProf) {
                         log("[-] Error updating player_profile.json: " + eProf.message);
@@ -16520,7 +16696,7 @@ function initIl2Cpp(module) {
                             if (!ci || ci.isNull()) return false;
                             var r = ci.add(0x10).readPointer();
                             if (!r || r.isNull()) return false;
-                            return !consumedIds[r.add(0x10).readS64()];
+                            return !consumedIds[objIdKey(r.add(0x10).readS64())];
                         });
                         log("[🃏 CARDS] Filtered loonaCardItems, new count: " + loonaCardItems.length);
                     }
@@ -16606,7 +16782,11 @@ function initIl2Cpp(module) {
                         } catch (eSnd) {}
 
                         // 2. Execute offline intensify calculation, RNG rolls, and data saving
-                        handleOfflineIntensify(targetCard, matList, NULL, probRate, priceRate, NULL);
+                        var didExec = handleOfflineIntensify(targetCard, matList, NULL, probRate, priceRate, NULL);
+                        if (didExec === false) {
+                            log("[⚠️ OFFLINE TRY] Intensify aborted (MAX or insufficient RP).");
+                            return;
+                        }
 
                         // 3. Clear registered material cards from scene
                         try {
@@ -16617,10 +16797,14 @@ function initIl2Cpp(module) {
                             log("[-] Error clearing material list: " + eClr.message);
                         }
 
-                        // 4. Update the target card's visual numberLevel and stats on the left panel
+                        // 4. Update target card visuals, grade/stars/numberLevel and stats on the left panel
                         try {
                             var rawObj = targetCard.add(0x10).readPointer();
+                            var updatedCId = (!rawObj.isNull()) ? rawObj.add(0x20).readS32() : 1001;
+                            var updatedGrade = (!rawObj.isNull()) ? rawObj.add(0x24).readS32() : 4;
                             var updatedLvl = (!rawObj.isNull()) ? rawObj.add(0x1C).readS16() : 50;
+                            var updatedIsPrism = (!rawObj.isNull()) ? (rawObj.add(0x2A).readU8() === 1) : false;
+                            var updatedIsEquip = (!rawObj.isNull()) ? (rawObj.add(0x28).readU8() === 1) : false;
                             var updatedScore = (!rawObj.isNull()) ? rawObj.add(0x1A).readS16() : 199;
                             var updatedEnergy = (!rawObj.isNull()) ? rawObj.add(0x18).readS16() : 100;
 
@@ -16632,15 +16816,18 @@ function initIl2Cpp(module) {
                                     if (!cardLarge.isNull()) {
                                         var pBuf = cardLarge.add(0x48).readPointer();
                                         if (!pBuf.isNull()) {
+                                            pBuf.add(0x3C).writeS32(updatedGrade);
+                                            pBuf.add(0x40).writeU8(updatedGrade === 4 ? 1 : 0);
+                                            pBuf.add(0x44).writeS32(getMaxCardLevel(updatedGrade));
                                             pBuf.add(0x48).writeS32(updatedLvl);
-                                            if (pBuf.add(0x44).readS32() < 99) pBuf.add(0x44).writeS32(99);
                                             try {
                                                 var setLevelFn = new NativeFunction(baseAddr.add(0x1394858), "void", ["pointer", "pointer", "pointer"]);
                                                 setLevelFn(cardLarge, pBuf, NULL);
                                             } catch (eSl) {}
                                         }
+                                        applyCardLargeVisuals(cardLarge, updatedCId, updatedGrade, updatedIsPrism, updatedLvl);
                                         var numLevel = cardLarge.add(0x80).readPointer();
-                                        if (!numLevel.isNull()) {
+                                        if (!numLevel.isNull() && updatedGrade === 4) {
                                             var setValFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "uint32", "pointer"]);
                                             setValFn(numLevel, updatedLvl, NULL);
                                             log("[✨ OFFLINE TRY] Updated cardLarge numberLevel to: " + updatedLvl);
@@ -16656,6 +16843,12 @@ function initIl2Cpp(module) {
                                         log("[✨ OFFLINE TRY] Updated statView: Score=" + updatedScore + ", Energy=" + updatedEnergy);
                                     }
                                 }
+                            }
+                            if (updatedIsEquip) {
+                                var updMeta = getCardMetadata(updatedCId);
+                                var updGroup = (updMeta && (updMeta.groupID || updMeta.group)) ? (updMeta.groupID || updMeta.group) : (currentSelectedGroupCode || 1001);
+                                syncGroupEquippedFastArray(updGroup);
+                                refreshInventoryHeaderView();
                             }
                         } catch (eVisual) {
                             log("[-] Error updating left card visuals: " + eVisual.message);
@@ -16728,9 +16921,35 @@ function initIl2Cpp(module) {
 
                         capturePopupSessionFromScene(tCardItem, matList);
 
+                        // Play button sound
+                        try {
+                            var playSoundFn = new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"]);
+                            playSoundFn(createIl2CppString("btn_touch"), NULL);
+                        } catch (eSndPop) {}
+
                         var prob = sceneThis.add(0xA8).readDouble();
                         var priceRate = sceneThis.add(0xB0).readDouble();
                         var price = sceneThis.add(0xB8).readS32();
+
+                        // Guard R50 MAX and insufficient RP cleanly before opening popup
+                        var tRawPop = (!tCardItem.isNull()) ? tCardItem.add(0x10).readPointer() : NULL;
+                        if (!tRawPop.isNull()) {
+                            var pGr = tRawPop.add(0x24).readS32();
+                            var pLvl = tRawPop.add(0x1C).readS16();
+                            if (pGr === 4 && pLvl >= getMaxCardLevel(4)) {
+                                log("[⚠️ TRY BLOCKED] Target card is already R50 MAX!");
+                                return;
+                            }
+                        }
+                        var profDirect = loadPlayerProfile();
+                        if (profDirect && profDirect.rhythmPoint !== undefined && profDirect.rhythmPoint < price) {
+                            log("[⚠️ SHORTAGE] Insufficient RP (" + profDirect.rhythmPoint + " < " + price + "); opening shortage popup.");
+                            try {
+                                var openShortageFn = new NativeFunction(baseAddr.add(0xAC1FD0), "void", ["pointer"]);
+                                openShortageFn(NULL);
+                            } catch (eShpD) {}
+                            return;
+                        }
 
                         var ratingupSprite = NULL;
                         var powerupSprite = NULL;
@@ -16760,67 +16979,9 @@ function initIl2Cpp(module) {
                     }
                 };
 
-                // Native trigger for intensify try: opens animated CardIntensifyPopup modal
+                // Native trigger for intensify try: routes safely through unified triggerDirectPopup (RP check, R50 guard, btnBoxSprites null-guard)
                 var triggerNativeIntensifyTry = function(sceneThis) {
-                    try {
-                        if (!sceneThis || sceneThis.isNull()) sceneThis = activeInventorySceneInstance;
-                        if (!sceneThis || sceneThis.isNull()) {
-                            log("[-] triggerNativeIntensifyTry: sceneThis is null!");
-                            return;
-                        }
-                        var matList = sceneThis.add(0xA0).readPointer();
-                        var matCount = (!matList.isNull()) ? matList.add(0x18).readS32() : 0;
-                        if (matCount <= 0) {
-                            log("[-] triggerNativeIntensifyTry: No material cards registered (count=" + matCount + ")");
-                            return;
-                        }
-
-                        // Ensure sceneView base container is active without hiding subviews
-                        try {
-                            var sv = sceneThis.add(0x48).readPointer();
-                            if (!sv.isNull()) {
-                                var svBase = sv.add(0x40).readPointer();
-                                if (!svBase.isNull()) {
-                                    var svGo = svBase.add(0x10).readPointer();
-                                    if (!svGo.isNull()) {
-                                        var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
-                                        setActiveFn(svGo, 1, NULL);
-                                    }
-                                }
-                            }
-                        } catch (eSv) {}
-
-                        var tCardItem = sceneThis.add(0x88).readPointer();
-                        capturePopupSessionFromScene(tCardItem, matList);
-
-                        // Patch 0x105BBD4 to NOP using Memory.patchCode (guarantees ARM64 CPU cache flush)
-                        try {
-                            Memory.patchCode(baseAddr.add(0x105BBD4), 4, function (code) {
-                                code.writeByteArray([0x1f, 0x20, 0x03, 0xd5]); // NOP
-                            });
-                            Memory.patchCode(baseAddr.add(0x105BC4C), 20, function (code) {
-                                code.writeByteArray([0xbf, 0x03, 0x1d, 0xf8, 0x05, 0x00, 0x00, 0x14, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5]);
-                            });
-                            Memory.patchCode(baseAddr.add(0x105BC6C), 20, function (code) {
-                                code.writeByteArray([0xbf, 0x83, 0x1d, 0xf8, 0x05, 0x00, 0x00, 0x14, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5]);
-                            });
-                            log("[🛡️ TRY GUARD] Patched 0x105BBD4, 0x105BC4C, 0x105BC6C via Memory.patchCode (cache flushed)!");
-                        } catch (ePatchNop) {
-                            try {
-                                Memory.protect(baseAddr.add(0x105BBD4), 4, "rwx");
-                                baseAddr.add(0x105BBD4).writeByteArray([0x1f, 0x20, 0x03, 0xd5]);
-                            } catch (eProt) {}
-                        }
-
-                        log("[⚡ TRIGGER NATIVE TRY] Calling native InventoryScene.OnIntensifyTry (0x105BA9C) on: " + sceneThis + " with " + matCount + " materials");
-                        var onTryFn = new NativeFunction(baseAddr.add(0x105BA9C), "void", ["pointer", "pointer"]);
-                        onTryFn(sceneThis, NULL);
-                        log("[⚡ TRIGGER NATIVE TRY] OnIntensifyTry returned cleanly!");
-                    } catch (eTrigTry) {
-                        log("[-] Error in triggerNativeIntensifyTry: " + eTrigTry.message + " stack: " + eTrigTry.stack);
-                        // Fallback to direct popup
-                        triggerDirectPopup(sceneThis);
-                    }
+                    triggerDirectPopup(sceneThis);
                 };
 
                 // Native IntensifyAssist.Start (0xF1CD34) tracer
@@ -16845,30 +17006,22 @@ function initIl2Cpp(module) {
                     log("[-] Error attaching to OpenRhythmPointShortagePopup: " + eShortage.message);
                 }
 
-                // Safe stub for StorePopup.Open (0xB6EE4C) to prevent crash when clicking OK on shortage modals offline
+                // Safe stub for StorePopup.Open (0xB6EE4C) to prevent crash/invalid navigation when clicking OK on shortage modals offline
                 try {
                     Interceptor.replace(baseAddr.add(0xB6EE4C), keepCb(new NativeCallback(function (type, callback, loadedCallback, category, code, methodInfo) {
-                        log("[🛒 STORE POPUP] StorePopup.Open suppressed in offline mode (type=" + type + ", category=" + category + ")");
-                        if (callback && !callback.isNull()) {
-                            try {
-                                var actionInvoke = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer", "pointer"]);
-                                actionInvoke(callback, NULL);
-                            } catch (eCb) {}
-                        }
+                        log("[🛒 STORE POPUP] StorePopup.Open suppressed cleanly in offline mode (type=" + type + ", category=" + category + ")");
                     }, "void", ["int", "pointer", "pointer", "int", "int", "pointer"])));
                     log("[+] Interceptor.replace installed on StorePopup.Open (0xB6EE4C)!");
                 } catch (eStore) {
                     log("[-] Error replacing StorePopup.Open: " + eStore.message);
                 }
 
-                // Attach monitor to native InventoryScene.OnIntensifyTry (0x105BA9C)
+                // Replace native InventoryScene.OnIntensifyTry (0x105BA9C) -> crash-proof offline handler (RP check, R50 guard, safe btnBoxSprites)
                 try {
-                    Interceptor.attach(baseAddr.add(0x105BA9C), {
-                        onEnter: function(args) {
-                            log("[⚡ NATIVE OnIntensifyTry ENTER] scene=" + args[0]);
-                            capturePopupSessionFromScene(NULL, NULL);
-                        }
-                    });
+                    Interceptor.replace(baseAddr.add(0x105BA9C), keepCb(new NativeCallback(function(sceneThis, methodInfo) {
+                        log("[⚡ NATIVE OnIntensifyTry REPLACE] scene=" + sceneThis);
+                        triggerDirectPopup(sceneThis);
+                    }, "void", ["pointer", "pointer"])));
                     Interceptor.attach(baseAddr.add(0xF1CBEC), {
                         onEnter: function(args) {
                             log("[⚡ IntensifyAssist.Open ENTER] params=" + args[0] + ", callback=" + args[1]);
@@ -17301,8 +17454,9 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             var isLk = (r.add(0x29).readU8() === 1);
                             var gr = r.add(0x24).readS32();
                             var oId = r.add(0x10).readS64();
-                            if (!isEq && !isLk && gr <= maxGr && oId !== 0) {
-                                soldObjIds[oId] = true;
+                            var oKey = objIdKey(oId);
+                            if (!isEq && !isLk && gr <= maxGr && oKey !== "0") {
+                                soldObjIds[oKey] = true;
                                 soldCount++;
                                 totalEarnedRp += getCardSellPrice(gr);
                             }
@@ -17327,7 +17481,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 newRpTotal = profile.rhythmPoint;
                                 if (Array.isArray(profile.inventoryCards)) {
                                     profile.inventoryCards = profile.inventoryCards.filter(function(entry) {
-                                        return !soldObjIds[entry.objectID];
+                                        return !soldObjIds[objIdKey(entry.objectID)];
                                     });
                                 }
                                 savePlayerProfile(profile);
@@ -17340,8 +17494,27 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             if (!ci || ci.isNull()) return false;
                             var r = ci.add(0x10).readPointer();
                             if (r.isNull()) return false;
-                            return !soldObjIds[r.add(0x10).readS64()];
+                            return !soldObjIds[objIdKey(r.add(0x10).readS64())];
                         });
+
+                        // Also remove sold cards from in-memory CardMap Dictionary
+                        try {
+                            var getCardMapFnB = new NativeFunction(baseAddr.add(0xF2751C), "pointer", ["pointer"]);
+                            var cardMapB = getCardMapFnB(NULL);
+                            if (cardMapB && !cardMapB.isNull()) {
+                                var dictRemoveFnB = findMethod("mscorlib", "System.Collections.Generic", "Dictionary`2", "Remove", 1);
+                                if (dictRemoveFnB) {
+                                    for (var sIdKey in soldObjIds) {
+                                        var sIdNum = parseInt(sIdKey, 10);
+                                        if (isNaN(sIdNum)) continue;
+                                        var remArgsB = Memory.alloc(Process.pointerSize * 2);
+                                        remArgsB.writeS64(sIdNum);
+                                        remArgsB.add(Process.pointerSize).writePointer(NULL);
+                                        il2cpp_runtime_invoke(dictRemoveFnB, cardMapB, remArgsB, NULL);
+                                    }
+                                }
+                            }
+                        } catch (eMapB) {}
 
                         log("[💰 OFFLINE SELL BUNDLE] Sold " + soldCount + " cards for +" + totalEarnedRp + " RP! New RP=" + newRpTotal + ", Remaining=" + loonaCardItems.length);
                         restoreDefaultDisplayCardList(sceneThis, true, true);
@@ -17453,6 +17626,38 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         }
                     }, "void", ["pointer", "pointer"]));
 
+                    var refreshAfterSortOrFilter = function(sceneThis, isSortChange) {
+                        if (!sceneThis || sceneThis.isNull()) return;
+                        var curState = sceneThis.add(0x24).readS32();
+                        if (curState === 8) {
+                            if (isSortChange) offlineMaterialSortActive = true;
+                            try {
+                                var sv = sceneThis.add(0x48).readPointer();
+                                if (!sv.isNull()) {
+                                    var sortView = sv.add(0x80).readPointer();
+                                    if (!sortView.isNull()) {
+                                        var sortText = sortView.add(0x40).readPointer();
+                                        var sortNames = ["Low", "High", "Newest"];
+                                        var matMode = offlineMaterialSortActive ? offlineSortType : 0;
+                                        if (!sortText.isNull()) {
+                                            var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                            setTextFn(sortText, createIl2CppString(sortNames[matMode] || "Low"), NULL);
+                                        }
+                                        var setButtonStateFn = new NativeFunction(baseAddr.add(0xF25BF0), "void", ["pointer", "int", "int", "bool", "pointer"]);
+                                        setButtonStateFn(sortView, 0, matMode, 0, NULL);
+                                        setButtonStateFn(sortView, 1, 0, offlineFilterGroup ? 1 : 0, NULL);
+                                        setButtonStateFn(sortView, 1, 1, offlineFilterMaterial ? 1 : 0, NULL);
+                                        setButtonStateFn(sortView, 1, 2, offlineFilterLock ? 1 : 0, NULL);
+                                        setButtonStateFn(sortView, 1, 3, offlineFilterPrism ? 1 : 0, NULL);
+                                    }
+                                }
+                            } catch (eMatSortUi) {}
+                            populateMaterialDisplayCardList(sceneThis);
+                        } else {
+                            applyOfflineSortAndFilter(sceneThis, true);
+                        }
+                    };
+
                     // InventoryScene.OnSortSelect (0x105D830)
                     Interceptor.replace(baseAddr.add(0x105D830), new NativeCallback(function(sceneThis, type, methodInfo) {
                         var sortTypeVal = (typeof type === 'number') ? type : (type && type.toInt32 ? type.toInt32() : 0);
@@ -17473,35 +17678,35 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 }
                             }
                         } catch (eCls) {}
-                        applyOfflineSortAndFilter(sceneThis, true);
+                        refreshAfterSortOrFilter(sceneThis, true);
                     }, "void", ["pointer", "int", "pointer"]));
 
                     // InventoryScene.OnSortGroup (0x105D960)
                     Interceptor.replace(baseAddr.add(0x105D960), new NativeCallback(function(sceneThis, methodInfo) {
                         offlineFilterGroup = !offlineFilterGroup;
                         log("[👥 NATIVE OnSortGroup] Intercepted! Toggled offlineFilterGroup=" + offlineFilterGroup);
-                        applyOfflineSortAndFilter(sceneThis, true);
+                        refreshAfterSortOrFilter(sceneThis, false);
                     }, "void", ["pointer", "pointer"]));
 
                     // InventoryScene.OnSortMaterial (0x105DA78)
                     Interceptor.replace(baseAddr.add(0x105DA78), new NativeCallback(function(sceneThis, methodInfo) {
                         offlineFilterMaterial = !offlineFilterMaterial;
                         log("[⚡ NATIVE OnSortMaterial] Intercepted! Toggled offlineFilterMaterial=" + offlineFilterMaterial);
-                        applyOfflineSortAndFilter(sceneThis, true);
+                        refreshAfterSortOrFilter(sceneThis, false);
                     }, "void", ["pointer", "pointer"]));
 
                     // InventoryScene.OnSortLock (0x105DB5C)
                     Interceptor.replace(baseAddr.add(0x105DB5C), new NativeCallback(function(sceneThis, methodInfo) {
                         offlineFilterLock = !offlineFilterLock;
                         log("[🔒 NATIVE OnSortLock] Intercepted! Toggled offlineFilterLock=" + offlineFilterLock);
-                        applyOfflineSortAndFilter(sceneThis, true);
+                        refreshAfterSortOrFilter(sceneThis, false);
                     }, "void", ["pointer", "pointer"]));
 
                     // InventoryScene.OnSortPrism (0x105DC40)
                     Interceptor.replace(baseAddr.add(0x105DC40), new NativeCallback(function(sceneThis, methodInfo) {
                         offlineFilterPrism = !offlineFilterPrism;
                         log("[🌈 NATIVE OnSortPrism] Intercepted! Toggled offlineFilterPrism=" + offlineFilterPrism);
-                        applyOfflineSortAndFilter(sceneThis, true);
+                        refreshAfterSortOrFilter(sceneThis, false);
                     }, "void", ["pointer", "pointer"]));
 
                     // InvenSortView UI Click Handlers:
@@ -17522,7 +17727,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     }
                                 }
                             }
-                            applyOfflineSortAndFilter(activeInventorySceneInstance, true);
+                            refreshAfterSortOrFilter(activeInventorySceneInstance, true);
                         }
                     }, "void", ["pointer", "pointer", "pointer"]));
 
@@ -17543,7 +17748,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     }
                                 }
                             }
-                            applyOfflineSortAndFilter(activeInventorySceneInstance, true);
+                            refreshAfterSortOrFilter(activeInventorySceneInstance, true);
                         }
                     }, "void", ["pointer", "pointer", "pointer"]));
 
@@ -17564,7 +17769,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     }
                                 }
                             }
-                            applyOfflineSortAndFilter(activeInventorySceneInstance, true);
+                            refreshAfterSortOrFilter(activeInventorySceneInstance, true);
                         }
                     }, "void", ["pointer", "pointer", "pointer"]));
 
@@ -17572,28 +17777,28 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     Interceptor.replace(baseAddr.add(0xF2635C), new NativeCallback(function(viewThis, go, methodInfo) {
                         offlineFilterLock = !offlineFilterLock;
                         log("[🔒 UI OnLock] Toggled offlineFilterLock=" + offlineFilterLock);
-                        if (activeInventorySceneInstance) applyOfflineSortAndFilter(activeInventorySceneInstance, true);
+                        if (activeInventorySceneInstance) refreshAfterSortOrFilter(activeInventorySceneInstance, false);
                     }, "void", ["pointer", "pointer", "pointer"]));
 
                     // InvenSortView.OnMaterial (0xF263BC)
                     Interceptor.replace(baseAddr.add(0xF263BC), new NativeCallback(function(viewThis, go, methodInfo) {
                         offlineFilterMaterial = !offlineFilterMaterial;
                         log("[⚡ UI OnMaterial] Toggled offlineFilterMaterial=" + offlineFilterMaterial);
-                        if (activeInventorySceneInstance) applyOfflineSortAndFilter(activeInventorySceneInstance, true);
+                        if (activeInventorySceneInstance) refreshAfterSortOrFilter(activeInventorySceneInstance, false);
                     }, "void", ["pointer", "pointer", "pointer"]));
 
                     // InvenSortView.OnGroup (0xF2641C)
                     Interceptor.replace(baseAddr.add(0xF2641C), new NativeCallback(function(viewThis, go, methodInfo) {
                         offlineFilterGroup = !offlineFilterGroup;
                         log("[👥 UI OnGroup] Toggled offlineFilterGroup=" + offlineFilterGroup);
-                        if (activeInventorySceneInstance) applyOfflineSortAndFilter(activeInventorySceneInstance, true);
+                        if (activeInventorySceneInstance) refreshAfterSortOrFilter(activeInventorySceneInstance, false);
                     }, "void", ["pointer", "pointer", "pointer"]));
 
                     // InvenSortView.OnPrism (0xF2647C)
                     Interceptor.replace(baseAddr.add(0xF2647C), new NativeCallback(function(viewThis, go, methodInfo) {
                         offlineFilterPrism = !offlineFilterPrism;
                         log("[🌈 UI OnPrism] Toggled offlineFilterPrism=" + offlineFilterPrism);
-                        if (activeInventorySceneInstance) applyOfflineSortAndFilter(activeInventorySceneInstance, true);
+                        if (activeInventorySceneInstance) refreshAfterSortOrFilter(activeInventorySceneInstance, false);
                     }, "void", ["pointer", "pointer", "pointer"]));
 
                     // Gameplay & Stage Network Bypasses for GameControl
@@ -17686,6 +17891,25 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     try {
                         if (!session || !session.materials || session.materials.length === 0) return;
                         if (session.consumedCommitted) return;
+                        // Validate RP cleanly before committing
+                        var checkProfRp = loadPlayerProfile();
+                        var plannedCost = 0;
+                        if (session.steps && session.steps.length > 0) {
+                            for (var sIdxC = 0; sIdxC < session.steps.length; sIdxC++) {
+                                var stC = session.steps[sIdxC];
+                                if (stC && stC.material) {
+                                    var bGrC = (stC.before && stC.before.grade !== undefined) ? stC.before.grade : 0;
+                                    var bLvlC = (stC.before && stC.before.level !== undefined) ? stC.before.level : 1;
+                                    var cInfo = getIntensifyPriceAndRate(bGrC, bLvlC, stC.material.grade, stC.material.level);
+                                    if (cInfo && cInfo.price) plannedCost += cInfo.price;
+                                }
+                            }
+                        }
+                        if (checkProfRp && checkProfRp.rhythmPoint !== undefined && checkProfRp.rhythmPoint < plannedCost) {
+                            log("[⚠️ CONSUME ABORTED] Insufficient RP (" + checkProfRp.rhythmPoint + " < " + plannedCost + ")");
+                            return false;
+                        }
+
                         session.consumedCommitted = true;
 
                         var consumedCount = session.materials.length;
@@ -17693,11 +17917,10 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         for (var k = 0; k < session.materials.length; k++) {
                             var m = session.materials[k];
                             if (m && m.objId !== undefined) {
-                                consumedIds[m.objId] = true;
-                                consumedIds[m.objId.toString()] = true;
+                                consumedIds[objIdKey(m.objId)] = true;
                             }
                         }
-                        log("[🔥 CONSUME MATERIALS] Burning " + consumedCount + " cards: " + JSON.stringify(session.materials.map(function(mat) { return { objId: mat.objId, cId: mat.cardId, gr: mat.grade, lvl: mat.level }; })));
+                        log("[🔥 CONSUME MATERIALS] Burning " + consumedCount + " cards: " + JSON.stringify(session.materials.map(function(mat) { return { objId: objIdKey(mat.objId), cId: mat.cardId, gr: mat.grade, lvl: mat.level }; })));
 
                         // 1. Update target card in memory (if available)
                         var targetCardPtr = session.targetCard;
@@ -17707,16 +17930,20 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 if (targetCardPtr.isNull()) targetCardPtr = activeInventorySceneInstance.add(0x98).readPointer();
                             }
                         }
+                        var targetIsEquip = false;
+                        var targetCardIdForSync = (session.targetInitial && session.targetInitial.cardId) ? session.targetInitial.cardId : 0;
                         if (targetCardPtr && !targetCardPtr.isNull() && session.finalTargetStats) {
                             var rawObj = targetCardPtr.add(0x10).readPointer();
                             if (!rawObj.isNull()) {
+                                targetIsEquip = (rawObj.add(0x28).readU8() === 1);
+                                targetCardIdForSync = rawObj.add(0x20).readS32();
                                 rawObj.add(0x18).writeS16(session.finalTargetStats.energy);
                                 rawObj.add(0x1A).writeS16(session.finalTargetStats.score);
                                 rawObj.add(0x1C).writeS16(session.finalTargetStats.level);
                                 rawObj.add(0x24).writeS32(session.finalTargetStats.grade);
                                 var finLvl = session.finalTargetStats.level;
                                 var finGr = session.finalTargetStats.grade;
-                                var newCode = (finGr < 4) ? (finGr * 5 + Math.min(4, finLvl - 1)) : (20 + Math.min(98, finLvl - 1));
+                                var newCode = getIntensifyCode(finGr, finLvl);
                                 targetCardPtr.add(0x20).writeS16(newCode);
                                 log("[⚡ TARGET UPDATED] Target card updated in memory: Grade=" + finGr + ", Level=" + finLvl);
                             }
@@ -17729,8 +17956,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 if (!ci || ci.isNull()) return false;
                                 var r = ci.add(0x10).readPointer();
                                 if (!r || r.isNull()) return false;
-                                var oId = r.add(0x10).readS64();
-                                return !consumedIds[oId] && !consumedIds[oId.toString()];
+                                return !consumedIds[objIdKey(r.add(0x10).readS64())];
                             });
                             log("[🃏 LOONA CARD ITEMS] Filtered loonaCardItems: " + countBefore + " -> " + loonaCardItems.length);
                         }
@@ -17739,60 +17965,62 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         try {
                             var profile = loadPlayerProfile();
                             if (profile) {
-                                var totalCost = 0;
-                                if (session.steps && session.steps.length > 0) {
-                                    for (var sIdx = 0; sIdx < session.steps.length; sIdx++) {
-                                        var st = session.steps[sIdx];
-                                        if (st && st.material) {
-                                            var bGr = (st.before && st.before.grade !== undefined) ? st.before.grade : 0;
-                                            var bLvl = (st.before && st.before.level !== undefined) ? st.before.level : 1;
-                                            var info = getIntensifyPriceAndRate(bGr, bLvl, st.material.grade, st.material.level);
-                                            if (info && info.price) totalCost += info.price;
-                                        }
-                                    }
+                                if (profile.rhythmPoint !== undefined && plannedCost > 0) {
+                                    profile.rhythmPoint = Math.max(0, profile.rhythmPoint - plannedCost);
+                                    log("[💰 RP DEDUCTION] Deducted " + plannedCost + " RP. Remaining balance: " + profile.rhythmPoint);
                                 }
-                                if (profile.rhythmPoint !== undefined && totalCost > 0) {
-                                    profile.rhythmPoint = Math.max(0, profile.rhythmPoint - totalCost);
-                                    log("[💰 RP DEDUCTION] Deducted " + totalCost + " RP. Remaining balance: " + profile.rhythmPoint);
-                                }
-
-                                // Live UI update on TopView (Rhythm Points counter)
-                                try {
-                                    refreshTopViewRhythmPoint(profile.rhythmPoint);
-                                } catch (eTopRp) {
-                                    log("[-] Error updating TopView RP: " + eTopRp.message);
-                                }
-
-                                // Update in-memory UserControl
-                                try {
-                                    setupUserControl(profile);
-                                } catch (eUc) {}
 
                                 if (profile.inventoryCards && Array.isArray(profile.inventoryCards)) {
                                     var profBefore = profile.inventoryCards.length;
                                     profile.inventoryCards = profile.inventoryCards.filter(function(cj) {
-                                        return !consumedIds[cj.objectID] && !consumedIds[cj.objectID ? cj.objectID.toString() : ""];
+                                        return !consumedIds[objIdKey(cj.objectID)];
                                     });
                                     if (session.targetInitial && session.finalTargetStats) {
-                                        var tOId = session.targetInitial.objId;
+                                        var tOKey = objIdKey(session.targetInitial.objId);
                                         var tCId = session.targetInitial.cardId;
                                         for (var pc = 0; pc < profile.inventoryCards.length; pc++) {
                                             var cardEntry = profile.inventoryCards[pc];
-                                            if (cardEntry.objectID === tOId || cardEntry.cardID === tCId) {
+                                            var matchByObj = (tOKey !== "0" && objIdKey(cardEntry.objectID) === tOKey);
+                                            var matchFallback = (tOKey === "0" && cardEntry.cardID === tCId);
+                                            if (matchByObj || matchFallback) {
                                                 cardEntry.grade = session.finalTargetStats.grade;
                                                 cardEntry.level = session.finalTargetStats.level;
                                                 cardEntry.score = session.finalTargetStats.score;
                                                 cardEntry.energy = session.finalTargetStats.energy;
+                                                if (cardEntry.isEquip) targetIsEquip = true;
+                                                break;
                                             }
                                         }
                                     }
                                     log("[💾 PROFILE UPDATED] profile.inventoryCards: " + profBefore + " -> " + profile.inventoryCards.length);
                                 }
                                 savePlayerProfile(profile);
+                                // Update in-memory UserControl then refresh all TopView currency counters (keeps RP & Diamond synced)
+                                try {
+                                    setupUserControl(profile);
+                                } catch (eUc) {}
+                                try {
+                                    refreshTopViewRhythmPoint(profile.rhythmPoint);
+                                } catch (eTopRp) {
+                                    log("[-] Error updating TopView RP: " + eTopRp.message);
+                                }
                             }
                         } catch (eProf) {
                             log("[-] Error updating player_profile.json: " + eProf.message);
                         }
+
+                        // 3b. Sync equipped group FastArray, Inventory header & CardBook if equipped or upgraded
+                        try {
+                            if (targetIsEquip && targetCardIdForSync > 0) {
+                                var syncMeta = getCardMetadata(targetCardIdForSync);
+                                var syncGroup = (syncMeta && (syncMeta.groupID || syncMeta.group)) ? (syncMeta.groupID || syncMeta.group) : (currentSelectedGroupCode || 1001);
+                                syncGroupEquippedFastArray(syncGroup);
+                                refreshInventoryHeaderView();
+                            }
+                            if (session.targetInitial && session.finalTargetStats && session.finalTargetStats.grade > session.targetInitial.grade) {
+                                try { ensureCardBookControlData(); } catch (eCbkUp) {}
+                            }
+                        } catch (eSync) {}
 
                         // 4. Remove consumed cards from native CardMap Dictionary
                         try {
@@ -17840,55 +18068,98 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             log("[✨ INTENSIFY RESULT] Allocated CardIntensifyPopup.Result: " + newRes);
                         }
 
-                        // 2. Build boolArray from activePopupSession.steps & compute stat progression
+                        // 2. Build boolArray from activePopupSession.steps & compute stat progression (supports Upgrade C5->B1..S5->R1 & R50 cap)
                         var boolArr = [];
+                        var isUpgradeSession = false;
                         if (activePopupSession && activePopupSession.steps && activePopupSession.steps.length > 0) {
                             var tInit = activePopupSession.targetInitial || { cardId: 1001, grade: 0, level: 1, score: 100, energy: 100, isPrism: false };
                             var curLevel = tInit.level;
                             var curGrade = tInit.grade;
                             var isPrism = !!tInit.isPrism;
-                            var maxLevel = (curGrade === 4) ? 99 : 5;
+                            var maxLevel = getMaxCardLevel(curGrade);
 
-                            for (var s = 0; s < activePopupSession.steps.length; s++) {
-                                var st = activePopupSession.steps[s];
-                                var stepBeforeLevel = curLevel;
-                                var stepBeforeStats = getCardBaseStats(curGrade, stepBeforeLevel, isPrism);
-
-                                if (testIntensifyMode === "force_fail") {
-                                    st.isSuccess = false;
-                                } else if (testIntensifyMode === "force_success") {
-                                    st.isSuccess = (curLevel < maxLevel);
-                                } else if (testIntensifyMode === "step_demo") {
-                                    st.isSuccess = (s > 0 && curLevel < maxLevel);
-                                } else {
-                                    var roll = Math.random() * 100.0;
-                                    var info = getIntensifyPriceAndRate(curGrade, curLevel, st.material.grade, st.material.level);
-                                    st.isSuccess = (roll < info.rate) && (curLevel < maxLevel);
-                                }
-
-                                if (st.isSuccess && curLevel < maxLevel) {
-                                    curLevel++;
-                                }
-
-                                var stepAfterStats = getCardBaseStats(curGrade, curLevel, isPrism);
-                                st.before = {
+                            if (curGrade < 4 && curLevel >= 5) {
+                                // Grade Up / Upgrade (C5->B1, B5->A1, A5->S1, S5->R1): 100% guaranteed, consumes 1 material
+                                isUpgradeSession = true;
+                                var stUp = activePopupSession.steps[0];
+                                var upBeforeStats = getCardBaseStats(curGrade, curLevel, isPrism);
+                                var prevGr = curGrade;
+                                var prevLv = curLevel;
+                                curGrade = curGrade + 1;
+                                curLevel = 1;
+                                var upAfterStats = getCardBaseStats(curGrade, curLevel, isPrism);
+                                stUp.isUpgrade = true;
+                                stUp.isSuccess = true;
+                                stUp.before = {
                                     cardId: tInit.cardId,
-                                    grade: curGrade,
-                                    level: stepBeforeLevel,
+                                    grade: prevGr,
+                                    level: prevLv,
                                     isPrism: isPrism,
-                                    score: stepBeforeStats.score,
-                                    energy: stepBeforeStats.energy
+                                    score: upBeforeStats.score,
+                                    energy: upBeforeStats.energy
                                 };
-                                st.after = {
+                                stUp.after = {
                                     cardId: tInit.cardId,
                                     grade: curGrade,
                                     level: curLevel,
                                     isPrism: isPrism,
-                                    score: stepAfterStats.score,
-                                    energy: stepAfterStats.energy
+                                    score: upAfterStats.score,
+                                    energy: upAfterStats.energy
                                 };
-                                st.isMaxLevelReached = (curLevel >= maxLevel);
-                                boolArr.push(!!st.isSuccess);
+                                stUp.isMaxLevelReached = false;
+                                activePopupSession.steps = [stUp];
+                                if (activePopupSession.materials && activePopupSession.materials.length > 1) {
+                                    activePopupSession.materials = [activePopupSession.materials[0]];
+                                }
+                                activePopupSession.isUpgradeSession = true;
+                                boolArr.push(true);
+                                log("[🌟 UPGRADE POPUP] " + tInit.cardId + ": Grade " + prevGr + " Lvl 5 -> Grade " + curGrade + " Lvl 1");
+                            } else {
+                                activePopupSession.isUpgradeSession = false;
+                                for (var s = 0; s < activePopupSession.steps.length; s++) {
+                                    var st = activePopupSession.steps[s];
+                                    var stepBeforeLevel = curLevel;
+                                    var stepBeforeStats = getCardBaseStats(curGrade, stepBeforeLevel, isPrism);
+
+                                    if (curLevel >= maxLevel) {
+                                        st.isSuccess = false;
+                                    } else if (testIntensifyMode === "force_fail") {
+                                        st.isSuccess = false;
+                                    } else if (testIntensifyMode === "force_success") {
+                                        st.isSuccess = true;
+                                    } else if (testIntensifyMode === "step_demo") {
+                                        st.isSuccess = (s > 0);
+                                    } else {
+                                        var roll = Math.random() * 100.0;
+                                        var info = getIntensifyPriceAndRate(curGrade, curLevel, st.material.grade, st.material.level);
+                                        st.isSuccess = (roll < info.rate);
+                                    }
+
+                                    if (st.isSuccess && curLevel < maxLevel) {
+                                        curLevel++;
+                                    }
+
+                                    var stepAfterStats = getCardBaseStats(curGrade, curLevel, isPrism);
+                                    st.isUpgrade = false;
+                                    st.before = {
+                                        cardId: tInit.cardId,
+                                        grade: curGrade,
+                                        level: stepBeforeLevel,
+                                        isPrism: isPrism,
+                                        score: stepBeforeStats.score,
+                                        energy: stepBeforeStats.energy
+                                    };
+                                    st.after = {
+                                        cardId: tInit.cardId,
+                                        grade: curGrade,
+                                        level: curLevel,
+                                        isPrism: isPrism,
+                                        score: stepAfterStats.score,
+                                        energy: stepAfterStats.energy
+                                    };
+                                    st.isMaxLevelReached = (curLevel >= maxLevel);
+                                    boolArr.push(!!st.isSuccess);
+                                }
                             }
 
                             activePopupSession.finalTargetStats = {
@@ -17899,7 +18170,10 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             };
 
                             // Commit consumption of materials, persist profile and update in-memory lists
-                            commitConsumedMaterials(activePopupSession);
+                            var committed = commitConsumedMaterials(activePopupSession);
+                            if (committed === false) {
+                                return;
+                            }
                         } else {
                             boolArr = [false];
                         }
@@ -17909,6 +18183,16 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             log("[-] triggerPopupIntensifyResult: ctxList failed to create!");
                             return;
                         }
+
+                        // Sync CardIntensifyPopup.Params flags (isRCard, isMaxLevel) for native header/sound/FX
+                        try {
+                            var pParams = pop.add(0x38).readPointer();
+                            if (!pParams.isNull()) {
+                                var finGrFlag = (activePopupSession && activePopupSession.finalTargetStats) ? activePopupSession.finalTargetStats.grade : 0;
+                                pParams.add(0xB8).writeU8((finGrFlag === 4) ? 1 : 0);
+                                pParams.add(0xB9).writeU8(isUpgradeSession ? 1 : 0);
+                            }
+                        } catch (ePfSet) {}
 
                         // 3. Reset index to 0
                         pop.add(0x158).writeS32(0);
@@ -17927,9 +18211,10 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         // Schedule safety watchdog on Unity Main Thread in ~75 frames (~1250ms)
                         popupResultWatchdogCountdown = 75;
 
-                        log("[✨ INTENSIFY RESULT] Calling CardIntensifyPopup.IntensifyResult (0x138467C) with " + boolArr.length + " attempts...");
+                        var isMaxParam = (activePopupSession && activePopupSession.steps && activePopupSession.steps[0] && activePopupSession.steps[0].isMaxLevelReached) ? 1 : 0;
+                        log("[✨ INTENSIFY RESULT] Calling CardIntensifyPopup.IntensifyResult (0x138467C) with " + boolArr.length + " attempts (isUpgrade=" + isUpgradeSession + ")...");
                         var intResFn = new NativeFunction(baseAddr.add(0x138467C), "void", ["pointer", "int", "pointer", "pointer"]);
-                        intResFn(pop, 0, ctxList, NULL);
+                        intResFn(pop, isMaxParam, ctxList, NULL);
                         log("[✨ INTENSIFY RESULT] IntensifyResult returned cleanly! State=" + pop.add(0x10C).readS32());
                     } catch (eTrigRes) {
                         log("[-] Error triggering IntensifyResult: " + eTrigRes.message);
@@ -18032,10 +18317,14 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     if (activePopupSession && activePopupSession.materials && activePopupSession.materials.length > 0) {
                                         if (!mCard.isNull()) applyPopupCardLargeState(mCard, activePopupSession.materials[0], "OnBuild.materialCard[0]");
                                     }
-                                    // Ensure Title is "Power Up" and active
+                                    // Set dynamic Title ("Upgrade", "Level Up", or "Power Up") and keep active
                                     try {
+                                        var initInfo = (activePopupSession && activePopupSession.targetInitial) ? activePopupSession.targetInitial : null;
+                                        var obIsUpgrade = initInfo ? (initInfo.grade < 4 && initInfo.level >= 5) : false;
+                                        var obIsR = initInfo ? (initInfo.grade === 4) : false;
+                                        var obTitle = obIsUpgrade ? "Upgrade" : (obIsR ? "Level Up" : "Power Up");
                                         var setTitleFn = new NativeFunction(baseAddr.add(0x1148F6C), "void", ["pointer", "pointer"]);
-                                        setTitleFn(pop, createIl2CppString("Power Up"));
+                                        setTitleFn(pop, createIl2CppString(obTitle));
                                         var titleBase = pop.add(0x90).readPointer();
                                         if (!titleBase.isNull()) {
                                             var titleGo = titleBase.add(0x10).readPointer();
@@ -18043,6 +18332,12 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                                 var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
                                                 setActiveFn(titleGo, 1, NULL);
                                             }
+                                        }
+                                        // Match popup try button text ("Upgrade" / "Level Up" / "Power Up")
+                                        var btnTryPop = pop.add(0x148).readPointer();
+                                        if (!btnTryPop.isNull()) {
+                                            var setBtnTextFnPop = new NativeFunction(baseAddr.add(0xE9B7B0), "void", ["pointer", "pointer", "pointer"]);
+                                            setBtnTextFnPop(btnTryPop, createIl2CppString(obTitle), NULL);
                                         }
                                     } catch (eTit0) {}
                                     // Do not auto-trigger immediately, allow inspection & manual tap on Rating Up (or explicit try_popup command)
@@ -18122,10 +18417,13 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
                                 var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
 
-                                // 1. Force Title to "Power Up" and make title active
+                                // 1. Set dynamic Title ("Upgrade", "Level Up", or "Power Up") and make title active
                                 try {
+                                    var resIsUpgrade = !!(activePopupSession && activePopupSession.isUpgradeSession);
+                                    var resIsR = !!(activePopupSession && activePopupSession.finalTargetStats && activePopupSession.finalTargetStats.grade === 4);
+                                    var resTitle = resIsUpgrade ? "Upgrade" : (resIsR ? "Level Up" : "Power Up");
                                     var setTitleFn = new NativeFunction(baseAddr.add(0x1148F6C), "void", ["pointer", "pointer"]);
-                                    setTitleFn(pop, createIl2CppString("Power Up"));
+                                    setTitleFn(pop, createIl2CppString(resTitle));
 
                                     var titleBase = pop.add(0x90).readPointer();
                                     if (!titleBase.isNull()) {
@@ -18210,29 +18508,37 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     }
 
                                     if (lastResultSuccess) {
-                                        // SUCCEED effects: show purple deltas on stat
+                                        // SUCCEED effects: show authentic purple stat deltas (without fake minimums)
                                         if (!stat.isNull()) {
-                                            var dScore = (step && step.after && step.before) ? Math.max(2, step.after.score - step.before.score) : 2;
-                                            var dEnergy = (step && step.after && step.before) ? Math.max(3, step.after.energy - step.before.energy) : 3;
+                                            var dScore = (step && step.after && step.before) ? Math.max(0, step.after.score - step.before.score) : 0;
+                                            var dEnergy = (step && step.after && step.before) ? Math.max(0, step.after.energy - step.before.energy) : 0;
                                             var scoreRise = stat.add(0x50).readPointer();
                                             if (!scoreRise.isNull()) {
-                                                setTextFn(scoreRise, createIl2CppString("+" + dScore), NULL);
-                                                scoreRise.add(0x20).writeFloat(0.72);
-                                                scoreRise.add(0x24).writeFloat(0.39);
-                                                scoreRise.add(0x28).writeFloat(0.83);
-                                                scoreRise.add(0x2C).writeFloat(1.0);
                                                 var sRiseGo = getGoFn(scoreRise, NULL);
-                                                if (!sRiseGo.isNull()) setActiveFn(sRiseGo, 1, NULL);
+                                                if (dScore > 0) {
+                                                    setTextFn(scoreRise, createIl2CppString("+" + dScore), NULL);
+                                                    scoreRise.add(0x20).writeFloat(0.72);
+                                                    scoreRise.add(0x24).writeFloat(0.39);
+                                                    scoreRise.add(0x28).writeFloat(0.83);
+                                                    scoreRise.add(0x2C).writeFloat(1.0);
+                                                    if (!sRiseGo.isNull()) setActiveFn(sRiseGo, 1, NULL);
+                                                } else if (!sRiseGo.isNull()) {
+                                                    setActiveFn(sRiseGo, 0, NULL);
+                                                }
                                             }
                                             var energyRise = stat.add(0x70).readPointer();
                                             if (!energyRise.isNull()) {
-                                                setTextFn(energyRise, createIl2CppString("+" + dEnergy), NULL);
-                                                energyRise.add(0x20).writeFloat(0.72);
-                                                energyRise.add(0x24).writeFloat(0.39);
-                                                energyRise.add(0x28).writeFloat(0.83);
-                                                energyRise.add(0x2C).writeFloat(1.0);
                                                 var eRiseGo = getGoFn(energyRise, NULL);
-                                                if (!eRiseGo.isNull()) setActiveFn(eRiseGo, 1, NULL);
+                                                if (dEnergy > 0) {
+                                                    setTextFn(energyRise, createIl2CppString("+" + dEnergy), NULL);
+                                                    energyRise.add(0x20).writeFloat(0.72);
+                                                    energyRise.add(0x24).writeFloat(0.39);
+                                                    energyRise.add(0x28).writeFloat(0.83);
+                                                    energyRise.add(0x2C).writeFloat(1.0);
+                                                    if (!eRiseGo.isNull()) setActiveFn(eRiseGo, 1, NULL);
+                                                } else if (!eRiseGo.isNull()) {
+                                                    setActiveFn(eRiseGo, 0, NULL);
+                                                }
                                             }
                                         }
                                     } else {
@@ -18305,12 +18611,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     return 0; // Return 0 (false) so Popup.OnClick does NOT close popup on Next!
                                 } else {
                                     log("[👉 DISMISS / OK] Final result confirmed, closing popup cleanly via Popup.OnClick -> Close...");
-                                    try {
-                                        if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
-                                            triggerSafeOnIntensify(activeInventorySceneInstance);
-                                        }
-                                    } catch (eResInven) {}
-                                    return 1; // Return 1 (true) so Popup.OnClick proceeds to Popup.Close()
+                                    return 1; // Return 1 (true) so Popup.OnClick proceeds to Popup.Close() and IntensifyAssist.Complete handles a single clean refresh!
                                 }
                             } catch (eOco) {
                                 log("[-] Error in OnClickOverride replacement: " + eOco.message);
@@ -18573,7 +18874,14 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             activeCardIntensifyPopup = NULL;
                             if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
                                 try {
-                                    triggerSafeOnIntensify(activeInventorySceneInstance);
+                                    var finStats = (activePopupSession && activePopupSession.finalTargetStats) ? activePopupSession.finalTargetStats : null;
+                                    var reachedRMax = !!(finStats && finStats.grade === 4 && finStats.level >= getMaxCardLevel(4));
+                                    if (reachedRMax) {
+                                        log("[🌟 MAX REACHED] Target card reached R50 MAX -> returning to STATE.Main!");
+                                        safeSetStateMain(activeInventorySceneInstance, true);
+                                    } else {
+                                        triggerSafeOnIntensify(activeInventorySceneInstance);
+                                    }
                                 } catch (eShw) {}
                             }
                         }
