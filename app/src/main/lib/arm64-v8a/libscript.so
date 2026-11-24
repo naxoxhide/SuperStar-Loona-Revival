@@ -45,6 +45,8 @@ if (abortPtr) {
 
 var globalTitleScene = null;
 var globalPlayerObj = null;
+var isCardBookDetailOpen = false;
+var activeClosingPopupClass = null;
 var il2cppInitialized = false;
 function tryInitAll() {
     if (il2cppInitialized) return;
@@ -2474,6 +2476,16 @@ function initIl2Cpp(module) {
                             } catch (ePortParam) {
                                 log("[-] Error inspecting CardPortraitPopup params: " + ePortParam.message);
                             }
+                        } else if (this.pName === "Custom/Popup_CardBook_Detail" && !args[1].isNull()) {
+                            var pParams = args[1];
+                            try {
+                                isCardBookDetailOpen = true;
+                                pParams.add(0x58).writeU8(1); // useBlind = true
+                                pParams.add(0x5A).writeU8(1); // hideScene = true
+                                log("[✨ CARDBOOK_DETAIL PARAMS] Custom/Popup_CardBook_Detail opened: blind=1, hideScene=1, isCardBookDetailOpen=true!");
+                            } catch (eCbdParam) {
+                                log("[-] Error inspecting CardBookDetailPopup params: " + eCbdParam.message);
+                            }
                         }
                     }
                 });
@@ -4057,6 +4069,9 @@ function initIl2Cpp(module) {
                         var targetSid = args[0].toInt32();
                         log("[🎬 SCENE] SceneControl.OpenScene -> sceneId: " + targetSid);
                         globalSceneId = targetSid;
+                        if (targetSid !== 5) {
+                            isCardBookDetailOpen = false;
+                        }
                         if (targetSid >= 3) {
                             isAtTouchToStart = false;
                             hasTriggeredLobbyTransition = true;
@@ -18254,11 +18269,24 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         log("[-] Error replacing CardIntensifyPopup.OnTry: " + eRepTry.message);
                     }
 
-                    // Popup.Close (0x114247C) -> Ensure root GameObject of any closed popup is deactivated cleanly
+                    // Popup.Close (0x114247C) -> Ensure root GameObject of any closed popup is deactivated cleanly & track lifecycle
                     try {
                         Interceptor.attach(baseAddr.add(0x114247C), {
                             onEnter: function(args) {
                                 this.pop = args[0];
+                                this.className = "";
+                                try {
+                                    if (this.pop && !this.pop.isNull()) {
+                                        var klass = this.pop.readPointer();
+                                        if (!klass.isNull()) {
+                                            var namePtr = klass.add(0x10).readPointer();
+                                            if (!namePtr.isNull()) {
+                                                this.className = namePtr.readCString();
+                                                activeClosingPopupClass = this.className;
+                                            }
+                                        }
+                                    }
+                                } catch (eClsN) {}
                             },
                             onLeave: function(retval) {
                                 try {
@@ -18269,15 +18297,44 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                         var popGo = getGoFn(pop, NULL);
                                         if (!popGo.isNull()) {
                                             setActiveFn(popGo, 0, NULL);
-                                            log("[🚪 POPUP CLOSE] Cleanly deactivated popup root gameObject for pop: " + pop);
+                                            log("[🚪 POPUP CLOSE] Cleanly deactivated popup root gameObject for pop: " + pop + " (" + this.className + ")");
+                                        }
+
+                                        if (this.className === "CardBookDetailPopup") {
+                                            isCardBookDetailOpen = false;
+                                            log("[🚪 CARDBOOK DETAIL CLOSE] CardBookDetailPopup closed; isCardBookDetailOpen set to false.");
                                         }
                                     }
                                 } catch (eClsPopGo) {}
+                                activeClosingPopupClass = null;
                             }
                         });
                         log("[+] Interceptor.attach installed on Popup.Close (0x114247C)!");
                     } catch (ePopCls) {
                         log("[-] Error attaching Popup.Close: " + ePopCls.message);
+                    }
+
+                    // TopViewControl.OnShowPopupEvent (0xB2EC60) -> Prevent premature ShowScene when closing child popups inside CardBookDetailPopup
+                    try {
+                        var hideSceneGlobalFn = new NativeFunction(baseAddr.add(0xD57338), "void", []);
+                        var showSceneGlobalFn = new NativeFunction(baseAddr.add(0xD575F0), "void", []);
+
+                        Interceptor.replace(baseAddr.add(0xB2EC60), keepCb(new NativeCallback(function(thiz, show) {
+                            if (show !== 0) {
+                                log("[👁️ ON_SHOW_POPUP] show=true -> HideScene()");
+                                hideSceneGlobalFn();
+                            } else {
+                                if (isCardBookDetailOpen && activeClosingPopupClass !== "CardBookDetailPopup") {
+                                    log("[🛡️ ON_SHOW_POPUP SHIELD] Suppressed ShowScene() for child popup (" + activeClosingPopupClass + ") while CardBookDetailPopup is active!");
+                                    return;
+                                }
+                                log("[👁️ ON_SHOW_POPUP] show=false -> ShowScene()");
+                                showSceneGlobalFn();
+                            }
+                        }, "void", ["pointer", "int"])));
+                        log("[+] Interceptor.replace installed on TopViewControl.OnShowPopupEvent (0xB2EC60)!");
+                    } catch (eShowPop) {
+                        log("[-] Error replacing TopViewControl.OnShowPopupEvent: " + eShowPop.message);
                     }
 
                     // CardPortraitPopup.OnBuild (0x138EEBC) -> Ensure full resolution card display in Portrait View

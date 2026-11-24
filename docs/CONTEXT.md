@@ -5170,9 +5170,14 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
   - `SceneControl.ShowScene()` decrementa `HideCount` a `0`. Al llegar a `0`, reactiva `CardBookScene` (`SetActive(true)`).
   - Al no cerrarse `CardBookDetailPopup` y carecer de fondo opaco propio, los círculos de temas se proyectan detrás de las cartas del tema.
 * **Estrategia de Solución:**
-  1. En `Popup.Close` (RVA `0x114247C`), cuando el popup que cierra es `Custom/Popup_Card_Info` o `Custom/Popup_Card_PortraitView` y `Custom/Popup_CardBook_Detail` permanece en la pila `Popup.Opened`, invocar inmediatamente `SceneControl.HideScene()` para neutralizar el decremento y mantener `CardBookScene` oculta.
-  2. En `ViewControl.OpenPopup` (RVA `0xAAA0D0`), blindar `Custom/Popup_CardBook_Detail` con `useBlind = true` (`0x58 = 1`) y `hideScene = true` (`0x5A = 1`).
-  3. Al pulsar `[X]` en `CardBookDetailPopup`, su cierre legítimo reactiva de manera natural la escena de temas `CardBookScene`.
+  1. En `TopViewControl.OnShowPopupEvent` (RVA `0xB2EC60`), interceptar cuando `show == 0`. Si `isCardBookDetailOpen === true` y el popup que se cierra no es `CardBookDetailPopup` (es decir, es un popup hijo como `CardInfoPopup` o `CardPortraitPopup`), suprimir la ejecución de `SceneControl.ShowScene()`. De este modo, `HideCount` se conserva intacto en `1` y la escena base `CardBookScene` permanece 100% oculta sin flicker ni reactivación prematura.
+  2. En `ViewControl.OpenPopup` (RVA `0xAAA0D0`), blindar `Custom/Popup_CardBook_Detail` con `useBlind = true` (`0x58 = 1`), `hideScene = true` (`0x5A = 1`) y marcar `isCardBookDetailOpen = true`.
+  3. En `Popup.Close` (RVA `0x114247C`), cuando cierra `CardBookDetailPopup`, marcar `isCardBookDetailOpen = false`, permitiendo que su invocación legítima a `ShowScene()` restablezca limpia y perfectamente la pestaña Group.
+  4. En `SceneControl.OpenScene` (RVA `0xD534BC`), si el destino no es SceneId 5, forzar `isCardBookDetailOpen = false` como garantía de reseteo.
+* **Resultados de Validación Visual QA:**
+  - `qa_cardbook_detail.png` vs `qa_cardbook_after_ok.png`: Diferencia de píxeles = `0.0` (idéntico bit por bit). Ningún círculo de tema ni residuo visual aparece flotando por debajo tras cerrar `CardInfoPopup`.
+  - `qa_returned_group_tab.png`: Al pulsar `[X]` en `CardBookDetailPopup`, la cuadrícula de temas del `Group` tab se restaura al 100% (diferencia de círculos = `0.0`).
+  - No-regresión en la escena de PowerUp (`InvenCardIntensifyView`) verificada exitosamente.
 
 
 
