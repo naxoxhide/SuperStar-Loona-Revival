@@ -6,6 +6,38 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### 🔬 CHECKPOINT 31 — Auditoría Forense Integral de la Escena Power Up / Upgrade / Level Up (`InventoryScene.STATE.Intensify`, `InvenCardIntensifyView`, `CardIntensifyPopup` y Tablas `cid.json` / `cbd.json`) (2026-11-25)
+
+**Investigación profunda en [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js), [`dump/dump.cs`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/dump/dump.cs), desensamblado ARM64 de [`libil2cpp.so`](file:///Users/ignaciorojas/Documents/main/lib/arm64-v8a/libil2cpp.so) y tablas JSON reales del juego:**
+
+1. **Reglas Oficiales Verificadas en `cid.json` y `cbd.json` (`/files/asiudgasg/sdisgkdc/`):**
+   - **Tope R50 Real en SuperStar LOONA:** En `cbd.json` (119 entradas), `code 20` corresponde a `R1` (`minScore: 101`, `minEnergy: 100`) y `code 69` corresponde a **`R50`** (`minScore: 199`, `minEnergy: 100`); los códigos `70..118` mantienen congelado `199 / 100`. En `cid.json` (120 entradas), `code 69` (`R50`) es el último nivel con tasas y costos válidos (`C1Price: 16644`, `R50Price: 33945`); desde `code 70` (`R51`) en adelante y en columnas `R51+` todas las entradas contienen centinela **`-2.0`** y precio `0`.
+   - **Centinela de Upgrade `-1.0`:** Las filas de Upgrade (`code 4` = C5 $\to$ B1 `2500` RP, `code 9` = B5 $\to$ A1 `5000` RP, `code 14` = A5 $\to$ S1 `10000` RP, `code 19` = S5 $\to$ R1 `20000` RP) usan `rate = -1.0` como indicador de **Upgrade 100% garantizado**.
+
+2. **Hallazgos Críticos Clasificados:**
+   - **Funcionalidad Faltante / Rota:**
+     * `triggerPopupIntensifyResult` (`L17843–L17903`) evalúa `curLevel < maxLevel` sin contemplar **Upgrade** (`curGrade < 4 && curLevel >= 5`). En `C5/B5/A5/S5`, `5 < 5` es siempre `false` (el Upgrade siempre falla en el popup, mientras la lógica de Grade Up en `handleOfflineIntensify` `L16390` no se invoca en el flujo UI normal).
+     * Límite máximo de R fijado erróneamente a **`99`** en 8 puntos (`L8907`, `L8933`, `L9110`, `L9525`, `CardItem.get_IsMaxLevel 0xB52408` en `L10826`, `L16343`, `L16636`, `L17850`), permitiendo materiales en `R50` MAX.
+     * `getIntensifyPriceAndRate` (`L4906–L4912`) ignora el centinela `-1.0` de `cid.json` y cae al default `70.0%`, mostrando `"High"` en lugar de Upgrade `100%`.
+     * Modo Upgrade permite hasta **5 materiales** (`L7926`, `L9495`, `RegistMaterialCardItem 0x1056B5C`) en vez de restringirlo a **1 material** idéntico en artista/grado/nivel 5.
+     * `InvenCardIntensifyView` carece de bloqueo visual / texto `MAX` cuando la carta ya está en `R50`.
+   - **Datos y Offsets Mal Referenciados:**
+     * `populateMaterialDisplayCardList` (`L8903`, `L8926`) lee `raw.add(0x18).readS32()` como `artistCode`, pero en `Account.Card` `0x18` es `(energy: int16, score: int16)`; además no rellena `item + 0x18` (`CardControl.Data`).
+     * `handleOfflineIntensify` (`L16498`) y `commitConsumedMaterials` (`L17781`) buscan con `cardEntry.objectID === targetObjId || cardEntry.cardID === cardId`, corrompiendo TODAS las copias duplicadas del mismo `cardID` en `player_profile.json`.
+     * `SetStateIntensify (0x1056BCC)` (`L16178`, `L16201`) usa `loonaArtistDataMap[artId]` (mapeado `1..11` en lugar de `resolveArtistDataForCard`) y llama `applyCardLargeVisuals(sCard, tcId, tGr, false)` omitiendo `isPrism` y `lvl`.
+     * `safeRefreshIntensifyView` (`L9156`, `L9234`, `L9255`/`L9297`): pedestales usan `artistNamesMap` (muestra `"LOONA"` fuera de OT11), pasan `isPrism = false` hardcoded y `enabledGo` se apaga incondicionalmente en `L9297`.
+     * `executeRecommend` (`L9590`) usa `allArtistDataMap[targetArtistCode]` en lugar de `resolveArtistDataForCard`.
+     * Handlers de Sort/Filter (`L17457–L17597`) invocan `applyOfflineSortAndFilter(sceneThis, true)` sin comprobar `curState === 8`, destruyendo el modo Material (`extractType = 0`).
+   - **Flags y Hooks Defectuosos:**
+     * `OpenPopup` (`L2412–L2421`), `CardIntensifyPopup.OnBuild` (`L18038`) y `OpenResultLayout` (`L18128`) hardcodean `"Power Up"` y omiten `upgradeText` (`0x80`), `ratingupText` (`0x78`), `isRCard` (`0xB8`) y `isMaxLevel` (`0xB9`).
+     * Parches binarios `0x105BC4C` y `0x105BC6C` (`L6298–L6308`, `L16801–L16806`) sobrescriben `ratingupSprite`/`powerupSprite` a `NULL` aunque `sceneView.btnBoxSprites` exista.
+     * `InventoryScene.OnEquipCardIntensify` (`0x105AB68`) no usa el flujo unificado seguro; `GetEquipViewData` (`L11049–L11112`) y `InvenCardEquipView.Refresh` (`L11179`, `L11248`) hardcodean `"LOONA"`, `isLeader = 0`, `"Level Up"` y omiten `lvl`; `handleInventoryBack` (`L10035`) ignora `isChangeSelectedCardItem` (`0xBE`).
+     * Doble ejecución de `triggerSafeOnIntensify` al cerrar el popup (`OnClickOverride L18310` + `IntensifyAssist.Complete 0xF1D048 L18576`).
+   - **Brechas Offline Standalone:**
+     * `setupUserControl` (`L1998`) evalúa `parseInt(profile.rhythmPoint) || 100000`, convirtiendo `0` RP en `100,000` RP en memoria e impidiendo el aviso nativo de falta de RP (`0xAC1FD0`); `executeOfflineTry` tampoco valida `rhythmPoint >= totalCost`.
+     * Mejora/Upgrade de cartas equipadas no refresca `refreshInventoryHeaderView()` (borde/Rave de grupo en tiempo real) ni registra nuevos grados en `CardBookControl.MyInfo` / `OpenCardBookGradeupPopup` (`0xACB070`).
+     * `csdCache` fallback (`L4930`: `[200,400,600,800,1200]`) difiere de `csd.json` (`[200,600,1200,1800,2400]`), y `executeOfflineSellBundle` (`L17339`) omite limpiar `CardMap`.
+
 ### 🔬 CHECKPOINT 30 — Restauración Integral de Card Information (`CardInfoPopup`) y Vista de Retrato (`CardPortraitPopup`) en Todas las Áreas del Juego (2026-11-24)
 
 **Restauración técnica, desensamblado IL2CPP, metadatos LOONA y validación visual:**
