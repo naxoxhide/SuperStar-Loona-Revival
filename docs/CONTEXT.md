@@ -5160,6 +5160,21 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
 * Bypass directo de `InstallZoomUpCardAssist.Open` invocando `CompleteCallback(1)` inmediatamente y forzando `CardControl.Data.IsExistZoomUpCard` a retornar `1`.
 * Corrección quirúrgica del hook de `System/Popup_Notice_1Btn` para preservar títulos y mensajes preexistentes.
 
+### 🎮 Investigación Bug Visual: Superposición Fantasma en CardBook (2026-11-24)
+* **Incidente:** Al abrir Collect Book (`CardBookScene`, SceneId = 5), seleccionar un tema (`CardBookDetailPopup`), abrir la información de una carta (`CardInfoPopup`) y cerrarla con `[OK]`, la escena base `CardBookScene` (con los 8 círculos de la pestaña Group) se reactiva prematuramente detrás de `CardBookDetailPopup`.
+* **Causa Raíz Identificada:**
+  - `SceneControl` usa un contador `HideCount` (`SceneControl.Data + 0x78`).
+  - Al abrir `CardBookDetailPopup`: Dalcomsoft configuró `hideScene = true`. `SceneControl.HideScene()` (RVA `0xD57338`) incrementa `HideCount` a `1` y oculta `CardBookScene`.
+  - Al abrir `CardInfoPopup`: En el hook anterior configuramos `hideScene = false` (`0x5A = 0`) para preservar la escena en PowerUp. Por ello, `SceneControl.HideScene()` no se invocó y `HideCount` quedó en `1`.
+  - Al cerrar `CardInfoPopup`: `Popup.Close` (RVA `0x114247C`) posee una asimetría nativa: invoca incondicionalmente `Popup.OnPopupShowEvents.Invoke(false)` si `Popup.Active_ == true` sin comprobar `paramBuffer.hideScene`. Esto dispara `TopViewControl.OnShowPopupEvent(false)` -> `SceneControl.ShowScene()` (RVA `0xD575F0`).
+  - `SceneControl.ShowScene()` decrementa `HideCount` a `0`. Al llegar a `0`, reactiva `CardBookScene` (`SetActive(true)`).
+  - Al no cerrarse `CardBookDetailPopup` y carecer de fondo opaco propio, los círculos de temas se proyectan detrás de las cartas del tema.
+* **Estrategia de Solución:**
+  1. En `Popup.Close` (RVA `0x114247C`), cuando el popup que cierra es `Custom/Popup_Card_Info` o `Custom/Popup_Card_PortraitView` y `Custom/Popup_CardBook_Detail` permanece en la pila `Popup.Opened`, invocar inmediatamente `SceneControl.HideScene()` para neutralizar el decremento y mantener `CardBookScene` oculta.
+  2. En `ViewControl.OpenPopup` (RVA `0xAAA0D0`), blindar `Custom/Popup_CardBook_Detail` con `useBlind = true` (`0x58 = 1`) y `hideScene = true` (`0x5A = 1`).
+  3. Al pulsar `[X]` en `CardBookDetailPopup`, su cierre legítimo reactiva de manera natural la escena de temas `CardBookScene`.
+
+
 
 
 
