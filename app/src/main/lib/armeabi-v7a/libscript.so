@@ -5476,6 +5476,20 @@ function initIl2Cpp(module) {
                     }
                 }
 
+                // Resolve authentic ArtistControl.Data across all 21 playable groups (falls back to LOONA 1001..1011 only when applicable)
+                function resolveArtistDataForCard(meta, cId) {
+                    ensureLoonaMocks();
+                    var aId = (meta && meta.artistID) ? meta.artistID : 0;
+                    if (aId > 0 && allArtistDataMap[aId]) {
+                        return allArtistDataMap[aId];
+                    }
+                    if (aId >= 1001 && aId <= 1011 && loonaArtistDataMap[aId - 1000]) {
+                        return loonaArtistDataMap[aId - 1000];
+                    }
+                    var mIdx = ((cId - 1001) % 11) + 1;
+                    return loonaArtistDataMap[mIdx] || NULL;
+                }
+
                 var cardbookThemeBadges = {"1001": [], "1002": [901], "1003": [902, 903], "1004": [901], "1005": [902, 903], "1007": [901], "1008": [901], "1009": [901], "2002": [901], "2003": [902, 903], "2004": [901], "2005": [902, 903], "2007": [901], "3003": [901], "3004": [901], "3005": [901], "3006": [901], "3007": [901], "3008": [901], "4002": [901], "4003": [901], "4004": [901], "4005": [901], "4006": [901], "4007": [901], "4009": [901], "4010": [901], "4011": [901], "4012": [901], "5002": [901], "5003": [902, 903], "5004": [901], "5005": [902, 903], "5006": [901], "5007": [901], "5008": [901], "5009": [901], "5010": [901], "6002": [901, 902], "6004": [901], "6005": [901], "6007": [902, 903], "6008": [901], "6010": [901], "7002": [901], "7003": [901, 902], "8002": [901], "8003": [901, 902], "9002": [901], "9003": [901, 902], "10002": [901], "10003": [901, 902], "11002": [901], "11003": [901, 902], "12002": [901], "12003": [901, 902], "13002": [901], "13003": [901, 902], "14002": [901], "14003": [901, 902], "15002": [901], "15003": [901, 902], "16002": [901], "16003": [901, 902], "17002": [901], "17003": [901, 902], "18002": [901], "19002": [901], "20002": [901]};
                 var loonaThemeDataMap = {};
                 function getOrCreateThemeData(themeId) {
@@ -7227,18 +7241,23 @@ function initIl2Cpp(module) {
                         }
 
                         var meta = getCardMetadata(cId);
+                        var gId = (meta && (meta.groupID || meta.group)) ? (meta.groupID || meta.group) : (currentSelectedGroupCode || 1001);
                         var aId = (meta && meta.artistID) ? meta.artistID : 1001;
                         var tId = (meta && meta.theme) ? meta.theme : 1001;
 
-                        var aName = artistNamesMap[aId] || "HeeJin";
-                        var tName = themeNamesMap[tId] || "Hi High";
+                        var gMetaObj = getGroupMetadata(gId);
+                        var aMetaObj = getArtistMetadata(aId);
+                        var tMetaObj = getThemeMetadata(tId);
+                        var gName = (gMetaObj && gMetaObj.name) ? gMetaObj.name : "LOONA";
+                        var aName = (aMetaObj && aMetaObj.name && aMetaObj.name !== ("Artist " + aId)) ? aMetaObj.name : (artistNamesMap[aId] || "HeeJin");
+                        var tName = (tMetaObj && tMetaObj.name && tMetaObj.name !== ("Theme " + tId)) ? tMetaObj.name : (themeNamesMap[tId] || "Hi High");
 
                         // Large card params
                         log("[🔍 GSVD] Step 3: createMockLargeCardParams for cId=" + cId);
                         var cardParams = createMockLargeCardParams(cId, gr, lvl, isPrism);
                         log("[🔍 GSVD] Step 4: cardParams=" + cardParams);
                         p.add(0x10).writePointer(cardParams || NULL);
-                        p.add(0x18).writePointer(createIl2CppString("LOONA"));
+                        p.add(0x18).writePointer(createIl2CppString(gName));
                         p.add(0x20).writePointer(createIl2CppString(aName));
 
                         // Stat params
@@ -7579,10 +7598,15 @@ function initIl2Cpp(module) {
                         }
 
                         var meta = getCardMetadata(cId);
+                        var gId = (meta && (meta.groupID || meta.group)) ? (meta.groupID || meta.group) : (currentSelectedGroupCode || 1001);
                         var aId = (meta && meta.artistID) ? meta.artistID : 1001;
                         var tId = (meta && meta.theme) ? meta.theme : 1001;
-                        var aName = artistNamesMap[aId] || "HeeJin";
-                        var tName = themeNamesMap[tId] || "Hi High";
+                        var gMetaObj = getGroupMetadata(gId);
+                        var aMetaObj = getArtistMetadata(aId);
+                        var tMetaObj = getThemeMetadata(tId);
+                        var gName = (gMetaObj && gMetaObj.name) ? gMetaObj.name : "LOONA";
+                        var aName = (aMetaObj && aMetaObj.name && aMetaObj.name !== ("Artist " + aId)) ? aMetaObj.name : (artistNamesMap[aId] || "HeeJin");
+                        var tName = (tMetaObj && tMetaObj.name && tMetaObj.name !== ("Theme " + tId)) ? tMetaObj.name : (themeNamesMap[tId] || "Hi High");
 
                         var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                         var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
@@ -7626,7 +7650,7 @@ function initIl2Cpp(module) {
                         var groupName = viewThis.add(0x40).readPointer();
                         if (!groupName.isNull()) {
                             try {
-                                var gStr = (groupNameStr && !groupNameStr.isNull()) ? groupNameStr : createIl2CppString("LOONA");
+                                var gStr = (groupNameStr && !groupNameStr.isNull()) ? groupNameStr : createIl2CppString(gName);
                                 setTextFn(groupName, gStr, NULL);
                             } catch (eG) {}
                         }
@@ -7873,8 +7897,7 @@ function initIl2Cpp(module) {
 
                             var meta = getCardMetadata(cId);
                             var memberIdx = (meta.artistID >= 1000) ? (meta.artistID - 1000) : meta.artistID;
-                            if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cId - 1001) % 11) + 1;
-                            var artistData = loonaArtistDataMap[memberIdx] || NULL;
+                            var artistData = resolveArtistDataForCard(meta, cId);
 
                             var curState = sceneThis.add(0x24).readS32();
                             if (curState === 8) {
@@ -7945,7 +7968,7 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing OnCardItem: " + eHoci.message);
                 }
 
-                // 9e-bis. InventoryScene.OnGroupCard (0x105BDE0) -> Safe replacement for clicking equipped theme cards (OT11 grid)
+                // 9e-bis. InventoryScene.OnGroupCard (0x105BDE0) -> Safe replacement for clicking equipped theme cards across all 21 groups
                 try {
                     var onGroupCardAddr = baseAddr.add(0x105BDE0);
                     Interceptor.replace(onGroupCardAddr, new NativeCallback(function (sceneThis, go, methodInfo) {
@@ -7953,7 +7976,13 @@ function initIl2Cpp(module) {
                         try {
                             if (sceneThis.isNull() || go.isNull()) return;
 
-                            // Get slot index from GameObject name (0 to 10)
+                            ensureLoonaMocks();
+                            var gCode = currentSelectedGroupCode || 1001;
+                            var gMeta = getGroupMetadata(gCode);
+                            var slotCount = (gMeta && gMeta.equipableSlot) ? gMeta.equipableSlot : 11;
+                            var artistCodes = (gMeta && gMeta.artistCodes) ? gMeta.artistCodes : [];
+
+                            // Get slot index from GameObject name (0 to slotCount - 1)
                             var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
                             var namePtr = getNameFn(go, NULL);
                             var slotIndex = -1;
@@ -7961,26 +7990,29 @@ function initIl2Cpp(module) {
                                 var nLen = namePtr.add(0x10).readS32();
                                 if (nLen > 0) {
                                     var nStr = namePtr.add(0x14).readUtf16String(nLen);
-                                    log("[👑 ON_GROUP_CARD] Clicked equipped slot name: '" + nStr + "'");
+                                    log("[👑 ON_GROUP_CARD] Clicked equipped slot name: '" + nStr + "' in group=" + gCode);
                                     slotIndex = parseInt(nStr, 10);
                                 }
                             }
-                            if (isNaN(slotIndex) || slotIndex < 0 || slotIndex > 10) slotIndex = 0;
-                            var targetArtistId = 1001 + slotIndex; // 1001 to 1011
+                            if (isNaN(slotIndex) || slotIndex < 0 || slotIndex >= slotCount) slotIndex = 0;
+                            var targetArtistId = (slotIndex < artistCodes.length) ? artistCodes[slotIndex] : (gCode + slotIndex);
 
-                            // Find equipped card for this artist from loonaCardItems
+                            // Find equipped card for this exact group + artist from loonaCardItems
                             var targetCardItem = NULL;
+                            var equippedCardItem = NULL;
                             if (loonaCardItems && loonaCardItems.length > 0) {
                                 for (var i = 0; i < loonaCardItems.length; i++) {
                                     var itm = loonaCardItems[i];
-                                    if (itm.isNull()) continue;
+                                    if (!itm || itm.isNull()) continue;
                                     try {
                                         var raw = itm.add(0x10).readPointer();
                                         if (!raw.isNull()) {
                                             var cid = raw.add(0x20).readS32();
                                             var isEq = (raw.add(0x28).readU8() === 1);
                                             var cMeta = getCardMetadata(cid);
-                                            if (cMeta.artistID === targetArtistId && isEq) {
+                                            var cGroup = (cMeta && (cMeta.groupID || cMeta.group)) ? (cMeta.groupID || cMeta.group) : 1001;
+                                            if (cGroup === gCode && cMeta && cMeta.artistID === targetArtistId && isEq) {
+                                                equippedCardItem = itm;
                                                 targetCardItem = itm;
                                                 break;
                                             }
@@ -7990,13 +8022,14 @@ function initIl2Cpp(module) {
                                 if (targetCardItem.isNull()) {
                                     for (var j = 0; j < loonaCardItems.length; j++) {
                                         var itm2 = loonaCardItems[j];
-                                        if (itm2.isNull()) continue;
+                                        if (!itm2 || itm2.isNull()) continue;
                                         try {
                                             var raw2 = itm2.add(0x10).readPointer();
                                             if (!raw2.isNull()) {
                                                 var cid2 = raw2.add(0x20).readS32();
                                                 var cMeta2 = getCardMetadata(cid2);
-                                                if (cMeta2.artistID === targetArtistId) {
+                                                var cGroup2 = (cMeta2 && (cMeta2.groupID || cMeta2.group)) ? (cMeta2.groupID || cMeta2.group) : 1001;
+                                                if (cGroup2 === gCode && cMeta2 && cMeta2.artistID === targetArtistId) {
                                                     targetCardItem = itm2;
                                                     break;
                                                 }
@@ -8004,27 +8037,23 @@ function initIl2Cpp(module) {
                                         } catch (eItm2) {}
                                     }
                                 }
-                                if (targetCardItem.isNull() && slotIndex < loonaCardItems.length) {
-                                    targetCardItem = loonaCardItems[slotIndex];
-                                }
                             }
 
                             if (targetCardItem.isNull()) {
-                                log("[-] ON_GROUP_CARD: Could not find CardItem for slot " + slotIndex);
+                                log("[-] ON_GROUP_CARD: Could not find CardItem for group=" + gCode + ", artist=" + targetArtistId + ", slot=" + slotIndex);
                                 return;
                             }
 
-                            var memberIdx = slotIndex + 1;
-                            var artistData = loonaArtistDataMap[memberIdx] || NULL;
+                            var artistData = allArtistDataMap[targetArtistId] || NULL;
 
                             // Set scene state fields
-                            sceneThis.add(0x88).writePointer(targetCardItem); // selectedCardItem
-                            sceneThis.add(0x98).writePointer(targetCardItem); // preSelectedCardItem
-                            sceneThis.add(0x80).writePointer(artistData);     // selectedArtistData
-                            sceneThis.add(0x90).writePointer(targetCardItem); // equippedCardItem
-                            sceneThis.add(0xBE).writeU8(0);                   // isChangeSelectedCardItem = false
+                            sceneThis.add(0x88).writePointer(targetCardItem);   // selectedCardItem
+                            sceneThis.add(0x98).writePointer(targetCardItem);   // preSelectedCardItem
+                            sceneThis.add(0x80).writePointer(artistData);       // selectedArtistData
+                            sceneThis.add(0x90).writePointer(equippedCardItem); // equippedCardItem
+                            sceneThis.add(0xBE).writeU8(0);                     // isChangeSelectedCardItem = false
 
-                            log("[👑 ON_GROUP_CARD] Transitioning to SetStateMain for member " + memberIdx);
+                            log("[👑 ON_GROUP_CARD] Transitioning to SetStateMain for group=" + gCode + ", artist=" + targetArtistId + ", slot=" + slotIndex);
                             safeSetStateMain(sceneThis, 0);
                         } catch (eOgc) {
                             log("[-] Error in OnGroupCard replace: " + eOgc.message);
@@ -9385,6 +9414,7 @@ function initIl2Cpp(module) {
                         sceneThis.add(0x88).writePointer(tCard);
                         sceneThis.add(0x98).writePointer(tCard);
 
+                        var isPrismTarget = false;
                         var raw = tCard.add(0x10).readPointer();
                         if (!raw.isNull()) {
                             var cId = raw.add(0x20).readS32();
@@ -9392,12 +9422,11 @@ function initIl2Cpp(module) {
                             tCard.add(0x18).writePointer(ccd || NULL);
                             var gr = raw.add(0x24).readS32();
                             var lvl = raw.add(0x1C).readS16();
+                            isPrismTarget = (raw.add(0x2A).readU8() === 1);
                             var code = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
                             tCard.add(0x20).writeS16(code);
                             var meta = getCardMetadata(cId);
-                            var memberIdx = (meta && meta.artistID >= 1000) ? (meta.artistID - 1000) : (meta ? meta.artistID : 0);
-                            if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cId - 1001) % 11) + 1;
-                            var artistData = loonaArtistDataMap[memberIdx] || NULL;
+                            var artistData = resolveArtistDataForCard(meta, cId);
                             if (artistData && !artistData.isNull()) {
                                 sceneThis.add(0x80).writePointer(artistData);
                             }
@@ -9434,7 +9463,7 @@ function initIl2Cpp(module) {
                             if (!selectView.isNull()) {
                                 var sCard = selectView.add(0x38).readPointer();
                                 if (!sCard.isNull()) {
-                                    applyCardLargeVisuals(sCard, cId, gr, false, lvl);
+                                    applyCardLargeVisuals(sCard, cId, gr, isPrismTarget, lvl);
                                     if (gr === 4) {
                                         try {
                                             var numLevel = sCard.add(0x80).readPointer();
@@ -9557,9 +9586,12 @@ function initIl2Cpp(module) {
                             }
                         }
                         var curArt = sceneThis.add(0x80).readPointer();
-                        if (curArt.isNull() && targetArtistCode > 0 && loonaArtistDataMap[targetArtistCode]) {
-                            sceneThis.add(0x80).writePointer(loonaArtistDataMap[targetArtistCode]);
-                            log("[⚡ RECOMMEND] Set scene.selectedArtistData to artist " + targetArtistCode);
+                        if (curArt.isNull() && targetArtistCode > 0) {
+                            var resolvedArt = allArtistDataMap[targetArtistCode] || loonaArtistDataMap[targetArtistCode] || NULL;
+                            if (resolvedArt && !resolvedArt.isNull()) {
+                                sceneThis.add(0x80).writePointer(resolvedArt);
+                                log("[⚡ RECOMMEND] Set scene.selectedArtistData to artist " + targetArtistCode);
+                            }
                         }
 
                         // 6. Register up to targetMax material cards
@@ -9836,19 +9868,17 @@ function initIl2Cpp(module) {
                         var isPrism = (rawCard.add(0x2A).readU8() === 1);
 
                         var meta = getCardMetadata(cId);
-                        var memberIdx = (meta.artistID >= 1000) ? (meta.artistID - 1000) : meta.artistID;
-                        if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cId - 1001) % 11) + 1;
-                        var artistData = loonaArtistDataMap[memberIdx] || NULL;
+                        var selGroupId = (meta && (meta.groupID || meta.group)) ? (meta.groupID || meta.group) : (currentSelectedGroupCode || 1001);
+                        var artistData = resolveArtistDataForCard(meta, cId);
 
                         // Always update selectedArtistData (0x80) with the selected card's member
                         if (artistData && !artistData.isNull()) {
                             sceneThis.add(0x80).writePointer(artistData);
                         }
 
-                        log("[🗃️ SET_STATE_MAIN] Card: id=" + cId + ", gr=" + gr + ", lvl=" + lvl + ", theme=" + meta.theme + ", eq=" + isEq);
+                        log("[🗃️ SET_STATE_MAIN] Card: id=" + cId + ", gr=" + gr + ", lvl=" + lvl + ", group=" + selGroupId + ", theme=" + meta.theme + ", eq=" + isEq);
 
-                        // Find equippedCardItem for this member slot
-                        var mSlot = memberIdx - 1;
+                        // Find equippedCardItem for this exact group + artist slot
                         var equippedCardItem = NULL;
                         if (loonaCardItems && loonaCardItems.length > 0) {
                             for (var k = 0; k < loonaCardItems.length; k++) {
@@ -9859,8 +9889,10 @@ function initIl2Cpp(module) {
                                         var cid2 = r.add(0x20).readS32();
                                         var isE2 = (r.add(0x28).readU8() === 1);
                                         var cMeta2 = getCardMetadata(cid2);
-                                        if (cMeta2.artistID === meta.artistID && isE2) {
+                                        var cGroup2 = (cMeta2 && (cMeta2.groupID || cMeta2.group)) ? (cMeta2.groupID || cMeta2.group) : 1001;
+                                        if (cGroup2 === selGroupId && cMeta2 && cMeta2.artistID === meta.artistID && isE2) {
                                             equippedCardItem = itm;
+                                            break;
                                         }
                                     }
                                 } catch (eEcl) {}
@@ -13843,6 +13875,21 @@ function initIl2Cpp(module) {
                     }, "int", ["pointer", "pointer"])));
 
                     Interceptor.replace(baseAddr.add(0xE43284), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        try {
+                            if (!thisPtr.isNull()) {
+                                var modelPtr = thisPtr.add(0x10).readPointer();
+                                if (!modelPtr.isNull()) {
+                                    var grp = modelPtr.add(0x70).readS32();
+                                    if (grp > 0) return grp;
+                                }
+                                for (var cid in loonaCardControlDataMap) {
+                                    if (loonaCardControlDataMap[cid] && loonaCardControlDataMap[cid].equals(thisPtr)) {
+                                        var cm = getCardMetadata(parseInt(cid, 10));
+                                        if (cm && (cm.groupID || cm.group)) return (cm.groupID || cm.group);
+                                    }
+                                }
+                            }
+                        } catch (e) {}
                         return 1001;
                     }, "int", ["pointer", "pointer"])));
 
@@ -13852,20 +13899,37 @@ function initIl2Cpp(module) {
                                 var modelPtr = thisPtr.add(0x10).readPointer();
                                 if (!modelPtr.isNull()) {
                                     var art = modelPtr.add(0x74).readS32();
-                                    if (art >= 1 && art <= 12) return art;
+                                    if (art > 0) return art;
                                 }
                                 for (var cid in loonaCardControlDataMap) {
                                     if (loonaCardControlDataMap[cid] && loonaCardControlDataMap[cid].equals(thisPtr)) {
+                                        var cm = getCardMetadata(parseInt(cid, 10));
+                                        if (cm && cm.artistID) return cm.artistID;
                                         var cNum = parseInt(cid, 10);
                                         return ((cNum - 1001) % 11) + 1;
                                     }
                                 }
                             }
                         } catch (e) {}
-                        return 1;
+                        return 1001;
                     }, "int", ["pointer", "pointer"])));
 
                     Interceptor.replace(baseAddr.add(0xE432BC), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        try {
+                            if (!thisPtr.isNull()) {
+                                var modelPtr = thisPtr.add(0x10).readPointer();
+                                if (!modelPtr.isNull()) {
+                                    var thm = modelPtr.add(0x30).readS32();
+                                    if (thm > 0) return thm;
+                                }
+                                for (var cid in loonaCardControlDataMap) {
+                                    if (loonaCardControlDataMap[cid] && loonaCardControlDataMap[cid].equals(thisPtr)) {
+                                        var cm = getCardMetadata(parseInt(cid, 10));
+                                        if (cm && cm.theme) return cm.theme;
+                                    }
+                                }
+                            }
+                        } catch (e) {}
                         return 1001;
                     }, "int", ["pointer", "pointer"])));
                     log("[+] Interceptor.replace installed on CardControl.Data identity getters (clean non-recursive)!");

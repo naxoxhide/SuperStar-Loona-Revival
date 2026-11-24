@@ -175,3 +175,7 @@ Esta skill define los pasos estándar y flujos de trabajo para analizar, desensa
 * **Metadatos y Localización Offline:**
   - `ArtistControl.Data`: `get_Birthday` (RVA `0xEBB480`), `get_Debut` (RVA `0xEBB6A4`), `get_DebutAlbum` (RVA `0xEBB718`) alimentados con datos biográficos LOONA.
   - Cadenas en `offlineLocaleStrings`: `0x30116C2` ("Card Information"), `0x30116C3` ("OK"), `0x30116C5` ("Artist"), `0x30116C6` ("Birthday"), `0x30116C7` ("Debut Date"), `0x30116C8` ("Debut Album"), `0x6CB9086` ("Close").
+
+### 13. Resolución Multi-Grupo en `InventoryScene` (`OnGroupCard` y `CardControl.Data`)
+* **`InventoryScene.OnGroupCard` (`0x105BDE0`):** En los 21 grupos jugables (`1001..21001`), cada grupo define su propio `equipableSlot` y arreglo `artistCodes` en `card_metadata_map.json`. Nunca derivar `artistID` como `1001 + slotIndex`; resolver siempre `gCode = currentSelectedGroupCode`, `targetArtistId = gMeta.artistCodes[slotIndex]`, filtrar por `groupID === gCode && artistID === targetArtistId` y usar `allArtistDataMap[targetArtistId]`.
+* **`CardControl.Data` (`0xE43284` `get_GroupCode`, `0xE432A0` `get_ArtistCode`, `0xE432BC` `get_ThemeCode`):** Leer siempre `CardData` (`0x70`, `0x74`, `0x30`) o `getCardMetadata(cid)` sin hardcodear `1001` ni truncar con `% 11`.

@@ -5186,7 +5186,18 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
   2. `safeSetStateMain` (`0x1053FB0`), `InventoryScene.OnCardItem` (`0x105CEE8`), `triggerSafeOnIntensify` (`0x105A97C`) y `executeRecommend` calculaban `loonaArtistDataMap[memberIdx]` (solo `1..11`) en lugar de `allArtistDataMap[meta.artistID]`.
   3. `safeGetSelectViewData` (`0x10572AC`) y `safeRefreshInvenCardSelectView` (`0xF22C34`) usaban mapas limitados (`artistNamesMap` `1001..1011`, `themeNamesMap` `1001..1009`) y `"LOONA"` fijo en lugar de `getGroupMetadata`, `getArtistMetadata` y `getThemeMetadata`.
   4. Los getters de `CardControl.Data` (`0xE43284` `get_GroupCode`, `0xE432A0` `get_ArtistCode`, `0xE432BC` `get_ThemeCode`) retornaban `1001` fijo o aplicaban `% 11` en lugar de leer `CardData` (`0x70`, `0x74`, `0x30`).
-* **Plan Propuesto:** [inventory_group_card_reference_fix_plan.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inventory_group_card_reference_fix_plan.md). Pendiente de aprobación del usuario.
+* **Solución Implementada:**
+  1. Creado helper unificado `resolveArtistDataForCard(meta, cId)` en [libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L5478) priorizando `allArtistDataMap[meta.artistID]`.
+  2. Reemplazado `InventoryScene.OnGroupCard` (`0x105BDE0`) para resolver `gCode = currentSelectedGroupCode || 1001`, `slotCount = gMeta.equipableSlot`, `targetArtistId = gMeta.artistCodes[slotIndex]`, filtrando `loonaCardItems` estrictamente por `groupID === gCode && artistID === targetArtistId` (eliminando el fallback peligroso `loonaCardItems[slotIndex]`).
+  3. Actualizados `safeSetStateMain`, `OnCardItem`, `triggerSafeOnIntensify` (incluyendo `isPrism` real) y `executeRecommend` para usar `resolveArtistDataForCard` / `allArtistDataMap` y validar `groupID`.
+  4. Actualizados `safeGetSelectViewData` y `safeRefreshInvenCardSelectView` para usar `getGroupMetadata`, `getArtistMetadata` y `getThemeMetadata`.
+  5. Actualizados los getters de `CardControl.Data` (`0xE43284`, `0xE432A0`, `0xE432BC`) para retornar códigos reales desde `CardData` / `getCardMetadata`.
+* **Validación Visual QA en BlueStacks (`127.0.0.1:5555`):**
+  - `[x x]` (`2/21`) HeeJin (`Butterfly`, `cardID=2001`): Detalle (`8/200`) y Level Up / Power Up muestran exactamente HeeJin Butterfly R50.
+  - `[x x]` (`2/21`) HyunJin (`Butterfly`, `cardID=2002`): Detalle (`6/200`) muestra `[x x] / HyunJin / Butterfly`.
+  - `[#]` (`3/21`, 10 slots) HeeJin (`Number 1`, `cardID=3001`) y `cardID=3003`: Grupo `[#]`, tema `Number 1`, carrusel `8/200`.
+  - `HeeJin` Solo (`7/21`, 3 slots, `cardID=7002`): Grupo `HeeJin`, tema `HeeJin`, carrusel `3/200`.
+  - `[+ +]` (`1/21`) HeeJin (`Hi High`, `cardID=1001`): Cero regresiones (`5/200`).
 
 
 
