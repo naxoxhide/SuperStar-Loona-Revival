@@ -4858,6 +4858,10 @@ function initIl2Cpp(module) {
                 var cgdCache = null;
                 var csdCache = null;
                 var csdByCode = null;
+                var gcdCache = null;
+                var gcdByCode = null;
+                var cachedThemeAbilityValues = null;
+                var cachedThemeAbilityListPtr = NULL;
 
                 function getMaxCardLevel(grade) {
                     return (parseInt(grade, 10) === 4) ? 50 : 5;
@@ -4933,6 +4937,195 @@ function initIl2Cpp(module) {
                             }
                         } catch (eCsd) {}
                     }
+                    if (!gcdCache) {
+                        try {
+                            var rawGcd = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/gcd.json") ||
+                                         readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/data/gcd.json");
+                            if (rawGcd) {
+                                gcdCache = JSON.parse(rawGcd);
+                                gcdByCode = indexTableByCode(gcdCache);
+                                log("[📊 GCD] Loaded gcd.json: " + gcdCache.length + " game config entries cached!");
+                            }
+                        } catch (eGcd) {}
+                    }
+                }
+
+                function getThemeAbilityValues() {
+                    if (cachedThemeAbilityValues) return cachedThemeAbilityValues;
+                    loadOfflineCardDataTables();
+                    var vals = [1, 2, 3];
+                    try {
+                        if (gcdByCode) {
+                            var codes = [15801, 15802, 15803];
+                            for (var i = 0; i < 3; i++) {
+                                var entry = gcdByCode[codes[i]];
+                                if (entry && entry.integerValue !== undefined && entry.integerValue !== null) {
+                                    var parsed = parseInt(entry.integerValue, 10);
+                                    if (!isNaN(parsed) && parsed > 0) vals[i] = parsed;
+                                }
+                            }
+                        }
+                    } catch (eTav) {}
+                    cachedThemeAbilityValues = vals;
+                    return vals;
+                }
+
+                function getManagedThemeAbilityValuesList() {
+                    if (cachedThemeAbilityListPtr && !cachedThemeAbilityListPtr.isNull()) {
+                        return cachedThemeAbilityListPtr;
+                    }
+                    try {
+                        var listObj = createManagedList(getThemeAbilityValues(), 'int');
+                        if (listObj && !listObj.isNull()) {
+                            cachedThemeAbilityListPtr = listObj;
+                            // Keep InventoryControl.ThemeAbilityValues (static +0x28) synced if initialized
+                            try {
+                                var invCtrlSlot = baseAddr.add(0x30ED358);
+                                var invCtrlKlass = invCtrlSlot.readPointer();
+                                if (invCtrlKlass && !invCtrlKlass.isNull()) {
+                                    var staticFields = invCtrlKlass.add(0xB8).readPointer();
+                                    if (staticFields && !staticFields.isNull()) {
+                                        staticFields.add(0x28).writePointer(listObj);
+                                    }
+                                }
+                            } catch (eInvStatic) {}
+                            return listObj;
+                        }
+                    } catch (eMtl) {}
+                    return NULL;
+                }
+
+                function computeGroupThemeBuffState(groupId, profileOpt) {
+                    var gId = parseInt(groupId, 10) || 1001;
+                    var gMeta = getGroupMetadata(gId);
+                    var memberCount = (gMeta && gMeta.equipableSlot) ? (parseInt(gMeta.equipableSlot, 10) || 11) : 11;
+                    var inactiveArtistCount = 0;
+                    var activeMembers = Math.max(1, memberCount - inactiveArtistCount);
+                    var thresholds = [
+                        Math.ceil((activeMembers / 3.0) * 1),
+                        Math.ceil((activeMembers / 3.0) * 2),
+                        Math.ceil((activeMembers / 3.0) * 3)
+                    ];
+
+                    var profile = profileOpt;
+                    if (!profile) {
+                        try { profile = loadPlayerProfile(); } catch (eP) { profile = null; }
+                    }
+
+                    var themeCounts = {};
+                    var themeLevels = {};
+                    var memberEquipped = {};
+                    var eqCount = 0;
+                    var minGrade = 4;
+                    var bestThemeId = -1;
+                    var maxThemeMatches = 0;
+
+                    if (profile && profile.inventoryCards) {
+                        for (var i = 0; i < profile.inventoryCards.length; i++) {
+                            var c = profile.inventoryCards[i];
+                            if (!c || !c.isEquip) continue;
+                            var cm = getCardMetadata(c.cardID);
+                            var cGroup = (cm && (cm.groupID || cm.group)) ? (cm.groupID || cm.group) : (c.groupID || 1001);
+                            if (cGroup !== gId) continue;
+
+                            var aId = (cm && cm.artistID) ? cm.artistID : (c.artistID || c.cardID);
+                            if (memberEquipped[aId]) continue;
+                            memberEquipped[aId] = true;
+                            eqCount++;
+
+                            if (c.grade !== undefined && c.grade < minGrade) minGrade = c.grade;
+                            var tId = (cm && cm.theme) ? cm.theme : (c.themeID || 1001);
+                            var tMeta = getThemeMetadata(tId);
+                            if (tMeta && tMeta.rehearsalTheme) continue;
+
+                            themeCounts[tId] = (themeCounts[tId] || 0) + 1;
+                        }
+                    }
+
+                    for (var thKey in themeCounts) {
+                        var cnt = themeCounts[thKey];
+                        var thNum = parseInt(thKey, 10);
+                        var lv = 0;
+                        if (cnt >= thresholds[2]) lv = 3;
+                        else if (cnt >= thresholds[1]) lv = 2;
+                        else if (cnt >= thresholds[0]) lv = 1;
+                        themeLevels[thNum] = lv;
+                        if (cnt > maxThemeMatches) {
+                            maxThemeMatches = cnt;
+                            bestThemeId = thNum;
+                        }
+                    }
+
+                    var groupThemeLevel = (bestThemeId > 0) ? (themeLevels[bestThemeId] || 0) : 0;
+                    return {
+                        groupId: gId,
+                        memberCount: memberCount,
+                        inactiveArtistCount: inactiveArtistCount,
+                        activeMembers: activeMembers,
+                        thresholds: thresholds,
+                        themeCounts: themeCounts,
+                        themeLevels: themeLevels,
+                        eqCount: eqCount,
+                        isGroupComplete: (eqCount === memberCount),
+                        minGrade: minGrade,
+                        bestThemeId: bestThemeId,
+                        maxThemeMatches: maxThemeMatches,
+                        groupThemeLevel: groupThemeLevel
+                    };
+                }
+
+                function computeCardThemeInfo(cardId, isEquipped, profileOpt) {
+                    var meta = getCardMetadata(cardId);
+                    var gId = (meta && (meta.groupID || meta.group)) ? (meta.groupID || meta.group) : (currentSelectedGroupCode || 1001);
+                    var tId = (meta && meta.theme) ? meta.theme : 1001;
+                    var tMeta = getThemeMetadata(tId);
+                    var state = computeGroupThemeBuffState(gId, profileOpt);
+                    var lv = 0;
+                    if (isEquipped && !(tMeta && tMeta.rehearsalTheme)) {
+                        lv = state.themeLevels[tId] || 0;
+                    }
+                    return {
+                        groupId: gId,
+                        themeId: tId,
+                        memberCount: state.memberCount,
+                        inactiveArtistCount: state.inactiveArtistCount,
+                        thresholds: state.thresholds,
+                        matchedCount: state.themeCounts[tId] || 0,
+                        themeLevel: lv
+                    };
+                }
+
+                function syncGroupCardThemeLevels(groupId, profileOpt) {
+                    try {
+                        var gId = parseInt(groupId, 10) || 1001;
+                        var state = computeGroupThemeBuffState(gId, profileOpt);
+                        if (loonaCardItems && loonaCardItems.length > 0) {
+                            for (var i = 0; i < loonaCardItems.length; i++) {
+                                var itm = loonaCardItems[i];
+                                if (!itm || itm.isNull()) continue;
+                                try {
+                                    var raw = itm.add(0x10).readPointer();
+                                    if (raw.isNull()) continue;
+                                    var cId = raw.add(0x20).readS32();
+                                    var cMeta = getCardMetadata(cId);
+                                    var cGroup = (cMeta && (cMeta.groupID || cMeta.group)) ? (cMeta.groupID || cMeta.group) : 1001;
+                                    if (cGroup !== gId) continue;
+                                    var isEq = (raw.add(0x28).readU8() === 1);
+                                    var tId = (cMeta && cMeta.theme) ? cMeta.theme : 1001;
+                                    var tMeta = getThemeMetadata(tId);
+                                    var lv = (isEq && !(tMeta && tMeta.rehearsalTheme)) ? (state.themeLevels[tId] || 0) : 0;
+                                    itm.add(0x38).writeS32(lv);
+                                } catch (eCi) {}
+                            }
+                        }
+                        var gItemObj = allInvenGroupItems[gId];
+                        if (gItemObj && !gItemObj.isNull()) {
+                            try {
+                                gItemObj.add(0x50).writeS32(state.bestThemeId);
+                                gItemObj.add(0x54).writeS32(state.groupThemeLevel);
+                            } catch (eGi) {}
+                        }
+                    } catch (eSync) {}
                 }
 
                 function getCardBaseStats(grade, level, isPrism) {
@@ -5829,6 +6022,7 @@ function initIl2Cpp(module) {
                             var level = accountPtr.add(0x1C).readS16();
                             var cardId = accountPtr.add(0x20).readS32();
                             var isPrism = (accountPtr.add(0x2A).readU8() === 1);
+                            var isEq = (accountPtr.add(0x28).readU8() === 1);
 
                             // Update stats from cbd.json
                             var stats = getCardBaseStats(grade, level, isPrism);
@@ -5848,7 +6042,8 @@ function initIl2Cpp(module) {
                             if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cardId - 1001) % 11) + 1;
                             thisPtr.add(0x30).writeS32(1001 * 10000 + 1 * 100 + memberIdx); // sortCardIndex
                             thisPtr.add(0x34).writeU8(0); // isNew = false
-                            thisPtr.add(0x38).writeS32(1); // <ThemeLevel>
+                            var initThemeInfo = computeCardThemeInfo(cardId, isEq, null);
+                            thisPtr.add(0x38).writeS32(initThemeInfo.themeLevel); // <ThemeLevel>
                             thisPtr.add(0x3C).writeU8(0); // isEquipLiveTheme = false
                             thisPtr.add(0x3E).writeS16(-1); // equipLiveThemeCode = -1
                             thisPtr.add(0x40).writePointer(NULL); // <themeCardItem>
@@ -6796,6 +6991,78 @@ function initIl2Cpp(module) {
                     }
                 }
 
+                function createMockCardThemeInfoParams(cardId, grade, isEquipped, isEmpty) {
+                    try {
+                        var themeParamsKlass = resolveMetadataSlot(0x31F11A8);
+                        if (!themeParamsKlass || themeParamsKlass.isNull()) {
+                            themeParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.sub", "CardThemeInfoView/Params");
+                        }
+                        if (!themeParamsKlass || themeParamsKlass.isNull()) {
+                            themeParamsKlass = getClass("Assembly-CSharp", "", "CardThemeInfoView.Params");
+                        }
+                        if (!themeParamsKlass || themeParamsKlass.isNull()) return NULL;
+
+                        var p = il2cpp_object_new(themeParamsKlass);
+                        if (!p || p.isNull()) return NULL;
+                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(p, 2);
+
+                        try {
+                            var ctorFn = new NativeFunction(baseAddr.add(0xE4B2F4), "void", ["pointer", "pointer"]);
+                            ctorFn(p, NULL);
+                        } catch (eCt) {}
+
+                        if (isEmpty) {
+                            p.add(0x10).writeU8(1); // isEmpty
+                            p.add(0x18).writePointer(createIl2CppString("No card selected."));
+                            p.add(0x20).writeS32(0);
+                            p.add(0x24).writeS32(11);
+                            p.add(0x28).writePointer(getManagedThemeAbilityValuesList() || NULL);
+                            p.add(0x30).writeS32(0);
+                            p.add(0x34).writeU8(0);
+                            return p;
+                        }
+
+                        var thInfo = computeCardThemeInfo(cardId, !!isEquipped, null);
+                        var tvList = getManagedThemeAbilityValuesList();
+
+                        p.add(0x10).writeU8(0); // isEmpty = false
+                        p.add(0x18).writePointer(NULL); // empty
+                        p.add(0x20).writeS32(thInfo.inactiveArtistCount); // inactiveArtistCount
+                        p.add(0x24).writeS32(thInfo.memberCount); // memberCount
+                        p.add(0x28).writePointer(tvList || NULL); // List<int> themeValues [1, 2, 3]
+                        p.add(0x30).writeS32(thInfo.themeLevel); // themeLevel (0..3)
+                        p.add(0x34).writeU8((parseInt(grade, 10) === 4) ? 1 : 0); // isRCard
+                        return p;
+                    } catch (eThP) {
+                        log("[-] Error creating CardThemeInfoView.Params: " + eThP.message);
+                        return NULL;
+                    }
+                }
+
+                // 5b. ViewControl.GetCardThemeInfoViewData (0xABFF78)
+                try {
+                    Interceptor.replace(baseAddr.add(0xABFF78), new NativeCallback(function (cardItem, methodInfo) {
+                        if (!cardItem || cardItem.isNull()) {
+                            return createMockCardThemeInfoParams(1001, 0, false, true);
+                        }
+                        var cId = 1001;
+                        var gr = 0;
+                        var isEq = false;
+                        try {
+                            var raw = cardItem.add(0x10).readPointer();
+                            if (!raw.isNull()) {
+                                cId = raw.add(0x20).readS32();
+                                gr = raw.add(0x24).readS32();
+                                isEq = (raw.add(0x28).readU8() === 1);
+                            }
+                        } catch (eRc) {}
+                        return createMockCardThemeInfoParams(cId, gr, isEq, false);
+                    }, "pointer", ["pointer", "pointer"]));
+                    log("[+] Interceptor.replace installed on ViewControl.GetCardThemeInfoViewData (0xABFF78)!");
+                } catch (eRepGct) {
+                    log("[-] Error replacing GetCardThemeInfoViewData: " + eRepGct.message);
+                }
+
                 // 6. ViewControl.GetSmallCardViewData (0xABEB30)
                 try {
                     Interceptor.replace(baseAddr.add(0xABEB30), new NativeCallback(function (cardItem, artistData, isViewCard, methodInfo) {
@@ -6954,30 +7221,12 @@ function initIl2Cpp(module) {
                             var emptySummaryList = createManagedList([], 'string');
                             p.add(0x30).writePointer(emptySummaryList || NULL);
 
-                            // Dynamic Grade & Theme Calculations for current group
-                            var eqCards = (profile && profile.inventoryCards) ? profile.inventoryCards.filter(function(c) { return c.isEquip; }) : [];
-                            var eqCount = 0;
-                            var minGrade = 4;
-                            var memberEquipped = {};
-                            var themeFrequency = {};
-
-                            for (var ei = 0; ei < eqCards.length; ei++) {
-                                var ec = eqCards[ei];
-                                var ecm = getCardMetadata(ec.cardID);
-                                if (ecm && (ecm.groupID || ecm.group) === gCode) {
-                                    var aId = ecm.artistID;
-                                    if (!memberEquipped[aId]) {
-                                        memberEquipped[aId] = true;
-                                        eqCount++;
-                                        if (ec.grade !== undefined && ec.grade < minGrade) minGrade = ec.grade;
-                                        var tId = ec.themeID || (ecm ? ecm.theme : null) || 1001;
-                                        themeFrequency[tId] = (themeFrequency[tId] || 0) + 1;
-                                    }
-                                }
-                            }
+                            // Dynamic Grade & Theme Calculations for current group (shared with BonusCheck / CardThemeInfoView)
+                            var grpBuffState = computeGroupThemeBuffState(gCode, profile);
+                            var minGrade = grpBuffState.minGrade;
 
                             // 1. Group Grade calculation
-                            var isGroupComplete = (eqCount === slotCount);
+                            var isGroupComplete = grpBuffState.isGroupComplete;
                             var gVal = isGroupComplete ? minGrade : -1;
                             var gScore = 0;
                             if (isGroupComplete) {
@@ -6985,21 +7234,9 @@ function initIl2Cpp(module) {
                                 gScore = scoreByGrade[gVal] !== undefined ? scoreByGrade[gVal] : 500000;
                             }
 
-                            // 2. Group Theme calculation
-                            var bestThemeId = -1;
-                            var maxThemeMatches = 0;
-                            for (var thId in themeFrequency) {
-                                if (themeFrequency[thId] > maxThemeMatches) {
-                                    maxThemeMatches = themeFrequency[thId];
-                                    bestThemeId = parseInt(thId, 10);
-                                }
-                            }
-
-                            // Level calculation: strictly 0 if not all cards equipped, or proportional if all equipped
-                            var tLevel = 0;
-                            if (isGroupComplete && bestThemeId > 0 && maxThemeMatches > 0) {
-                                tLevel = Math.min(3, Math.floor((3.0 / slotCount) * maxThemeMatches));
-                            }
+                            // 2. Group Theme calculation (native BonusCheck does not require full deck when threshold is met)
+                            var bestThemeId = grpBuffState.bestThemeId;
+                            var tLevel = grpBuffState.groupThemeLevel;
 
                             // Rave bonus string and Theme image path
                             var raveText = "-";
@@ -7346,8 +7583,9 @@ function initIl2Cpp(module) {
                         p.add(0x38).writePointer(createIl2CppString("Theme"));
                         p.add(0x40).writePointer(createIl2CppString(tName));
 
-                        // Theme params: write NULL safely
-                        p.add(0x48).writePointer(NULL);
+                        // Theme params: build genuine CardThemeInfoView.Params
+                        var themeParamsObj = createMockCardThemeInfoParams(cId, gr, isEq, false);
+                        p.add(0x48).writePointer(themeParamsObj || NULL);
 
                         var profile = null;
                         try { profile = loadPlayerProfile(); } catch (ePf) {}
@@ -7773,11 +8011,18 @@ function initIl2Cpp(module) {
 
                         // 7. theme (0x68)
                         var theme = viewThis.add(0x68).readPointer();
-                        if (!theme.isNull() && !themeParams.isNull()) {
+                        if (!theme.isNull()) {
                             try {
-                                var themeRefreshFn = new NativeFunction(baseAddr.add(0x1393510), "void", ["pointer", "pointer", "pointer"]);
-                                themeRefreshFn(theme, themeParams, NULL);
-                            } catch (eThm) {}
+                                if (themeParams.isNull()) {
+                                    themeParams = createMockCardThemeInfoParams(cId, gr, isEq, false);
+                                }
+                                if (!themeParams.isNull()) {
+                                    var themeRefreshFn = new NativeFunction(baseAddr.add(0x1393510), "void", ["pointer", "pointer", "pointer"]);
+                                    themeRefreshFn(theme, themeParams, NULL);
+                                }
+                            } catch (eThm) {
+                                log("[-] Error refreshing CardThemeInfoView: " + eThm.message);
+                            }
                         }
 
                         // 8. equipIcon (0x70)
@@ -11282,8 +11527,9 @@ function initIl2Cpp(module) {
                             p.add(0x38).writePointer(createIl2CppString("Theme"));
                             p.add(0x40).writePointer(createIl2CppString(tName));
 
-                            // Theme params: write NULL safely (native 0xABFF78 crashes with access violation 0x132 on mock cardItem)
-                            p.add(0x48).writePointer(NULL);
+                            // Theme params: build genuine CardThemeInfoView.Params
+                            var eqThemeParamsObj = createMockCardThemeInfoParams(cId, gr, isEq, false);
+                            p.add(0x48).writePointer(eqThemeParamsObj || NULL);
 
                             p.add(0x50).writePointer(createIl2CppString("Equip"));
                             p.add(0x58).writePointer(createIl2CppString("Cancel"));
@@ -14645,7 +14891,8 @@ function initIl2Cpp(module) {
                                 var memberIdx = (aId >= 1000) ? (aId % 1000) : aId;
                                 cardItemObj.add(0x30).writeS32(gCode * 10000 + 1 * 100 + memberIdx); // sortCardIndex
                                 cardItemObj.add(0x34).writeU8(0); // isNew = false
-                                cardItemObj.add(0x38).writeS32(1); // <ThemeLevel>
+                                var initThInfo = computeCardThemeInfo(cId, !!cData.isEquip, profile);
+                                cardItemObj.add(0x38).writeS32(initThInfo.themeLevel); // <ThemeLevel>
                                 cardItemObj.add(0x3C).writeU8(0); // isEquipLiveTheme = false
                                 cardItemObj.add(0x3E).writeS16(-1); // equipLiveThemeCode = -1
                                 cardItemObj.add(0x40).writePointer(NULL); // <themeCardItem>
@@ -15298,6 +15545,7 @@ function initIl2Cpp(module) {
                                 loonaGroupItemObj.add(0x28).writePointer(loonaCardListFastArray);
                             }
                         }
+                        syncGroupCardThemeLevels(gCode);
                         return groupCardFastArray;
                     } catch (eSfa) {
                         log("[-] Error in syncGroupEquippedFastArray: " + eSfa.message);
