@@ -1660,15 +1660,32 @@ function initIl2Cpp(module) {
                     userId: 10001,
                     nickname: nickname || "Orbit",
                     profileCode: 1001,
+                    statusMessage: "",
+                    uiColorTop: "",
+                    uiColorBottom: "",
+                    repThemeCode: 1001,
+                    repLobbyBgCode: 1007,
+                    ownedProfiles: [],
                     diamond: 10000,
                     rhythmPoint: 100000,
                     headphone: 50,
                     dalcomCoin: 5000,
                     themeChanger: 10,
                     cardInvenMax: 200,
-                    equipedLobbyBgList: [100001],
+                    equipedLobbyBgList: [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011],
                     favoriteGroups: [1001, 2001, 3001, 4001, 5001],
                     collectionRewardsClaimed: { card: 0, theme: 0 },
+                    stats: {
+                        bestScoreMusic: { code: 0, score: 0 },
+                        mostPlayMusic: { code: 0, count: 0 },
+                        superStarCard: null,
+                        superStarScore: 0,
+                        monthlyAllSP: 0,
+                        monthlyPlay: 0,
+                        monthlyMyRecord: 0,
+                        monthlyAttendance: 1,
+                        bestCardbook: 0
+                    },
                     leaderCard: {
                         objectID: 100001,
                         cardID: 1001,
@@ -1682,7 +1699,41 @@ function initIl2Cpp(module) {
                 };
             }
 
+            function ensureProfileUserFields(profile) {
+                if (!profile || typeof profile !== "object") return profile;
+                if (profile.statusMessage === undefined || profile.statusMessage === null) profile.statusMessage = "";
+                if (!profile.uiColorTop || typeof profile.uiColorTop !== "string") profile.uiColorTop = "5B58A8";
+                if (!profile.uiColorBottom || typeof profile.uiColorBottom !== "string") profile.uiColorBottom = "3C387F";
+                profile.uiColorTop = profile.uiColorTop.replace(/^(0x|#)/i, "").slice(0, 6);
+                profile.uiColorBottom = profile.uiColorBottom.replace(/^(0x|#)/i, "").slice(0, 6);
+                if (profile.repThemeCode === undefined || profile.repThemeCode === null) profile.repThemeCode = 1001;
+                if (profile.repLobbyBgCode === undefined || profile.repLobbyBgCode === null) {
+                    var defBg = 1007;
+                    try {
+                        var bgPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/chosen_bg.txt";
+                        if (fileExists(bgPath)) {
+                            var bgRaw = parseInt((readTextFile(bgPath) || "").trim(), 10);
+                            if (!isNaN(bgRaw) && bgRaw >= 1001) defBg = bgRaw;
+                        }
+                    } catch (eBgDef) {}
+                    profile.repLobbyBgCode = defBg;
+                }
+                if (!Array.isArray(profile.ownedProfiles)) profile.ownedProfiles = [];
+                if (!profile.stats || typeof profile.stats !== "object") profile.stats = {};
+                if (!profile.stats.bestScoreMusic) profile.stats.bestScoreMusic = { code: 0, score: 0 };
+                if (!profile.stats.mostPlayMusic) profile.stats.mostPlayMusic = { code: 0, count: 0 };
+                if (profile.stats.superStarCard === undefined) profile.stats.superStarCard = null;
+                if (profile.stats.superStarScore === undefined) profile.stats.superStarScore = 0;
+                if (profile.stats.monthlyAllSP === undefined) profile.stats.monthlyAllSP = 0;
+                if (profile.stats.monthlyPlay === undefined) profile.stats.monthlyPlay = 0;
+                if (profile.stats.monthlyMyRecord === undefined) profile.stats.monthlyMyRecord = 0;
+                if (profile.stats.monthlyAttendance === undefined) profile.stats.monthlyAttendance = 1;
+                if (profile.stats.bestCardbook === undefined) profile.stats.bestCardbook = 0;
+                return profile;
+            }
+
             function savePlayerProfile(profile) {
+                ensureProfileUserFields(profile);
                 cachedProfile = profile;
                 var jsonStr = JSON.stringify(profile, null, 2);
                 var ok = writeTextFile(PROFILE_PATH, jsonStr);
@@ -1702,7 +1753,7 @@ function initIl2Cpp(module) {
                     var content = readTextFile(PROFILE_PATH);
                     if (content) {
                         try {
-                            cachedProfile = JSON.parse(content);
+                            cachedProfile = ensureProfileUserFields(JSON.parse(content));
                             return cachedProfile;
                         } catch (e) {
                             log("[-] Error parsing player profile JSON from PROFILE_PATH: " + e.message);
@@ -1713,7 +1764,7 @@ function initIl2Cpp(module) {
                     var content = readTextFile(FALLBACK_PATH);
                     if (content) {
                         try {
-                            cachedProfile = JSON.parse(content);
+                            cachedProfile = ensureProfileUserFields(JSON.parse(content));
                             return cachedProfile;
                         } catch (e) {
                             log("[-] Error parsing player profile JSON from FALLBACK_PATH: " + e.message);
@@ -2342,8 +2393,93 @@ function initIl2Cpp(module) {
                         } catch (eGl) {}
                         return int64(-1);
                     }, "int64", ["pointer"])));
-                    Interceptor.replace(baseAddr.add(0xAB42E0), keepCb(new NativeCallback(function (methodInfo) { return 1; }, "int", ["pointer"])));
-                    Interceptor.replace(baseAddr.add(0xAB4408), keepCb(new NativeCallback(function (methodInfo) { return 1; }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB3F28), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        var c = (p && p.uiColorTop) ? String(p.uiColorTop).replace(/^(0x|#)/i, "").slice(0, 6) : "5B58A8";
+                        return createIl2CppString(c.length === 6 ? c : "5B58A8");
+                    }, "pointer", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB404C), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        var c = (p && p.uiColorBottom) ? String(p.uiColorBottom).replace(/^(0x|#)/i, "").slice(0, 6) : "3C387F";
+                        return createIl2CppString(c.length === 6 ? c : "3C387F");
+                    }, "pointer", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB42E0), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        if (p && p.repThemeCode !== undefined && p.repThemeCode !== null) {
+                            return parseInt(p.repThemeCode, 10) || -1;
+                        }
+                        return -1;
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB4408), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        if (p && p.repLobbyBgCode !== undefined && p.repLobbyBgCode !== null) {
+                            return parseInt(p.repLobbyBgCode, 10) || -1;
+                        }
+                        return -1;
+                    }, "int16", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB4530), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        return createIl2CppString((p && p.statusMessage) ? String(p.statusMessage) : "");
+                    }, "pointer", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB4654), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        return (p && p.stats && p.stats.bestScoreMusic) ? (parseInt(p.stats.bestScoreMusic.code, 10) || 0) : 0;
+                    }, "int16", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB4834), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        return (p && p.stats && p.stats.bestScoreMusic) ? (parseInt(p.stats.bestScoreMusic.score, 10) || 0) : 0;
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB4A00), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        return (p && p.stats && p.stats.mostPlayMusic) ? (parseInt(p.stats.mostPlayMusic.code, 10) || 0) : 0;
+                    }, "int16", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB4BE0), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        return (p && p.stats && p.stats.mostPlayMusic) ? (parseInt(p.stats.mostPlayMusic.count, 10) || 0) : 0;
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB4DAC), keepCb(new NativeCallback(function (methodInfo) {
+                        try {
+                            var p = loadPlayerProfile();
+                            var sc = (p && p.stats) ? p.stats.superStarCard : null;
+                            if (!sc || !sc.cardID) return NULL;
+                            var cardCls = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.account", "Card") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.account", "Card");
+                            if (!cardCls || cardCls.isNull()) return NULL;
+                            var obj = il2cpp_object_new(cardCls);
+                            new NativeFunction(baseAddr.add(0xE9EA88), "void", ["pointer"])(obj);
+                            obj.add(0x10).writeS64(sc.objectID || 0);
+                            obj.add(0x18).writeS16(sc.energy || 100);
+                            obj.add(0x1A).writeS16(sc.score || 100);
+                            obj.add(0x1C).writeS16(sc.level || 1);
+                            obj.add(0x20).writeS32(sc.cardID || 0);
+                            obj.add(0x24).writeS32(sc.grade || 0);
+                            return obj;
+                        } catch (eWs) {}
+                        return NULL;
+                    }, "pointer", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB4FC0), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        return (p && p.stats) ? (parseInt(p.stats.superStarScore, 10) || 0) : 0;
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB518C), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        return (p && p.stats) ? (parseInt(p.stats.monthlyAllSP, 10) || 0) : 0;
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB5358), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        return (p && p.stats) ? (parseInt(p.stats.monthlyPlay, 10) || 0) : 0;
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB5524), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        return (p && p.stats) ? (parseInt(p.stats.monthlyMyRecord, 10) || 0) : 0;
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB56F0), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        return (p && p.stats) ? (parseInt(p.stats.monthlyAttendance, 10) || 0) : 0;
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB58BC), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        return (p && p.stats) ? (parseInt(p.stats.bestCardbook, 10) || 0) : 0;
+                    }, "int", ["pointer"])));
                 } catch (eDia) {}
                 log("[🛡️ USER GUARD] UserControl null guards (Nickname, RP, Diamond, Headphones, DalcomCoin, Inven, ProfileCode) successfully installed!");
             } catch (eUserG) {
@@ -2535,7 +2671,7 @@ function initIl2Cpp(module) {
                         activeInputPopup = thiz;
                         var textPtr = args[1];
                         var text = readIl2CppString(textPtr);
-                        if ((!text || text.trim() === "") && !hasPrefilled) {
+                        if (globalSceneId <= 2 && !isLobbyIntegrated && (!text || text.trim() === "") && !hasPrefilled) {
                             hasPrefilled = true;
                             log("[✨ PREFILL] Setting initial nickname 'Orbit' on main thread in OnCheckEmpty...");
                             try {
@@ -2845,26 +2981,33 @@ function initIl2Cpp(module) {
                     return 1; // 1 = WIFI
                 }, "int", []));
 
-                // In-game Nickname change: UserControl.ChangeNickname (0xAAEB4C)
-                Interceptor.attach(baseAddr.add(0xAAEB4C), {
-                    onEnter: function (args) {
-                        var newNick = readIl2CppString(args[0]);
-                        var cb = args[1];
-                        log("[✏️ NICKNAME] UserControl.ChangeNickname called with: " + newNick);
-                        if (newNick && newNick.trim() !== "") {
-                            var p = loadPlayerProfile() || createDefaultProfile("Orbit");
-                            p.nickname = newNick;
-                            savePlayerProfile(p);
-                            setupUserControl(p);
+                // In-game Nickname change: UserControl.ChangeNickname (0xAAEB4C) -> clean offline replacement (prevents HTTP RPC)
+                Interceptor.replace(baseAddr.add(0xAAEB4C), keepCb(new NativeCallback(function (nickPtr, cbPtr, methodInfo) {
+                    var newNick = (!nickPtr.isNull()) ? readIl2CppString(nickPtr) : "";
+                    log("[✏️ NICKNAME] UserControl.ChangeNickname called with: " + newNick);
+                    if (newNick && newNick.trim() !== "") {
+                        var p = loadPlayerProfile() || createDefaultProfile("Orbit");
+                        p.nickname = newNick.trim();
+                        savePlayerProfile(p);
+                        if (globalPlayerObj && !globalPlayerObj.isNull()) {
+                            globalPlayerObj.add(0x18).writePointer(createIl2CppString(p.nickname));
                         }
-                        if (!cb.isNull() && actionIntInvokeFn) {
-                            try {
-                                actionIntInvokeFn(cb, 0); // 0 = SUCCESS
-                                log("[✅ NICKNAME] ChangeNickname callback(0) invoked!");
-                            } catch (e) {}
+                        try {
+                            var topCtrl = new NativeFunction(baseAddr.add(0xB13204), "pointer", ["pointer"])(NULL);
+                            if (!topCtrl.isNull()) {
+                                new NativeFunction(baseAddr.add(0xB2DF4C), "void", ["pointer", "pointer", "pointer"])(topCtrl, NULL, NULL);
+                            }
+                        } catch (eTn) {}
+                        refreshTopViewAll();
+                    }
+                    if (cbPtr && !cbPtr.isNull()) {
+                        if (typeof safeInvokeActionInt === "function") {
+                            safeInvokeActionInt(cbPtr, 1000);
+                        } else if (actionIntInvokeFn) {
+                            try { actionIntInvokeFn(cbPtr, 1000); } catch (e) {}
                         }
                     }
-                });
+                }, "void", ["pointer", "pointer", "pointer"])));
             } catch (e) {
                 log("[-] Error attaching failsafe hooks: " + e.message);
             }
@@ -4582,6 +4725,13 @@ function initIl2Cpp(module) {
                                                     }
                                                 }
                                             } catch (cfge) {}
+                                            try {
+                                                var pLobbyBg = loadPlayerProfile();
+                                                if (pLobbyBg && pLobbyBg.repLobbyBgCode >= 1001 && pLobbyBg.repLobbyBgCode <= 1076) {
+                                                    chosenBgId = pLobbyBg.repLobbyBgCode;
+                                                    log("[🎨 LOBBY BG] Synced chosenBgId from player_profile.repLobbyBgCode: " + chosenBgId);
+                                                }
+                                            } catch (ePlbg) {}
 
                                             var bgFilePath = weoihxdDir + chosenBgId + "_l.i.bytes";
 
@@ -5959,6 +6109,9 @@ function initIl2Cpp(module) {
                         if (!loonaThemeTypeData || loonaThemeTypeData.isNull()) {
                             loonaThemeTypeData = getOrCreateThemeTypeData(0);
                         }
+                        if (typeof ensureOfflineProfileAndBgControl === "function") {
+                            ensureOfflineProfileAndBgControl();
+                        }
                         log("[🔍 LOONA_MOCKS COMPLETED!]");
                     } catch (eMocks) {
                         log("[-] Error ensuring LOONA mocks: " + eMocks.message);
@@ -6025,8 +6178,8 @@ function initIl2Cpp(module) {
                             td.add(0x18).writePointer(createIl2CppString(sPath));
                             td.add(0x20).writePointer(createIl2CppString(lPath));
                             td.add(0x48).writePointer(createIl2CppString(lPath));
-                            td.add(0x70).writeS16(ttCode);
-                            td.add(0x74).writeS16(lType);
+                            td.add(0x30).writeS16(ttCode);
+                            td.add(0x42).writeS16(lType);
                             tObj.add(0x10).writePointer(td);
                         }
                         loonaThemeDataMap[themeId] = tObj;
@@ -6899,6 +7052,80 @@ function initIl2Cpp(module) {
                 // =========================================================================
                 // INVENTORY STABILIZATION HOOKS & PROXIES
                 // =========================================================================
+                var cachedEachThemeDictKlass = NULL;
+                var cachedEachThemeDictCtor = NULL;
+                var cachedEachThemeDictAdd = NULL;
+                function buildGroupEachThemeBestDict(gCode) {
+                    try {
+                        if (!cachedEachThemeDictKlass || cachedEachThemeDictKlass.isNull()) {
+                            cachedEachThemeDictKlass = readGotMetadata(0x30F77E8);
+                            cachedEachThemeDictCtor = readGotMetadata(0x314BCD0);
+                            if (cachedEachThemeDictKlass && !cachedEachThemeDictKlass.isNull()) {
+                                ensureIl2CppClassInit(cachedEachThemeDictKlass);
+                                cachedEachThemeDictAdd = il2cpp_class_get_method_from_name
+                                    ? il2cpp_class_get_method_from_name(cachedEachThemeDictKlass, Memory.allocUtf8String("Add"), 2)
+                                    : NULL;
+                            }
+                        }
+                        if (!cachedEachThemeDictKlass || cachedEachThemeDictKlass.isNull() || !cachedEachThemeDictCtor || cachedEachThemeDictCtor.isNull()) {
+                            return NULL;
+                        }
+                        var dictObj = il2cpp_object_new(cachedEachThemeDictKlass);
+                        if (!dictObj || dictObj.isNull()) return NULL;
+                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(dictObj, 2);
+                        new NativeFunction(baseAddr.add(0x2368A30), "void", ["pointer", "pointer"])(dictObj, cachedEachThemeDictCtor);
+
+                        if (loonaCardItems && loonaCardItems.length > 0 && cachedEachThemeDictAdd && !cachedEachThemeDictAdd.isNull()) {
+                            var byThemeArtist = {};
+                            for (var i = 0; i < loonaCardItems.length; i++) {
+                                var itm = loonaCardItems[i];
+                                if (!itm || itm.isNull()) continue;
+                                try {
+                                    var raw = itm.add(0x10).readPointer();
+                                    if (!raw || raw.isNull()) continue;
+                                    var cid = raw.add(0x20).readS32();
+                                    var cMeta = getCardMetadata(cid);
+                                    if (!cMeta) continue;
+                                    var cg = parseInt(cMeta.group || cMeta.groupID, 10) || 0;
+                                    if (cg !== gCode) continue;
+                                    var tId = parseInt(cMeta.theme || cMeta.themeID, 10) || 0;
+                                    var aId = parseInt(cMeta.artistID, 10) || 0;
+                                    if (tId <= 0 || aId <= 0) continue;
+                                    if (!byThemeArtist[tId]) byThemeArtist[tId] = {};
+                                    var prev = byThemeArtist[tId][aId];
+                                    var gr = raw.add(0x24).readS32();
+                                    var lv = raw.add(0x1C).readS16();
+                                    var isEq = raw.add(0x28).readU8() === 1 ? 1 : 0;
+                                    var scoreRank = isEq * 1000000 + gr * 1000 + lv;
+                                    if (!prev || scoreRank > prev.rank) {
+                                        byThemeArtist[tId][aId] = { item: itm, rank: scoreRank };
+                                    }
+                                } catch (eIt) {}
+                            }
+                            var addFn = new NativeFunction(baseAddr.add(0x236948C), "void", ["pointer", "int", "pointer", "pointer"]);
+                            var tKeys = Object.keys(byThemeArtist);
+                            for (var ti = 0; ti < tKeys.length; ti++) {
+                                var tCode = parseInt(tKeys[ti], 10);
+                                var aMap = byThemeArtist[tCode];
+                                var aKeys = Object.keys(aMap);
+                                var bestArr = [];
+                                for (var ai = 0; ai < aKeys.length; ai++) {
+                                    bestArr.push(aMap[aKeys[ai]].item);
+                                }
+                                var faTheme = createFastArray(bestArr, 'card');
+                                if (faTheme && !faTheme.isNull()) {
+                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(faTheme, 2);
+                                    try { addFn(dictObj, tCode, faTheme, cachedEachThemeDictAdd); } catch (eAddT) {}
+                                }
+                            }
+                        }
+                        return dictObj;
+                    } catch (eBtd) {
+                        log("[-] Error in buildGroupEachThemeBestDict(" + gCode + "): " + eBtd.message);
+                        return NULL;
+                    }
+                }
+
                 // 1. GroupItem..ctor (0xB56EF4) - Safe replacement that never throws NullReferenceException
                 try {
                     Interceptor.replace(baseAddr.add(0xB56EF4), new NativeCallback(function (thisPtr, code, map, subItem, methodInfo) {
@@ -6907,11 +7134,12 @@ function initIl2Cpp(module) {
                             ensureLoonaMocks();
                             var gObj = allGroupDataMap[code] || loonaGroupData || NULL;
                             var fa = allGroupArtistListMap[code] || loonaCardListFastArray || NULL;
+                            var etDict = buildGroupEachThemeBestDict(code);
                             thisPtr.add(0x10).writePointer(gObj);
                             thisPtr.add(0x18).writePointer(NULL);
                             thisPtr.add(0x20).writePointer(NULL);
                             thisPtr.add(0x28).writePointer(fa);
-                            thisPtr.add(0x30).writePointer(NULL);
+                            thisPtr.add(0x30).writePointer(etDict || NULL);
                             thisPtr.add(0x38).writeS16(-1);
                             thisPtr.add(0x40).writePointer(NULL);
                             thisPtr.add(0x48).writeS16(-1);
@@ -10870,6 +11098,8 @@ function initIl2Cpp(module) {
 
                 // Dedicated pool for Empty Card textures (sdhgauwehdnu) - shared across all themes to prevent OOM
                 var emptyCardTexturePool = {};
+                var profileUrlToLocalMap = {};
+                var lobbyBgUrlToLocalMap = {};
                 // CardBook UI & Asset Resolution Dictionaries
                 var cardbookBgMap = {"cardbook_mybg_double_plus.png": "1001", "cardbook_mybg_xx.png": "2001", "cardbook_mybg_hash.png": "3001", "cardbook_mybg_12.png": "4001", "cardbook_mybg_and.png": "5001", "cardbook_mybg_flip_that.png": "6001", "cardbook_mybg_heejin.png": "7001", "cardbook_mybg_hyunjin.png": "8001", "cardbook_mybg_haseul.png": "9001", "cardbook_mybg_yeojin.png": "10001", "cardbook_mybg_vivi.png": "11001", "cardbook_mybg_kim_lip.png": "12001", "cardbook_mybg_jin_soul.png": "13001", "cardbook_mybg_choerry.png": "14001", "cardbook_mybg_yves.png": "15001", "cardbook_mybg_go_won.png": "16001", "cardbook_mybg_olivia_hye.png": "17001", "cardbook_mybg_love_n_live.png": "18001", "cardbook_mybg_love_n_evil.png": "19001", "cardbook_mybg_mix_n_match.png": "20001", "cardbook_mybg_max_n_match.png": "21001"};
                 var cardbookEmblemMap = {"emblem_double_plus.png": "1001", "emblem_xx.png": "2001", "emblem_hash.png": "3001", "emblem_12.png": "4001", "emblem_and.png": "5001", "emblem_flip_that.png": "6001", "emblem_heejin.png": "7001", "emblem_hyunjin.png": "8001", "emblem_haseul.png": "9001", "emblem_yeojin.png": "10001", "emblem_vivi.png": "11001", "emblem_kim_lip.png": "12001", "emblem_jinsoul.png": "13001", "emblem_choerry.png": "14001", "emblem_yves.png": "15001", "emblem_gowon.png": "16001", "emblem_olivia_hye.png": "17001", "emblem_love_live.png": "18001", "emblem_love_evil.png": "19001", "emblem_mix_match.png": "20001", "emblem_max_match.png": "21001"};
@@ -12027,6 +12257,10 @@ function initIl2Cpp(module) {
                                                 relPath = "asiudgasg/asodhsg/bhfbfhbf/" + cardbookBadgeMap[filename] + ".i.bytes";
                                             } else if (cardbookThemeLogoMap && cardbookThemeLogoMap[filename]) {
                                                 relPath = "asiudgasg/asodhsg/agewfcbxhaa/" + cardbookThemeLogoMap[filename] + ".i.bytes";
+                                            } else if (typeof profileUrlToLocalMap !== "undefined" && profileUrlToLocalMap[cleanUrl]) {
+                                                relPath = profileUrlToLocalMap[cleanUrl];
+                                            } else if (typeof lobbyBgUrlToLocalMap !== "undefined" && lobbyBgUrlToLocalMap[cleanUrl]) {
+                                                relPath = lobbyBgUrlToLocalMap[cleanUrl];
                                             } else if (urlToCardMap && urlToCardMap[cleanUrl]) {
                                                 var uInfo = urlToCardMap[cleanUrl];
                                                 var uFolder = "wadceg";
@@ -15311,16 +15545,27 @@ function initIl2Cpp(module) {
                         isInventoryPopulated = true;
                         ensureLoonaMocks();
 
-                        try {
-                            var openCardFn = new NativeFunction(baseAddr.add(0xF27DA8), "void", ["pointer"]);
-                            openCardFn(NULL);
-                            log("[🃏 INVENTORY] Native InventoryControl.OpenCard() executed!");
-                        } catch (eOc) {
-                            log("[-] Error in OpenCard: " + eOc.message);
-                        }
-
                         var getCardMapFn = new NativeFunction(baseAddr.add(0xF2751C), "pointer", ["pointer"]);
                         var cardMap = getCardMapFn(NULL);
+                        if (!cardMap || cardMap.isNull()) {
+                            try {
+                                var cmKlass = readGotMetadata(0x30FF100);
+                                var cmCtor = readGotMetadata(0x310ACC0);
+                                if (cmKlass && !cmKlass.isNull() && cmCtor && !cmCtor.isNull()) {
+                                    ensureIl2CppClassInit(cmKlass);
+                                    var newCm = il2cpp_object_new(cmKlass);
+                                    if (newCm && !newCm.isNull()) {
+                                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(newCm, 2);
+                                        new NativeFunction(baseAddr.add(0x234F4C8), "void", ["pointer", "int", "pointer"])(newCm, 16, cmCtor);
+                                        new NativeFunction(baseAddr.add(0xF27580), "void", ["pointer", "pointer"])(newCm, NULL);
+                                        cardMap = getCardMapFn(NULL);
+                                        log("[🃏 INVENTORY] Allocated & registered CardMap Dictionary: " + cardMap);
+                                    }
+                                }
+                            } catch (eCmInit) {
+                                log("[-] Error creating CardMap Dictionary: " + eCmInit.message);
+                            }
+                        }
 
                         var profile = loadPlayerProfile();
                         if (!profile || !profile.inventoryCards || profile.inventoryCards.length === 0) {
@@ -15498,7 +15743,7 @@ function initIl2Cpp(module) {
 
                                     var groupItemObj = il2cpp_object_new(groupItemKlass);
                                     if (il2cpp_gchandle_new && !groupItemObj.isNull()) {
-                                        il2cpp_gchandle_new(groupItemObj, 2);
+                                        il2cpp_gchandle_new(groupItemObj, 1);
                                     }
                                     try {
                                         var groupItemCtorFn = new NativeFunction(baseAddr.add(0xB56EF4), "void", ["pointer", "int", "pointer", "pointer"]);
@@ -15702,6 +15947,31 @@ function initIl2Cpp(module) {
                         0x6CB9086: "Close"
                     };
 
+                    var lcdLocaleMap = null;
+                    var lcdLocaleLoaded = false;
+                    function getLcdFallbackString(codeInt) {
+                        if (!lcdLocaleLoaded) {
+                            lcdLocaleLoaded = true;
+                            lcdLocaleMap = {};
+                            try {
+                                var lcdRaw = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/lcd.json");
+                                if (lcdRaw) {
+                                    var lcdArr = JSON.parse(lcdRaw);
+                                    for (var li = 0; li < lcdArr.length; li++) {
+                                        var lr = lcdArr[li];
+                                        if (lr && lr.code !== undefined && lr.enUS !== undefined) {
+                                            lcdLocaleMap[(parseInt(lr.code, 10) >>> 0)] = String(lr.enUS);
+                                        }
+                                    }
+                                    log("[🌐 LOCALE] Cached " + Object.keys(lcdLocaleMap).length + " strings from lcd.json!");
+                                }
+                            } catch (eLcd) {
+                                log("[-] Error loading lcd.json: " + eLcd.message);
+                            }
+                        }
+                        return lcdLocaleMap ? lcdLocaleMap[codeInt] : undefined;
+                    }
+
                     Interceptor.attach(baseAddr.add(0xCF1064), {
                         onEnter: function (args) {
                             this.code32 = args[0].toInt32() >>> 0;
@@ -15710,7 +15980,12 @@ function initIl2Cpp(module) {
                             if (offlineLocaleStrings[this.code32] !== undefined) {
                                 retval.replace(createIl2CppString(offlineLocaleStrings[this.code32]));
                             } else {
-                                log("[🌐 LOCALE MISS] Code 0x" + this.code32.toString(16).toUpperCase());
+                                var lcdStr = getLcdFallbackString(this.code32);
+                                if (lcdStr !== undefined) {
+                                    retval.replace(createIl2CppString(lcdStr));
+                                } else {
+                                    log("[🌐 LOCALE MISS] Code 0x" + this.code32.toString(16).toUpperCase());
+                                }
                             }
                         }
                     });
@@ -16613,6 +16888,7 @@ function initIl2Cpp(module) {
                                 }
                             }
                         } catch (eGt) {}
+                        if (lastMissedLocalePopupCode === 21) return createIl2CppString("Locked Profile");
                         if (lastMissedLocalePopupCode === 59) return createIl2CppString("Sell All");
                         if (lastMissedLocalePopupCode === 58) return createIl2CppString("Sell All");
                         if (lastMissedLocalePopupCode === 57) return createIl2CppString("Sell All");
@@ -16629,6 +16905,7 @@ function initIl2Cpp(module) {
                                 }
                             }
                         } catch (eGm) {}
+                        if (lastMissedLocalePopupCode === 21) return createIl2CppString("Locked profile ({0}).\nEvent & limited profiles will be purchasable in Offline Shop.");
                         if (lastMissedLocalePopupCode === 59) return createIl2CppString("Earned {0} RP!");
                         if (lastMissedLocalePopupCode === 58) return createIl2CppString("Sell {0} card(s) for {1} RP?");
                         return createIl2CppString("");
@@ -16644,6 +16921,7 @@ function initIl2Cpp(module) {
                                 }
                             }
                         } catch (eGb) {}
+                        if (lastMissedLocalePopupCode === 21) return createIl2CppString("OK");
                         if (lastMissedLocalePopupCode === 59) return createIl2CppString(index === 1 ? "OK" : "Cancel");
                         if (lastMissedLocalePopupCode === 58) return createIl2CppString(index === 1 ? "Sell" : "Cancel");
                         return createIl2CppString(index === 1 ? "OK" : "Cancel");
@@ -20595,23 +20873,1266 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     log("[-] Error installing LobbyScene safe stubs: " + eLobbyStubs.message);
                 }
 
-                // Safe stubs for LobbyBgDataControl (Open: 0xB3EB60, Close: 0xB3EF68, get_IsOpened: 0xB3E9C4, Find: 0xB3F0A4)
-                try {
-                    Interceptor.replace(baseAddr.add(0xB3EB60), new NativeCallback(function (methodInfo) {
-                        log("[🛡️ LOBBY BG] LobbyBgDataControl.Open safely bypassed!");
-                    }, "void", ["pointer"]));
-                    Interceptor.replace(baseAddr.add(0xB3EF68), new NativeCallback(function (methodInfo) {
-                        log("[🛡️ LOBBY BG] LobbyBgDataControl.Close safely bypassed!");
-                    }, "void", ["pointer"]));
-                    Interceptor.replace(baseAddr.add(0xB3E9C4), new NativeCallback(function (methodInfo) {
-                        return 1;
-                    }, "bool", ["pointer"]));
-                    Interceptor.replace(baseAddr.add(0xB3F0A4), new NativeCallback(function (code, methodInfo) {
+                // Offline User Profile, ProfileControl, LobbyBgDataControl, Ranking & Edit Sub-Flows
+                var ENABLE_OFFLINE_SEARCH_MOCK = false; // Keep true-ready mock search profiles disabled by default (shows clean offline notice)
+                var offlineProfileControlsInit = false;
+                var profileDataMap = {};        // code -> ProfileControl.Data
+                var profileMetaMap = {};        // code -> raw prd row (disk-verified)
+                var profileLocalFileMap = {};   // code -> "asiudgasg/asodhsg/halwuiefjs/<file>"
+                var lobbyBgDataMap = {};        // code -> LobbyBgDataControl.Data
+                var lobbyBgMetaMap = {};        // code -> raw lbg row
+                var lobbyBgFreeSet = {};        // code -> true (1001..1011 base free wallpapers from lbs.json sellType===3)
+                var cardPackYearMetaMap = {};   // code -> cpy row
+                var profileManagedDict = NULL;
+                var profileGroupManagedDict = NULL;
+                var lobbyBgManagedDict = NULL;
+                var artistTypeDataMap = {};     // short code -> ArtistTypeControl.Data
+                var artistTypeManagedDict = NULL;
+                var offlineMyRankingObj = NULL;
+                var offlinePersonObj = NULL;
+
+                function readGotMetadata(slotRva) {
+                    try {
+                        var cell = baseAddr.add(slotRva).readPointer();
+                        if (!cell || cell.isNull()) return NULL;
+                        if (!initMetaFnNative) {
+                            initMetaFnNative = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
+                        }
+                        initMetaFnNative(cell);
+                        return cell.readPointer();
+                    } catch (eRgm) {
+                        log("[-] Error in readGotMetadata(0x" + slotRva.toString(16) + "): " + eRgm.message);
                         return NULL;
-                    }, "pointer", ["int16", "pointer"]));
-                    log("[+] Safe stubs installed for LobbyBgDataControl (Open, Close, get_IsOpened, Find)!");
+                    }
+                }
+
+                function ensureIl2CppClassInit(klass) {
+                    if (!klass || klass.isNull()) return;
+                    try {
+                        new NativeFunction(baseAddr.add(0xA43C9C), "void", ["pointer"])(klass);
+                    } catch (eCi) {}
+                }
+
+                function invokeSingleDelegate1(delPtr, il2cppArgType, argVal) {
+                    if (!delPtr || delPtr.isNull()) return false;
+                    try {
+                        var mPtr = delPtr.add(0x10).readPointer();
+                        if (!mPtr || mPtr.isNull()) return false;
+                        var mTarget = delPtr.add(0x20).readPointer();
+                        var mInfo = delPtr.add(0x28).readPointer();
+                        var isStatic = (!mTarget || mTarget.isNull());
+                        if (isStatic) {
+                            new NativeFunction(mPtr, "void", [il2cppArgType, "pointer"])(argVal, mInfo || NULL);
+                        } else {
+                            new NativeFunction(mPtr, "void", ["pointer", il2cppArgType, "pointer"])(mTarget, argVal, mInfo || NULL);
+                        }
+                        return true;
+                    } catch (eInv1) {
+                        log("[-] invokeSingleDelegate1 error: " + eInv1.message);
+                        return false;
+                    }
+                }
+
+                function invokeSingleDelegate2(delPtr, type1, val1, type2, val2) {
+                    if (!delPtr || delPtr.isNull()) return false;
+                    try {
+                        var mPtr = delPtr.add(0x10).readPointer();
+                        if (!mPtr || mPtr.isNull()) return false;
+                        var mTarget = delPtr.add(0x20).readPointer();
+                        var mInfo = delPtr.add(0x28).readPointer();
+                        var isStatic = (!mTarget || mTarget.isNull());
+                        if (isStatic) {
+                            new NativeFunction(mPtr, "void", [type1, type2, "pointer"])(val1, val2, mInfo || NULL);
+                        } else {
+                            new NativeFunction(mPtr, "void", ["pointer", type1, type2, "pointer"])(mTarget, val1, val2, mInfo || NULL);
+                        }
+                        return true;
+                    } catch (eInv2) {
+                        log("[-] invokeSingleDelegate2 error: " + eInv2.message);
+                        return false;
+                    }
+                }
+
+                function safeInvokeDelegate1(cbPtr, il2cppArgType, argVal) {
+                    if (!cbPtr || cbPtr.isNull()) return;
+                    try {
+                        var delegatesArr = cbPtr.add(0x68).readPointer();
+                        if (delegatesArr && !delegatesArr.isNull()) {
+                            var len = delegatesArr.add(0x18).readU32();
+                            var any = false;
+                            for (var i = 0; i < len && i < 16; i++) {
+                                var sub = delegatesArr.add(0x20 + i * Process.pointerSize).readPointer();
+                                if (sub && !sub.isNull() && invokeSingleDelegate1(sub, il2cppArgType, argVal)) {
+                                    any = true;
+                                }
+                            }
+                            if (any) return;
+                        }
+                    } catch (eArr1) {}
+                    invokeSingleDelegate1(cbPtr, il2cppArgType, argVal);
+                }
+
+                function safeInvokeDelegate2(cbPtr, type1, val1, type2, val2) {
+                    if (!cbPtr || cbPtr.isNull()) return;
+                    try {
+                        var delegatesArr = cbPtr.add(0x68).readPointer();
+                        if (delegatesArr && !delegatesArr.isNull()) {
+                            var len = delegatesArr.add(0x18).readU32();
+                            var any = false;
+                            for (var i = 0; i < len && i < 16; i++) {
+                                var sub = delegatesArr.add(0x20 + i * Process.pointerSize).readPointer();
+                                if (sub && !sub.isNull() && invokeSingleDelegate2(sub, type1, val1, type2, val2)) {
+                                    any = true;
+                                }
+                            }
+                            if (any) return;
+                        }
+                    } catch (eArr2) {}
+                    invokeSingleDelegate2(cbPtr, type1, val1, type2, val2);
+                }
+
+                function safeInvokeActionInt(cbPtr, code) {
+                    safeInvokeDelegate1(cbPtr, "int", code);
+                }
+
+                function safeInvokeActionIntList(cbPtr, code, listPtr) {
+                    safeInvokeDelegate2(cbPtr, "int", code, "pointer", listPtr || NULL);
+                }
+
+                function safeInvokeActionIntObj(cbPtr, code, objPtr) {
+                    safeInvokeDelegate2(cbPtr, "int", code, "pointer", objPtr || NULL);
+                }
+
+                function isProfileOwnedOffline(code) {
+                    code = parseInt(code, 10) || 0;
+                    if (code <= 0) return false;
+                    var row = profileMetaMap[code];
+                    // Base game profiles (eventType === 0, 111 profiles) are unlocked by default;
+                    // event/limited profiles stay locked unless owned/purchased in player_profile.json.
+                    if (row && (parseInt(row.eventType, 10) || 0) === 0) return true;
+                    var prof = loadPlayerProfile();
+                    if (prof && Array.isArray(prof.ownedProfiles)) {
+                        for (var i = 0; i < prof.ownedProfiles.length; i++) {
+                            if (parseInt(prof.ownedProfiles[i], 10) === code) return true;
+                        }
+                    }
+                    return false;
+                }
+
+                function ensureOfflineProfileAndBgControl() {
+                    if (offlineProfileControlsInit) return;
+                    offlineProfileControlsInit = true;
+                    var pbStep = "init";
+                    try {
+                        pbStep = "read_tables";
+                        var sdisDir = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/";
+                        var halDir = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/halwuiefjs/";
+                        var weoDir = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/weoihxd/";
+
+                        var umapRaw = readTextFile(sdisDir + "url_shared_map.json");
+                        var umap = umapRaw ? JSON.parse(umapRaw) : {};
+
+                        var prdRaw = readTextFile(sdisDir + "prd.json");
+                        var prdArr = prdRaw ? JSON.parse(prdRaw) : [];
+
+                        var lbgRaw = readTextFile(sdisDir + "lbg.json");
+                        var lbgArr = lbgRaw ? JSON.parse(lbgRaw) : [];
+
+                        var lbsRaw = readTextFile(sdisDir + "lbs.json");
+                        var lbsArr = lbsRaw ? JSON.parse(lbsRaw) : [];
+
+                        var cpyRaw = readTextFile(sdisDir + "cpy.json");
+                        var cpyArr = cpyRaw ? JSON.parse(cpyRaw) : [];
+
+                        for (var ci = 0; ci < cpyArr.length; ci++) {
+                            var cpyRow = cpyArr[ci];
+                            if (cpyRow && cpyRow.code !== undefined) {
+                                cardPackYearMetaMap[parseInt(cpyRow.code, 10)] = cpyRow;
+                            }
+                        }
+
+                        for (var si = 0; si < lbsArr.length; si++) {
+                            var lbsRow = lbsArr[si];
+                            if (lbsRow && parseInt(lbsRow.sellType, 10) === 3) {
+                                lobbyBgFreeSet[parseInt(lbsRow.lobbyBgID || lbsRow.code, 10)] = true;
+                            }
+                        }
+
+                        // Build ProfileControl.Data map (only profiles whose image asset exists on disk)
+                        pbStep = "profile_classes";
+                        var pCtrlDataCls = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "ProfileControl/Data");
+                        var pDataCls = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "ProfileData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "ProfileData");
+                        pbStep = "pdDict";
+                        var pdDictKlass = readGotMetadata(0x313E650);
+                        var pdDictCtorInfo = readGotMetadata(0x31199B8);
+                        var pdDictAddInfo = readGotMetadata(0x3102540);
+                        if (pdDictKlass && !pdDictKlass.isNull() && pdDictCtorInfo && !pdDictCtorInfo.isNull()) {
+                            ensureIl2CppClassInit(pdDictKlass);
+                            profileManagedDict = il2cpp_object_new(pdDictKlass);
+                            if (profileManagedDict && !profileManagedDict.isNull()) {
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(profileManagedDict, 2);
+                                new NativeFunction(baseAddr.add(0x2368A5C), "void", ["pointer", "int", "pointer"])(profileManagedDict, prdArr.length || 512, pdDictCtorInfo);
+                            }
+                        }
+                        pbStep = "pgDict";
+                        var pgDictKlass = readGotMetadata(0x3131A18);
+                        var pgDictCtorInfo = readGotMetadata(0x311A920);
+                        var pgDictAddInfo = readGotMetadata(0x3126F00);
+                        if (pgDictKlass && !pgDictKlass.isNull()) {
+                            ensureIl2CppClassInit(pgDictKlass);
+                            profileGroupManagedDict = il2cpp_object_new(pgDictKlass);
+                            if (profileGroupManagedDict && !profileGroupManagedDict.isNull()) {
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(profileGroupManagedDict, 2);
+                                new NativeFunction(baseAddr.add(0x2361728), "void", ["pointer", "pointer"])(profileGroupManagedDict, pgDictCtorInfo);
+                            }
+                        }
+                        var dictAddIntObjFn = new NativeFunction(baseAddr.add(0x236948C), "void", ["pointer", "int", "pointer", "pointer"]);
+                        var dictAddIntIntFn = new NativeFunction(baseAddr.add(0x2362174), "void", ["pointer", "int", "int", "pointer"]);
+
+                        var firstProfileObj = NULL;
+                        var pCount = 0;
+                        var groupAddedSet = {};
+                        pbStep = "profile_loop";
+                        for (var pi = 0; pi < prdArr.length; pi++) {
+                            var row = prdArr[pi];
+                            if (!row || !row.profileImage) continue;
+                            var mapped = umap[row.profileImage];
+                            if (!mapped) continue;
+                            var baseFile = mapped.split("/").pop();
+                            var diskPng = halDir + baseFile + ".png";
+                            var diskRaw = halDir + baseFile;
+                            if (!fileExists(diskPng) && !fileExists(diskRaw)) continue;
+
+                            var pCode = parseInt(row.code, 10) || 0;
+                            if (pCode <= 0) continue;
+                            var relPath = "asiudgasg/" + mapped;
+                            var cleanUrl = row.profileImage.split("?")[0];
+                            profileUrlToLocalMap[cleanUrl] = relPath;
+                            profileMetaMap[pCode] = row;
+                            profileLocalFileMap[pCode] = relPath;
+
+                            if (pCtrlDataCls && !pCtrlDataCls.isNull() && pDataCls && !pDataCls.isNull()) {
+                                var pModel = il2cpp_object_new(pDataCls);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(pModel, 2);
+                                pModel.add(0x10).writeS32(pCode);
+                                pModel.add(0x14).writeS32(parseInt(row.groupID, 10) || 1001);
+                                pModel.add(0x18).writeS32(parseInt(row.artistID, 10) || 1001);
+                                pModel.add(0x28).writePointer(createIl2CppString(row.profileImage));
+                                pModel.add(0x30).writeS32(parseInt(row.eventType, 10) || 0);
+                                pModel.add(0x34).writeS16(parseInt(row.profileType, 10) || 0);
+                                pModel.add(0x36).writeS16(0);
+                                pModel.add(0x3C).writeS32(parseInt(row.price, 10) || 0);
+                                pModel.add(0x40).writePointer(row.eventCode ? createIl2CppString(String(row.eventCode)) : NULL);
+                                pModel.add(0x48).writePointer(row.analyticsData ? createIl2CppString(String(row.analyticsData)) : createIl2CppString("Profile " + pCode));
+
+                                var pcObj = il2cpp_object_new(pCtrlDataCls);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(pcObj, 2);
+                                pcObj.add(0x10).writePointer(pModel);
+                                pcObj.add(0x18).writeS32(pCount);
+                                try {
+                                    var aData = resolveArtistDataForCard({ artistID: parseInt(row.artistID, 10) || 1001 }, pCode);
+                                    pcObj.add(0x20).writePointer(aData || NULL);
+                                } catch (eAd) {}
+                                pcObj.add(0x28).writePointer(createDownloadPath(relPath));
+
+                                profileDataMap[pCode] = pcObj;
+                                if (firstProfileObj.isNull()) firstProfileObj = pcObj;
+                                if (profileManagedDict && !profileManagedDict.isNull()) {
+                                    try { dictAddIntObjFn(profileManagedDict, pCode, pcObj, pdDictAddInfo); } catch (eDa) {}
+                                }
+                                var gIdP = parseInt(row.groupID, 10) || 1001;
+                                if (!groupAddedSet[gIdP] && profileGroupManagedDict && !profileGroupManagedDict.isNull()) {
+                                    groupAddedSet[gIdP] = true;
+                                    try { dictAddIntIntFn(profileGroupManagedDict, gIdP, pCode, pgDictAddInfo); } catch (eGa) {}
+                                }
+                                pCount++;
+                            }
+                        }
+
+                        // Write static fields on ProfileControl (0x30F5208)
+                        pbStep = "profile_statics";
+                        try {
+                            var pCtrlCls = readGotMetadata(0x30F5208);
+                            if (pCtrlCls && !pCtrlCls.isNull()) {
+                                ensureIl2CppClassInit(pCtrlCls);
+                                var pStat = pCtrlCls.add(0xB8).readPointer();
+                                if (pStat && !pStat.isNull()) {
+                                    pStat.writeU8(1); // IsOpened = true
+                                    if (!firstProfileObj.isNull()) pStat.add(0x8).writePointer(firstProfileObj);
+                                    if (profileManagedDict && !profileManagedDict.isNull()) pStat.add(0x10).writePointer(profileManagedDict);
+                                    if (profileGroupManagedDict && !profileGroupManagedDict.isNull()) pStat.add(0x18).writePointer(profileGroupManagedDict);
+                                }
+                            }
+                        } catch (ePs) {}
+
+                        // Build LobbyBgDataControl.Data map from lbg.json
+                        pbStep = "lbgDict";
+                        var lbgCtrlDataCls = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "LobbyBgDataControl/Data");
+                        var lbgModelCls = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "LobbyBgData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "LobbyBgData");
+                        var lbgDictKlass = readGotMetadata(0x311B0C0);
+                        var lbgDictCtorInfo = readGotMetadata(0x31200D0);
+                        var lbgDictAddInfo = readGotMetadata(0x3113570);
+                        if (lbgDictKlass && !lbgDictKlass.isNull() && lbgDictCtorInfo && !lbgDictCtorInfo.isNull()) {
+                            ensureIl2CppClassInit(lbgDictKlass);
+                            lobbyBgManagedDict = il2cpp_object_new(lbgDictKlass);
+                            if (lobbyBgManagedDict && !lobbyBgManagedDict.isNull()) {
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(lobbyBgManagedDict, 2);
+                                new NativeFunction(baseAddr.add(0x22CFDF4), "void", ["pointer", "int", "pointer"])(lobbyBgManagedDict, lbgArr.length || 128, lbgDictCtorInfo);
+                            }
+                        }
+                        var dictAddShortObjFn = new NativeFunction(baseAddr.add(0x22D0824), "void", ["pointer", "int16", "pointer", "pointer"]);
+
+                        var bgCount = 0;
+                        pbStep = "lbg_loop";
+                        for (var bi = 0; bi < lbgArr.length; bi++) {
+                            var bgRow = lbgArr[bi];
+                            if (!bgRow || bgRow.code === undefined) continue;
+                            var bgCode = parseInt(bgRow.code, 10) || 0;
+                            if (bgCode <= 0) continue;
+
+                            var relS = "asiudgasg/asodhsg/weoihxd/" + bgCode + "_s.i.bytes";
+                            var relL = "asiudgasg/asodhsg/weoihxd/" + bgCode + "_l.i.bytes";
+                            if (bgRow.bgImageSmall) lobbyBgUrlToLocalMap[bgRow.bgImageSmall.split("?")[0]] = relS;
+                            if (bgRow.bgImageLarge) lobbyBgUrlToLocalMap[bgRow.bgImageLarge.split("?")[0]] = relL;
+                            lobbyBgMetaMap[bgCode] = bgRow;
+
+                            if (lbgCtrlDataCls && !lbgCtrlDataCls.isNull() && lbgModelCls && !lbgModelCls.isNull()) {
+                                var bModel = il2cpp_object_new(lbgModelCls);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(bModel, 2);
+                                bModel.add(0x10).writeS16(bgCode);
+                                bModel.add(0x14).writeS32(parseInt(bgRow.groupID, 10) || 1001);
+                                bModel.add(0x18).writePointer(createIl2CppString(bgRow.bgImageSmall || ""));
+                                bModel.add(0x20).writePointer(createIl2CppString(bgRow.bgImageLarge || ""));
+                                bModel.add(0x28).writePointer(createIl2CppString(bgRow.productBgColor || "0x535d9cFF"));
+                                bModel.add(0x30).writePointer(createIl2CppString(bgRow.productFontColor || "0xFFFFFFFF"));
+                                bModel.add(0x38).writeS32(parseInt(bgRow.bgName, 10) || 0);
+                                bModel.add(0x40).writePointer(createIl2CppString(bgRow.analyticsData || ("Wallpaper " + bgCode)));
+                                bModel.add(0x48).writeS32(parseInt(bgRow.itemName, 10) || 0);
+
+                                var bgObj = il2cpp_object_new(lbgCtrlDataCls);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(bgObj, 2);
+                                bgObj.add(0x10).writePointer(bModel);
+                                bgObj.add(0x18).writePointer(createDownloadPath(relS));
+                                bgObj.add(0x20).writePointer(createDownloadPath(relL));
+                                lobbyBgDataMap[bgCode] = bgObj;
+                                if (lobbyBgManagedDict && !lobbyBgManagedDict.isNull()) {
+                                    try { dictAddShortObjFn(lobbyBgManagedDict, bgCode, bgObj, lbgDictAddInfo); } catch (eBda) {}
+                                }
+                                bgCount++;
+                            }
+                        }
+
+                        // Write static fields on LobbyBgDataControl (0x30E18C8)
+                        try {
+                            var lbgCtrlCls = readGotMetadata(0x30E18C8);
+                            if (lbgCtrlCls && !lbgCtrlCls.isNull()) {
+                                ensureIl2CppClassInit(lbgCtrlCls);
+                                var lStat = lbgCtrlCls.add(0xB8).readPointer();
+                                if (lStat && !lStat.isNull()) {
+                                    lStat.writeU8(1); // IsOpened = true
+                                    if (lobbyBgManagedDict && !lobbyBgManagedDict.isNull()) lStat.add(0x8).writePointer(lobbyBgManagedDict);
+                                    try {
+                                        var defBgListPtr = lStat.add(0x20).readPointer();
+                                        if (defBgListPtr && !defBgListPtr.isNull()) {
+                                            var clearDbgInfo = readGotMetadata(0x30E2F18);
+                                            var addDbgInfo = readGotMetadata(0x30E57C8);
+                                            if (clearDbgInfo && !clearDbgInfo.isNull()) {
+                                                new NativeFunction(baseAddr.add(0x23CE81C), "void", ["pointer", "pointer"])(defBgListPtr, clearDbgInfo);
+                                            }
+                                            var freeCodes = Object.keys(lobbyBgFreeSet).map(function (k) { return parseInt(k, 10); }).sort(function (a, b) { return a - b; });
+                                            if (addDbgInfo && !addDbgInfo.isNull()) {
+                                                var addDbgFn = new NativeFunction(baseAddr.add(0x23CE41C), "void", ["pointer", "pointer", "pointer"]);
+                                                for (var fbi = 0; fbi < freeCodes.length; fbi++) {
+                                                    var fObj = lobbyBgDataMap[freeCodes[fbi]];
+                                                    if (fObj && !fObj.isNull()) addDbgFn(defBgListPtr, fObj, addDbgInfo);
+                                                }
+                                            }
+                                        }
+                                    } catch (eDbg) {}
+                                }
+                            }
+                        } catch (eLs) {}
+
+                        // Initialize ArtistTypeControl (att.json) so ChangeProfileNewAssist.Start finds ArtistTypeControl.Find(artistType)
+                        try {
+                            pbStep = "artist_type";
+                            var attRaw = readTextFile(sdisDir + "att.json");
+                            var attArr = attRaw ? JSON.parse(attRaw) : [
+                                { code: 1, equipType: true, viewType: 0, cardUseType: true, cardAppearType: 0, cardBookScoreType: 0 },
+                                { code: 2, equipType: true, viewType: 1, cardUseType: true, cardAppearType: 1, cardBookScoreType: 1 },
+                                { code: 3, equipType: true, viewType: 1, cardUseType: true, cardAppearType: 2, cardBookScoreType: 1 },
+                                { code: 4, equipType: false, viewType: 2, cardUseType: false, cardAppearType: 2, cardBookScoreType: 2 }
+                            ];
+                            var attCtrlCls = readGotMetadata(0x30FE4B0);
+                            var attCtrlDataCls = readGotMetadata(0x31364C8) || getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "ArtistTypeControl/Data");
+                            var attModelCls = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "ArtistTypeData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "ArtistTypeData");
+                            var attDictKlass = readGotMetadata(0x3108718);
+                            var attDictCtorInfo = readGotMetadata(0x30CFAE0);
+                            var attDictAddInfo = readGotMetadata(0x3129928);
+                            if (attDictKlass && !attDictKlass.isNull() && attDictCtorInfo && !attDictCtorInfo.isNull()) {
+                                ensureIl2CppClassInit(attDictKlass);
+                                artistTypeManagedDict = il2cpp_object_new(attDictKlass);
+                                if (artistTypeManagedDict && !artistTypeManagedDict.isNull()) {
+                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(artistTypeManagedDict, 2);
+                                    new NativeFunction(baseAddr.add(0x22CFDF4), "void", ["pointer", "int", "pointer"])(artistTypeManagedDict, attArr.length || 8, attDictCtorInfo);
+                                }
+                            }
+                            if (attCtrlDataCls && !attCtrlDataCls.isNull() && attModelCls && !attModelCls.isNull()) {
+                                ensureIl2CppClassInit(attCtrlDataCls);
+                                ensureIl2CppClassInit(attModelCls);
+                                var attDataCtorFn = new NativeFunction(baseAddr.add(0xEC3F8C), "void", ["pointer", "pointer", "pointer"]);
+                                var dictAddShortObjAtt = new NativeFunction(baseAddr.add(0x22D0824), "void", ["pointer", "int16", "pointer", "pointer"]);
+                                for (var ati = 0; ati < attArr.length; ati++) {
+                                    var atr = attArr[ati];
+                                    if (!atr || atr.code === undefined) continue;
+                                    var atCode = parseInt(atr.code, 10);
+                                    var atModel = il2cpp_object_new(attModelCls);
+                                    if (!atModel || atModel.isNull()) continue;
+                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(atModel, 2);
+                                    atModel.add(0x10).writeS16(atCode);
+                                    atModel.add(0x12).writeU8(atr.equipType ? 1 : 0);
+                                    atModel.add(0x14).writeS16(parseInt(atr.viewType || 0, 10));
+                                    atModel.add(0x16).writeU8(atr.cardUseType ? 1 : 0);
+                                    atModel.add(0x18).writeS16(parseInt(atr.cardAppearType || 0, 10));
+                                    atModel.add(0x1A).writeS16(parseInt(atr.cardBookScoreType || 0, 10));
+                                    var atObj = il2cpp_object_new(attCtrlDataCls);
+                                    if (!atObj || atObj.isNull()) continue;
+                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(atObj, 2);
+                                    attDataCtorFn(atObj, atModel, NULL);
+                                    artistTypeDataMap[atCode] = atObj;
+                                    if (artistTypeManagedDict && !artistTypeManagedDict.isNull() && attDictAddInfo && !attDictAddInfo.isNull()) {
+                                        try { dictAddShortObjAtt(artistTypeManagedDict, atCode, atObj, attDictAddInfo); } catch (eAta) {}
+                                    }
+                                }
+                            }
+                            if (attCtrlCls && !attCtrlCls.isNull()) {
+                                ensureIl2CppClassInit(attCtrlCls);
+                                var atStat = attCtrlCls.add(0xB8).readPointer();
+                                if (atStat && !atStat.isNull()) {
+                                    atStat.writeU8(1);
+                                    if (artistTypeManagedDict && !artistTypeManagedDict.isNull()) atStat.add(0x8).writePointer(artistTypeManagedDict);
+                                }
+                            }
+                        } catch (eAtt) {
+                            log("[-] ArtistTypeControl init error: " + eAtt.message);
+                        }
+
+                        // Initialize WordFilterControl & InputControl cleanly so Status Message / Nickname validation never hits null Map/liWordFilter
+                        try {
+                            pbStep = "wordfilter_input_open";
+                            if (!new NativeFunction(baseAddr.add(0xCDF664), "uint8", ["pointer"])(NULL)) {
+                                new NativeFunction(baseAddr.add(0xCDF7A0), "void", ["pointer"])(NULL);
+                            }
+                            if (!new NativeFunction(baseAddr.add(0xF15338), "uint8", ["pointer"])(NULL)) {
+                                new NativeFunction(baseAddr.add(0xF15474), "void", ["pointer"])(NULL);
+                            }
+                        } catch (eWf) {}
+
+                        log("[👤 PROFILE/BG INIT] Initialized ProfileControl (" + pCount + " disk-backed profiles) & LobbyBgDataControl (" + bgCount + " wallpapers, " + Object.keys(lobbyBgFreeSet).length + " free base)!");
+                    } catch (eInitPb) {
+                        log("[-] Error in ensureOfflineProfileAndBgControl at step [" + pbStep + "]: " + eInitPb.message);
+                    }
+                }
+
+                function ensureOfflineLeagueRanking() {
+                    try {
+                        if (!offlinePersonObj || offlinePersonObj.isNull()) {
+                            var pCls = getClass("Assembly-CSharp", "", "Person") ||
+                                       getClass("Assembly-CSharp", "com.dalcomsoft.project.app.data", "Person") ||
+                                       getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control", "Person");
+                            if (pCls && !pCls.isNull()) {
+                                offlinePersonObj = il2cpp_object_new(pCls);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(offlinePersonObj, 2);
+                                offlinePersonObj.add(0x10).writePointer(globalPlayerObj || NULL);
+                            }
+                        }
+                        if (!offlineMyRankingObj || offlineMyRankingObj.isNull()) {
+                            var wrCls = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "LeagueControl/WeeklyRanking") ||
+                                        getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control", "LeagueControl/WeeklyRanking") ||
+                                        getClass("Assembly-CSharp", "", "LeagueControl/WeeklyRanking") ||
+                                        getClass("Assembly-CSharp", "", "Ranking");
+                            if (wrCls && !wrCls.isNull()) {
+                                offlineMyRankingObj = il2cpp_object_new(wrCls);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(offlineMyRankingObj, 2);
+                                try { new NativeFunction(baseAddr.add(0xB5E26C), "void", ["pointer", "int", "pointer"])(offlineMyRankingObj, 1, NULL); } catch (eCwr) {}
+                                if (offlinePersonObj && !offlinePersonObj.isNull()) {
+                                    offlineMyRankingObj.add(0x10).writePointer(offlinePersonObj);
+                                }
+                                offlineMyRankingObj.add(0x18).writeS32(1); // Rank = 1
+                                offlineMyRankingObj.add(0x1C).writeS32(0); // Score
+                                offlineMyRankingObj.add(0x20).writeU8(0);  // IsArena = false
+                            }
+                        } else if (offlinePersonObj && !offlinePersonObj.isNull()) {
+                            offlineMyRankingObj.add(0x10).writePointer(offlinePersonObj);
+                        }
+                        if (offlineMyRankingObj && !offlineMyRankingObj.isNull()) {
+                            var lCtrlCls = readGotMetadata(0x30E6500);
+                            if (lCtrlCls && !lCtrlCls.isNull()) {
+                                ensureIl2CppClassInit(lCtrlCls);
+                                var lStat = lCtrlCls.add(0xB8).readPointer();
+                                if (lStat && !lStat.isNull()) {
+                                    lStat.add(0x6).writeU8(1); // IsOpened = true
+                                    lStat.add(0x10).writeS32(1); // LeagueClass = Bronze II
+                                    lStat.add(0x30).writePointer(offlineMyRankingObj); // MyRanking
+                                }
+                            }
+                        }
+                    } catch (eLr) {
+                        log("[-] Error in ensureOfflineLeagueRanking: " + eLr.message);
+                    }
+                }
+
+                // ProfileControl hooks (Open: 0xDEE170, Close: 0xDEE754, IsOpened: 0xDEDE3C, FirstData: 0xDEDF0C, Map: 0xDEDFD8, groupMap: 0xDEE0A4, Find: 0xDEE8D0)
+                try {
+                    Interceptor.replace(baseAddr.add(0xDEE170), keepCb(new NativeCallback(function (methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                    }, "void", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xDEE754), keepCb(new NativeCallback(function (methodInfo) {}, "void", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xDEDE3C), keepCb(new NativeCallback(function (methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        return 1;
+                    }, "bool", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xDEDFD8), keepCb(new NativeCallback(function (methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        return (profileManagedDict && !profileManagedDict.isNull()) ? profileManagedDict : NULL;
+                    }, "pointer", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xDEE0A4), keepCb(new NativeCallback(function (methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        return (profileGroupManagedDict && !profileGroupManagedDict.isNull()) ? profileGroupManagedDict : NULL;
+                    }, "pointer", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xDEE8D0), keepCb(new NativeCallback(function (code, methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        if (profileDataMap[code]) return profileDataMap[code];
+                        return profileDataMap[1001] || NULL;
+                    }, "pointer", ["int", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xBD986C), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        try {
+                            var model = thisPtr.add(0x10).readPointer();
+                            if (!model.isNull()) {
+                                var pCode = model.add(0x10).readS32();
+                                var rel = profileLocalFileMap[pCode] || ("asiudgasg/asodhsg/halwuiefjs/" + pCode + ".i.bytes");
+                                return createDownloadPath(rel);
+                            }
+                        } catch (ePip) {}
+                        return createDownloadPath("asiudgasg/asodhsg/halwuiefjs/1001.i.bytes");
+                    }, "pointer", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xBD96F0), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        try {
+                            var model = thisPtr.add(0x10).readPointer();
+                            if (!model.isNull()) {
+                                return 1; // Expose all disk-backed profiles (base + locked event/shop) in PROFILE SELECT
+                            }
+                        } catch (eWp) {}
+                        return 0;
+                    }, "bool", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xBD9644), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        try {
+                            var model = thisPtr.add(0x10).readPointer();
+                            if (!model.isNull()) {
+                                var pCode = model.add(0x10).readS32();
+                                var row = profileMetaMap[pCode];
+                                if (row && row.analyticsData) return createIl2CppString(String(row.analyticsData));
+                            }
+                        } catch (ePn) {}
+                        return createIl2CppString("");
+                    }, "pointer", ["pointer", "pointer"])));
+                    log("[+] Replaced ProfileControl & ProfileControl.Data with disk-backed offline handlers!");
+                } catch (ePc) {
+                    log("[-] Error replacing ProfileControl: " + ePc.message);
+                }
+
+                // LobbyBgDataControl replacements (Open: 0xB3EB60, Close: 0xB3EF68, IsOpened: 0xB3E9C4, Map: 0xB3EA94, Find: 0xB3F0A4)
+                try {
+                    Interceptor.replace(baseAddr.add(0xB3EB60), keepCb(new NativeCallback(function (methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                    }, "void", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xB3EF68), keepCb(new NativeCallback(function (methodInfo) {}, "void", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xB3E9C4), keepCb(new NativeCallback(function (methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        return 1;
+                    }, "bool", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xB3EA94), keepCb(new NativeCallback(function (methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        return (lobbyBgManagedDict && !lobbyBgManagedDict.isNull()) ? lobbyBgManagedDict : NULL;
+                    }, "pointer", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xB3F0A4), keepCb(new NativeCallback(function (code, methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        if (lobbyBgDataMap[code]) return lobbyBgDataMap[code];
+                        return NULL;
+                    }, "pointer", ["int16", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xE74744), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        try {
+                            var model = thisPtr.add(0x10).readPointer();
+                            if (!model.isNull()) {
+                                var code = model.add(0x10).readS16();
+                                return createDownloadPath("asiudgasg/asodhsg/weoihxd/" + code + "_s.i.bytes");
+                            }
+                        } catch (eBgs) {}
+                        return createDownloadPath("asiudgasg/asodhsg/weoihxd/1007_s.i.bytes");
+                    }, "pointer", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xE74854), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        try {
+                            var model = thisPtr.add(0x10).readPointer();
+                            if (!model.isNull()) {
+                                var code = model.add(0x10).readS16();
+                                return createDownloadPath("asiudgasg/asodhsg/weoihxd/" + code + "_l.i.bytes");
+                            }
+                        } catch (eBgl) {}
+                        return createDownloadPath("asiudgasg/asodhsg/weoihxd/1007_l.i.bytes");
+                    }, "pointer", ["pointer", "pointer"])));
+                    var nativeLbgGetBgName = new NativeFunction(baseAddr.add(0xE74964), "pointer", ["pointer", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xE74964), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        try {
+                            var model = thisPtr.add(0x10).readPointer();
+                            if (!model.isNull()) {
+                                var code = model.add(0x10).readS16();
+                                var row = lobbyBgMetaMap[code];
+                                var res = nativeLbgGetBgName(thisPtr, NULL);
+                                if (res && !res.isNull()) {
+                                    var s = readIl2CppString(res);
+                                    if (s && s.length > 0) return res;
+                                }
+                                if (row && row.analyticsData) {
+                                    return createIl2CppString(String(row.analyticsData));
+                                }
+                            }
+                        } catch (eBn) {}
+                        return createIl2CppString("Wallpaper");
+                    }, "pointer", ["pointer", "pointer"])));
+                    log("[+] Replaced LobbyBgDataControl & LobbyBgDataControl.Data with lbg.json + weoihxd offline handlers!");
                 } catch (eLbg) {
-                    log("[-] Error installing LobbyBgDataControl stubs: " + eLbg.message);
+                    log("[-] Error replacing LobbyBgDataControl: " + eLbg.message);
+                }
+
+                // CardPackYearControl.Find (0x1389F10) & Data.get_Name (0xE475DC) backed by cpy.json
+                try {
+                    var cpyObjCache = {};
+                    Interceptor.replace(baseAddr.add(0x1389F10), keepCb(new NativeCallback(function (code, methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        if (cpyObjCache[code]) return cpyObjCache[code];
+                        var row = cardPackYearMetaMap[code];
+                        if (!row) return NULL;
+                        try {
+                            var dCls = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardPackYearControl/Data");
+                            var mCls = getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.asset", "CardPackYearData") || getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.asset", "CardPackYearData");
+                            if (dCls && !dCls.isNull() && mCls && !mCls.isNull()) {
+                                var mObj = il2cpp_object_new(mCls);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(mObj, 2);
+                                mObj.add(0x10).writeS32(parseInt(row.code, 10) || code);
+                                mObj.add(0x18).writePointer(createIl2CppString(row.name || ("Event " + code)));
+                                var dObj = il2cpp_object_new(dCls);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(dObj, 2);
+                                dObj.add(0x10).writePointer(mObj);
+                                cpyObjCache[code] = dObj;
+                                return dObj;
+                            }
+                        } catch (eCpy) {}
+                        return NULL;
+                    }, "pointer", ["int", "pointer"])));
+                } catch (eCpyHook) {}
+
+                // CardControl.FindThemeToCardList (0x11D6B3C) for InfoBasicView Representative Theme display
+                try {
+                    Interceptor.replace(baseAddr.add(0x11D6B3C), keepCb(new NativeCallback(function (themeCode, methodInfo) {
+                        try {
+                            var meta = getGlobalMetadata();
+                            var matched = [];
+                            var seenArtist = {};
+                            if (meta && meta.cards) {
+                                var keys = Object.keys(meta.cards);
+                                for (var i = 0; i < keys.length; i++) {
+                                    var cMeta = meta.cards[keys[i]];
+                                    if (!cMeta) continue;
+                                    var tVal = parseInt(cMeta.theme !== undefined ? cMeta.theme : cMeta.themeID, 10) || 0;
+                                    if (tVal === themeCode && parseInt(cMeta.type, 10) !== 1) {
+                                        var aKey = parseInt(cMeta.artistID, 10) || 0;
+                                        if (!seenArtist[aKey]) {
+                                            seenArtist[aKey] = true;
+                                            matched.push(cMeta);
+                                        }
+                                    }
+                                }
+                                if (matched.length === 0) {
+                                    for (var j = 0; j < keys.length; j++) {
+                                        var cMeta2 = meta.cards[keys[j]];
+                                        if (!cMeta2) continue;
+                                        var tVal2 = parseInt(cMeta2.theme !== undefined ? cMeta2.theme : cMeta2.themeID, 10) || 0;
+                                        if (tVal2 === themeCode) {
+                                            var aKey2 = parseInt(cMeta2.artistID, 10) || 0;
+                                            if (!seenArtist[aKey2]) {
+                                                seenArtist[aKey2] = true;
+                                                matched.push(cMeta2);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            matched.sort(function (a, b) {
+                                return (parseInt(a.artistID, 10) || 0) - (parseInt(b.artistID, 10) || 0);
+                            });
+
+                            var listKlass = readGotMetadata(0x30E7290);
+                            var ctorInfo = readGotMetadata(0x31392B0);
+                            if (listKlass && !listKlass.isNull() && ctorInfo && !ctorInfo.isNull()) {
+                                ensureIl2CppClassInit(listKlass);
+                                var listObj = il2cpp_object_new(listKlass);
+                                if (il2cpp_gchandle_new) il2cpp_gchandle_new(listObj, 2);
+                                new NativeFunction(baseAddr.add(0x23CD7B4), "void", ["pointer", "pointer"])(listObj, ctorInfo);
+                                var addMethod = il2cpp_class_get_method_from_name ? il2cpp_class_get_method_from_name(listKlass, Memory.allocUtf8String("Add"), 1) : NULL;
+                                var addFn = new NativeFunction(baseAddr.add(0x23CE41C), "void", ["pointer", "pointer", "pointer"]);
+                                var added = 0;
+                                for (var m = 0; m < matched.length; m++) {
+                                    var cIdVal = parseInt(matched[m].code !== undefined ? matched[m].code : (matched[m].cardID || matched[m].id), 10) || 0;
+                                    if (cIdVal <= 0) continue;
+                                    var ccd = getOrCreateCardControlData(cIdVal);
+                                    if (ccd && !ccd.isNull()) {
+                                        addFn(listObj, ccd, addMethod);
+                                        added++;
+                                    }
+                                }
+                                log("[🎨 THEME LIST] FindThemeToCardList(" + themeCode + ") -> listObj=" + listObj + " items=" + added);
+                                return listObj;
+                            }
+                        } catch (eFtl) {
+                            log("[-] Error in CardControl.FindThemeToCardList: " + eFtl.message);
+                        }
+                        return NULL;
+                    }, "pointer", ["int", "pointer"])));
+                    log("[+] Replaced CardControl.FindThemeToCardList (0x11D6B3C) for InfoPopup Representative Theme!");
+                } catch (eFtlH) {
+                    log("[-] Error replacing CardControl.FindThemeToCardList: " + eFtlH.message);
+                }
+
+                // Guard CardView.ShowLimitedEffect (0x13945E8) & ShowPrismEffect (0x1394720) when CardView.params (+0x48) is null
+                try {
+                    var origShowLimitedFx = new NativeFunction(baseAddr.add(0x13945E8), "void", ["pointer", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0x13945E8), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        if (!thisPtr || thisPtr.isNull()) return;
+                        try {
+                            var p = thisPtr.add(0x48).readPointer();
+                            if (!p || p.isNull()) return;
+                        } catch (eLim) { return; }
+                        origShowLimitedFx(thisPtr, methodInfo);
+                    }, "void", ["pointer", "pointer"])));
+                    var origShowPrismFx = new NativeFunction(baseAddr.add(0x1394720), "void", ["pointer", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0x1394720), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        if (!thisPtr || thisPtr.isNull()) return;
+                        try {
+                            var p = thisPtr.add(0x48).readPointer();
+                            if (!p || p.isNull()) return;
+                        } catch (ePr) { return; }
+                        origShowPrismFx(thisPtr, methodInfo);
+                    }, "void", ["pointer", "pointer"])));
+                    log("[+] Shielded CardView.ShowLimitedEffect (0x13945E8) & ShowPrismEffect (0x1394720) against null params!");
+                } catch (eCvFx) {}
+
+                // URLsControl.LoadFrom_File_or_Location (0x163A880) so InfoAssist.DownloadBgImage never stalls on HTTP
+                try {
+                    var origLoadFromFile = new NativeFunction(baseAddr.add(0x163A880), "pointer", ["int", "pointer", "pointer", "pointer", "uint32", "int", "pointer", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0x163A880), keepCb(new NativeCallback(function (type, filePathPtr, versionPtr, locsPtr, options, order, cbPtr, methodInfo) {
+                        var relPath = "";
+                        try { if (!filePathPtr.isNull()) relPath = readIl2CppString(filePathPtr); } catch (eS) {}
+                        if (relPath && (relPath.indexOf("asiudgasg/") !== -1 || relPath.indexOf("weoihxd/") !== -1 || relPath.indexOf("halwuiefjs/") !== -1 || relPath.indexOf(".i.bytes") !== -1)) {
+                            var resKlass = getClass("Assembly-CSharp", "", "WWWFile/Result") ||
+                                           getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control", "WWWFile/Result") ||
+                                           getClass("Assembly-CSharp-firstpass", "", "WWWFile/Result");
+                            var resObj = (resKlass && !resKlass.isNull()) ? il2cpp_object_new(resKlass) : Memory.alloc(0x40);
+                            if (resObj && !resObj.isNull()) {
+                                if (resKlass && !resKlass.isNull()) {
+                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(resObj, 2);
+                                    try { new NativeFunction(baseAddr.add(0x20D41F4), "void", ["pointer", "pointer"])(resObj, NULL); } catch (eRc) {}
+                                }
+                                try { resObj.add(0x20).writeU8(1); } catch (eD) {} // IsNotCanceled = true
+                            }
+                            log("[🌐 URLs] LoadFrom_File_or_Location offline hit: " + relPath + " cb=" + cbPtr);
+                            safeInvokeDelegate1(cbPtr, "pointer", resObj);
+                            return resObj;
+                        }
+                        return origLoadFromFile(type, filePathPtr, versionPtr, locsPtr, options, order, cbPtr, methodInfo);
+                    }, "pointer", ["int", "pointer", "pointer", "pointer", "uint32", "int", "pointer", "pointer"])));
+                } catch (eLffl) {}
+
+                // LeagueControl & Ranking getters for offline MyInfo card header (avatar, nickname, BRONZE II)
+                try {
+                    Interceptor.replace(baseAddr.add(0x1063CB0), keepCb(new NativeCallback(function (methodInfo) {
+                        return createIl2CppString("BRONZE II");
+                    }, "pointer", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0x1065714), keepCb(new NativeCallback(function (methodInfo) {
+                        ensureOfflineLeagueRanking();
+                        return (offlineMyRankingObj && !offlineMyRankingObj.isNull()) ? offlineMyRankingObj : NULL;
+                    }, "pointer", ["pointer"])));
+                    var origRankIsMe = new NativeFunction(baseAddr.add(0xF85618), "bool", ["pointer", "pointer"]);
+                    var origRankName = new NativeFunction(baseAddr.add(0xF8573C), "pointer", ["pointer", "pointer"]);
+                    var origRankSpecial = new NativeFunction(baseAddr.add(0xF8579C), "int16", ["pointer", "pointer"]);
+                    var origRankProf = new NativeFunction(baseAddr.add(0xF857B0), "int", ["pointer", "pointer"]);
+                    var origRankTopRec = new NativeFunction(baseAddr.add(0xF85824), "pointer", ["pointer", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xF85618), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        if (offlineMyRankingObj && !offlineMyRankingObj.isNull() && thisPtr.equals(offlineMyRankingObj)) return 1;
+                        return origRankIsMe(thisPtr, NULL);
+                    }, "bool", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xF8573C), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        if (offlineMyRankingObj && !offlineMyRankingObj.isNull() && thisPtr.equals(offlineMyRankingObj)) {
+                            var p = loadPlayerProfile();
+                            return createIl2CppString((p && p.nickname) ? p.nickname : "Orbit");
+                        }
+                        return origRankName(thisPtr, NULL);
+                    }, "pointer", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xF8579C), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        if (offlineMyRankingObj && !offlineMyRankingObj.isNull() && thisPtr.equals(offlineMyRankingObj)) return 0;
+                        return origRankSpecial(thisPtr, NULL);
+                    }, "int16", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xF857B0), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        if (offlineMyRankingObj && !offlineMyRankingObj.isNull() && thisPtr.equals(offlineMyRankingObj)) {
+                            var p = loadPlayerProfile();
+                            return (p && p.profileCode) ? (parseInt(p.profileCode, 10) || 1001) : 1001;
+                        }
+                        return origRankProf(thisPtr, NULL);
+                    }, "int", ["pointer", "pointer"])));
+                    var cachedOfflineRecordInfo = NULL;
+                    var getOfflineRecordInfo = function () {
+                        try {
+                            var p = loadPlayerProfile();
+                            ensureProfileUserFields(p);
+                            var mCode = (p && p.stats && p.stats.bestScoreMusic && p.stats.bestScoreMusic.code > 0) ? parseInt(p.stats.bestScoreMusic.code, 10) : -1;
+                            var mScore = (p && p.stats && p.stats.bestScoreMusic && p.stats.bestScoreMusic.score > 0) ? parseInt(p.stats.bestScoreMusic.score, 10) : 0;
+                            if (!cachedOfflineRecordInfo || cachedOfflineRecordInfo.isNull()) {
+                                var rCls = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents.model", "RecordInfo") ||
+                                           getClass("Assembly-CSharp", "", "RecordInfo");
+                                if (rCls && !rCls.isNull()) {
+                                    cachedOfflineRecordInfo = il2cpp_object_new(rCls);
+                                    if (il2cpp_gchandle_new && !cachedOfflineRecordInfo.isNull()) il2cpp_gchandle_new(cachedOfflineRecordInfo, 2);
+                                }
+                            }
+                            if (cachedOfflineRecordInfo && !cachedOfflineRecordInfo.isNull()) {
+                                cachedOfflineRecordInfo.add(0x10).writeS16(mCode);
+                                cachedOfflineRecordInfo.add(0x14).writeS32(mScore);
+                                return cachedOfflineRecordInfo;
+                            }
+                        } catch (eRi) {}
+                        return NULL;
+                    };
+                    Interceptor.replace(baseAddr.add(0xF85824), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        if (offlineMyRankingObj && !offlineMyRankingObj.isNull() && thisPtr.equals(offlineMyRankingObj)) return getOfflineRecordInfo();
+                        return origRankTopRec(thisPtr, NULL);
+                    }, "pointer", ["pointer", "pointer"])));
+
+                    // Person getters (used when Ranking == null -> UserControl.Me / EditPopup / InfoPopup fallback)
+                    var origPersIsMe = new NativeFunction(baseAddr.add(0x10F8A38), "bool", ["pointer", "pointer"]);
+                    var origPersName = new NativeFunction(baseAddr.add(0x10FCC5C), "pointer", ["pointer", "pointer"]);
+                    var origPersSpecial = new NativeFunction(baseAddr.add(0x10FCCBC), "int16", ["pointer", "pointer"]);
+                    var origPersProf = new NativeFunction(baseAddr.add(0x10FCCD0), "int", ["pointer", "pointer"]);
+                    var origPersTopRec = new NativeFunction(baseAddr.add(0x10FCD50), "pointer", ["pointer", "pointer"]);
+                    var isLocalPersonPtr = function (thisPtr) {
+                        if (!thisPtr || thisPtr.isNull()) return false;
+                        if (offlinePersonObj && !offlinePersonObj.isNull() && thisPtr.equals(offlinePersonObj)) return true;
+                        try {
+                            var dataPtr = thisPtr.add(0x10).readPointer();
+                            if (globalPlayerObj && !globalPlayerObj.isNull() && dataPtr.equals(globalPlayerObj)) return true;
+                        } catch (eIp) {}
+                        return !ENABLE_OFFLINE_SEARCH_MOCK;
+                    };
+                    Interceptor.replace(baseAddr.add(0x10F8A38), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        if (isLocalPersonPtr(thisPtr)) return 1;
+                        return origPersIsMe(thisPtr, NULL);
+                    }, "bool", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0x10FCC5C), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        if (isLocalPersonPtr(thisPtr)) {
+                            var p = loadPlayerProfile();
+                            return createIl2CppString((p && p.nickname) ? p.nickname : "Orbit");
+                        }
+                        return origPersName(thisPtr, NULL);
+                    }, "pointer", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0x10FCCBC), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        if (isLocalPersonPtr(thisPtr)) return 0;
+                        return origPersSpecial(thisPtr, NULL);
+                    }, "int16", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0x10FCCD0), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        if (isLocalPersonPtr(thisPtr)) {
+                            var p = loadPlayerProfile();
+                            return (p && p.profileCode) ? (parseInt(p.profileCode, 10) || 1001) : 1001;
+                        }
+                        return origPersProf(thisPtr, NULL);
+                    }, "int", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0x10FCD50), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        if (isLocalPersonPtr(thisPtr)) return getOfflineRecordInfo();
+                        return origPersTopRec(thisPtr, NULL);
+                    }, "pointer", ["pointer", "pointer"])));
+                } catch (eRank) {
+                    log("[-] Error setting offline LeagueControl/Ranking hooks: " + eRank.message);
+                }
+
+                // InfoAssist.OpenInfoPopup guard -> ensure offlineMyRanking & profile/bg controls initialized before opening
+                try {
+                    Interceptor.attach(baseAddr.add(0xBAFCE4), {
+                        onEnter: function (args) {
+                            ensureOfflineProfileAndBgControl();
+                            ensureOfflineLeagueRanking();
+                        }
+                    });
+                } catch (eIaOp) {}
+
+                // UserControl RPC Offline Handlers for Profile, Customization & Statistics
+                try {
+                    // UserControl.GetMyInfo (0xAAFAC8)
+                    Interceptor.replace(baseAddr.add(0xAAFAC8), keepCb(new NativeCallback(function (cbPtr, methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        ensureOfflineLeagueRanking();
+                        safeInvokeActionInt(cbPtr, 1000);
+                    }, "void", ["pointer", "pointer"])));
+
+                    // UserControl.GetMyStatistics (0xAAFE70)
+                    Interceptor.replace(baseAddr.add(0xAAFE70), keepCb(new NativeCallback(function (cbPtr, methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        ensureOfflineLeagueRanking();
+                        log("[📊 STATS] UserControl.GetMyStatistics -> returning offline stats cleanly!");
+                        safeInvokeActionInt(cbPtr, 1000);
+                    }, "void", ["pointer", "pointer"])));
+
+                    // UserControl.SetStatistics (0xAB00A8)
+                    Interceptor.replace(baseAddr.add(0xAB00A8), keepCb(new NativeCallback(function (statType, targetPtr, value, cbPtr, methodInfo) {
+                        try {
+                            var p = loadPlayerProfile() || createDefaultProfile("Orbit");
+                            ensureProfileUserFields(p);
+                            var targetStr = (!targetPtr.isNull()) ? readIl2CppString(targetPtr) : "";
+                            if (statType === 0) {
+                                p.stats.bestScoreMusic = { code: parseInt(targetStr, 10) || 0, score: value };
+                            } else if (statType === 1) {
+                                p.stats.mostPlayMusic = { code: parseInt(targetStr, 10) || 0, count: value };
+                            } else if (statType === 2) {
+                                p.stats.superStarScore = value;
+                            } else if (statType === 3) {
+                                p.stats.monthlyAllSP = value;
+                            } else if (statType === 4) {
+                                p.stats.monthlyPlay = value;
+                            } else if (statType === 5) {
+                                p.stats.monthlyMyRecord = value;
+                            } else if (statType === 6) {
+                                p.stats.monthlyAttendance = value;
+                            } else if (statType === 7) {
+                                p.stats.bestCardbook = parseInt(targetStr, 10) || value;
+                            }
+                            savePlayerProfile(p);
+                            log("[📊 STATS] Updated offline stat type=" + statType + " target=" + targetStr + " val=" + value);
+                        } catch (eSs) {}
+                        safeInvokeActionInt(cbPtr, 1000);
+                    }, "void", ["int", "pointer", "int", "pointer", "pointer"])));
+
+                    // UserControl.ChangeMyInfo (0xAAFD00): PlayerInfoCategory 0..5
+                    Interceptor.replace(baseAddr.add(0xAAFD00), keepCb(new NativeCallback(function (category, numberVal, strPtr, cbPtr, methodInfo) {
+                        try {
+                            var p = loadPlayerProfile() || createDefaultProfile("Orbit");
+                            ensureProfileUserFields(p);
+                            var numVal = numberVal ? numberVal.toNumber() : -2;
+                            var strVal = (strPtr && !strPtr.isNull()) ? readIl2CppString(strPtr) : "";
+                            if (category === 0) {
+                                p.uiColorTop = strVal;
+                            } else if (category === 1) {
+                                p.uiColorBottom = strVal;
+                            } else if (category === 2) {
+                                if (numVal <= 0) {
+                                    p.leaderCard = null;
+                                } else {
+                                    var matched = Array.isArray(p.inventoryCards) ? p.inventoryCards.find(function (ic) { return ic && ic.objectID === numVal; }) : null;
+                                    p.leaderCard = matched ? { objectID: matched.objectID, cardID: matched.cardID, grade: matched.grade, level: matched.level } : numVal;
+                                }
+                            } else if (category === 3) {
+                                p.repThemeCode = (numVal > 0) ? numVal : -1;
+                            } else if (category === 4) {
+                                p.repLobbyBgCode = (numVal > 0) ? numVal : -1;
+                            } else if (category === 5) {
+                                p.statusMessage = strVal;
+                            }
+                            savePlayerProfile(p);
+                            log("[👤 USER INFO] ChangeMyInfo cat=" + category + " num=" + numVal + " str='" + strVal + "' persisted!");
+                        } catch (eCmi) {
+                            log("[-] Error in offline ChangeMyInfo: " + eCmi.message);
+                        }
+                        safeInvokeActionInt(cbPtr, 1000);
+                    }, "void", ["int", "int64", "pointer", "pointer", "pointer"])));
+
+                    // UserControl.ValidNickname (0xAAEA00)
+                    Interceptor.replace(baseAddr.add(0xAAEA00), keepCb(new NativeCallback(function (nickPtr, cbPtr, methodInfo) {
+                        var nick = (!nickPtr.isNull()) ? readIl2CppString(nickPtr) : "";
+                        var trimmed = (nick || "").trim();
+                        var resCode = (trimmed.length >= 2 && trimmed.length <= 12) ? 1000 : 101;
+                        log("[✏️ NICKNAME] ValidNickname('" + nick + "') -> code=" + resCode);
+                        safeInvokeActionInt(cbPtr, resCode);
+                    }, "void", ["pointer", "pointer", "pointer"])));
+
+                    // UserControl.IsOwnProfile (0xAAF978), AddOwnProfile (0xAAD4D0), GetBuyProfileImage (0xAAFA04)
+                    Interceptor.replace(baseAddr.add(0xAAF978), keepCb(new NativeCallback(function (code, methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        return isProfileOwnedOffline(code) ? 1 : 0;
+                    }, "bool", ["int", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAAD4D0), keepCb(new NativeCallback(function (code, methodInfo) {
+                        var p = loadPlayerProfile() || createDefaultProfile("Orbit");
+                        ensureProfileUserFields(p);
+                        if (p.ownedProfiles.indexOf(code) === -1) p.ownedProfiles.push(code);
+                        savePlayerProfile(p);
+                    }, "void", ["int", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAAFA04), keepCb(new NativeCallback(function (cbPtr, methodInfo) {
+                        safeInvokeActionInt(cbPtr, 1000);
+                    }, "void", ["pointer", "pointer"])));
+
+                    // UserControl.ChangeProfileImage (0xAAF6C0 ProfileData, 0xAAF81C ArtistData)
+                    var commitProfileImageChange = function (newCode, cbPtr) {
+                        try {
+                            var p = loadPlayerProfile() || createDefaultProfile("Orbit");
+                            ensureProfileUserFields(p);
+                            p.profileCode = parseInt(newCode, 10) || 1001;
+                            savePlayerProfile(p);
+                            if (globalPlayerObj && !globalPlayerObj.isNull()) {
+                                globalPlayerObj.add(0x28).writeInt(p.profileCode);
+                                globalPlayerObj.add(0x2C).writeU8(1);
+                            }
+                            try {
+                                var topCtrl = new NativeFunction(baseAddr.add(0xB13204), "pointer", ["pointer"])(NULL);
+                                if (!topCtrl.isNull()) {
+                                    new NativeFunction(baseAddr.add(0xB2DE94), "void", ["pointer", "pointer", "pointer"])(topCtrl, NULL, NULL);
+                                }
+                            } catch (eTp) {}
+                            log("[🖼️ PROFILE] Equipped profile avatar code=" + p.profileCode);
+                        } catch (eCpi) {}
+                        safeInvokeActionInt(cbPtr, 1000);
+                    };
+                    Interceptor.replace(baseAddr.add(0xAAF6C0), keepCb(new NativeCallback(function (pDataPtr, cbPtr, methodInfo) {
+                        var code = 1001;
+                        try {
+                            if (!pDataPtr.isNull()) {
+                                var model = pDataPtr.add(0x10).readPointer();
+                                if (!model.isNull()) code = model.add(0x10).readS32();
+                            }
+                        } catch (eGpc) {}
+                        commitProfileImageChange(code, cbPtr);
+                    }, "void", ["pointer", "pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAAF81C), keepCb(new NativeCallback(function (aDataPtr, cbPtr, methodInfo) {
+                        var code = 1001;
+                        try {
+                            if (!aDataPtr.isNull()) {
+                                var model = aDataPtr.add(0x10).readPointer();
+                                if (!model.isNull()) code = model.add(0x10).readS32();
+                            }
+                        } catch (eGac) {}
+                        commitProfileImageChange(code, cbPtr);
+                    }, "void", ["pointer", "pointer", "pointer"])));
+
+                    // ProfilePurchaseAssist.Open (0xDEEFE8) -> Locked shop profiles notify cleanly until Shop task
+                    Interceptor.replace(baseAddr.add(0xDEEFE8), keepCb(new NativeCallback(function (profileCode, cbPtr, methodInfo) {
+                        log("[🛒 PROFILE SHOP] Locked profile " + profileCode + " tapped -> Shop offline notice");
+                        showOfflineToast("Locked profiles will be purchasable in Offline Shop.", 2.2);
+                        if (cbPtr && !cbPtr.isNull()) {
+                            try {
+                                var mPtr = cbPtr.add(Process.pointerSize * 2).readPointer();
+                                if (!mPtr.isNull()) new NativeFunction(mPtr, "void", ["pointer", "bool", "bool", "pointer"])(cbPtr, 0, 0, NULL);
+                            } catch (ePpc) {}
+                        }
+                    }, "void", ["int", "pointer", "pointer"])));
+
+                    // EditAssist.OnEventBGEdit (0x12599A4) -> Keep EditPopup open and show offline shop notice (matches user decision #2)
+                    Interceptor.replace(baseAddr.add(0x12599A4), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        try { new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"])(createIl2CppString("btn_touch"), NULL); } catch (eS) {}
+                        log("[🖼️ BG EDIT] Wallpaper shop unavailable in offline standalone mode.");
+                        showOfflineToast("Wallpaper Shop is unavailable in offline standalone mode.", 2.2);
+                    }, "void", ["pointer", "pointer"])));
+
+                    // User Search (ENABLE_OFFLINE_SEARCH_MOCK = false -> clean offline toast; ready mock code preserved if enabled later)
+                    var offlineDummyPlayers = [
+                        { userId: 20001, nickname: "HeeJinFan", profileCode: 1001, statusMessage: "LOONA Forever!", uiColorTop: "", uiColorBottom: "", leaderCard: { objectID: 200001, cardID: 1001, grade: 4, level: 50 }, repThemeCode: 1001, repLobbyBgCode: 1001 },
+                        { userId: 20002, nickname: "JinSoulOrbit", profileCode: 1007, statusMessage: "Singing in the Rain", uiColorTop: "", uiColorBottom: "", leaderCard: { objectID: 200007, cardID: 1007, grade: 4, level: 50 }, repThemeCode: 1001, repLobbyBgCode: 1007 }
+                    ];
+                    function findDummyOfflinePlayer(val) {
+                        var q = String(val || "").toLowerCase();
+                        return offlineDummyPlayers.filter(function (dp) {
+                            return dp.userId === val || dp.nickname.toLowerCase().indexOf(q) !== -1;
+                        });
+                    }
+                    var origInfoSearchOpen = new NativeFunction(baseAddr.add(0xF75A5C), "void", ["pointer", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xF75A5C), keepCb(new NativeCallback(function (cbPtr, methodInfo) {
+                        if (!ENABLE_OFFLINE_SEARCH_MOCK) {
+                            log("[🔍 SEARCH] Player search unavailable offline (ENABLE_OFFLINE_SEARCH_MOCK=false)");
+                            showOfflineToast("Player search is unavailable in offline standalone mode.", 2.2);
+                            if (cbPtr && !cbPtr.isNull()) safeInvokeActionInt(cbPtr, 0);
+                            return;
+                        }
+                        origInfoSearchOpen(cbPtr, NULL);
+                    }, "void", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB01A0), keepCb(new NativeCallback(function (nickPtr, cbPtr, methodInfo) {
+                        if (!ENABLE_OFFLINE_SEARCH_MOCK) {
+                            showOfflineToast("Player search is unavailable in offline standalone mode.", 2.2);
+                            safeInvokeActionIntList(cbPtr, 0, NULL);
+                            return;
+                        }
+                        var matches = findDummyOfflinePlayer(readIl2CppString(nickPtr));
+                        // Ready mock branch (inactive when ENABLE_OFFLINE_SEARCH_MOCK === false)
+                        safeInvokeActionIntList(cbPtr, matches.length > 0 ? 0 : 1, NULL);
+                    }, "void", ["pointer", "pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAAFC2C), keepCb(new NativeCallback(function (targetId, cbPtr, methodInfo) {
+                        safeInvokeActionIntObj(cbPtr, ENABLE_OFFLINE_SEARCH_MOCK ? 0 : 1, NULL);
+                    }, "void", ["int64", "pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAAFFD4), keepCb(new NativeCallback(function (targetId, cbPtr, methodInfo) {
+                        safeInvokeActionIntObj(cbPtr, ENABLE_OFFLINE_SEARCH_MOCK ? 0 : 1, NULL);
+                    }, "void", ["int64", "pointer", "pointer"])));
+
+                    // GuideAssist.Open (0xBA0374) & Share safe offline handlers
+                    var origGuideOpen = new NativeFunction(baseAddr.add(0xBA0374), "void", ["int16", "pointer", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xBA0374), keepCb(new NativeCallback(function (guideType, cbPtr, methodInfo) {
+                        if (guideType === 6) { // GuideType.MyInfo
+                            log("[❓ GUIDE] MyInfo help offline summary shown.");
+                            showOfflineToast("Tap Edit to customize your avatar, nickname, status, colors, and favorite card/theme.", 2.8);
+                            if (cbPtr && !cbPtr.isNull()) safeInvokeActionInt(cbPtr, 0);
+                            return;
+                        }
+                        origGuideOpen(guideType, cbPtr, NULL);
+                    }, "void", ["int16", "pointer", "pointer"])));
+
+                    Interceptor.replace(baseAddr.add(0xFE5DDC), keepCb(new NativeCallback(function (methodInfo) {
+                        return createIl2CppString("#SuperStarLOONA");
+                    }, "pointer", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xFE6228), keepCb(new NativeCallback(function (methodInfo) {
+                        return createIl2CppString("");
+                    }, "pointer", ["pointer"])));
+                    [0x12490C4, 0x1249290, 0x1249464].forEach(function (shareRva) {
+                        try {
+                            Interceptor.replace(baseAddr.add(shareRva), keepCb(new NativeCallback(function (imgPtr, arg2, arg3, methodInfo) {
+                                // Facebook(tex, cb), Twitter(tex, text, cb), Instagram(tex, cb)
+                                var cbPtr = (shareRva === 0x1249290) ? arg3 : arg2;
+                                showOfflineToast("Social sharing is unavailable in offline standalone mode.", 2.0);
+                                try { new NativeFunction(baseAddr.add(0xB3E230), "void", ["pointer"])(NULL); } catch (eLc) {}
+                                if (cbPtr && !cbPtr.isNull()) {
+                                    try {
+                                        var mPtr = cbPtr.add(Process.pointerSize * 2).readPointer();
+                                        if (!mPtr.isNull()) new NativeFunction(mPtr, "void", ["pointer", "pointer", "pointer"])(cbPtr, NULL, NULL);
+                                    } catch (eScb) {}
+                                }
+                            }, "void", ["pointer", "pointer", "pointer", "pointer"])));
+                        } catch (eShH) {}
+                    });
+
+                    // InputControl.IsVaild(int charNum) (0xF15844) -> Enforce official icd.json ranges offline (ASCII printable, Korean Hangul, CJK punctuation)
+                    var cachedInputCharRanges = null;
+                    function getInputCharRanges() {
+                        if (cachedInputCharRanges !== null) return cachedInputCharRanges;
+                        try {
+                            var icdRaw = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/icd.json");
+                            var parsed = icdRaw ? JSON.parse(icdRaw) : null;
+                            if (Array.isArray(parsed) && parsed.length > 0) {
+                                cachedInputCharRanges = parsed.map(function (r) {
+                                    return { min: parseInt(r.min, 16) || 0, max: parseInt(r.max, 16) || 0 };
+                                });
+                                return cachedInputCharRanges;
+                            }
+                        } catch (eIcd) {}
+                        cachedInputCharRanges = [
+                            { min: 0x0020, max: 0x007E },
+                            { min: 0x1100, max: 0x11FF },
+                            { min: 0x3130, max: 0x318F },
+                            { min: 0xAC00, max: 0xD7AF }
+                        ];
+                        return cachedInputCharRanges;
+                    }
+                    Interceptor.replace(baseAddr.add(0xF15844), keepCb(new NativeCallback(function (charNum, methodInfo) {
+                        var ranges = getInputCharRanges();
+                        var cp = charNum & 0xFFFF;
+                        for (var ri = 0; ri < ranges.length; ri++) {
+                            if (cp >= ranges[ri].min && cp <= ranges[ri].max) return 1;
+                        }
+                        return 0;
+                    }, "uint8", ["int", "pointer"])));
+
+                    // ArtistTypeControl replacements (IsOpened: 0xAD6FEC, Map: 0xAD708C, Open: 0xAD7128, Find: 0xAD0F24)
+                    Interceptor.replace(baseAddr.add(0xAD6FEC), keepCb(new NativeCallback(function (methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        return 1;
+                    }, "uint8", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAD708C), keepCb(new NativeCallback(function (methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        return artistTypeManagedDict || NULL;
+                    }, "pointer", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAD7128), keepCb(new NativeCallback(function (methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                    }, "void", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAD0F24), keepCb(new NativeCallback(function (code, methodInfo) {
+                        ensureOfflineProfileAndBgControl();
+                        return artistTypeDataMap[code] || artistTypeDataMap[1] || NULL;
+                    }, "pointer", ["int16", "pointer"])));
+
+                    // LobbyBgStoreDataControl offline RPC replacements (changeMyLobbyBg: 0xFF5688, getMyLobbyBgList: 0xFF548C, changeLobbyBgList: 0xFF5924, buyLobbyBgItem: 0xFF5760)
+                    var syncUserLobbySlide = function (codesArr) {
+                        try {
+                            var slideList = new NativeFunction(baseAddr.add(0xAB3BA8), "pointer", ["pointer"])(NULL);
+                            if (slideList && !slideList.isNull()) {
+                                var listClearInfo = readGotMetadata(0x30E4D78);
+                                var listAddInfo = readGotMetadata(0x314B0C0);
+                                if (listClearInfo && !listClearInfo.isNull()) {
+                                    new NativeFunction(baseAddr.add(0x2495FAC), "void", ["pointer", "pointer"])(slideList, listClearInfo);
+                                }
+                                if (Array.isArray(codesArr) && listAddInfo && !listAddInfo.isNull()) {
+                                    var listAddIntFn = new NativeFunction(baseAddr.add(0x2495BA0), "void", ["pointer", "int", "pointer"]);
+                                    for (var si = 0; si < codesArr.length; si++) {
+                                        var cVal = parseInt(codesArr[si], 10) || 0;
+                                        if (cVal > 0) listAddIntFn(slideList, cVal, listAddInfo);
+                                    }
+                                }
+                            }
+                        } catch (eSyncSlide) {}
+                        try {
+                            new NativeFunction(baseAddr.add(0xFF61A8), "void", ["bool", "pointer"])(1, NULL); // set_UpdateMyEquipBG(true)
+                        } catch (eUbg) {}
+                    };
+
+                    Interceptor.replace(baseAddr.add(0xFF5688), keepCb(new NativeCallback(function (cbPtr, code, methodInfo) {
+                        var bgCode = (code & 0xFFFF);
+                        try {
+                            var p = loadPlayerProfile() || createDefaultProfile("Orbit");
+                            ensureProfileUserFields(p);
+                            p.repLobbyBgCode = bgCode;
+                            p.equipedLobbyBgList = [bgCode];
+                            savePlayerProfile(p);
+                            syncUserLobbySlide(p.equipedLobbyBgList);
+                            log("[🖼️ LOBBY BG] Equipped offline wallpaper repLobbyBgCode=" + bgCode);
+                        } catch (eCbg) {
+                            log("[-] Error in offline changeMyLobbyBg: " + eCbg.message);
+                        }
+                        safeInvokeActionInt(cbPtr, 1000);
+                    }, "void", ["pointer", "int16", "pointer"])));
+
+                    Interceptor.replace(baseAddr.add(0xFF548C), keepCb(new NativeCallback(function (cbPtr, methodInfo) {
+                        try {
+                            var p = loadPlayerProfile() || createDefaultProfile("Orbit");
+                            ensureProfileUserFields(p);
+                            var eq = (Array.isArray(p.equipedLobbyBgList) && p.equipedLobbyBgList.length > 0)
+                                ? p.equipedLobbyBgList
+                                : [p.repLobbyBgCode || 1001];
+                            syncUserLobbySlide(eq);
+                        } catch (eGbg) {}
+                        safeInvokeActionInt(cbPtr, 1000);
+                    }, "void", ["pointer", "pointer"])));
+
+                    Interceptor.replace(baseAddr.add(0xFF5924), keepCb(new NativeCallback(function (cbPtr, newBgCode, equip, methodInfo) {
+                        try {
+                            var p = loadPlayerProfile() || createDefaultProfile("Orbit");
+                            ensureProfileUserFields(p);
+                            if (equip && newBgCode > 0) {
+                                p.repLobbyBgCode = newBgCode;
+                                if (!Array.isArray(p.equipedLobbyBgList)) p.equipedLobbyBgList = [];
+                                if (p.equipedLobbyBgList.indexOf(newBgCode) === -1) p.equipedLobbyBgList.push(newBgCode);
+                            }
+                            savePlayerProfile(p);
+                            syncUserLobbySlide(p.equipedLobbyBgList);
+                        } catch (eClb) {}
+                        safeInvokeActionInt(cbPtr, 1000);
+                    }, "void", ["pointer", "int", "bool", "pointer"])));
+
+                    Interceptor.replace(baseAddr.add(0xFF5760), keepCb(new NativeCallback(function (cbPtr, code, methodInfo) {
+                        log("[🛒 LOBBY BG SHOP] buyLobbyBgItem(" + code + ") unavailable in offline standalone mode.");
+                        showOfflineToast("Wallpaper Shop is unavailable in offline standalone mode.", 2.2);
+                        safeInvokeActionInt(cbPtr, 0);
+                    }, "void", ["pointer", "int16", "pointer"])));
+
+                    log("[+] Installed complete offline User Profile, Edit, Search, Guide, and Share hooks!");
+                } catch (eProfRpc) {
+                    log("[-] Error installing User Profile RPC hooks: " + eProfRpc.message);
                 }
 
                 // Hook LobbyScene.OnOpen (0xB45508)
@@ -20634,10 +22155,18 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                             // Refresh and verify user profile in TopBar
                             try {
+                                if (typeof ensureOfflineProfileAndBgControl === "function") ensureOfflineProfileAndBgControl();
+                                if (typeof ensureOfflineLeagueRanking === "function") ensureOfflineLeagueRanking();
                                 var currentProf = loadPlayerProfile();
                                 if (currentProf) {
                                     setupUserControl(currentProf);
-                                    log("[👤 LOBBY] TopBar profile data synchronized for '" + currentProf.nickname + "'!");
+                                    try {
+                                        var topCtrlInstL = new NativeFunction(baseAddr.add(0xB13204), "pointer", ["pointer"])(NULL);
+                                        if (!topCtrlInstL.isNull()) {
+                                            new NativeFunction(baseAddr.add(0xB2DE94), "void", ["pointer", "pointer", "pointer"])(topCtrlInstL, NULL, NULL);
+                                        }
+                                    } catch (eTrp) {}
+                                    log("[👤 LOBBY] TopBar profile & avatar synchronized for '" + currentProf.nickname + "'!");
                                 }
                             } catch (eProf) {
                                 log("[-] Error refreshing profile in LobbyScene: " + eProf.message);
