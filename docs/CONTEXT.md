@@ -5266,6 +5266,35 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
   - `HeeJin` Solo (`7/21`, 3 slots, `cardID=7002`): Grupo `HeeJin`, tema `HeeJin`, carrusel `3/200`.
   - `[+ +]` (`1/21`) HeeJin (`Hi High`, `cardID=1001`): Cero regresiones (`5/200`).
 
+---
+
+### 📋 Auditoría Completa y Offline Standalone de `InventoryScene` y `CardBookScene` (2026-11-25)
+
+* **Objetivo:** Completar las 3 fases de [inventory_cardbook_audit_plan.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/inventory_cardbook_audit_plan.md) en [libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js): estabilización de `InventoryScene` y `CardBookScene`, restauración nativa de `CardSellBundlePopup` (`Custom/Popup_Card_Sell_Bundle`), flujo de venta individual con confirmación, avisos limpios offline para `Shop`/`Help`, soporte de favoritos y recompensas en `CardBook`, y corrección de `Choose Group` / `Music`.
+* **Checkpoint Base:** Commit `63df6686` (`chore(checkpoint): pre-inventory-cardbook-full-offline-fixes`) en rama `feat/card-ui`.
+* **Correcciones Implementadas y Hallazgos Clave:**
+  1. **Inicialización y Carrusel en `InventoryScene`:**
+     - `cardCountText` del carrusel usa `profile.cardInvenMax || 200` (`" / " + maxInvenCar`).
+     - `applyOfflineSortAndFilter` y `SetStateDefault.onLeave` envuelven `InvenCardView.SetData` (`0xF23384`) en `try/catch` con fallback a `ReloadKeepPos` (`0x125C750`) + `_ResetVisibleCellViews` (`0x125D768`), y `SetStateDefault.onLeave` pasa `force=false` evitando abortos al abrir `InventoryScene`.
+  2. **Confirmación de Venta Individual y Callback `Popup_Notice_2Btn` (`Popup.Close` `0x114247C`):**
+     - `Popup_Notice_2Btn` asigna `Result.isOk` (`[pop + 0x40] + 0x10 = 1`) y llama directamente a `Popup.Close` (`0x114247C`) sin pasar por `Popup.OnOk` (`0x114B6C8`). El hook en `Popup.Close` inspecciona `resPtr.add(0x10).readU8() === 1` para disparar `pendingPopupConfirmFn()`.
+  3. **Restauración Nativa de `Sell All` (`Custom/Popup_Card_Sell_Bundle`):**
+     - Corregido el nombre de prefab en GOT `0x30CAC80` a `Custom/Popup_Card_Sell_Bundle` y la llamada a `UIHelper.OpenPopup` (`0xAAA0D0`) con su firma real de **8 argumentos** y lectura de slots GOT (`0x310D950`, `0x30E15D0`, `0x3102548`) vía `readGotSlot`.
+     - Corregidos los fallbacks de `LocalePopupControl.Find` (`0xCF2998`) y `LocalePopupControl.Data` (`get_Icon` `0xE77FD4`, `get_Title` `0xE78048`, `GetMessage` `0xE780E8`, `GetButton` `0xE781BC`) usando `createIl2CppString(...)` (antes invocaba `il2cpp_string_new` con strings JS causando `ArgumentNullException` en `string.Format`) y cubriendo códigos `57`, `58` (`"Sell {0} card(s) for {1} RP?"`) y `59` (`"Sell All"` / `"Earned {0} RP!"`).
+     - Corregido `InventoryControl.SellBundle` (`0xF2D7F0`) para priorizar únicamente `sellArrayPtr` (lote de máximo `100` cartas confirmadas en `SellCardBundle`), recurriendo a `sellListPtr` solo si `sellArrayPtr` está vacío, y pasando `skipSetData = false` a `restoreDefaultDisplayCardList` (también corregido en `executeOfflineSellBundle`) para refrescar inmediatamente el contador (`670 -> 570 / 2500`) y carrusel.
+     - *Nota de Prefab verificada:* En `InvenCardMainView` (`0xF227B4`), `btnExchange` (`0x38`) comparte exactamente la posición `(147.3, 75.4)` con `btnInfo` (`0x40`) y viene desactivado (`activeSelf = 0`) de fábrica en el prefab de SuperStar LOONA; `OnExchangeTheme` (`0x105AD6C`) queda enlazado al flujo offline sin sobreponerlo sobre `Information`.
+  4. **Estabilización de `CardBookScene` (`Choose Group`, Favoritos, Recompensas y Visibilidad):**
+     - Corregido el crash de `CardBookScene.OnSelectGroup` (`Choose Group` -> `0xC3BF30`) validando `DisplayGroupList` (`InventoryControl.static_fields + 0xc0`) en `ensureDisplayGroupList()` e `InventoryControl.OpenGroup` (`0xF2827C`).
+     - Corregida la fuga de `HideCount` (`SceneControl.Data + 0x78`) en `TopViewControl.OnShowPopupEvent` (`0xB2EC60`): en lugar de suprimir `ShowScene()` para todo popup distinto de `CardBookDetailPopup` (lo que dejaba `HideCount = 1` y la pantalla vacía al abrir un grupo desde `Popup_ChangeGroup`, que sí usa `hideScene = true`), el escudo ahora solo suprime `ShowScene()` cuando se cierra un popup hijo no-ocultante (`CardInfoPopup` o `CardPortraitPopup`) con `isCardBookDetailOpen === true`.
+     - Verificado en `CardBookMainView` que el banner `BEST CARD BOOK` cubre hasta `y ≈ 718` px, mientras el primer botón de favorito (`slot=0`, `[+ +]`) responde correctamente en `MainView.OnSelectFavoriteGroup` (`0x11CDC2C`) -> `OnFavoriteGroupFive` (`0x11D2630`).
+  5. **Avisos Limpios Offline y Ruta `Music` -> `SelectMusicScene`:**
+     - `Shop` (`InventoryScene.OnStore` `0x105DD24` y `CardBook`) y `Help` (`0x105CA50`, `0x105CB28`, `0x1060B98`, `0x11D23A0`, `0x11CC010`) muestran `Popup_Notice_1Btn` limpios (`Shop (Offline Mode)`, `Help (Offline Mode)`).
+     - Parcheado `cbz x8, #0x103d2b8` en `SelectMusicScene.OnOpen` (`0x103D280`, bytes `[0xc8, 0x01, 0x00, 0xb4]`) para evitar el `NullReferenceException` en `0x103D44C` cuando la lista estática de ranking semanal (`+0x30`) es nula al transicionar desde el botón `Music` de Inventario (`0x105CD68`). *(Nota: la pantalla destino `SelectMusicScene` aún permanece en indicador de carga por RPCs musicales offline fuera del alcance de esta tarea).*
+* **Validación Visual QA (`127.0.0.1:5555`, Perfil Restaurado):**
+  - `InventoryScene`: carga completa sin abortos (`670 / 2500`, `500.000 RP`, `9.999 Diamonds`), `Sell All` nativo (`100` cartas `+20.000 RP`, refresco inmediato a `570 / 2500`), venta individual (`+600 RP`), `Shop (Offline Mode)`, `Help (Offline Mode)`, navegación a `SelectMusicScene` (`SceneId: 7`) sin crash.
+  - `CardBookScene`: recompensas `RECEIVE` (`+10 Diamonds`, `+2000 RP`), límite máx. 5 favoritos y toggle, `All Cards` (`Popup_CardBook_All`), `Choose Group` (`Custom/Popup_ChangeGroup`) -> `[x x]`, apertura/cierre de `CardInfoPopup` sin superposición fantasma (`[🛡️ ON_SHOW_POPUP SHIELD]`) y retorno limpio a `CardBookMainView` y a la escena previa con `[X]`.
+  - Perfil original restaurado y verificado tras pruebas destructivas (`qa11_cb_detail_no_ghost.png`, `qa11_cb_restored.png`, `qa11_inven_settled.png`).
+
 
 
 

@@ -1664,9 +1664,13 @@ function initIl2Cpp(module) {
                     rhythmPoint: 100000,
                     headphone: 50,
                     dalcomCoin: 5000,
+                    themeChanger: 10,
                     cardInvenMax: 200,
                     equipedLobbyBgList: [100001],
+                    favoriteGroups: [1001, 2001, 3001, 4001, 5001],
+                    collectionRewardsClaimed: { card: 0, theme: 0 },
                     leaderCard: {
+                        objectID: 100001,
                         cardID: 1001,
                         grade: 4,
                         level: 50
@@ -1846,6 +1850,142 @@ function initIl2Cpp(module) {
                 }
             }
 
+            function showOfflineToast(msg, seconds) {
+                try {
+                    var toastFn = new NativeFunction(baseAddr.add(0xB2766C), "void", ["pointer", "bool", "float", "pointer", "bool", "pointer"]);
+                    toastFn(createIl2CppString(String(msg || "")), 1, (seconds !== undefined && seconds !== null) ? seconds : 2.2, NULL, 0, NULL);
+                } catch (eTst) {
+                    log("[-] Error in showOfflineToast: " + eTst.message);
+                }
+            }
+
+            var cachedCacTiers = null;
+            function getCacTiers(pointType) {
+                if (!cachedCacTiers) {
+                    cachedCacTiers = { 0: [], 1: [] };
+                    try {
+                        var rawCac = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/cac.json");
+                        if (rawCac && rawCac.length > 0) {
+                            var arr = JSON.parse(rawCac);
+                            if (Array.isArray(arr)) {
+                                for (var ci = 0; ci < arr.length; ci++) {
+                                    var row = arr[ci];
+                                    if (!row) continue;
+                                    var tp = row.collectionPointType === 1 ? 1 : 0;
+                                    cachedCacTiers[tp].push(row);
+                                }
+                                cachedCacTiers[0].sort(function(a, b) { return a.level - b.level; });
+                                cachedCacTiers[1].sort(function(a, b) { return a.level - b.level; });
+                                log("[🏆 CAC] Loaded cac.json tiers: card=" + cachedCacTiers[0].length + ", theme=" + cachedCacTiers[1].length);
+                            }
+                        }
+                    } catch (eCac) {
+                        log("[-] Error loading cac.json: " + eCac.message);
+                    }
+                    if (cachedCacTiers[0].length === 0) {
+                        for (var cl = 1; cl <= 100; cl++) {
+                            cachedCacTiers[0].push({ code: cl - 1, level: cl, collectionPointType: 0, pointValue: cl * 20, rewardItem: 2, rewardQuantity: 10 + Math.floor((cl - 1) / 10) });
+                        }
+                    }
+                    if (cachedCacTiers[1].length === 0) {
+                        for (var tl = 1; tl <= 100; tl++) {
+                            cachedCacTiers[1].push({ code: 1000 + tl - 1, level: tl, collectionPointType: 1, pointValue: 40 + (tl - 1) * 120, rewardItem: 4, rewardQuantity: Math.min(40000, 2000 + Math.floor((tl - 1) / 3) * 1000) });
+                        }
+                    }
+                }
+                return pointType === 1 ? cachedCacTiers[1] : cachedCacTiers[0];
+            }
+
+            function getOfflineFavoriteGroups() {
+                try {
+                    var prof = loadPlayerProfile();
+                    if (prof && Array.isArray(prof.favoriteGroups)) {
+                        var cleaned = [];
+                        for (var fi = 0; fi < prof.favoriteGroups.length && cleaned.length < 5; fi++) {
+                            var gc = parseInt(prof.favoriteGroups[fi], 10);
+                            if (!isNaN(gc) && gc > 0 && cleaned.indexOf(gc) === -1) cleaned.push(gc);
+                        }
+                        return cleaned;
+                    }
+                } catch (eGfg) {}
+                return [1001, 2001, 3001, 4001, 5001];
+            }
+
+            function saveOfflineFavoriteGroups(list) {
+                var cleaned = [];
+                if (Array.isArray(list)) {
+                    for (var i = 0; i < list.length && cleaned.length < 5; i++) {
+                        var gc = parseInt(list[i], 10);
+                        if (!isNaN(gc) && gc > 0 && cleaned.indexOf(gc) === -1) cleaned.push(gc);
+                    }
+                }
+                try {
+                    var prof = loadPlayerProfile();
+                    if (prof) {
+                        prof.favoriteGroups = cleaned;
+                        savePlayerProfile(prof);
+                    }
+                } catch (eSfg) {
+                    log("[-] Error saving favoriteGroups: " + eSfg.message);
+                }
+                return cleaned;
+            }
+
+            var didOpenLocalePopupCtrl = false;
+            function ensureLocalePopupControlOpen() {
+                if (didOpenLocalePopupCtrl) return;
+                didOpenLocalePopupCtrl = true;
+                try {
+                    new NativeFunction(baseAddr.add(0xCF2C44), "void", [])();
+                    log("[🌐 LOCALE] LocalePopupControl.Open() initialized!");
+                } catch (eLpo) {
+                    log("[-] Error initializing LocalePopupControl: " + eLpo.message);
+                }
+            }
+
+            var pendingPopupConfirmFn = null;
+            var pendingConfirmPopupPtr = NULL;
+            function openOfflineNoticePopup(title, message, okText) {
+                return openOfflineConfirmPopup(title, message, okText || "OK", null, null);
+            }
+            function openOfflineConfirmPopup(title, message, okText, cancelText, onConfirmFn) {
+                try {
+                    var paramsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.popup", "Popup/Params");
+                    if (!paramsKlass || paramsKlass.isNull()) {
+                        showOfflineToast(message || title, 2.2);
+                        return NULL;
+                    }
+                    var p = il2cpp_object_new(paramsKlass);
+                    if (p.isNull()) return NULL;
+                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(p, 2);
+                    try {
+                        new NativeFunction(baseAddr.add(0xBD3F60), "void", ["pointer", "pointer"])(p, NULL);
+                    } catch (eCtor) {}
+                    p.add(0x18).writePointer(createIl2CppString(String(title || "Notice")));
+                    p.add(0x20).writePointer(createIl2CppString(String(message || "")));
+                    p.add(0x48).writePointer(createIl2CppString(String(okText || "OK")));
+                    p.add(0x50).writePointer(cancelText ? createIl2CppString(String(cancelText)) : NULL);
+                    p.add(0x58).writeU8(1); // useBlind
+                    p.add(0x59).writeU8(1); // useBtnX
+                    p.add(0x5A).writeU8(0); // hideScene
+                    p.add(0x64).writeU8(1); // foremost
+
+                    pendingPopupConfirmFn = null;
+                    pendingConfirmPopupPtr = NULL;
+                    var openNoticeFn = new NativeFunction(baseAddr.add(0xAC0C10), "pointer", ["pointer", "pointer", "pointer"]);
+                    var popPtr = openNoticeFn(p, NULL, NULL);
+                    if (onConfirmFn && popPtr && !popPtr.isNull()) {
+                        pendingConfirmPopupPtr = popPtr;
+                        pendingPopupConfirmFn = onConfirmFn;
+                    }
+                    return popPtr;
+                } catch (ePop) {
+                    log("[-] Error in openOfflineConfirmPopup: " + ePop.message);
+                    showOfflineToast(message || title, 2.2);
+                    return NULL;
+                }
+            }
+
             function activateTopView(sceneId) {
                 var scId = sceneId || 3;
                 try {
@@ -1987,11 +2127,11 @@ function initIl2Cpp(module) {
                         }
                         var lInfo = profile.leaderCard;
                         if (typeof lInfo !== "object" || lInfo === null) {
-                            lInfo = { cardID: typeof lInfo === "number" ? lInfo : 10001, grade: 4, level: 50 };
+                            lInfo = { cardID: (typeof lInfo === "number" ? lInfo : 0), grade: 4, level: 50 };
                         }
-                        leaderObj.add(0x10).writeInt(parseInt(lInfo.cardID) || 10001);
-                        leaderObj.add(0x14).writeInt(lInfo.grade !== undefined ? (parseInt(lInfo.grade) || 4) : 4);
-                        leaderObj.add(0x18).writeShort(parseInt(lInfo.level) || 50);
+                        leaderObj.add(0x10).writeInt(parseInt(lInfo.cardID, 10) || 0);
+                        leaderObj.add(0x14).writeInt(lInfo.grade !== undefined ? (parseInt(lInfo.grade, 10) || 0) : 4);
+                        leaderObj.add(0x18).writeShort(parseInt(lInfo.level, 10) || 1);
                         playerObj.add(0x30).writePointer(leaderObj);
                     } catch (e) {
                         log("[-] Error initializing LeaderCard: " + e.message);
@@ -2178,7 +2318,30 @@ function initIl2Cpp(module) {
                     Interceptor.replace(baseAddr.add(0xAB37CC), keepCb(new NativeCallback(function (methodInfo) { return 100000; }, "int", ["pointer"])));
                     Interceptor.replace(baseAddr.add(0xAB38EC), keepCb(new NativeCallback(function (amount, methodInfo) { return 1; }, "int", ["int", "pointer"])));
                     // Theme changer & leader
-                    Interceptor.replace(baseAddr.add(0xAB39C0), keepCb(new NativeCallback(function (methodInfo) { return 10; }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB39C0), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        if (p && p.themeChanger !== undefined && p.themeChanger !== null) {
+                            return Math.max(0, parseInt(p.themeChanger, 10) || 0);
+                        }
+                        return 10;
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB4170), keepCb(new NativeCallback(function (methodInfo) {
+                        try {
+                            var p = loadPlayerProfile();
+                            if (!p || !p.leaderCard) return int64(-1);
+                            if (typeof p.leaderCard === "object" && p.leaderCard.objectID) {
+                                return int64(p.leaderCard.objectID);
+                            }
+                            if (typeof p.leaderCard === "number" && p.leaderCard > 0) {
+                                if (p.leaderCard >= 100000) return int64(p.leaderCard);
+                                if (Array.isArray(p.inventoryCards)) {
+                                    var found = p.inventoryCards.find(function (ic) { return ic && ic.cardID === p.leaderCard; });
+                                    if (found && found.objectID) return int64(found.objectID);
+                                }
+                            }
+                        } catch (eGl) {}
+                        return int64(-1);
+                    }, "int64", ["pointer"])));
                     Interceptor.replace(baseAddr.add(0xAB42E0), keepCb(new NativeCallback(function (methodInfo) { return 1; }, "int", ["pointer"])));
                     Interceptor.replace(baseAddr.add(0xAB4408), keepCb(new NativeCallback(function (methodInfo) { return 1; }, "int", ["pointer"])));
                 } catch (eDia) {}
@@ -2518,6 +2681,30 @@ function initIl2Cpp(module) {
                             } catch (eCbdParam) {
                                 log("[-] Error inspecting CardBookDetailPopup params: " + eCbdParam.message);
                             }
+                        } else if (this.pName === "Custom/Popup_CardBook_All" && !args[1].isNull()) {
+                            var pParamsAll = args[1];
+                            try {
+                                pParamsAll.add(0x58).writeU8(1); // useBlind = true
+                                pParamsAll.add(0x5A).writeU8(0); // hideScene = false
+                                pParamsAll.add(0x64).writeU8(1); // foremost = true
+                                log("[✨ CARDBOOK_ALL PARAMS] Custom/Popup_CardBook_All opened: blind=1, foremost=1!");
+                            } catch (eCbaParam) {}
+                        } else if ((this.pName === "Custom/Popup_Card_Sell_Bundle" || this.pName === "Custom/Popup_Sell_Bundle") && !args[1].isNull()) {
+                            var pSellB = args[1];
+                            try {
+                                if (pSellB.add(0x18).readPointer().isNull()) pSellB.add(0x18).writePointer(createIl2CppString("Sell Cards"));
+                                if (pSellB.add(0x48).readPointer().isNull()) pSellB.add(0x48).writePointer(createIl2CppString("Sell"));
+                                if (pSellB.add(0x50).readPointer().isNull()) pSellB.add(0x50).writePointer(createIl2CppString("Cancel"));
+                                if (pSellB.add(0x78).readPointer().isNull()) pSellB.add(0x78).writePointer(createIl2CppString("Grade"));
+                                if (pSellB.add(0x88).readPointer().isNull()) pSellB.add(0x88).writePointer(createIl2CppString("Limited Theme"));
+                                if (pSellB.add(0x90).readPointer().isNull()) pSellB.add(0x90).writePointer(createIl2CppString("Card Level"));
+                                if (pSellB.add(0xB0).readPointer().isNull()) pSellB.add(0xB0).writePointer(createIl2CppString("Prism Card"));
+                                pSellB.add(0x58).writeU8(1); // useBlind = true
+                                pSellB.add(0x59).writeU8(1); // useBtnX = true
+                                pSellB.add(0x5A).writeU8(0); // hideScene = false
+                                pSellB.add(0x64).writeU8(1); // foremost = true
+                                log("[💰 SELL_BUNDLE PARAMS] Custom/Popup_Card_Sell_Bundle configured cleanly!");
+                            } catch (eSbP) {}
                         }
                     }
                 });
@@ -3823,6 +4010,16 @@ function initIl2Cpp(module) {
                     log("[-] Error patching MusicControl.UpdateDisplayList: " + eMdl.message);
                 }
 
+                // Patch SelectMusicScene.OnOpen (0x103D280) to skip null league ranking list instead of throwing NRE
+                try {
+                    Memory.protect(baseAddr.add(0x103D280), 4, 'rwx');
+                    baseAddr.add(0x103D280).writeByteArray([0xc8, 0x01, 0x00, 0xb4]); // cbz x8, #0x103d2b8
+                    Memory.protect(baseAddr.add(0x103D280), 4, 'r-x');
+                    log("[🛡️ SELECT_MUSIC] Patched SelectMusicScene.OnOpen null league rank branch (0x103D280)!");
+                } catch (eSmRank) {
+                    log("[-] Error patching 0x103D280: " + eSmRank.message);
+                }
+
                 var isAtTouchToStart = false;
                 Interceptor.attach(baseAddr.add(0xB243BC), {
                     onEnter: function (args) {
@@ -4790,31 +4987,37 @@ function initIl2Cpp(module) {
                     }
                 }
 
-                var accountOwnedCards = {
-                    1001: { grade: 4, level: 50 },
-                    1002: { grade: 4, level: 50 },
-                    1003: { grade: 4, level: 50 },
-                    1004: { grade: 4, level: 50 },
-                    1005: { grade: 4, level: 50 },
-                    1006: { grade: 4, level: 50 },
-                    1007: { grade: 4, level: 50 },
-                    1008: { grade: 4, level: 50 },
-                    1009: { grade: 4, level: 50 },
-                    1010: { grade: 4, level: 50 },
-                    1011: { grade: 4, level: 50 }
-                };
+                var accountOwnedCards = {};
+                var accountOwnedPrismCards = {};
 
                 function syncAccountOwnedCards() {
                     try {
                         var prof = loadPlayerProfile();
+                        accountOwnedCards = {};
+                        accountOwnedPrismCards = {};
                         if (prof && prof.inventoryCards && prof.inventoryCards.length > 0) {
                             for (var i = 0; i < prof.inventoryCards.length; i++) {
                                 var ic = prof.inventoryCards[i];
-                                if (!accountOwnedCards[ic.cardID] || ic.grade > accountOwnedCards[ic.cardID].grade) {
-                                    accountOwnedCards[ic.cardID] = { grade: ic.grade, level: ic.level };
+                                if (!ic || !ic.cardID) continue;
+                                var gr = (ic.grade !== undefined && ic.grade !== null) ? ic.grade : 0;
+                                var lvl = ic.level || 1;
+                                var meta = (typeof getCardMetadata === "function") ? getCardMetadata(ic.cardID) : null;
+                                var isPr = !!(ic.isPrism || (meta && meta.type === 1));
+                                if (!accountOwnedCards[ic.cardID] || gr > accountOwnedCards[ic.cardID].grade) {
+                                    accountOwnedCards[ic.cardID] = { grade: gr, level: lvl, isPrism: isPr };
+                                }
+                                if (isPr) {
+                                    if (!accountOwnedPrismCards[ic.cardID] || gr > accountOwnedPrismCards[ic.cardID].grade) {
+                                        accountOwnedPrismCards[ic.cardID] = { grade: gr, level: lvl };
+                                    }
                                 }
                             }
-                            log("[🗃️ OWNED CARDS] Synced " + prof.inventoryCards.length + " cards to accountOwnedCards!");
+                            log("[🗃️ OWNED CARDS] Synced " + prof.inventoryCards.length + " cards (" + Object.keys(accountOwnedCards).length + " unique, " + Object.keys(accountOwnedPrismCards).length + " prism)!");
+                        } else {
+                            // Default starter fallback only before profile creation
+                            for (var di = 1001; di <= 1011; di++) {
+                                accountOwnedCards[di] = { grade: 4, level: 50, isPrism: false };
+                            }
                         }
                     } catch (eSc) {
                         log("[-] Error in syncAccountOwnedCards: " + eSc.message);
@@ -6035,12 +6238,14 @@ function initIl2Cpp(module) {
                             var fCode = getIntensifyCode(grade, level);
                             thisPtr.add(0x20).writeS16(fCode); // <IntensifyCode>
                             thisPtr.add(0x24).writeU32(0x3F800000); // <CardGradeBonusValue> = 1.0f
-                            thisPtr.add(0x28).writeS32(100); // <SellPrice>
+                            thisPtr.add(0x28).writeS32(getCardSellPrice(grade)); // <SellPrice>
                             thisPtr.add(0x2C).writeU8(0); // isMaterial = false
                             var meta = getCardMetadata(cardId);
-                            var memberIdx = (meta.artistID >= 1000) ? (meta.artistID - 1000) : meta.artistID;
-                            if (memberIdx < 1 || memberIdx > 11) memberIdx = ((cardId - 1001) % 11) + 1;
-                            thisPtr.add(0x30).writeS32(1001 * 10000 + 1 * 100 + memberIdx); // sortCardIndex
+                            var gCodeIdx = (meta && (meta.groupID || meta.group)) ? (meta.groupID || meta.group) : 1001;
+                            var tCodeIdx = (meta && meta.theme) ? meta.theme : 1;
+                            var memberIdx = (meta && meta.artistID >= 1000) ? (meta.artistID % 1000) : ((meta && meta.artistID) ? meta.artistID : (((cardId - 1001) % 11) + 1));
+                            if (memberIdx < 1 || memberIdx > 20) memberIdx = ((cardId - 1001) % 11) + 1;
+                            thisPtr.add(0x30).writeS32(gCodeIdx * 10000 + tCodeIdx * 100 + memberIdx); // sortCardIndex
                             thisPtr.add(0x34).writeU8(0); // isNew = false
                             var initThemeInfo = computeCardThemeInfo(cardId, isEq, null);
                             thisPtr.add(0x38).writeS32(initThemeInfo.themeLevel); // <ThemeLevel>
@@ -7401,7 +7606,10 @@ function initIl2Cpp(module) {
                         p.add(0x50).writePointer(createIl2CppString("Information"));
                         p.add(0x58).writePointer(createIl2CppString("Equip"));
                         p.add(0x60).writePointer(createIl2CppString("Unequip"));
-                        p.add(0x68).writeS32(0); // exchangeCount
+                        var mvProf = null;
+                        try { mvProf = loadPlayerProfile(); } catch (eMvP) {}
+                        var exCnt = (mvProf && mvProf.themeChanger !== undefined) ? parseInt(mvProf.themeChanger, 10) : 10;
+                        p.add(0x68).writeS32(isNaN(exCnt) ? 0 : exCnt); // exchangeCount
                         p.add(0x6C).writeU8(isEvent ? 1 : 0); // isEvent
 
                         return p;
@@ -7503,6 +7711,23 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing InvenCardMainView.Refresh: " + eHicmr.message);
                 }
 
+                function isProfileLeaderCard(profile, cardId, objIdVal) {
+                    if (!profile || !profile.leaderCard) return false;
+                    var lc = profile.leaderCard;
+                    var oKey = objIdKey(objIdVal);
+                    if (typeof lc === "object") {
+                        if (lc.objectID !== undefined && lc.objectID !== null && oKey !== "0") {
+                            return objIdKey(lc.objectID) === oKey;
+                        }
+                        return lc.cardID === cardId;
+                    }
+                    if (typeof lc === "number" && lc > 0) {
+                        if (oKey !== "0" && lc >= 100000) return lc.toString() === oKey;
+                        return lc === cardId;
+                    }
+                    return false;
+                }
+
                 // 9c. InventoryScene.GetSelectViewData (0x10572AC) -> Bulletproof replacement with full ABI signature
                 function safeGetSelectViewData(sceneThis, cardItem, artistData, otherCardItem, isSell) {
                     try {
@@ -7531,17 +7756,19 @@ function initIl2Cpp(module) {
                             ctorFn(p, NULL);
                         } catch (eCt) {}
 
-                        var cId = 1001;
-                        var gr = 4;
-                        var lvl = 50;
+                        var cId = 0;
+                        var gr = 0;
+                        var lvl = 1;
                         var isPrism = false;
                         var isEq = false;
                         var isLk = false;
+                        var objIdVal = 0;
 
                         if (cardItem && !cardItem.isNull()) {
                             try {
                                 var raw = cardItem.add(0x10).readPointer();
                                 if (!raw.isNull()) {
+                                    objIdVal = raw.add(0x10).readS64();
                                     cId = raw.add(0x20).readS32();
                                     gr = raw.add(0x24).readS32();
                                     lvl = raw.add(0x1C).readS16();
@@ -7551,10 +7778,16 @@ function initIl2Cpp(module) {
                                 }
                             } catch (eRci) {}
                         }
+                        if (cId <= 0 && !isSell && artistData && !artistData.isNull()) {
+                            try {
+                                var adModel = artistData.add(0x10).readPointer();
+                                if (!adModel.isNull()) cId = adModel.add(0x10).readS32();
+                            } catch (eAd) {}
+                        }
 
-                        var meta = getCardMetadata(cId);
+                        var meta = getCardMetadata(cId > 0 ? cId : 1001);
                         var gId = (meta && (meta.groupID || meta.group)) ? (meta.groupID || meta.group) : (currentSelectedGroupCode || 1001);
-                        var aId = (meta && meta.artistID) ? meta.artistID : 1001;
+                        var aId = (meta && meta.artistID) ? meta.artistID : (cId > 0 ? cId : 1001);
                         var tId = (meta && meta.theme) ? meta.theme : 1001;
 
                         var gMetaObj = getGroupMetadata(gId);
@@ -7562,20 +7795,16 @@ function initIl2Cpp(module) {
                         var tMetaObj = getThemeMetadata(tId);
                         var gName = (gMetaObj && gMetaObj.name) ? gMetaObj.name : "LOONA";
                         var aName = (aMetaObj && aMetaObj.name && aMetaObj.name !== ("Artist " + aId)) ? aMetaObj.name : (artistNamesMap[aId] || "HeeJin");
-                        var tName = (tMetaObj && tMetaObj.name && tMetaObj.name !== ("Theme " + tId)) ? tMetaObj.name : (themeNamesMap[tId] || "Hi High");
+                        var tName = (cId > 0) ? ((tMetaObj && tMetaObj.name && tMetaObj.name !== ("Theme " + tId)) ? tMetaObj.name : (themeNamesMap[tId] || "Hi High")) : "-";
 
-                        // Large card params
-                        log("[🔍 GSVD] Step 3: createMockLargeCardParams for cId=" + cId);
-                        var cardParams = createMockLargeCardParams(cId, gr, lvl, isPrism);
-                        log("[🔍 GSVD] Step 4: cardParams=" + cardParams);
+                        // Large card params (use empty params when slot is empty in STATE.Equip)
+                        var cardParams = (cId > 0 && (!cardItem.isNull())) ? createMockLargeCardParams(cId, gr, lvl, isPrism) : NULL;
                         p.add(0x10).writePointer(cardParams || NULL);
                         p.add(0x18).writePointer(createIl2CppString(gName));
                         p.add(0x20).writePointer(createIl2CppString(aName));
 
                         // Stat params
-                        log("[🔍 GSVD] Step 5: createMockCardStatInfoParams");
                         var statParams = createMockCardStatInfoParams(gr, lvl, isPrism);
-                        log("[🔍 GSVD] Step 6: statParams=" + statParams);
                         p.add(0x28).writePointer(statParams || NULL);
 
                         p.add(0x30).writeS32(0); // deltaScore
@@ -7584,22 +7813,13 @@ function initIl2Cpp(module) {
                         p.add(0x40).writePointer(createIl2CppString(tName));
 
                         // Theme params: build genuine CardThemeInfoView.Params
-                        var themeParamsObj = createMockCardThemeInfoParams(cId, gr, isEq, false);
+                        var themeParamsObj = createMockCardThemeInfoParams(cId > 0 ? cId : 1001, gr, isEq, cId <= 0 || cardItem.isNull());
                         p.add(0x48).writePointer(themeParamsObj || NULL);
 
                         var profile = null;
                         try { profile = loadPlayerProfile(); } catch (ePf) {}
-                        var isLeaderCard = false;
-                        if (profile && profile.leaderCard !== undefined && profile.leaderCard !== null) {
-                            if (profile.leaderCard === cId) isLeaderCard = true;
-                            try {
-                                if (cardItem && !cardItem.isNull()) {
-                                    var rawL = cardItem.add(0x10).readPointer();
-                                    if (!rawL.isNull() && rawL.add(0x10).readS64() === profile.leaderCard) isLeaderCard = true;
-                                }
-                            } catch (eLdr) {}
-                        }
-                        var canSell = (!isEq && !isLk);
+                        var isLeaderCard = (cId > 0) && isProfileLeaderCard(profile, cId, objIdVal);
+                        var canSell = (cId > 0 && !isEq && !isLk);
 
                         p.add(0x50).writeU8(isEq ? 1 : 0);
                         p.add(0x51).writeU8((isSell || canSell) ? 1 : 0);
@@ -7857,17 +8077,20 @@ function initIl2Cpp(module) {
                         var isLeader = (p && !p.isNull()) ? (p.add(0x52).readU8() === 1) : false;
                         var isLk = (p && !p.isNull()) ? (p.add(0x53).readU8() === 1) : false;
 
-                        var cId = 1007; // default to JinSoul
+                        var hasValidParams = (p && !p.isNull());
+                        var isEmptySlot = (hasValidParams && cardParams.isNull());
+                        var cId = isEmptySlot ? 0 : 1007;
                         var objId = 0;
-                        var gr = 4;
-                        var lvl = 55;
+                        var gr = isEmptySlot ? 0 : 4;
+                        var lvl = isEmptySlot ? 1 : 55;
                         var isPrism = false;
                         var card = viewThis.add(0x38).readPointer();
 
-                        // Unconditionally inspect selected card directly from InventoryScene for 100% accurate metadata
-                        if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                        // Inspect selected card from InventoryScene when not an explicit empty slot
+                        if (!isEmptySlot && activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                            var curInvenState = activeInventorySceneInstance.add(0x64).readS32();
                             var tCard = activeInventorySceneInstance.add(0x88).readPointer();
-                            if (tCard.isNull()) tCard = activeInventorySceneInstance.add(0x98).readPointer();
+                            if (tCard.isNull() && curInvenState !== 7) tCard = activeInventorySceneInstance.add(0x98).readPointer();
                             if (!tCard.isNull()) {
                                 var raw = tCard.add(0x10).readPointer();
                                 if (!raw.isNull()) {
@@ -7884,11 +8107,9 @@ function initIl2Cpp(module) {
 
                         try {
                             var prof = loadPlayerProfile();
-                            if (prof && prof.leaderCard !== undefined && prof.leaderCard !== null) {
-                                isLeader = (prof.leaderCard === cId || (objId !== 0 && prof.leaderCard === objId));
-                            }
+                            isLeader = (!isEmptySlot && cId > 0) ? isProfileLeaderCard(prof, cId, objId) : false;
                         } catch (ePfL) {}
-                        isSell = (!isEq && !isLk);
+                        isSell = (!isEmptySlot && !isEq && !isLk);
 
                         if (!cardParams.isNull()) {
                             try {
@@ -7929,28 +8150,34 @@ function initIl2Cpp(module) {
 
                         // 1. card (0x38) -> CardLargeView (Photo, Golden Tier Frame, Level Badge)
                         if (!card.isNull()) {
-                            if (cardParams.isNull()) {
-                                try {
-                                    cardParams = createMockLargeCardParams(cId, gr, lvl, isPrism);
-                                } catch (eMlp) {}
+                            try {
+                                var cLargeGo = getGoFn(card, NULL);
+                                if (!cLargeGo.isNull()) setActiveFn(cLargeGo, isEmptySlot ? 0 : 1, NULL);
+                            } catch (eClg) {}
+                            if (!isEmptySlot) {
+                                if (cardParams.isNull()) {
+                                    try {
+                                        cardParams = createMockLargeCardParams(cId, gr, lvl, isPrism);
+                                    } catch (eMlp) {}
+                                }
+                                if (!cardParams.isNull()) {
+                                    try {
+                                        card.add(0x48).writePointer(cardParams);
+                                        var setLevelFn = new NativeFunction(baseAddr.add(0x1394858), "void", ["pointer", "pointer", "pointer"]);
+                                        setLevelFn(card, cardParams, NULL);
+                                    } catch (eC) {}
+                                }
+                                if (gr === 4) {
+                                    try {
+                                        var numLevel = card.add(0x80).readPointer();
+                                        if (!numLevel.isNull()) {
+                                            var setValFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "uint32", "pointer"]);
+                                            setValFn(numLevel, lvl, NULL);
+                                        }
+                                    } catch (eNumL) {}
+                                }
+                                applyCardLargeVisuals(card, cId, gr, isPrism, lvl);
                             }
-                            if (!cardParams.isNull()) {
-                                try {
-                                    card.add(0x48).writePointer(cardParams);
-                                    var setLevelFn = new NativeFunction(baseAddr.add(0x1394858), "void", ["pointer", "pointer", "pointer"]);
-                                    setLevelFn(card, cardParams, NULL);
-                                } catch (eC) {}
-                            }
-                            if (gr === 4) {
-                                try {
-                                    var numLevel = card.add(0x80).readPointer();
-                                    if (!numLevel.isNull()) {
-                                        var setValFn = new NativeFunction(baseAddr.add(0xC10448), "void", ["pointer", "uint32", "pointer"]);
-                                        setValFn(numLevel, lvl, NULL);
-                                    }
-                                } catch (eNumL) {}
-                            }
-                            applyCardLargeVisuals(card, cId, gr, isPrism, lvl);
                         }
 
                         // Eliminate black square in selectView
@@ -8871,9 +9098,11 @@ function initIl2Cpp(module) {
                         try {
                             var cardCountText = cardView.add(0x38).readPointer();
                             if (!cardCountText.isNull()) {
+                                var profCar = loadPlayerProfile();
+                                var maxInvenCar = (profCar && profCar.cardInvenMax) ? profCar.cardInvenMax : 200;
                                 var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
-                                setTextFn(cardCountText, createIl2CppString(filteredItems.length + " / 200"), NULL);
-                                log("[✅ CAROUSEL] Updated cardCountText to: " + filteredItems.length + " / 200");
+                                setTextFn(cardCountText, createIl2CppString(filteredItems.length + " / " + maxInvenCar), NULL);
+                                log("[✅ CAROUSEL] Updated cardCountText to: " + filteredItems.length + " / " + maxInvenCar);
                             }
                         } catch (eCct) {
                             log("[-] Error updating cardCountText: " + eCct.message);
@@ -9144,11 +9373,18 @@ function initIl2Cpp(module) {
                                     var acv = scroller.add(0x120).readPointer();
                                     var acvCount = (!acv.isNull()) ? acv.add(0x18).readS32() : 0;
 
+                                    var usedSetData = false;
                                     if (force || acvCount === 0) {
                                         log("[🗃️ INVENTORY] Initializing InvenCardView via SetData (0xF23384) with count=" + filtered.length);
-                                        var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
-                                        setDataFn(cardView, filtered.length, 0, eventListener, NULL);
-                                    } else {
+                                        try {
+                                            var setDataFn = new NativeFunction(baseAddr.add(0xF23384), "void", ["pointer", "int", "bool", "pointer", "pointer"]);
+                                            setDataFn(cardView, filtered.length, 0, eventListener, NULL);
+                                            usedSetData = true;
+                                        } catch (eSdForce) {
+                                            log("[-] Warning SetData in applyOfflineSortAndFilter (falling back to ReloadKeepPos): " + eSdForce.message);
+                                        }
+                                    }
+                                    if (!usedSetData) {
                                         // Directly write InvenCardView properties
                                         cardView.add(0x98).writeS32(filtered.length);
                                         cardView.add(0x90).writePointer(eventListener);
@@ -9188,12 +9424,25 @@ function initIl2Cpp(module) {
                                     }
                                     log("[✅ OFFLINE SORT] InvenCardView updated with count=" + filtered.length);
 
-                                    // Update cardCountText
+                                    // Update cardCountText & groupCountText using dynamic limits
                                     try {
+                                        var profCnt = loadPlayerProfile();
+                                        var maxInven = (profCnt && profCnt.cardInvenMax) ? profCnt.cardInvenMax : 200;
                                         var cardCountText = cardView.add(0x38).readPointer();
                                         if (!cardCountText.isNull()) {
                                             var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
-                                            setTextFn(cardCountText, createIl2CppString(filtered.length + " / 200"), NULL);
+                                            setTextFn(cardCountText, createIl2CppString(filtered.length + " / " + maxInven), NULL);
+                                        }
+                                        var groupViewCnt = sceneView.add(0x70).readPointer();
+                                        if (!groupViewCnt.isNull()) {
+                                            var gCountTxt = groupViewCnt.add(0x38).readPointer();
+                                            if (!gCountTxt.isNull()) {
+                                                var gMetaAll = getGlobalMetadata();
+                                                var gPlay = (gMetaAll && gMetaAll.playableGroups) ? gMetaAll.playableGroups : PLAYABLE_GROUP_CODES;
+                                                var gIdx = Math.max(0, gPlay.indexOf(currentSelectedGroupCode));
+                                                var setTextFnG = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                                setTextFnG(gCountTxt, createIl2CppString((gIdx + 1) + " / " + gPlay.length), NULL);
+                                            }
                                         }
                                     } catch (eCctR) {}
                                 }
@@ -10410,7 +10659,7 @@ function initIl2Cpp(module) {
                         onLeave: function (retval) {
                             if (this.scene && !this.scene.isNull()) {
                                 log("[🗃️ SET_STATE_DEFAULT] onLeave triggered, restoring all cards to displayCardList!");
-                                restoreDefaultDisplayCardList(this.scene, true, false);
+                                restoreDefaultDisplayCardList(this.scene, false, false);
                             }
                         }
                     });
@@ -10522,7 +10771,11 @@ function initIl2Cpp(module) {
                 try {
                     Interceptor.replace(baseAddr.add(0xACC8B8), new NativeCallback(function (callback, openCallBack, methodInfo) {
                         log("[📖 CARDBOOK] Intercepted ViewControl.OpenMyCollectionPopupOrCardBookScene -> Direct SceneControl.OpenScene(5)!");
-                        try { ensureCardBookControlData(); } catch (eCbd) {}
+                        try {
+                            var curScene = new NativeFunction(baseAddr.add(0xD54A60), "int", ["pointer"])(NULL);
+                            cardBookPreviousSceneId = (curScene === 4) ? 4 : 3;
+                        } catch (eScId) {}
+                        try { ensureCardBookControlData(true); } catch (eCbd) {}
                         isCardBookActivated = false;
                         var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
                         openSceneFn(5, NULL, NULL, NULL);
@@ -10536,7 +10789,7 @@ function initIl2Cpp(module) {
                     Interceptor.replace(baseAddr.add(0x105DE08), new NativeCallback(function (sceneThis, methodInfo) {
                         log("[📖 CARDBOOK] Intercepted InventoryScene.OnMyCollection -> Direct SceneControl.OpenScene(5) from Inventory!");
                         cardBookPreviousSceneId = 4;
-                        try { ensureCardBookControlData(); } catch (eCbd) {}
+                        try { ensureCardBookControlData(true); } catch (eCbd) {}
                         isCardBookActivated = false;
                         var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
                         openSceneFn(5, NULL, NULL, NULL);
@@ -10550,7 +10803,7 @@ function initIl2Cpp(module) {
                     Interceptor.replace(baseAddr.add(0xB4C628), new NativeCallback(function (sceneThis, methodInfo) {
                         log("[📖 CARDBOOK] Intercepted LobbyScene.OnMyCollection -> Direct SceneControl.OpenScene(5) from Lobby!");
                         cardBookPreviousSceneId = 3;
-                        try { ensureCardBookControlData(); } catch (eCbd) {}
+                        try { ensureCardBookControlData(true); } catch (eCbd) {}
                         isCardBookActivated = false;
                         var openSceneFn = new NativeFunction(baseAddr.add(0xD534BC), "void", ["int", "pointer", "pointer", "pointer"]);
                         openSceneFn(5, NULL, NULL, NULL);
@@ -11492,14 +11745,9 @@ function initIl2Cpp(module) {
                             p.add(0x18).writePointer(createIl2CppString(gName));
                             p.add(0x20).writePointer(createIl2CppString(aName));
 
-                            // Stat params (0xABFCD0)
-                            try {
-                                if (cardItem && !cardItem.isNull()) {
-                                    var getStatFn = new NativeFunction(baseAddr.add(0xABFCD0), "pointer", ["pointer", "pointer"]);
-                                    var statParams = getStatFn(cardItem, NULL);
-                                    p.add(0x28).writePointer(statParams || NULL);
-                                }
-                            } catch (eStp) {}
+                            // Stat params (sync with cbd.json formula)
+                            var statParams = createMockCardStatInfoParams(gr, lvl, isPrism);
+                            p.add(0x28).writePointer(statParams || NULL);
 
                             // Delta stats
                             var deltaScore = 0;
@@ -11536,10 +11784,7 @@ function initIl2Cpp(module) {
                             var eqProf = null;
                             try { eqProf = loadPlayerProfile(); } catch (ePfEq) {}
                             var eqObjId = (!cardItem.isNull() && !cardItem.add(0x10).readPointer().isNull()) ? cardItem.add(0x10).readPointer().add(0x10).readS64() : 0;
-                            var isEqLeader = false;
-                            if (eqProf && eqProf.leaderCard !== undefined && eqProf.leaderCard !== null) {
-                                isEqLeader = (eqProf.leaderCard === cId || (eqObjId !== 0 && objIdKey(eqProf.leaderCard) === objIdKey(eqObjId)));
-                            }
+                            var isEqLeader = isProfileLeaderCard(eqProf, cId, eqObjId);
                             p.add(0x60).writeU8(isEqLeader ? 1 : 0); // isLeader
                             p.add(0x61).writeU8(isLk ? 1 : 0);
                             p.add(0x62).writeU8(isR ? 1 : 0);
@@ -11886,7 +12131,155 @@ function initIl2Cpp(module) {
                 }
 
                 // CardBook Protocol Offline Handlers
-                var offlineFavoriteGroups = [1001, 2001, 3001, 4001, 5001];
+                var offlineFavoriteGroups = getOfflineFavoriteGroups();
+
+                // Provide persistent UserControl.get_CardFavoriteGroupList (0xAB240C)
+                try {
+                    Interceptor.replace(baseAddr.add(0xAB240C), keepCb(new NativeCallback(function (methodInfo) {
+                        offlineFavoriteGroups = getOfflineFavoriteGroups();
+                        return createManagedList(offlineFavoriteGroups, 'int') || NULL;
+                    }, "pointer", ["pointer"])));
+                    log("[+] Interceptor.replace installed on UserControl.get_CardFavoriteGroupList (0xAB240C)!");
+                } catch (eCfgList) {
+                    log("[-] Error replacing get_CardFavoriteGroupList: " + eCfgList.message);
+                }
+
+                // Persistent CardBookControl.SetFavorite (0x11C6FA8) (max 5 groups)
+                try {
+                    Interceptor.replace(baseAddr.add(0x11C6FA8), keepCb(new NativeCallback(function (code, methodInfo) {
+                        try {
+                            var favs = getOfflineFavoriteGroups();
+                            var idx = favs.indexOf(code);
+                            var msg = "";
+                            if (idx >= 0) {
+                                favs.splice(idx, 1);
+                                msg = "Removed from My Favorite Group.";
+                            } else {
+                                if (favs.length >= 5) {
+                                    showOfflineToast("You can register up to 5 favorite groups.", 2.2);
+                                    return 0;
+                                }
+                                favs.push(code);
+                                msg = "Registered to My Favorite Group!";
+                            }
+                            offlineFavoriteGroups = saveOfflineFavoriteGroups(favs);
+                            showOfflineToast(msg, 2.0);
+                            if (activeCardBookSceneInstance && !activeCardBookSceneInstance.isNull()) {
+                                populateFavoriteGroupsOffline(activeCardBookSceneInstance);
+                            }
+                            log("[⭐ CARDBOOK FAVORITE] Toggled group=" + code + " -> favorites=" + JSON.stringify(offlineFavoriteGroups));
+                            return 1;
+                        } catch (eSf) {
+                            log("[-] Error in SetFavorite: " + eSf.message);
+                            return 0;
+                        }
+                    }, "bool", ["int", "pointer"])));
+                    log("[+] Interceptor.replace installed on CardBookControl.SetFavorite (0x11C6FA8)!");
+                } catch (eSfHook) {}
+
+                // Real collection achievement reward claim: CardBookControl.GetReward (0x11C65F8)
+                try {
+                    Interceptor.replace(baseAddr.add(0x11C65F8), keepCb(new NativeCallback(function (type, methodInfo) {
+                        try {
+                            var isTheme = (type === 1);
+                            var key = isTheme ? "theme" : "card";
+                            var tiers = getCacTiers(type);
+                            var prof = loadPlayerProfile();
+                            if (!prof) return;
+                            if (!prof.collectionRewardsClaimed) prof.collectionRewardsClaimed = { card: 0, theme: 0 };
+                            var claimedLvl = parseInt(prof.collectionRewardsClaimed[key] || 0, 10);
+                            var nextTier = null;
+                            for (var ti = 0; ti < tiers.length; ti++) {
+                                if (tiers[ti].level > claimedLvl) {
+                                    nextTier = tiers[ti];
+                                    break;
+                                }
+                            }
+                            if (!nextTier) {
+                                showOfflineToast("All collection rewards already claimed!", 2.0);
+                                return;
+                            }
+                            var curPts = isTheme ? offlineTotalThemePointsEarned : offlineTotalCardsOwned;
+                            if (curPts < nextTier.pointValue) {
+                                showOfflineToast("Need " + nextTier.pointValue.toLocaleString() + " points to claim!", 2.0);
+                                return;
+                            }
+                            var qty = parseInt(nextTier.rewardQuantity || 0, 10);
+                            var itemName = "";
+                            if (nextTier.rewardItem === 2) {
+                                prof.diamond = (prof.diamond || 0) + qty;
+                                itemName = "Diamonds";
+                            } else {
+                                prof.rhythmPoint = (prof.rhythmPoint || 0) + qty;
+                                itemName = "RP";
+                            }
+                            prof.collectionRewardsClaimed[key] = nextTier.level;
+                            savePlayerProfile(prof);
+                            setupUserControl(prof);
+                            refreshTopViewAll();
+                            showOfflineToast("Collection Reward Lv." + nextTier.level + " Claimed! +" + qty.toLocaleString() + " " + itemName, 2.5);
+                            if (activeCardBookSceneInstance && !activeCardBookSceneInstance.isNull()) {
+                                populateCollectionPointsOffline(activeCardBookSceneInstance);
+                            }
+                            log("[🏆 CARDBOOK REWARD] Claimed " + key + " Lv." + nextTier.level + " (need=" + nextTier.pointValue + ", have=" + curPts + "): +" + qty + " " + itemName);
+                        } catch (eGrC) {
+                            log("[-] Error in CardBookControl.GetReward: " + eGrC.message);
+                        }
+                    }, "void", ["int", "pointer"])));
+                    log("[+] Interceptor.replace installed on CardBookControl.GetReward (0x11C65F8)!");
+                } catch (eGrHook) {}
+
+                // Safe Favorite Group 5 tile click: CardBookScene.OnFavoriteGroupFive (0x11D2630)
+                try {
+                    Interceptor.replace(baseAddr.add(0x11D2630), keepCb(new NativeCallback(function (sceneThis, slotIdx, methodInfo) {
+                        try {
+                            try {
+                                new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"])(createIl2CppString("btn_touch"), NULL);
+                            } catch (eSndFav) {}
+                            var favs = getOfflineFavoriteGroups();
+                            if (slotIdx < 0 || slotIdx >= favs.length) return;
+                            var gCode = favs[slotIdx];
+                            ensureCardBookControlData(false);
+                            var grpItem = allCbGroupItemMap[gCode] || cachedLoonaCbGroupItem || NULL;
+                            if (grpItem && !grpItem.isNull() && sceneThis && !sceneThis.isNull()) {
+                                var openDetailFn = new NativeFunction(baseAddr.add(0x11CF9C0), "void", ["pointer", "pointer", "bool", "pointer"]);
+                                openDetailFn(sceneThis, grpItem, 1, NULL);
+                                log("[⭐ CARDBOOK] OnFavoriteGroupFive(slot=" + slotIdx + ") opened group=" + gCode);
+                            }
+                        } catch (eFavClk) {
+                            log("[-] Error in OnFavoriteGroupFive: " + eFavClk.message);
+                        }
+                    }, "void", ["pointer", "int", "pointer"])));
+                    log("[+] Interceptor.replace installed on CardBookScene.OnFavoriteGroupFive (0x11D2630)!");
+                } catch (eFavFiveHook) {
+                    log("[-] Error installing OnFavoriteGroupFive hook: " + eFavFiveHook.message);
+                }
+
+                // Trace BestCardBook / SelectFavoriteGroup to diagnose click routing on CardBookMainView
+                try {
+                    Interceptor.attach(baseAddr.add(0x11D2268), {
+                        onEnter: function () { log("[📖 CARDBOOK] OnBestCardBook (0x11D2268) triggered"); }
+                    });
+                    Interceptor.attach(baseAddr.add(0x11CDC2C), {
+                        onEnter: function (args) { log("[📖 CARDBOOK] MainView.OnSelectFavoriteGroup (0x11CDC2C) slot=" + args[1].toInt32()); }
+                    });
+                } catch (eCbTraceFav) {}
+
+                // Ensure All Cards & Choose Group in CardBook have fresh CardBookControl data
+                try {
+                    Interceptor.attach(baseAddr.add(0x11D0FB8), {
+                        onEnter: function (args) {
+                            ensureCardBookControlData(false);
+                            log("[📖 CARDBOOK] OnAllCard triggered");
+                        }
+                    });
+                    Interceptor.attach(baseAddr.add(0x11D0E94), {
+                        onEnter: function (args) {
+                            ensureCardBookControlData(false);
+                            log("[📖 CARDBOOK] OnSelectGroup (Choose Group) triggered");
+                        }
+                    });
+                } catch (eCbBtns) {}
 
                 try {
                     // CardBook.getReward (0xE9EFB4)
@@ -12082,20 +12475,23 @@ function initIl2Cpp(module) {
                 // 3c. CardBookControl.GetThemePoint (0x11C6994) & GetTotalThemePoint (0x11C6B40)
                 try {
                     Interceptor.replace(baseAddr.add(0x11C6994), new NativeCallback(function () {
-                        return 2400;
+                        return (typeof offlineTotalThemePointsEarned !== "undefined") ? offlineTotalThemePointsEarned : 0;
                     }, "int", []));
                     Interceptor.replace(baseAddr.add(0x11C6B40), new NativeCallback(function () {
-                        return 2400;
+                        return (typeof offlineTotalThemePointsPossible !== "undefined" && offlineTotalThemePointsPossible > 0) ? offlineTotalThemePointsPossible : 15;
                     }, "int", []));
-                    log("[+] Interceptor.replace installed on CardBookControl.GetThemePoint & GetTotalThemePoint (2400 pts)!");
+                    log("[+] Interceptor.replace installed on CardBookControl.GetThemePoint & GetTotalThemePoint (dynamic cap.json pts)!");
                 } catch (eThmPt) {
                     log("[-] Error replacing GetThemePoint: " + eThmPt.message);
                 }
 
-                // 3d. CardBookControl.GroupItem.GetGrade (0xB96694) -> Always return Grade R (4)
+                // 3d. CardBookControl.GroupItem.GetGrade (0xB96694) -> Return computed group grade from offset 0x38
                 try {
                     Interceptor.replace(baseAddr.add(0xB96694), keepCb(new NativeCallback(function (thisPtr, isMe, methodInfo) {
-                        return 4; // CardGrade.R (4)
+                        if (thisPtr && !thisPtr.isNull()) {
+                            return thisPtr.add(0x38).readS32();
+                        }
+                        return 0;
                     }, "int", ["pointer", "bool", "pointer"])));
                     log("[+] Interceptor.replace installed on CardBookControl.GroupItem.GetGrade (0xB96694)!");
                 } catch (eGrd) {
@@ -12136,20 +12532,27 @@ function initIl2Cpp(module) {
                 }
 
                 // --- CARDBOOK MAINVIEW OFFLINE RESTORATION HELPERS ---
-                // Dynamic offline CardBook group metrics calculator based on accountOwnedCards
+                // Dynamic offline CardBook group metrics calculator based on accountOwnedCards + cap.json/cgd.json
                 var calculateOfflineGroupCardBookMetrics = function (gCode) {
                     var metaAll = getGlobalMetadata();
                     var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gCode] : null;
                     if (!gMeta) {
                         return {
                             grade: 0,
+                            nextGrade: 1,
                             isRGrade: false,
                             isMaxLevel: false,
                             level: 0,
+                            maxLevel: 1,
                             gauge: 0.0,
+                            currentPoint: 0,
+                            nextPoint: 1,
+                            themePoints: 0,
+                            maxThemePoints: 15,
                             points: 0,
                             totalSlots: 0,
-                            obtainedCards: 0
+                            obtainedCards: 0,
+                            rCardCount: 0
                         };
                     }
 
@@ -12172,10 +12575,15 @@ function initIl2Cpp(module) {
                     var obtainedCards = 0;
                     var rCardCount = 0;
                     var nonRPoints = 0;
+                    var themePoints = 0;
+                    var maxThemePoints = themeCount * 15;
                     var cardBookValues = { 0: 1, 1: 2, 2: 3, 3: 4 }; // C=1, B=2, A=3, S=4
+                    var capThemePts = [3, 5, 7, 10, 15]; // cap.json: C=3, B=5, A=7, S=10, R=15
 
                     for (var i = 0; i < regularThemes.length; i++) {
                         var tCode = regularThemes[i];
+                        var tOwned = 0;
+                        var tMinGrade = 99;
                         for (var s = 0; s < slotCount; s++) {
                             var aCode = artistCodes[s];
                             var cardId = (typeof themeArtistCardMap !== "undefined" && themeArtistCardMap[tCode + "_" + aCode])
@@ -12183,7 +12591,9 @@ function initIl2Cpp(module) {
                                 : 0;
                             if (cardId > 0 && typeof accountOwnedCards !== "undefined" && accountOwnedCards[cardId]) {
                                 obtainedCards++;
+                                tOwned++;
                                 var g = (accountOwnedCards[cardId].grade !== undefined) ? accountOwnedCards[cardId].grade : 4;
+                                if (g < tMinGrade) tMinGrade = g;
                                 if (g === 4) {
                                     rCardCount++;
                                 } else {
@@ -12191,18 +12601,28 @@ function initIl2Cpp(module) {
                                 }
                             }
                         }
+                        if (slotCount > 0 && tOwned === slotCount && tMinGrade >= 0 && tMinGrade <= 4) {
+                            themePoints += (capThemePts[tMinGrade] || 0);
+                        }
                     }
 
                     if (totalSlots === 0 || obtainedCards === 0) {
                         return {
                             grade: 0, // C fallback
+                            nextGrade: 1,
                             isRGrade: false,
                             isMaxLevel: false,
                             level: 0,
+                            maxLevel: Math.max(1, themeCount),
                             gauge: 0.0,
+                            currentPoint: 0,
+                            nextPoint: Math.max(1, totalSlots),
+                            themePoints: 0,
+                            maxThemePoints: maxThemePoints,
                             points: 0,
                             totalSlots: totalSlots,
-                            obtainedCards: 0
+                            obtainedCards: 0,
+                            rCardCount: 0
                         };
                     }
 
@@ -12210,61 +12630,81 @@ function initIl2Cpp(module) {
                     if (rCardCount > 0) {
                         var isMaxLevel = (rCardCount === totalSlots && totalSlots > 0);
                         var level = 0;
+                        var nextLevelThreshold = totalSlots;
                         if (themeCount > 0) {
                             for (var th = 1; th <= themeCount; th++) {
-                                var threshold = Math.floor(totalSlots / themeCount * th);
+                                var threshold = Math.round((totalSlots / themeCount) * th);
                                 if (threshold <= rCardCount) {
                                     level = th;
                                 } else {
+                                    nextLevelThreshold = threshold;
                                     break;
                                 }
                             }
                         }
                         if (isMaxLevel) {
                             level = themeCount;
-                        } else if (level < 1) {
-                            level = 1;
+                            nextLevelThreshold = totalSlots;
                         }
-                        var gauge = totalSlots > 0 ? (rCardCount / totalSlots) : 1.0;
+                        var gauge = nextLevelThreshold > 0 ? Math.min(1.0, rCardCount / nextLevelThreshold) : 1.0;
                         return {
                             grade: 4, // R
+                            nextGrade: 4,
                             isRGrade: true,
                             isMaxLevel: isMaxLevel,
                             level: level,
+                            maxLevel: Math.max(1, themeCount),
                             gauge: gauge,
-                            points: rCardCount * 2400,
+                            currentPoint: rCardCount,
+                            nextPoint: nextLevelThreshold,
+                            themePoints: themePoints,
+                            maxThemePoints: maxThemePoints,
+                            points: themePoints * 100 + rCardCount * 10 + nonRPoints,
                             totalSlots: totalSlots,
-                            obtainedCards: obtainedCards
+                            obtainedCards: obtainedCards,
+                            rCardCount: rCardCount
                         };
                     }
 
-                    // CASE 2: Group has non-R cards (C, B, A, S)
+                    // CASE 2: Group has non-R cards (C=1, B=2, A=3, S=4 per slot; avg = nonRPoints / totalSlots)
                     var avg = nonRPoints / totalSlots;
-                    var grade = 0; // C
+                    var grade = 0;
+                    var nextPoint = totalSlots;
                     var gauge = 0.0;
-                    if (avg >= 4.0) {
-                        grade = 3; // S
-                        gauge = Math.min(1.0, (avg - 4.0) / 1.0);
-                    } else if (avg >= 2.5) {
+                    if (avg >= 3.0) {
+                        grade = 3; // S -> next is R (all cards upgraded)
+                        nextPoint = 4 * totalSlots;
+                        gauge = Math.min(1.0, nonRPoints / nextPoint);
+                    } else if (avg >= 2.0) {
                         grade = 2; // A
-                        gauge = Math.min(1.0, (avg - 2.5) / 1.5);
+                        nextPoint = 3 * totalSlots;
+                        gauge = Math.min(1.0, (avg - 2.0) / 1.0);
                     } else if (avg >= 1.0) {
                         grade = 1; // B
-                        gauge = Math.min(1.0, (avg - 1.0) / 1.5);
+                        nextPoint = 2 * totalSlots;
+                        gauge = Math.min(1.0, (avg - 1.0) / 1.0);
                     } else {
                         grade = 0; // C
+                        nextPoint = totalSlots;
                         gauge = Math.min(1.0, avg / 1.0);
                     }
 
                     return {
                         grade: grade,
+                        nextGrade: Math.min(4, grade + 1),
                         isRGrade: false,
                         isMaxLevel: false,
                         level: 0,
+                        maxLevel: Math.max(1, themeCount),
                         gauge: gauge,
-                        points: nonRPoints,
+                        currentPoint: nonRPoints,
+                        nextPoint: Math.max(1, nextPoint),
+                        themePoints: themePoints,
+                        maxThemePoints: maxThemePoints,
+                        points: themePoints * 100 + nonRPoints,
                         totalSlots: totalSlots,
-                        obtainedCards: obtainedCards
+                        obtainedCards: obtainedCards,
+                        rCardCount: 0
                     };
                 };
 
@@ -12477,9 +12917,8 @@ function initIl2Cpp(module) {
                         };
 
                         var metaAll = getGlobalMetadata();
-                        var favCodes = (typeof offlineFavoriteGroups !== "undefined" && offlineFavoriteGroups && offlineFavoriteGroups.length > 0)
-                            ? offlineFavoriteGroups
-                            : [1001, 2001, 3001, 4001, 5001];
+                        var favCodes = getOfflineFavoriteGroups();
+                        offlineFavoriteGroups = favCodes;
 
                         var arrLen = favItemList.add(0x18).readS32();
                         for (var i = 0; i < arrLen && i < 5; i++) {
@@ -12570,7 +13009,7 @@ function initIl2Cpp(module) {
                 var offlineTotalThemePointsPossible = 74400;
                 var offlineTotalThemePointsEarned = 74400;
 
-                var buildCollectionRewardData = function (type, currentPts, targetPts, rewardQuantity, rewardIconPath) {
+                var buildCollectionRewardData = function (type, currentPts, targetPts, rewardQuantity, rewardIconPath, missionType) {
                     var cellParamKlass = resolveMetadataSlot(0x31F0E80);
                     var rewardParamKlass = resolveMetadataSlot(0x31F41F8);
                     if (!cellParamKlass || cellParamKlass.isNull()) return NULL;
@@ -12579,7 +13018,7 @@ function initIl2Cpp(module) {
                     if (il2cpp_gchandle_new && !cpObj.isNull()) il2cpp_gchandle_new(cpObj, 2);
 
                     // Canonical Dalcomsoft English from lcd.json (code 181416001: 'Achieve {0} points!')
-                    var ptStr = createIl2CppString("Achieve " + currentPts.toLocaleString() + " points!");
+                    var ptStr = createIl2CppString("Achieve " + targetPts.toLocaleString() + " points!");
                     cpObj.add(0x10).writePointer(ptStr);
 
                     if (rewardParamKlass && !rewardParamKlass.isNull()) {
@@ -12594,7 +13033,7 @@ function initIl2Cpp(module) {
 
                     cpObj.add(0x20).writePointer(createIl2CppString("RECEIVE"));
                     cpObj.add(0x28).writePointer(createIl2CppString("COMPLETED"));
-                    cpObj.add(0x30).writeS32(2); // type = 2 (Completed)
+                    cpObj.add(0x30).writeS32((missionType !== undefined && missionType !== null) ? missionType : 0); // 0=progress, 1=Reward, 2=Completed
                     return cpObj;
                 };
 
@@ -12631,14 +13070,37 @@ function initIl2Cpp(module) {
                         var themeColPoint = mainView.add(0x70).readPointer();
                         var setColFn = new NativeFunction(baseAddr.add(0x11C5184), "void", ["pointer", "pointer", "pointer"]);
 
-                        // Dynamic values from offline inventory calculation
                         var curCards = offlineTotalCardsOwned;
                         var totCards = offlineTotalCardsPossible;
                         var curThemes = offlineTotalThemePointsEarned;
                         var totThemes = offlineTotalThemePointsPossible;
 
+                        var prof = loadPlayerProfile();
+                        var claimedObj = (prof && prof.collectionRewardsClaimed) ? prof.collectionRewardsClaimed : { card: 0, theme: 0 };
+
+                        var resolveTierState = function(tiers, claimedLvl, curPts) {
+                            var nextTier = null;
+                            for (var ti = 0; ti < tiers.length; ti++) {
+                                if (tiers[ti].level > claimedLvl) {
+                                    nextTier = tiers[ti];
+                                    break;
+                                }
+                            }
+                            if (!nextTier) {
+                                var lastT = tiers.length > 0 ? tiers[tiers.length - 1] : { pointValue: curPts, rewardQuantity: 0 };
+                                return { targetPts: lastT.pointValue, rewardStr: (lastT.rewardQuantity || 0).toLocaleString(), missionType: 2 };
+                            }
+                            return {
+                                targetPts: nextTier.pointValue,
+                                rewardStr: (nextTier.rewardQuantity || 0).toLocaleString(),
+                                missionType: (curPts >= nextTier.pointValue) ? 1 : 0
+                            };
+                        };
+
                         if (!cardColPoint.isNull()) {
-                            var cpCell = buildCollectionRewardData("card", totCards, totCards, "10", "asiudgasg/asodhsg/bhfbfhbf/317.i.bytes");
+                            var cTiers = getCacTiers(0);
+                            var cState = resolveTierState(cTiers, parseInt(claimedObj.card || 0, 10), curCards);
+                            var cpCell = buildCollectionRewardData("card", curCards, cState.targetPts, cState.rewardStr, "asiudgasg/asodhsg/bhfbfhbf/317.i.bytes", cState.missionType);
                             var cpParam = createCollectionPointViewParam(
                                 "ALL CARDS COLLECTION",
                                 "*Any Theme is available.",
@@ -12653,7 +13115,9 @@ function initIl2Cpp(module) {
                             }
                         }
                         if (!themeColPoint.isNull()) {
-                            var tpCell = buildCollectionRewardData("theme", totThemes, totThemes, "2,000", "asiudgasg/asodhsg/bhfbfhbf/968.i.bytes");
+                            var tTiers = getCacTiers(1);
+                            var tState = resolveTierState(tTiers, parseInt(claimedObj.theme || 0, 10), curThemes);
+                            var tpCell = buildCollectionRewardData("theme", curThemes, tState.targetPts, tState.rewardStr, "asiudgasg/asodhsg/bhfbfhbf/968.i.bytes", tState.missionType);
                             var tpParam = createCollectionPointViewParam(
                                 "ALL THEMES COLLECTION",
                                 "*Any Theme is available.",
@@ -13481,19 +13945,7 @@ function initIl2Cpp(module) {
                     log("[-] Error patching VerifyFavoriteGroupCode: " + eVfgc.message);
                 }
 
-                // 10. CardBookScene.<OpenDetailPopup>b__0 (0xE40F08) -> mov w8, #1; strb w8, [x21, #0xf0]; b #0xe40f2c
-                // Bypass null check on UserDataControl.CardFavoriteGroupList when opening CardBookDetailPopup
-                try {
-                    Memory.protect(baseAddr.add(0xE40F08), 12, "rwx");
-                    baseAddr.add(0xE40F08).writeByteArray([
-                        0x28, 0x00, 0x80, 0x52, // mov w8, #1
-                        0xa8, 0xc2, 0x03, 0x39, // strb w8, [x21, #0xf0]
-                        0x07, 0x00, 0x00, 0x14  // b 0xe40f2c (+0x1c = 7 instructions)
-                    ]);
-                    log("[+] Byte patch on CardBookScene.<OpenDetailPopup>b__0 (0xE40F08): bypass favorite group list check");
-                } catch (eOdp) {
-                    log("[-] Error patching OpenDetailPopup callback: " + eOdp.message);
-                }
+                // 10. CardBookScene.<OpenDetailPopup>b__0 (0xE40F08) -> left unpatched because UserControl.get_CardFavoriteGroupList (0xAB240C) now returns real persistent List<int>
 
                 // --- CardBookDetailPopup & CardBookDetailCellView UI Glitch Fixes ---
                 try {
@@ -13566,7 +14018,7 @@ function initIl2Cpp(module) {
                     });
                     log("[+] Attached to CardBookDetailCellView.RefreshCellView (0x11C9E44) [Badge cleanup]");
 
-                    // 3. Fix Theme Point Area: Ensure all gradePoint texts are active and filled
+                    // 3. Fix Theme Point Area: Ensure all gradePoint texts + themePoint_Text are active and filled
                     Interceptor.attach(baseAddr.add(0x11CBEB8), {
                         onEnter: function (args) {
                             this.self = args[0];
@@ -13594,6 +14046,18 @@ function initIl2Cpp(module) {
                                             }
                                         }
                                     }
+                                }
+                            }
+                            var themePtTxt = pointArea.add(0x18).readPointer();
+                            if (!themePtTxt.isNull()) {
+                                var tpGo = getGoFn(themePtTxt, NULL);
+                                if (tpGo && !tpGo.isNull()) setActFn(tpGo, 1, NULL);
+                                var curTpStr = readIl2CppString(getTextFn(themePtTxt, NULL));
+                                if (!curTpStr || curTpStr.length === 0 || curTpStr === "0 / 0") {
+                                    var pObj = popup.add(0x38).readPointer();
+                                    var gCode = (!pObj.isNull()) ? pObj.add(0x8C).readS32() : 1001;
+                                    var gm = calculateOfflineGroupCardBookMetrics(gCode);
+                                    setTextFn(themePtTxt, createIl2CppString("Theme Point : " + gm.themePoints + " / " + gm.maxThemePoints), NULL);
                                 }
                             }
                         }
@@ -14394,8 +14858,23 @@ function initIl2Cpp(module) {
                             log("[🃏 INVENTORY] SetCurrentGroup: set SelectedGroupCode to " + targetGroup + " (index=" + index + ")!");
                             if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
                                 try {
-                                    refreshDynamicInventorySlots(activeInventorySceneInstance, targetGroup);
-                                } catch (eRdis) {}
+                                    syncGroupEquippedFastArray(targetGroup);
+                                    var svCur = activeInventorySceneInstance.add(0x48).readPointer();
+                                    if (!svCur.isNull()) {
+                                        var gvCur = svCur.add(0x70).readPointer();
+                                        if (!gvCur.isNull()) {
+                                            var gCountTxtCur = gvCur.add(0x38).readPointer();
+                                            if (!gCountTxtCur.isNull()) {
+                                                var setTxtCur = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
+                                                setTxtCur(gCountTxtCur, createIl2CppString((index + 1) + " / " + playables.length), NULL);
+                                            }
+                                            var refGvCur = new NativeFunction(baseAddr.add(0xF25124), "void", ["pointer"]);
+                                            refGvCur(gvCur);
+                                        }
+                                    }
+                                } catch (eRdis) {
+                                    log("[-] Error refreshing group header in SetCurrentGroup: " + eRdis.message);
+                                }
                             }
                         } catch (eScgInner) {
                             log("[-] Error setting SelectedGroupCode: " + eScgInner.message);
@@ -14405,6 +14884,27 @@ function initIl2Cpp(module) {
                 } catch (eScg) {
                     log("[-] Error replacing InventoryControl.SetCurrentGroup: " + eScg.message);
                 }
+
+                // Keep currentSelectedGroupCode & groupCountText in sync when scroller snaps (swipe or arrow JumpToDataIndex)
+                try {
+                    Interceptor.attach(baseAddr.add(0xF256D0), {
+                        onEnter: function (args) {
+                            try {
+                                var dataIdx = args[3].toInt32();
+                                var meta = getGlobalMetadata();
+                                var playables = (meta && meta.playableGroups) ? meta.playableGroups : PLAYABLE_GROUP_CODES;
+                                if (dataIdx >= 0 && dataIdx < playables.length) {
+                                    var targetGroup = playables[dataIdx];
+                                    if (currentSelectedGroupCode !== targetGroup) {
+                                        var setCurGroupFn = new NativeFunction(baseAddr.add(0xF2B810), "void", ["int", "int", "pointer"]);
+                                        setCurGroupFn(dataIdx, 0, NULL);
+                                    }
+                                }
+                            } catch (eIgv) {}
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on InvenGroupView.<Awake>b__14_0 (0xF256D0)!");
+                } catch (eIgvHook) {}
 
                 // Proxy InventoryControl.get_selectedGroupCode (0xF26C40)
                 try {
@@ -14550,8 +15050,16 @@ function initIl2Cpp(module) {
                 var cachedDglInstance = NULL;
                 var ensureDisplayGroupList = function() {
                     try {
+                        var setDglFn = new NativeFunction(baseAddr.add(0xF27770), "void", ["pointer", "pointer"]);
                         if (!cachedDglInstance.isNull() && cachedDglInstance.compare(ptr(0x10000)) > 0) {
-                            return cachedDglInstance;
+                            try {
+                                var cachedSize = cachedDglInstance.add(0x18).readS32();
+                                var cachedItems = cachedDglInstance.add(0x10).readPointer();
+                                if (cachedSize > 0 && !cachedItems.isNull() && !cachedItems.add(0x20).readPointer().isNull()) {
+                                    setDglFn(cachedDglInstance, NULL);
+                                    return cachedDglInstance;
+                                }
+                            } catch (eChkDgl) {}
                         }
                         ensureLoonaMocks();
                         var meta = getGlobalMetadata();
@@ -14566,7 +15074,6 @@ function initIl2Cpp(module) {
                         }
                         var newDgl = createManagedList(groupItems, 'group');
                         if (newDgl && !newDgl.isNull()) {
-                            var setDglFn = new NativeFunction(baseAddr.add(0xF27770), "void", ["pointer", "pointer"]);
                             setDglFn(newDgl, NULL);
                             cachedDglInstance = newDgl;
                             log("[🃏 INVENTORY] Created authentic IL2CPP List<GroupItem> for DisplayGroupList: " + newDgl + " (count=" + groupItems.length + ")");
@@ -14882,14 +15389,15 @@ function initIl2Cpp(module) {
                                 var formulaCode = (gr < 4) ? (gr * 5 + Math.min(4, lvl - 1)) : (20 + Math.min(98, lvl - 1));
                                 cardItemObj.add(0x20).writeS16(formulaCode); // <IntensifyCode>
                                 cardItemObj.add(0x24).writeU32(0x3F800000); // 1.0f
-                                cardItemObj.add(0x28).writeS32(100); // <SellPrice>
+                                cardItemObj.add(0x28).writeS32(getCardSellPrice(gr)); // <SellPrice>
                                 var meta = getCardMetadata(cId);
                                 var isMat = (cData.isMaterial || (meta && meta.isMaterial) || (cId >= 30001 && cId <= 30005));
                                 cardItemObj.add(0x2C).writeU8(isMat ? 1 : 0); // isMaterial
                                 var gCode = (meta && (meta.groupID || meta.group)) ? (meta.groupID || meta.group) : 1001;
+                                var tCode = (meta && meta.theme) ? meta.theme : 1001;
                                 var aId = (meta && meta.artistID) ? meta.artistID : 1001;
                                 var memberIdx = (aId >= 1000) ? (aId % 1000) : aId;
-                                cardItemObj.add(0x30).writeS32(gCode * 10000 + 1 * 100 + memberIdx); // sortCardIndex
+                                cardItemObj.add(0x30).writeS32(gCode * 10000 + (tCode % 100) * 100 + memberIdx); // sortCardIndex
                                 cardItemObj.add(0x34).writeU8(0); // isNew = false
                                 var initThInfo = computeCardThemeInfo(cId, !!cData.isEquip, profile);
                                 cardItemObj.add(0x38).writeS32(initThInfo.themeLevel); // <ThemeLevel>
@@ -15077,10 +15585,15 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing OpenCard: " + eOcr.message);
                 }
 
-                // Intercept InventoryControl.OpenGroup (0xF2827C) to bypass missing GroupData storage
+                // Intercept InventoryControl.OpenGroup (0xF2827C) to keep DisplayGroupList populated across scenes
                 try {
                     Interceptor.replace(baseAddr.add(0xF2827C), new NativeCallback(function (methodInfo) {
-                        log("[🃏 INVENTORY] Native OpenGroup intercepted! (LOONA GroupItem handled by offline populator)");
+                        if (Object.keys(allInvenGroupItems).length === 0) {
+                            populateOfflineInventoryCards();
+                        } else {
+                            ensureDisplayGroupList();
+                        }
+                        log("[🃏 INVENTORY] Native OpenGroup intercepted & DisplayGroupList ensured!");
                     }, "void", ["pointer"]));
                     log("[+] Interceptor.replace installed on InventoryControl.OpenGroup (0xF2827C)!");
                 } catch (eOgr) {
@@ -15272,7 +15785,8 @@ function initIl2Cpp(module) {
                                                 var sortText = sortView.add(0x40).readPointer();
                                                 if (!sortText.isNull()) {
                                                     var setTextFn = new NativeFunction(baseAddr.add(0x21A5FC4), "void", ["pointer", "pointer", "pointer"]);
-                                                    setTextFn(sortText, createIl2CppString("High"), NULL);
+                                                    var sortNames = ["Low", "High", "New"];
+                                                    setTextFn(sortText, createIl2CppString(sortNames[offlineSortType] || "High"), NULL);
                                                 }
                                             }
 
@@ -15346,11 +15860,11 @@ function initIl2Cpp(module) {
                                                         setActiveFn(cGo, 1, NULL);
                                                     }
                                                 } catch (eCgo) {}
-                                                // If text is empty or not formatted, force update
+                                                // Always sync card count with dynamic cardInvenMax
                                                 if (!cTxt || cTxt.length === 0) {
                                                     var prof = loadPlayerProfile();
                                                     var cardCount = (prof && prof.inventoryCards) ? prof.inventoryCards.length : 14;
-                                                    var maxCount = 200;
+                                                    var maxCount = (prof && prof.cardInvenMax) ? prof.cardInvenMax : 200;
                                                     setTextFn(cardCountText, createIl2CppString(cardCount + " / " + maxCount), NULL);
                                                     log("[📊 CARD COUNT] Force set text to: " + cardCount + " / " + maxCount);
                                                 }
@@ -15372,8 +15886,12 @@ function initIl2Cpp(module) {
                                                     }
                                                 } catch (eGgo) {}
                                                 if (!gTxt || gTxt.length === 0) {
-                                                    setTextFn(groupCountText, createIl2CppString("1 / 1"), NULL);
-                                                    log("[📊 GROUP COUNT] Force set text to: 1 / 1");
+                                                    var gMetaPlay = getGlobalMetadata();
+                                                    var gPlay = (gMetaPlay && gMetaPlay.playableGroups) ? gMetaPlay.playableGroups : PLAYABLE_GROUP_CODES;
+                                                    var gIdx = gPlay.indexOf(currentSelectedGroupCode);
+                                                    if (gIdx < 0) gIdx = 0;
+                                                    setTextFn(groupCountText, createIl2CppString((gIdx + 1) + " / " + gPlay.length), NULL);
+                                                    log("[📊 GROUP COUNT] Force set text to: " + (gIdx + 1) + " / " + gPlay.length);
                                                 }
                                             }
                                         }
@@ -15394,6 +15912,7 @@ function initIl2Cpp(module) {
                             activeInventorySceneInstance = args[0];
                             log("[🗃️ INVENTORY SCENE] InventoryScene.OnOpen entered! instance: " + args[0]);
                             try {
+                                ensureLocalePopupControlOpen();
                                 populateOfflineInventoryCards();
                                 ensureInventoryLists(args[0]);
                             } catch (ie) {
@@ -16048,8 +16567,9 @@ function initIl2Cpp(module) {
                     log("[-] Error attaching theme equip tracers: " + eTcTr.message);
                 }
 
-                // LocalePopupControl.Find (0xCF2998) & LocalePopupControl.Data.get_Title (0xE78048) safe fallback
+                // LocalePopupControl.Find (0xCF2998) & LocalePopupControl.Data safe fallbacks
                 var dummyLpdPtr = Memory.alloc(32);
+                var lastMissedLocalePopupCode = 0;
                 try {
                     Interceptor.attach(baseAddr.add(0xCF2998), {
                         onEnter: function (args) {
@@ -16057,6 +16577,7 @@ function initIl2Cpp(module) {
                         },
                         onLeave: function (retval) {
                             if (retval.isNull()) {
+                                lastMissedLocalePopupCode = this.code;
                                 log("[🌐 LOCALE_POPUP] LocalePopupControl.Find(" + this.code + ") returned null -> returning dummy non-null pointer!");
                                 retval.replace(dummyLpdPtr);
                             }
@@ -16068,22 +16589,68 @@ function initIl2Cpp(module) {
                 }
 
                 try {
-                    var nativeLpdGetTitle = new NativeFunction(baseAddr.add(0xE78048), "pointer", ["pointer"]);
-                    Interceptor.replace(baseAddr.add(0xE78048), new NativeCallback(function (thisPtr, methodInfo) {
+                    var nativeLpdGetIcon = new NativeFunction(baseAddr.add(0xE77FD4), "pointer", ["pointer", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xE77FD4), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
                         try {
-                            if (!thisPtr.isNull()) {
+                            if (!thisPtr.isNull() && !thisPtr.equals(dummyLpdPtr)) {
                                 var model = thisPtr.add(0x10).readPointer();
                                 if (!model.isNull()) {
-                                    var res = nativeLpdGetTitle(thisPtr);
+                                    var res = nativeLpdGetIcon(thisPtr, NULL);
+                                    if (!res.isNull()) return res;
+                                }
+                            }
+                        } catch (eGi) {}
+                        return createIl2CppString("");
+                    }, "pointer", ["pointer", "pointer"])));
+                    var nativeLpdGetTitle = new NativeFunction(baseAddr.add(0xE78048), "pointer", ["pointer", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xE78048), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
+                        try {
+                            if (!thisPtr.isNull() && !thisPtr.equals(dummyLpdPtr)) {
+                                var model = thisPtr.add(0x10).readPointer();
+                                if (!model.isNull()) {
+                                    var res = nativeLpdGetTitle(thisPtr, NULL);
                                     if (!res.isNull()) return res;
                                 }
                             }
                         } catch (eGt) {}
-                        return il2cpp_string_new("Select Theme");
-                    }, "pointer", ["pointer", "pointer"]));
-                    log("[+] Replaced LocalePopupControl.Data.get_Title (0xE78048) with safe fallback!");
+                        if (lastMissedLocalePopupCode === 59) return createIl2CppString("Sell All");
+                        if (lastMissedLocalePopupCode === 58) return createIl2CppString("Sell All");
+                        if (lastMissedLocalePopupCode === 57) return createIl2CppString("Sell All");
+                        return createIl2CppString("Select Theme");
+                    }, "pointer", ["pointer", "pointer"])));
+                    var nativeLpdGetMsg = new NativeFunction(baseAddr.add(0xE780E8), "pointer", ["pointer", "int", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xE780E8), keepCb(new NativeCallback(function (thisPtr, index, methodInfo) {
+                        try {
+                            if (!thisPtr.isNull() && !thisPtr.equals(dummyLpdPtr)) {
+                                var model = thisPtr.add(0x10).readPointer();
+                                if (!model.isNull()) {
+                                    var res = nativeLpdGetMsg(thisPtr, index, NULL);
+                                    if (!res.isNull()) return res;
+                                }
+                            }
+                        } catch (eGm) {}
+                        if (lastMissedLocalePopupCode === 59) return createIl2CppString("Earned {0} RP!");
+                        if (lastMissedLocalePopupCode === 58) return createIl2CppString("Sell {0} card(s) for {1} RP?");
+                        return createIl2CppString("");
+                    }, "pointer", ["pointer", "int", "pointer"])));
+                    var nativeLpdGetBtn = new NativeFunction(baseAddr.add(0xE781BC), "pointer", ["pointer", "int", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xE781BC), keepCb(new NativeCallback(function (thisPtr, index, methodInfo) {
+                        try {
+                            if (!thisPtr.isNull() && !thisPtr.equals(dummyLpdPtr)) {
+                                var model = thisPtr.add(0x10).readPointer();
+                                if (!model.isNull()) {
+                                    var res = nativeLpdGetBtn(thisPtr, index, NULL);
+                                    if (!res.isNull()) return res;
+                                }
+                            }
+                        } catch (eGb) {}
+                        if (lastMissedLocalePopupCode === 59) return createIl2CppString(index === 1 ? "OK" : "Cancel");
+                        if (lastMissedLocalePopupCode === 58) return createIl2CppString(index === 1 ? "Sell" : "Cancel");
+                        return createIl2CppString(index === 1 ? "OK" : "Cancel");
+                    }, "pointer", ["pointer", "int", "pointer"])));
+                    log("[+] Replaced LocalePopupControl.Data (Icon/Title/GetMessage/GetButton) with safe fallbacks!");
                 } catch (eLpdGtHook) {
-                    log("[-] Error replacing LocalePopupControl.Data.get_Title: " + eLpdGtHook.message);
+                    log("[-] Error replacing LocalePopupControl.Data methods: " + eLpdGtHook.message);
                 }
 
                 // SelectThemeAssist.GetCardListByGroup (0x104F6D0) safe offline implementation
@@ -17254,10 +17821,11 @@ function initIl2Cpp(module) {
                     log("[-] Error attaching to OpenRhythmPointShortagePopup: " + eShortage.message);
                 }
 
-                // Safe stub for StorePopup.Open (0xB6EE4C) to prevent crash/invalid navigation when clicking OK on shortage modals offline
+                // Offline notice for StorePopup.Open (0xB6EE4C)
                 try {
                     Interceptor.replace(baseAddr.add(0xB6EE4C), keepCb(new NativeCallback(function (type, callback, loadedCallback, category, code, methodInfo) {
-                        log("[🛒 STORE POPUP] StorePopup.Open suppressed cleanly in offline mode (type=" + type + ", category=" + category + ")");
+                        log("[🛒 STORE POPUP] StorePopup.Open intercepted offline (type=" + type + ", category=" + category + ")");
+                        showOfflineToast("Shop is unavailable in offline standalone mode.", 2.2);
                     }, "void", ["int", "pointer", "pointer", "int", "int", "pointer"])));
                     log("[+] Interceptor.replace installed on StorePopup.Open (0xB6EE4C)!");
                 } catch (eStore) {
@@ -17461,9 +18029,10 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         try {
                             var profile = loadPlayerProfile();
                             if (profile && Array.isArray(profile.inventoryCards)) {
+                                var lkKey = objIdKey(objId);
                                 for (var i = 0; i < profile.inventoryCards.length; i++) {
                                     var ce = profile.inventoryCards[i];
-                                    if (ce.objectID === objId || (objId === 0 && ce.cardID === cId)) {
+                                    if ((lkKey !== "0" && objIdKey(ce.objectID) === lkKey) || (lkKey === "0" && ce.cardID === cId)) {
                                         ce.isLock = newLock;
                                         break;
                                     }
@@ -17474,7 +18043,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             log("[-] Error saving lock state to profile: " + ePf.message);
                         }
 
-                        // Refresh SelectView & Carousel
+                        // Refresh SelectView, EquipView (if in STATE.Equip) & Carousel
+                        var curStateLk = sceneThis.add(0x64).readS32();
                         var sceneView = sceneThis.add(0x48).readPointer();
                         if (!sceneView.isNull()) {
                             var selectView = sceneView.add(0x48).readPointer();
@@ -17483,9 +18053,20 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 var selParams = safeGetSelectViewData(sceneThis, tCard, NULL, eqCard, (!newLock) ? 1 : 0);
                                 safeRefreshInvenCardSelectView(selectView, selParams);
                             }
+                            if (curStateLk === 7) {
+                                try {
+                                    var eqViewLk = sceneView.add(0x60).readPointer();
+                                    if (!eqViewLk.isNull()) {
+                                        var eqParamsLk = new NativeFunction(baseAddr.add(0x10577DC), "pointer", ["pointer", "pointer", "pointer", "pointer", "pointer"])(sceneThis, tCard, NULL, sceneThis.add(0x90).readPointer(), NULL);
+                                        if (!eqParamsLk.isNull()) {
+                                            new NativeFunction(baseAddr.add(0xF219B4), "void", ["pointer", "pointer", "pointer"])(eqViewLk, eqParamsLk, NULL);
+                                        }
+                                    }
+                                } catch (eEqLk) {}
+                            }
                         }
                         safeUpdateLowerCarousel(sceneThis, tCard);
-                        log("[🔒 OFFLINE LOCK] Card ID=" + cId + " (ObjID=" + objId + ") lock toggled: " + curLock + " -> " + newLock);
+                        log("[🔒 OFFLINE LOCK] Card ID=" + cId + " (ObjID=" + objIdKey(objId) + ") lock toggled: " + curLock + " -> " + newLock);
                     } catch (eLk) {
                         log("[-] Error in executeOfflineLock: " + eLk.message);
                     }
@@ -17507,6 +18088,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                         var objId = raw.add(0x10).readS64();
                         var cId = raw.add(0x20).readS32();
+                        var gr = raw.add(0x24).readS32();
+                        var lvl = raw.add(0x1C).readS16();
 
                         // Play button sound
                         try {
@@ -17518,21 +18101,28 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         try {
                             var profile = loadPlayerProfile();
                             if (profile) {
-                                if (profile.leaderCard === cId || (objId !== 0 && profile.leaderCard === objId)) {
-                                    profile.leaderCard = 0;
+                                if (isProfileLeaderCard(profile, cId, objId)) {
+                                    profile.leaderCard = null;
                                     isNowLeader = false;
                                 } else {
-                                    profile.leaderCard = cId;
+                                    var oNum = parseInt(objIdKey(objId), 10);
+                                    profile.leaderCard = {
+                                        objectID: (!isNaN(oNum) && oNum > 0) ? oNum : cId,
+                                        cardID: cId,
+                                        grade: gr,
+                                        level: lvl
+                                    };
                                     isNowLeader = true;
                                 }
                                 savePlayerProfile(profile);
                                 setupUserControl(profile);
-                                refreshTopViewRhythmPoint(newRpTotal);
+                                refreshTopViewAll();
                             }
                         } catch (ePf) {
                             log("[-] Error saving leaderCard to profile: " + ePf.message);
                         }
 
+                        var curStateLdr = sceneThis.add(0x64).readS32();
                         var sceneView = sceneThis.add(0x48).readPointer();
                         if (!sceneView.isNull()) {
                             var selectView = sceneView.add(0x48).readPointer();
@@ -17541,8 +18131,19 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 var selParams = safeGetSelectViewData(sceneThis, tCard, NULL, eqCard, 1);
                                 safeRefreshInvenCardSelectView(selectView, selParams);
                             }
+                            if (curStateLdr === 7) {
+                                try {
+                                    var eqViewLdr = sceneView.add(0x60).readPointer();
+                                    if (!eqViewLdr.isNull()) {
+                                        var eqParamsLdr = new NativeFunction(baseAddr.add(0x10577DC), "pointer", ["pointer", "pointer", "pointer", "pointer", "pointer"])(sceneThis, tCard, NULL, sceneThis.add(0x90).readPointer(), NULL);
+                                        if (!eqParamsLdr.isNull()) {
+                                            new NativeFunction(baseAddr.add(0xF219B4), "void", ["pointer", "pointer", "pointer"])(eqViewLdr, eqParamsLdr, NULL);
+                                        }
+                                    }
+                                } catch (eEqLdr) {}
+                            }
                         }
-                        log("[👑 OFFLINE LEADER] Card ID=" + cId + " (ObjID=" + objId + ") leader state set to: " + isNowLeader);
+                        log("[👑 OFFLINE LEADER] Card ID=" + cId + " (ObjID=" + objIdKey(objId) + ") leader state set to: " + isNowLeader);
                     } catch (eLdr) {
                         log("[-] Error in executeOfflineLeader: " + eLdr.message);
                     }
@@ -17563,17 +18164,18 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         if (raw.isNull()) return;
 
                         var objId = raw.add(0x10).readS64();
+                        var sellKey = objIdKey(objId);
                         var cId = raw.add(0x20).readS32();
                         var gr = raw.add(0x24).readS32();
                         var isEq = (raw.add(0x28).readU8() === 1);
                         var isLk = (raw.add(0x29).readU8() === 1);
 
                         if (isEq) {
-                            log("[⚠️ OFFLINE SELL] Cannot sell equipped card ID=" + cId + " (ObjID=" + objId + ")!");
+                            log("[⚠️ OFFLINE SELL] Cannot sell equipped card ID=" + cId + " (ObjID=" + sellKey + ")!");
                             return;
                         }
                         if (isLk) {
-                            log("[⚠️ OFFLINE SELL] Cannot sell locked card ID=" + cId + " (ObjID=" + objId + ")!");
+                            log("[⚠️ OFFLINE SELL] Cannot sell locked card ID=" + cId + " (ObjID=" + sellKey + ")!");
                             return;
                         }
 
@@ -17592,15 +18194,18 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             if (profile) {
                                 profile.rhythmPoint = (profile.rhythmPoint || 0) + sellPrice;
                                 newRpTotal = profile.rhythmPoint;
+                                if (isProfileLeaderCard(profile, cId, objId)) {
+                                    profile.leaderCard = null;
+                                }
                                 if (Array.isArray(profile.inventoryCards)) {
                                     var removedOnce = false;
                                     profile.inventoryCards = profile.inventoryCards.filter(function(entry) {
                                         if (removedOnce) return true;
-                                        if (objId !== 0 && entry.objectID === objId) {
+                                        if (sellKey !== "0" && objIdKey(entry.objectID) === sellKey) {
                                             removedOnce = true;
                                             return false;
                                         }
-                                        if (objId === 0 && entry.cardID === cId && !entry.isEquip && !entry.isLock) {
+                                        if (sellKey === "0" && entry.cardID === cId && !entry.isEquip && !entry.isLock) {
                                             removedOnce = true;
                                             return false;
                                         }
@@ -17608,8 +18213,9 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     });
                                 }
                                 savePlayerProfile(profile);
+                                syncAccountOwnedCards();
                                 setupUserControl(profile);
-                                refreshTopViewRhythmPoint(newRpTotal);
+                                refreshTopViewAll();
                             }
                         } catch (ePf) {
                             log("[-] Error updating profile on sell: " + ePf.message);
@@ -17626,7 +18232,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     return false;
                                 }
                                 var r = ci.add(0x10).readPointer();
-                                if (!r.isNull() && objId !== 0 && r.add(0x10).readS64() === objId) {
+                                if (!r.isNull() && sellKey !== "0" && objIdKey(r.add(0x10).readS64()) === sellKey) {
                                     removedMem = true;
                                     return false;
                                 }
@@ -17638,7 +18244,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         try {
                             var getCardMapFn = new NativeFunction(baseAddr.add(0xF2751C), "pointer", ["pointer"]);
                             var cardMap = getCardMapFn(NULL);
-                            if (cardMap && !cardMap.isNull() && objId !== 0) {
+                            if (cardMap && !cardMap.isNull() && sellKey !== "0") {
                                 var dictRemoveFn = findMethod("mscorlib", "System.Collections.Generic", "Dictionary`2", "Remove", 1);
                                 if (dictRemoveFn) {
                                     var remArgs = Memory.alloc(Process.pointerSize * 2);
@@ -17649,9 +18255,11 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             }
                         } catch (eMap) {}
 
-                        log("[💰 OFFLINE SELL] Sold Card ID=" + cId + " (ObjID=" + objId + ", Grade=" + gr + ") for +" + sellPrice + " RP! New RP=" + newRpTotal + ", Remaining Cards=" + loonaCardItems.length);
+                        try { ensureCardBookControlData(true); } catch (eCbSell) {}
 
-                        // Select next card in same member/theme or fallback to equipped card / Default view
+                        log("[💰 OFFLINE SELL] Sold Card ID=" + cId + " (ObjID=" + sellKey + ", Grade=" + gr + ") for +" + sellPrice + " RP! New RP=" + newRpTotal + ", Remaining Cards=" + loonaCardItems.length);
+
+                        // Select next card of SAME member, else equippedCardItem of same artist, else back to Default view
                         var meta = getCardMetadata(cId);
                         var nextCard = NULL;
                         for (var k = 0; k < loonaCardItems.length; k++) {
@@ -17666,8 +18274,11 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 if (!rC.add(0x28).readU8()) break; // Prefer unequipped card of same member if available
                             }
                         }
-                        if (nextCard.isNull() && loonaCardItems.length > 0) {
-                            nextCard = loonaCardItems[0];
+                        if (nextCard.isNull()) {
+                            try {
+                                var eqCand = sceneThis.add(0x90).readPointer();
+                                if (!eqCand.isNull() && !eqCand.equals(tCard)) nextCard = eqCand;
+                            } catch (eEqFb) {}
                         }
 
                         if (!nextCard.isNull()) {
@@ -17765,14 +18376,220 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         } catch (eMapB) {}
 
                         log("[💰 OFFLINE SELL BUNDLE] Sold " + soldCount + " cards for +" + totalEarnedRp + " RP! New RP=" + newRpTotal + ", Remaining=" + loonaCardItems.length);
-                        restoreDefaultDisplayCardList(sceneThis, true, true);
+                        restoreDefaultDisplayCardList(sceneThis, true, false);
                     } catch (eSb) {
                         log("[-] Error in executeOfflineSellBundle: " + eSb.message);
                     }
                 }
 
-                // Install Phase 4 Native Hooks (Lock, Leader, Sell, SellBundle)
+                // Offline Theme Exchange helper & confirmation
+                function executeOfflineThemeExchange(sceneThis) {
+                    try {
+                        if (!sceneThis || sceneThis.isNull()) sceneThis = activeInventorySceneInstance;
+                        if (!sceneThis || sceneThis.isNull()) return;
+                        var tCard = sceneThis.add(0x88).readPointer();
+                        if (tCard.isNull()) tCard = sceneThis.add(0x98).readPointer();
+                        if (tCard.isNull()) return;
+                        var raw = tCard.add(0x10).readPointer();
+                        if (raw.isNull()) return;
+
+                        var objId = raw.add(0x10).readS64();
+                        var oKey = objIdKey(objId);
+                        var curCid = raw.add(0x20).readS32();
+                        var gr = raw.add(0x24).readS32();
+                        var isEq = (raw.add(0x28).readU8() === 1);
+                        var meta = getCardMetadata(curCid);
+                        if (!meta) return;
+                        var gId = meta.groupID || meta.group || currentSelectedGroupCode || 1001;
+                        var aId = meta.artistID || 1001;
+                        var curThemeId = meta.theme || 1001;
+
+                        var metaAll = getGlobalMetadata();
+                        var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gId] : null;
+                        var themeCodes = (gMeta && gMeta.themeCodes) ? gMeta.themeCodes : [];
+                        ensureThemeArtistCardMap();
+
+                        var candidates = [];
+                        for (var ti = 0; ti < themeCodes.length; ti++) {
+                            var tc = themeCodes[ti];
+                            if (tc === curThemeId) continue;
+                            var tm = (metaAll && metaAll.themes) ? metaAll.themes[tc] : null;
+                            if (tm && tm.limitedType !== 0) continue; // Normal themes only
+                            var candCid = themeArtistCardMap[tc + "_" + aId] || 0;
+                            if (candCid > 0) candidates.push({ themeId: tc, cardId: candCid });
+                        }
+                        if (candidates.length === 0) {
+                            showOfflineToast("No other normal theme available for exchange.", 2.2);
+                            return;
+                        }
+
+                        var profile = loadPlayerProfile();
+                        if (!profile) return;
+                        var curTcCount = (profile.themeChanger !== undefined) ? parseInt(profile.themeChanger, 10) : 10;
+                        if (isNaN(curTcCount) || curTcCount <= 0) {
+                            showOfflineToast("No Theme Exchangers remaining.", 2.2);
+                            return;
+                        }
+
+                        var pick = candidates[Math.floor(Math.random() * candidates.length)];
+                        var newCid = pick.cardId;
+                        var oldThemeName = themeNamesMap[curThemeId] || ("Theme " + curThemeId);
+                        var newThemeName = themeNamesMap[pick.themeId] || ("Theme " + pick.themeId);
+
+                        profile.themeChanger = curTcCount - 1;
+                        if (isProfileLeaderCard(profile, curCid, objId) && typeof profile.leaderCard === "object" && profile.leaderCard !== null) {
+                            profile.leaderCard.cardID = newCid;
+                        }
+                        if (Array.isArray(profile.inventoryCards)) {
+                            for (var i = 0; i < profile.inventoryCards.length; i++) {
+                                var ce = profile.inventoryCards[i];
+                                if ((oKey !== "0" && objIdKey(ce.objectID) === oKey) || (oKey === "0" && ce.cardID === curCid)) {
+                                    ce.cardID = newCid;
+                                    break;
+                                }
+                            }
+                        }
+                        savePlayerProfile(profile);
+
+                        raw.add(0x20).writeS32(newCid);
+                        tCard.add(0x18).writePointer(getOrCreateCardControlData(newCid) || NULL);
+                        var newMeta = getCardMetadata(newCid);
+                        var newGCode = (newMeta && (newMeta.groupID || newMeta.group)) ? (newMeta.groupID || newMeta.group) : gId;
+                        var newAId = (newMeta && newMeta.artistID) ? newMeta.artistID : aId;
+                        var newMemberIdx = (newAId >= 1000) ? (newAId % 1000) : newAId;
+                        tCard.add(0x30).writeS32(newGCode * 10000 + (pick.themeId % 100) * 100 + newMemberIdx);
+
+                        syncAccountOwnedCards();
+                        setupUserControl(profile);
+                        refreshTopViewAll();
+                        ensureCardBookControlData(true);
+
+                        if (isEq) {
+                            syncGroupEquippedFastArray(gId);
+                            refreshInventoryHeaderView();
+                        }
+
+                        var curStateEx = sceneThis.add(0x64).readS32();
+                        if (curStateEx === 7) {
+                            var svEx = sceneThis.add(0x48).readPointer();
+                            if (!svEx.isNull()) {
+                                var eqViewEx = svEx.add(0x60).readPointer();
+                                if (!eqViewEx.isNull()) {
+                                    var eqParamsEx = new NativeFunction(baseAddr.add(0x10577DC), "pointer", ["pointer", "pointer", "pointer", "pointer", "pointer"])(sceneThis, tCard, NULL, sceneThis.add(0x90).readPointer(), NULL);
+                                    if (!eqParamsEx.isNull()) {
+                                        new NativeFunction(baseAddr.add(0xF219B4), "void", ["pointer", "pointer", "pointer"])(eqViewEx, eqParamsEx, NULL);
+                                    }
+                                }
+                            }
+                            safeUpdateLowerCarousel(sceneThis, tCard);
+                        } else {
+                            safeSetStateMain(sceneThis, 1);
+                        }
+                        showOfflineToast("Theme exchanged: " + oldThemeName + " -> " + newThemeName + "!", 2.4);
+                        log("[🎨 OFFLINE THEME EXCHANGE] ObjID=" + oKey + ": " + curCid + " (" + oldThemeName + ") -> " + newCid + " (" + newThemeName + "), remaining TC=" + profile.themeChanger);
+                    } catch (eEx) {
+                        log("[-] Error in executeOfflineThemeExchange: " + eEx.message);
+                    }
+                }
+
+                function requestOfflineThemeExchange(sceneThis) {
+                    try {
+                        if (!sceneThis || sceneThis.isNull()) sceneThis = activeInventorySceneInstance;
+                        if (!sceneThis || sceneThis.isNull()) return;
+                        try {
+                            new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"])(createIl2CppString("btn_touch"), NULL);
+                        } catch (eSnd) {}
+                        var tCard = sceneThis.add(0x88).readPointer();
+                        if (tCard.isNull()) tCard = sceneThis.add(0x98).readPointer();
+                        if (tCard.isNull()) return;
+                        var raw = tCard.add(0x10).readPointer();
+                        if (raw.isNull()) return;
+
+                        var curCid = raw.add(0x20).readS32();
+                        var meta = getCardMetadata(curCid);
+                        var isMat = (tCard.add(0x2C).readU8() === 1) || (meta && meta.isMaterial) || (curCid >= 30001 && curCid <= 30005);
+                        if (isMat) {
+                            showOfflineToast("Material cards cannot use Theme Exchanger.", 2.0);
+                            return;
+                        }
+                        var profile = loadPlayerProfile();
+                        var curTcCount = (profile && profile.themeChanger !== undefined) ? parseInt(profile.themeChanger, 10) : 10;
+                        if (isNaN(curTcCount) || curTcCount <= 0) {
+                            showOfflineToast("No Theme Exchangers remaining.", 2.0);
+                            return;
+                        }
+                        var gId = (meta && (meta.groupID || meta.group)) ? (meta.groupID || meta.group) : (currentSelectedGroupCode || 1001);
+                        var aId = (meta && meta.artistID) ? meta.artistID : 1001;
+                        var curThemeId = (meta && meta.theme) ? meta.theme : 1001;
+                        var metaAll = getGlobalMetadata();
+                        var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gId] : null;
+                        var themeCodes = (gMeta && gMeta.themeCodes) ? gMeta.themeCodes : [];
+                        ensureThemeArtistCardMap();
+                        var hasOther = false;
+                        for (var ti = 0; ti < themeCodes.length; ti++) {
+                            var tc = themeCodes[ti];
+                            if (tc === curThemeId) continue;
+                            var tm = (metaAll && metaAll.themes) ? metaAll.themes[tc] : null;
+                            if (tm && tm.limitedType !== 0) continue;
+                            if ((themeArtistCardMap[tc + "_" + aId] || 0) > 0) { hasOther = true; break; }
+                        }
+                        if (!hasOther) {
+                            showOfflineToast("This group has only one normal theme.", 2.0);
+                            return;
+                        }
+                        var curThemeName = themeNamesMap[curThemeId] || ("Theme " + curThemeId);
+                        openOfflineConfirmPopup(
+                            "Theme Exchange",
+                            "Use 1 Theme Exchanger (Owned: " + curTcCount + ") to change '" + curThemeName + "' to another random normal theme?",
+                            "Exchange",
+                            "Cancel",
+                            function() { executeOfflineThemeExchange(sceneThis); }
+                        );
+                    } catch (eReqEx) {
+                        log("[-] Error in requestOfflineThemeExchange: " + eReqEx.message);
+                    }
+                }
+
+                // Install Phase 4 Native Hooks (Confirm Popup, Lock, Leader, Confirmed Sell, Native SellBundle, ThemeExchange, Shop/Help Notices, Music Route)
                 try {
+                    // Track OK / Close on generic Popup confirmation modals
+                    Interceptor.attach(baseAddr.add(0x114B6C8), {
+                        onEnter: function (args) {
+                            this._confirmCb = null;
+                            if (pendingPopupConfirmFn && pendingConfirmPopupPtr && !pendingConfirmPopupPtr.isNull() && args[0].equals(pendingConfirmPopupPtr)) {
+                                this._confirmCb = pendingPopupConfirmFn;
+                                pendingPopupConfirmFn = null;
+                                pendingConfirmPopupPtr = NULL;
+                            }
+                        },
+                        onLeave: function () {
+                            if (this._confirmCb) {
+                                try { this._confirmCb(); } catch (eCbOk) { log("[-] Error in popup confirm callback: " + eCbOk.message); }
+                            }
+                        }
+                    });
+                    Interceptor.attach(baseAddr.add(0x114247C), {
+                        onEnter: function (args) {
+                            this._closeConfirmCb = null;
+                            if (pendingConfirmPopupPtr && !pendingConfirmPopupPtr.isNull() && args[0].equals(pendingConfirmPopupPtr)) {
+                                try {
+                                    var resPtr = args[0].add(0x40).readPointer();
+                                    var isOk = (!resPtr.isNull() && resPtr.add(0x10).readU8() === 1);
+                                    if (isOk && pendingPopupConfirmFn) {
+                                        this._closeConfirmCb = pendingPopupConfirmFn;
+                                    }
+                                } catch (eResChk) {}
+                                pendingPopupConfirmFn = null;
+                                pendingConfirmPopupPtr = NULL;
+                            }
+                        },
+                        onLeave: function () {
+                            if (this._closeConfirmCb) {
+                                try { this._closeConfirmCb(); } catch (eCbCloseOk) { log("[-] Error in popup close confirm callback: " + eCbCloseOk.message); }
+                            }
+                        }
+                    });
+
                     // InventoryScene.OnLock (0x10598CC) & InventoryScene.OnEquipCardLock (0x1059A80) & InvenCardSelectView.OnValueChangedLock (0xF22FB8)
                     Interceptor.replace(baseAddr.add(0x10598CC), new NativeCallback(function(sceneThis, isLock, methodInfo) {
                         log("[🔒 NATIVE OnLock] Intercepted on scene=" + sceneThis);
@@ -17801,27 +18618,237 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         executeOfflineLeader(activeInventorySceneInstance);
                     }, "void", ["pointer", "bool", "pointer"]));
 
-                    // InventoryScene.OnSellCard (0x10590D8) & InvenCardSelectView.OnSell (0xF22F58)
+                    // Confirmed Individual Card Sell: InventoryScene.OnSellCard (0x10590D8) & InvenCardSelectView.OnSell (0xF22F58)
+                    var requestOfflineSellConfirm = function(sceneThis) {
+                        var sc = (sceneThis && !sceneThis.isNull()) ? sceneThis : activeInventorySceneInstance;
+                        if (!sc || sc.isNull()) return;
+                        var tCard = sc.add(0x88).readPointer();
+                        if (tCard.isNull()) tCard = sc.add(0x98).readPointer();
+                        if (tCard.isNull()) return;
+                        var raw = tCard.add(0x10).readPointer();
+                        if (raw.isNull()) return;
+                        var isEq = (raw.add(0x28).readU8() === 1);
+                        var isLk = (raw.add(0x29).readU8() === 1);
+                        if (isEq) { showOfflineToast("Equipped cards cannot be sold.", 2.0); return; }
+                        if (isLk) { showOfflineToast("Locked cards cannot be sold.", 2.0); return; }
+                        var gr = raw.add(0x24).readS32();
+                        var gradeLabels = ["C", "B", "A", "S", "R"];
+                        var price = getCardSellPrice(gr);
+                        openOfflineConfirmPopup(
+                            "Sell Card",
+                            "Sell this Grade " + (gradeLabels[gr] || "?") + " card for +" + price.toLocaleString() + " RP?",
+                            "Sell",
+                            "Cancel",
+                            function() { executeOfflineSell(sc); }
+                        );
+                    };
                     Interceptor.replace(baseAddr.add(0x10590D8), new NativeCallback(function(sceneThis, methodInfo) {
-                        log("[💰 NATIVE OnSellCard] Intercepted on scene=" + sceneThis);
-                        executeOfflineSell(sceneThis);
+                        log("[💰 NATIVE OnSellCard] Opening sell confirmation on scene=" + sceneThis);
+                        requestOfflineSellConfirm(sceneThis);
                     }, "void", ["pointer", "pointer"]));
                     Interceptor.replace(baseAddr.add(0xF22F58), new NativeCallback(function(viewThis, methodInfo) {
-                        log("[💰 UI OnSell] Intercepted on view=" + viewThis);
-                        executeOfflineSell(activeInventorySceneInstance);
+                        log("[💰 UI OnSell] Opening sell confirmation on view=" + viewThis);
+                        requestOfflineSellConfirm(activeInventorySceneInstance);
                     }, "void", ["pointer", "pointer"]));
 
-                    // InventoryScene.OnSellCardBundle (0x10593D4) & InventoryView.OnSellBundle (0x10609D0)
-                    Interceptor.replace(baseAddr.add(0x10593D4), new NativeCallback(function(sceneThis, methodInfo) {
-                        log("[💰 NATIVE OnSellCardBundle] Intercepted on scene=" + sceneThis);
-                        executeOfflineSellBundle(sceneThis, 1);
-                    }, "void", ["pointer", "pointer"]));
-                    Interceptor.replace(baseAddr.add(0x10609D0), new NativeCallback(function(viewThis, methodInfo) {
-                        log("[💰 UI OnSellBundle] Intercepted on view=" + viewThis);
-                        executeOfflineSellBundle(activeInventorySceneInstance, 1);
-                    }, "void", ["pointer", "pointer"]));
+                    // Restore native CardSellBundlePopup: replace OnSellCardBundle (0x10593D4) to avoid early exit when LocalePopupControl.Find(57) is null,
+                    // build authentic CardSellBundlePopup.Params + Action<Popup, Popup.Result> pointing to <OnSellCardBundle>b__75_0, and handle InventoryControl.SellBundle (0xF2D7F0)
+                    var readGotSlot = function(slotRva) {
+                        var cell = baseAddr.add(slotRva).readPointer();
+                        if (cell.isNull()) return NULL;
+                        if (!initMetaFnNative) initMetaFnNative = new NativeFunction(baseAddr.add(0xA43BE8), "void", ["pointer"]);
+                        initMetaFnNative(cell);
+                        return cell.readPointer();
+                    };
+                    var makeStringArray = function(strs) {
+                        var strArrKlass = readGotSlot(0x310D950);
+                        if (!strArrKlass || strArrKlass.isNull()) return NULL;
+                        var il2cppArrayNewFn = new NativeFunction(baseAddr.add(0xA43C00), "pointer", ["pointer", "int"]);
+                        var arr = il2cppArrayNewFn(strArrKlass, strs.length);
+                        if (!arr.isNull()) {
+                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(arr, 2);
+                            for (var si = 0; si < strs.length; si++) {
+                                arr.add(0x20 + si * 8).writePointer(createIl2CppString(strs[si]));
+                            }
+                        }
+                        return arr;
+                    };
+                    Interceptor.replace(baseAddr.add(0x10593D4), keepCb(new NativeCallback(function(sceneThis, methodInfo) {
+                        log("[💰 NATIVE OnSellCardBundle ENTER] scene=" + sceneThis);
+                        try {
+                            try { new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"])(createIl2CppString("btn_touch"), NULL); } catch (eSndSb) {}
+                            var sbParamsKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.view.popup", "CardSellBundlePopup/Params");
+                            if (!sbParamsKlass || sbParamsKlass.isNull()) {
+                                log("[-] CardSellBundlePopup/Params class not found!");
+                                return;
+                            }
+                            var p = il2cpp_object_new(sbParamsKlass);
+                            if (p.isNull()) return;
+                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(p, 2);
+                            try { new NativeFunction(baseAddr.add(0xE49E58), "void", ["pointer", "pointer"])(p, NULL); } catch (eSbCtor) {}
 
-                    log("[+] Phase 4 hooks installed (Lock/Unlock, Leader Card, Sell Card, Sell Bundle)!");
+                            p.add(0x18).writePointer(createIl2CppString("Sell All"));
+                            p.add(0x20).writePointer(createIl2CppString("Select cards to sell for RP."));
+                            p.add(0x48).writePointer(createIl2CppString("Sell"));
+                            p.add(0x50).writePointer(createIl2CppString("Cancel"));
+                            p.add(0x58).writeU8(1); // useBlind
+                            p.add(0x59).writeU8(1); // useBtnX
+                            p.add(0x5A).writeU8(0); // hideScene
+                            p.add(0x64).writeU8(1); // foremost
+
+                            p.add(0x78).writePointer(createIl2CppString("Grade"));
+                            p.add(0x80).writePointer(createIl2CppString("Sell unlocked cards up to selected grade"));
+                            p.add(0x88).writePointer(createIl2CppString("Limited Theme"));
+                            p.add(0x90).writePointer(createIl2CppString("Card Level"));
+                            p.add(0xB0).writePointer(createIl2CppString("Prism Card"));
+
+                            p.add(0x98).writePointer(makeStringArray(["C Grade", "Up to B Grade", "Up to A Grade"]));
+                            p.add(0xA0).writePointer(makeStringArray(["Exclude Limited", "Include Limited"]));
+                            p.add(0xA8).writePointer(makeStringArray(["Lv.1 Only", "All Levels"]));
+                            p.add(0xB8).writePointer(makeStringArray(["Exclude Prism", "Include Prism"]));
+
+                            var cbPtr = NULL;
+                            var actKlass = readGotSlot(0x30E15D0);
+                            var mPtr = readGotSlot(0x3102548);
+                            if (actKlass && !actKlass.isNull() && mPtr && !mPtr.isNull() && sceneThis && !sceneThis.isNull()) {
+                                cbPtr = il2cpp_object_new(actKlass);
+                                if (!cbPtr.isNull()) {
+                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(cbPtr, 2);
+                                    new NativeFunction(baseAddr.add(0xBD527C), "void", ["pointer", "pointer", "pointer", "pointer"])(cbPtr, sceneThis, mPtr, NULL);
+                                }
+                            }
+                            var openPopupFn = new NativeFunction(baseAddr.add(0xAAA0D0), "pointer", ["pointer", "pointer", "pointer", "pointer", "pointer", "int", "int", "pointer"]);
+                            var openedPop = openPopupFn(createIl2CppString("Custom/Popup_Card_Sell_Bundle"), p, cbPtr, NULL, NULL, 1, 0, NULL);
+                            log("[💰 NATIVE OnSellCardBundle] Opened Custom/Popup_Card_Sell_Bundle -> " + openedPop);
+                        } catch (eSbOpen) {
+                            log("[-] Error in OnSellCardBundle: " + eSbOpen.message);
+                        }
+                    }, "void", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xF2D7F0), keepCb(new NativeCallback(function(sellListPtr, sellArrayPtr, totalPrice, callbackPtr, methodInfo) {
+                        try {
+                            var soldObjIds = {};
+                            if (sellArrayPtr && !sellArrayPtr.isNull()) {
+                                var arrLen = sellArrayPtr.add(0x18).readS32();
+                                for (var ai = 0; ai < arrLen; ai++) {
+                                    var oid = sellArrayPtr.add(0x20 + ai * 8).readS64();
+                                    var ok = objIdKey(oid);
+                                    if (ok !== "0") soldObjIds[ok] = oid;
+                                }
+                            }
+                            if (Object.keys(soldObjIds).length === 0 && sellListPtr && !sellListPtr.isNull()) {
+                                var listCnt = sellListPtr.add(0x18).readS32();
+                                var listItems = sellListPtr.add(0x10).readPointer();
+                                if (!listItems.isNull()) {
+                                    for (var li = 0; li < listCnt; li++) {
+                                        var ci = listItems.add(0x20 + li * 8).readPointer();
+                                        if (ci.isNull()) continue;
+                                        var r = ci.add(0x10).readPointer();
+                                        if (r.isNull()) continue;
+                                        var oid2 = r.add(0x10).readS64();
+                                        var ok2 = objIdKey(oid2);
+                                        if (ok2 !== "0") soldObjIds[ok2] = oid2;
+                                    }
+                                }
+                            }
+                            var soldKeys = Object.keys(soldObjIds);
+                            if (soldKeys.length === 0) {
+                                if (callbackPtr && !callbackPtr.isNull()) {
+                                    try { new NativeFunction(baseAddr.add(0x18DDF3C), "void", ["pointer", "int", "pointer"])(callbackPtr, 1000, NULL); } catch (eCbEmpty) {}
+                                }
+                                return;
+                            }
+
+                            var computedRp = 0;
+                            var profile = loadPlayerProfile();
+                            if (profile && Array.isArray(profile.inventoryCards)) {
+                                profile.inventoryCards = profile.inventoryCards.filter(function(entry) {
+                                    var ek = objIdKey(entry.objectID);
+                                    if (soldObjIds[ek] !== undefined) {
+                                        computedRp += getCardSellPrice(entry.grade !== undefined ? entry.grade : 0);
+                                        return false;
+                                    }
+                                    return true;
+                                });
+                            }
+                            var earnedRp = (totalPrice > 0) ? totalPrice : computedRp;
+                            if (profile) {
+                                profile.rhythmPoint = (profile.rhythmPoint || 0) + earnedRp;
+                                savePlayerProfile(profile);
+                                syncAccountOwnedCards();
+                                setupUserControl(profile);
+                                refreshTopViewAll();
+                            }
+                            if (loonaCardItems && loonaCardItems.length > 0) {
+                                loonaCardItems = loonaCardItems.filter(function(ci) {
+                                    if (!ci || ci.isNull()) return false;
+                                    var r = ci.add(0x10).readPointer();
+                                    if (r.isNull()) return false;
+                                    return soldObjIds[objIdKey(r.add(0x10).readS64())] === undefined;
+                                });
+                            }
+                            try {
+                                var getCardMapFnSb = new NativeFunction(baseAddr.add(0xF2751C), "pointer", ["pointer"]);
+                                var cardMapSb = getCardMapFnSb(NULL);
+                                if (cardMapSb && !cardMapSb.isNull()) {
+                                    var dictRemoveFnSb = findMethod("mscorlib", "System.Collections.Generic", "Dictionary`2", "Remove", 1);
+                                    if (dictRemoveFnSb) {
+                                        for (var sk in soldObjIds) {
+                                            var rmArgs = Memory.alloc(Process.pointerSize * 2);
+                                            rmArgs.writeS64(soldObjIds[sk]);
+                                            rmArgs.add(Process.pointerSize).writePointer(NULL);
+                                            il2cpp_runtime_invoke(dictRemoveFnSb, cardMapSb, rmArgs, NULL);
+                                        }
+                                    }
+                                }
+                            } catch (eMapSb) {}
+                            try { ensureCardBookControlData(true); } catch (eCbSb) {}
+
+                            if (activeInventorySceneInstance && !activeInventorySceneInstance.isNull()) {
+                                restoreDefaultDisplayCardList(activeInventorySceneInstance, true, false);
+                            }
+                            if (callbackPtr && !callbackPtr.isNull()) {
+                                try { new NativeFunction(baseAddr.add(0x18DDF3C), "void", ["pointer", "int", "pointer"])(callbackPtr, 1000, NULL); } catch (eCbOkSb) {}
+                            }
+                            showOfflineToast("Sold " + soldKeys.length + " cards for +" + earnedRp.toLocaleString() + " RP!", 2.4);
+                            log("[💰 NATIVE SellBundle] Sold " + soldKeys.length + " cards for +" + earnedRp + " RP!");
+                        } catch (eSbCtrl) {
+                            log("[-] Error in InventoryControl.SellBundle: " + eSbCtrl.message);
+                        }
+                    }, "void", ["pointer", "pointer", "int", "pointer", "pointer"])));
+
+                    // Theme Exchange: InventoryScene.OnExchangeTheme (0x105AD6C)
+                    Interceptor.replace(baseAddr.add(0x105AD6C), keepCb(new NativeCallback(function(sceneThis, methodInfo) {
+                        log("[🎨 NATIVE OnExchangeTheme] Intercepted on scene=" + sceneThis);
+                        requestOfflineThemeExchange(sceneThis);
+                    }, "void", ["pointer", "pointer"])));
+
+                    // Shop & Help clean offline notices (Inventory & CardBook)
+                    Interceptor.replace(baseAddr.add(0x105DD24), keepCb(new NativeCallback(function(sceneThis, methodInfo) {
+                        try { new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"])(createIl2CppString("btn_touch"), NULL); } catch (e) {}
+                        openOfflineNoticePopup("Shop (Offline Mode)", "The Shop is not available in offline standalone mode yet.");
+                    }, "void", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0x11D2D14), keepCb(new NativeCallback(function(sceneThis, methodInfo) {
+                        try { new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"])(createIl2CppString("btn_touch"), NULL); } catch (e) {}
+                        openOfflineNoticePopup("Shop (Offline Mode)", "The Shop is not available in offline standalone mode yet.");
+                    }, "void", ["pointer", "pointer"])));
+                    var helpNoticeCb = keepCb(new NativeCallback(function(thisPtr, methodInfo) {
+                        try { new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"])(createIl2CppString("btn_touch"), NULL); } catch (e) {}
+                        openOfflineNoticePopup("Help (Offline Mode)", "Online help guides are disabled in offline standalone mode.");
+                    }, "void", ["pointer", "pointer"]));
+                    Interceptor.replace(baseAddr.add(0x105CA50), helpNoticeCb); // InventoryScene.OnHelp
+                    Interceptor.replace(baseAddr.add(0x105CB28), helpNoticeCb); // InventoryScene.OnInventoryHelp
+                    Interceptor.replace(baseAddr.add(0x1060B98), helpNoticeCb); // InventoryView.OnInventoryHelp
+                    Interceptor.replace(baseAddr.add(0x11D23A0), helpNoticeCb); // CardBookScene.OnHelp
+                    Interceptor.replace(baseAddr.add(0x11CC010), helpNoticeCb); // CardBookDetailPopup.OnHelp
+
+                    // InventoryScene.OnSelectMusic (0x105CD68) -> verify clean Music transition
+                    Interceptor.attach(baseAddr.add(0x105CD68), {
+                        onEnter: function () {
+                            log("[🎵 INVENTORY MUSIC] OnSelectMusic triggered for group=" + currentSelectedGroupCode);
+                        }
+                    });
+
+                    log("[+] Phase 4 & Phase 3 hooks installed cleanly!");
                 } catch (ePh4Hooks) {
                     log("[-] Error installing Phase 4 hooks: " + ePh4Hooks.message);
                 }
@@ -18257,17 +19284,16 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             log("[-] Error updating player_profile.json: " + eProf.message);
                         }
 
-                        // 3b. Sync equipped group FastArray, Inventory header & CardBook if equipped or upgraded
+                        // 3b. Sync owned maps, equipped group FastArray, Inventory header & CardBook
                         try {
+                            syncAccountOwnedCards();
                             if (targetIsEquip && targetCardIdForSync > 0) {
                                 var syncMeta = getCardMetadata(targetCardIdForSync);
                                 var syncGroup = (syncMeta && (syncMeta.groupID || syncMeta.group)) ? (syncMeta.groupID || syncMeta.group) : (currentSelectedGroupCode || 1001);
                                 syncGroupEquippedFastArray(syncGroup);
                                 refreshInventoryHeaderView();
                             }
-                            if (session.targetInitial && session.finalTargetStats && session.finalTargetStats.grade > session.targetInitial.grade) {
-                                try { ensureCardBookControlData(); } catch (eCbkUp) {}
-                            }
+                            try { ensureCardBookControlData(true); } catch (eCbkUp) {}
                         } catch (eSync) {}
 
                         // 4. Remove consumed cards from native CardMap Dictionary
@@ -18937,8 +19963,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 log("[👁️ ON_SHOW_POPUP] show=true -> HideScene()");
                                 hideSceneGlobalFn();
                             } else {
-                                if (isCardBookDetailOpen && activeClosingPopupClass !== "CardBookDetailPopup") {
-                                    log("[🛡️ ON_SHOW_POPUP SHIELD] Suppressed ShowScene() for child popup (" + activeClosingPopupClass + ") while CardBookDetailPopup is active!");
+                                if (isCardBookDetailOpen && (activeClosingPopupClass === "CardInfoPopup" || activeClosingPopupClass === "CardPortraitPopup")) {
+                                    log("[🛡️ ON_SHOW_POPUP SHIELD] Suppressed ShowScene() for non-hiding child popup (" + activeClosingPopupClass + ") while CardBookDetailPopup is active!");
                                     return;
                                 }
                                 log("[👁️ ON_SHOW_POPUP] show=false -> ShowScene()");
@@ -19170,29 +20196,31 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                 // --- Helper to initialize CardBookControl.SharedInfo and MyInfo ---
                 var isCardBookDataEnsured = false;
-                function ensureCardBookControlData() {
-                    if (isCardBookDataEnsured) return;
+                var didOpenCbStatics = false;
+                function ensureCardBookControlData(forceRebuild) {
+                    if (isCardBookDataEnsured && !forceRebuild) return;
                     try {
                         isCardBookDataEnsured = true;
                         ensureLoonaMocks();
-                        populateOfflineInventoryCards();
-
-                        // Initialize CollectionPointDataControl (BasicGradePoint dictionary)
-                        try {
-                            var cpOpenFn = new NativeFunction(baseAddr.add(0xDA5F44), "void", []);
-                            cpOpenFn();
-                            log("[📖 CARDBOOK] CollectionPointDataControl.Open() initialized!");
-                        } catch (eCpo) {
-                            log("[-] Error initializing CollectionPointDataControl: " + eCpo.message);
+                        if (typeof loonaCardItems !== "undefined" && loonaCardItems && loonaCardItems.length > 0) {
+                            syncAccountOwnedCards();
+                        } else {
+                            populateOfflineInventoryCards();
                         }
 
-                        // Initialize LocalePopupControl (Popup locale titles)
-                        try {
-                            var lpcOpenFn = new NativeFunction(baseAddr.add(0xCF2C44), "void", []);
-                            lpcOpenFn();
-                            log("[🌐 LOCALE] LocalePopupControl.Open() initialized!");
-                        } catch (eLpo) {
-                            log("[-] Error initializing LocalePopupControl: " + eLpo.message);
+                        if (!didOpenCbStatics) {
+                            didOpenCbStatics = true;
+                            // Initialize CollectionPointDataControl (BasicGradePoint dictionary)
+                            try {
+                                var cpOpenFn = new NativeFunction(baseAddr.add(0xDA5F44), "void", []);
+                                cpOpenFn();
+                                log("[📖 CARDBOOK] CollectionPointDataControl.Open() initialized!");
+                            } catch (eCpo) {
+                                log("[-] Error initializing CollectionPointDataControl: " + eCpo.message);
+                            }
+
+                            // Initialize LocalePopupControl (Popup locale titles)
+                            ensureLocalePopupControlOpen();
                         }
 
                         var infoKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "CardBookControl/Info");
@@ -19211,21 +20239,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         var info = il2cpp_object_new(infoKlass);
                         if (il2cpp_gchandle_new) il2cpp_gchandle_new(info, 2);
 
-                        // 2. Instantiate CardBookControl.CardbookGradeInfo (Grade R50)
-                        var gradeInfo = NULL;
-                        if (cbGradeInfoKlass && !cbGradeInfoKlass.isNull()) {
-                            gradeInfo = il2cpp_object_new(cbGradeInfoKlass);
-                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(gradeInfo, 2);
-                            gradeInfo.add(0x10).writeS32(4);     // grade = CardGrade.R (4)
-                            gradeInfo.add(0x14).writeS32(50);    // currentLevel = 50
-                            gradeInfo.add(0x18).writeS32(50);    // maxLevel = 50
-                            gradeInfo.add(0x1C).writeS32(2400);  // currentPoint = 2400
-                            gradeInfo.add(0x20).writeS32(2400);  // nextPoint = 2400
-                            gradeInfo.add(0x24).writeS32(24);    // cardCount = 24
-                            gradeInfo.add(0x28).writeU8(1);      // isMaxLevel = true
-                        }
-
-                        // 3. Build CardBookControl.GroupItem for all 21 groups with all 99 themes
+                        // 2. Build CardBookControl.GroupItem for all playable groups
                         var metaAll = getGlobalMetadata();
                         var playables = (metaAll && metaAll.playableGroups) ? metaAll.playableGroups : PLAYABLE_GROUP_CODES;
                         var themeCtorFn = new NativeFunction(baseAddr.add(0xB9766C), "void", ["pointer", "pointer", "int", "pointer"]);
@@ -19235,7 +20249,9 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         allCbGroupItemMap = {};
                         allCbGroupItemList = [];
                         allCbGroupItemToCodeMap = {};
-                        var totalCollectPoints = 0;
+                        var bestCbGroupItem = NULL;
+                        var bestCbScore = -1;
+                        var capThemePts = [3, 5, 7, 10, 15]; // cap.json: C=3, B=5, A=7, S=10, R=15
 
                         // Reset offline inventory collection metrics
                         offlineTotalCardsPossible = 0;
@@ -19245,6 +20261,30 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         offlineTotalThemePointsPossible = 0;
                         offlineTotalThemePointsEarned = 0;
 
+                        // Shared builder for Normal and Prism CardBook slot items
+                        function createCardBookSlotItem(gCodeArg, tCodeArg, slotCardId, artistCode, isOwnedSlot, emptyIsPrism) {
+                            var slotItem = il2cpp_object_new(cbCardItemKlass);
+                            if (il2cpp_gchandle_new && !slotItem.isNull()) il2cpp_gchandle_new(slotItem, 2);
+                            if (isOwnedSlot) {
+                                var ownedEntry = accountOwnedCards[slotCardId];
+                                var cardGrade = (ownedEntry && ownedEntry.grade !== undefined) ? ownedEntry.grade : 4;
+                                var ccd = getOrCreateCardControlData(slotCardId);
+                                cbCardItemCtor(slotItem, ccd, NULL);
+
+                                var cbData = il2cpp_object_new(cbCardDataKlass);
+                                if (il2cpp_gchandle_new && !cbData.isNull()) il2cpp_gchandle_new(cbData, 2);
+                                cbData.add(0x10).writeS32(slotCardId);
+                                cbData.add(0x14).writeS32(cardGrade);
+                                cbData.add(0x18).writeS32(1);
+                                slotItem.add(0x10).writePointer(cbData);
+                                return { item: slotItem, grade: cardGrade };
+                            }
+                            var emptyCcd = getOrCreateEmptyCardControlData(gCodeArg, artistCode, tCodeArg, slotCardId, emptyIsPrism);
+                            cbCardItemCtor(slotItem, emptyCcd, NULL);
+                            slotItem.add(0x10).writePointer(NULL); // model = NULL -> IsVaild = false, Grade = None (5)
+                            return { item: slotItem, grade: 99 };
+                        }
+
                         for (var pgi = 0; pgi < playables.length; pgi++) {
                             var gCode = playables[pgi];
                             var gMeta = (metaAll && metaAll.groups) ? metaAll.groups[gCode] : null;
@@ -19253,8 +20293,6 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             var pArtistCodes = (gMeta && gMeta.artistCodes) ? gMeta.artistCodes : [];
 
                             var themeItems = [];
-                            var groupObtainedCards = 0;
-                            var groupPoints = 0;
 
                             for (var t = 0; t < themeCodes.length; t++) {
                                 var tCode = themeCodes[t];
@@ -19268,30 +20306,6 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                                 var themeOwnedSlots = 0;
                                 var minGradeInTheme = 99;
-
-                                // Shared builder for Normal and Prism CardBook slot items
-                                function createCardBookSlotItem(slotCardId, artistCode, isOwnedSlot, emptyIsPrism) {
-                                    var slotItem = il2cpp_object_new(cbCardItemKlass);
-                                    if (il2cpp_gchandle_new && !slotItem.isNull()) il2cpp_gchandle_new(slotItem, 2);
-                                    if (isOwnedSlot) {
-                                        var ownedEntry = accountOwnedCards[slotCardId];
-                                        var cardGrade = (ownedEntry && ownedEntry.grade !== undefined) ? ownedEntry.grade : 4;
-                                        var ccd = getOrCreateCardControlData(slotCardId);
-                                        cbCardItemCtor(slotItem, ccd, NULL);
-
-                                        var cbData = il2cpp_object_new(cbCardDataKlass);
-                                        if (il2cpp_gchandle_new && !cbData.isNull()) il2cpp_gchandle_new(cbData, 2);
-                                        cbData.add(0x10).writeS32(slotCardId);
-                                        cbData.add(0x14).writeS32(cardGrade);
-                                        cbData.add(0x18).writeS32(1);
-                                        slotItem.add(0x10).writePointer(cbData);
-                                        return { item: slotItem, grade: cardGrade };
-                                    }
-                                    var emptyCcd = getOrCreateEmptyCardControlData(gCode, artistCode, tCode, slotCardId, emptyIsPrism);
-                                    cbCardItemCtor(slotItem, emptyCcd, NULL);
-                                    slotItem.add(0x10).writePointer(NULL); // model = NULL -> IsVaild = false, Grade = None (5)
-                                    return { item: slotItem, grade: 99 };
-                                }
 
                                 // Populate CardList FastArray with genuine CardItem for each slot
                                 var cardListFa = tItem.add(0x18).readPointer();
@@ -19307,10 +20321,10 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                                 offlineTotalCardsPossible++;
                                             }
 
-                                            var slotRes = createCardBookSlotItem(cardId, aCode, isOwned, false);
+                                            var slotRes = createCardBookSlotItem(gCode, tCode, cardId, aCode, isOwned, false);
                                             if (isOwned) {
                                                 themeOwnedSlots++;
-                                                offlineTotalCardsOwned++;
+                                                if (!isLimited) offlineTotalCardsOwned++;
                                                 if (slotRes.grade < minGradeInTheme) minGradeInTheme = slotRes.grade;
                                             }
                                             pool.add(0x20 + s * 8).writePointer(slotRes.item);
@@ -19327,7 +20341,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                             var paCode = (ps < pArtistCodes.length) ? pArtistCodes[ps] : (1001 + ps);
                                             var pCardId = themeArtistPrismCardMap[tCode + "_" + paCode] || 0;
                                             var isPrismOwned = (pCardId > 0 && typeof accountOwnedCards !== "undefined" && accountOwnedCards[pCardId]);
-                                            var pSlotRes = createCardBookSlotItem(pCardId, paCode, isPrismOwned, true);
+                                            var pSlotRes = createCardBookSlotItem(gCode, tCode, pCardId, paCode, isPrismOwned, true);
                                             prismPool.add(0x20 + ps * 8).writePointer(pSlotRes.item);
                                         }
                                     }
@@ -19335,30 +20349,23 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                                 var themeGradePoint = 0;
                                 if (isLimited) {
-                                    // USER CONSTRAINT: "evita las cartas limited como las que aparezcan que se van a tener como obtenidas en la cuenta"
                                     themeGradePoint = 0;
                                     themeOwnedSlots = 0;
                                 } else {
                                     offlineTotalThemesPossible++;
-                                    offlineTotalThemePointsPossible += 2400;
+                                    offlineTotalThemePointsPossible += 15;
 
-                                    if (themeOwnedSlots === slotCount && slotCount > 0) {
+                                    if (themeOwnedSlots === slotCount && slotCount > 0 && minGradeInTheme >= 0 && minGradeInTheme <= 4) {
                                         offlineTotalThemesCompleted++;
-                                        if (minGradeInTheme === 0) themeGradePoint = 300;       // C
-                                        else if (minGradeInTheme === 1) themeGradePoint = 600;  // B
-                                        else if (minGradeInTheme === 2) themeGradePoint = 1000; // A
-                                        else if (minGradeInTheme === 3) themeGradePoint = 1600; // S
-                                        else themeGradePoint = 2400;                            // R
+                                        themeGradePoint = capThemePts[minGradeInTheme] || 0;
                                         offlineTotalThemePointsEarned += themeGradePoint;
                                     } else {
                                         themeGradePoint = 0;
                                     }
                                 }
 
-                                tItem.add(0x28).writeS32(themeGradePoint); // themeGradePoint
+                                tItem.add(0x28).writeS32(themeGradePoint); // themeGradePoint (cap.json)
                                 tItem.add(0x2C).writeS32(themeOwnedSlots); // Count = obtained cards in theme
-                                groupObtainedCards += themeOwnedSlots;
-                                groupPoints += themeGradePoint;
                                 themeItems.push(tItem);
                             }
 
@@ -19372,10 +20379,10 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 if (il2cpp_gchandle_new) il2cpp_gchandle_new(cbGroupGradeInfo, 2);
                                 cbGroupGradeInfo.add(0x10).writeS32(gMetrics.grade);
                                 cbGroupGradeInfo.add(0x14).writeS32(gMetrics.level);
-                                cbGroupGradeInfo.add(0x18).writeS32(gMetrics.level);
-                                cbGroupGradeInfo.add(0x1C).writeS32(groupPoints);  // currentPoint
-                                cbGroupGradeInfo.add(0x20).writeS32(groupPoints);  // nextPoint
-                                cbGroupGradeInfo.add(0x24).writeS32(gMetrics.obtainedCards); // cardCount
+                                cbGroupGradeInfo.add(0x18).writeS32(gMetrics.maxLevel);
+                                cbGroupGradeInfo.add(0x1C).writeS32(gMetrics.currentPoint);
+                                cbGroupGradeInfo.add(0x20).writeS32(gMetrics.nextPoint);
+                                cbGroupGradeInfo.add(0x24).writeS32(gMetrics.obtainedCards);
                                 cbGroupGradeInfo.add(0x28).writeU8(gMetrics.isMaxLevel ? 1 : 0);
                             }
 
@@ -19388,9 +20395,9 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             cbGroupItem.add(0x28).writePointer(themeListManaged);
                             cbGroupItem.add(0x30).writePointer(NULL);
                             cbGroupItem.add(0x38).writeS32(gMetrics.grade);
-                            cbGroupItem.add(0x3C).writeS32(gMetrics.grade);
-                            cbGroupItem.add(0x40).writeS32(groupPoints);
-                            cbGroupItem.add(0x44).writeS32(groupPoints);
+                            cbGroupItem.add(0x3C).writeS32(gMetrics.nextGrade);
+                            cbGroupItem.add(0x40).writeS32(gMetrics.currentPoint);
+                            cbGroupItem.add(0x44).writeS32(gMetrics.nextPoint);
                             cbGroupItem.add(0x48).writeFloat(gMetrics.gauge);
                             cbGroupItem.add(0x4C).writeS32(gMetrics.level);
                             cbGroupItem.add(0x50).writeS32(gMetrics.obtainedCards);
@@ -19403,7 +20410,12 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             allCbGroupItemMap[gCode] = cbGroupItem;
                             allCbGroupItemList.push(cbGroupItem);
                             allCbGroupItemToCodeMap[cbGroupItem.toString()] = gCode;
-                            totalCollectPoints += groupPoints;
+
+                            var gBestScore = gMetrics.grade * 1000000 + gMetrics.points;
+                            if (gBestScore > bestCbScore) {
+                                bestCbScore = gBestScore;
+                                bestCbGroupItem = cbGroupItem;
+                            }
 
                             if (gCode === 1001) {
                                 cachedLoonaCbGroupItem = cbGroupItem;
@@ -19413,8 +20425,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         // 5. Wrap GroupList in genuine managed list structure
                         var groupListManaged = createManagedList(allCbGroupItemList, 'cardbook_group');
 
-                        // 6. Populate CardBookControl.Info fields
-                        info.add(0x10).writePointer(cachedLoonaCbGroupItem || allCbGroupItemList[0]);
+                        // 6. Populate CardBookControl.Info fields (BestCardBook matches populateBestCardBookBanner)
+                        info.add(0x10).writePointer((bestCbGroupItem && !bestCbGroupItem.isNull()) ? bestCbGroupItem : (cachedLoonaCbGroupItem || allCbGroupItemList[0]));
                         info.add(0x18).writePointer(groupListManaged);
                         info.add(0x20).writeS32(offlineTotalCardsPossible); // CardCollectTotalPoint
                         info.add(0x24).writeS32(offlineTotalCardsOwned);    // CardCollectCurrentPoint
@@ -19430,7 +20442,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         var setIsOpenedFn = new NativeFunction(baseAddr.add(0x11C537C), "void", ["int", "pointer"]);
                         setIsOpenedFn(1, NULL);
 
-                        log("[📖 CARDBOOK] Fully populated CardBookControl.Info, GroupItem, GradeInfo, ThemeList and registered MyInfo & SharedInfo!");
+                        log("[📖 CARDBOOK] Fully populated CardBookControl.Info: cards=" + offlineTotalCardsOwned + "/" + offlineTotalCardsPossible + ", themePts=" + offlineTotalThemePointsEarned + "/" + offlineTotalThemePointsPossible);
                     } catch (eCbData) {
                         log("[-] Error in ensureCardBookControlData: " + eCbData.message);
                     }
