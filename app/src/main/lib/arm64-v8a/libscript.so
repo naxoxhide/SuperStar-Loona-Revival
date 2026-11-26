@@ -23185,6 +23185,38 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                     // 6. Diagnostic trace for SelectMusicScene & IngameLoadingScene & IngameScene & ResultScene
                     try {
+                        Interceptor.attach(baseAddr.add(0x10489E4), { // SelectMusicSlotView.Awake
+                            onEnter: function (args) {
+                                try {
+                                    var slotView = args[0];
+                                    log("[🎵 SLOT_VIEW] Awake on slotView=" + slotView);
+                                    var scroller = slotView.add(0x38).readPointer();
+                                    var prefab = slotView.add(0x40).readPointer();
+                                    log("[🎵 SLOT_VIEW] scroller=" + scroller + " prefab=" + prefab);
+                                    if (!prefab.isNull()) {
+                                        var mPtr = prefab.add(0x10).readPointer();
+                                        log("[🎵 SLOT_VIEW] prefab.m_CachedPtr=" + mPtr);
+                                    }
+                                    if (!scroller.isNull()) {
+                                        var container = scroller.add(0xC8).readPointer();
+                                        log("[🎵 SLOT_VIEW] container=" + container);
+                                        if (!container.isNull()) {
+                                            var childCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int32", ["pointer", "pointer"]);
+                                            var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int32", "pointer"]);
+                                            var cnt = childCountFn(container, NULL);
+                                            log("[🎵 SLOT_VIEW] container childCount=" + cnt);
+                                            for (var i = 0; i < cnt; i++) {
+                                                var ch = getChildFn(container, i, NULL);
+                                                log("[🎵 SLOT_VIEW] child[" + i + "]=" + ch);
+                                            }
+                                        }
+                                    }
+                                } catch (eSvAw) {
+                                    log("[-] Error in SlotView Awake inspect: " + eSvAw.message);
+                                }
+                            }
+                        });
+
                         Interceptor.attach(baseAddr.add(0xBF2198), {
                             onEnter: function (args) { log("[🎵 SELECT_MUSIC] <SetStateLoadingData>b__0 result=" + args[1].toInt32()); },
                             onLeave: function () { log("[🎵 SELECT_MUSIC] <SetStateLoadingData>b__0 LEAVE!"); }
