@@ -23183,17 +23183,15 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         return defStrPtr;
                     }, "pointer", ["pointer", "int32", "pointer"])));
 
-                    // 6. Diagnostic trace for SelectMusicScene & IngameLoadingScene & IngameScene & ResultScene
+                    // 6. Diagnostic trace & Prefab Shield for SelectMusicScene & IngameLoadingScene & IngameScene & ResultScene
                     try {
-                        var readIl2cppStr = function(strPtr) {
-                            if (!strPtr || strPtr.isNull()) return "(null)";
-                            try {
-                                var len = strPtr.add(0x10).readS32();
-                                return strPtr.add(0x14).readUtf16String(len);
-                            } catch (eStr) { return "(err)"; }
-                        };
+                        var savedValidPrefab = NULL;
+                        var savedValidGo = NULL;
+                        var savedCloneCell = NULL;
+
+                        var dontDestroyOnLoadFn = new NativeFunction(baseAddr.add(0x1DC7FB4), "void", ["pointer", "pointer"]);
+                        var instantiateObjectFn = new NativeFunction(baseAddr.add(0x1DC7A34), "pointer", ["pointer", "pointer"]);
                         var getGoFn = new NativeFunction(baseAddr.add(0x1db6ad4), "pointer", ["pointer", "pointer"]);
-                        var getNameFn = new NativeFunction(baseAddr.add(0x1dc5a54), "pointer", ["pointer", "pointer"]);
 
                         Interceptor.attach(baseAddr.add(0x10489E4), { // SelectMusicSlotView.Awake
                             onEnter: function (args) {
@@ -23205,28 +23203,35 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     log("[🎵 SLOT_VIEW] scroller=" + scroller + " prefab=" + prefab);
                                     if (!prefab.isNull()) {
                                         var mPtr = prefab.add(0x10).readPointer();
-                                        var pKl = prefab.readPointer();
-                                        var pKlName = il2cpp_class_get_name(pKl).readUtf8String();
-                                        var pGo = getGoFn(prefab, NULL);
-                                        var pGoName = (!pGo.isNull()) ? readIl2cppStr(getNameFn(pGo, NULL)) : "(null)";
-                                        var pGoCached = (!pGo.isNull()) ? pGo.add(0x10).readPointer() : NULL;
-                                        log("[🎵 SLOT_VIEW] prefab class=" + pKlName + " m_CachedPtr=" + mPtr + " go=" + pGo + " name=" + pGoName + " goCached=" + pGoCached);
-                                    }
-                                    if (!scroller.isNull()) {
-                                        var container = scroller.add(0xC8).readPointer();
-                                        log("[🎵 SLOT_VIEW] container=" + container);
-                                        if (!container.isNull()) {
-                                            var childCountFn = new NativeFunction(baseAddr.add(0x181ECF0), "int32", ["pointer", "pointer"]);
-                                            var getChildFn = new NativeFunction(baseAddr.add(0x181F128), "pointer", ["pointer", "int32", "pointer"]);
-                                            var cnt = childCountFn(container, NULL);
-                                            log("[🎵 SLOT_VIEW] container childCount=" + cnt);
-                                            for (var i = 0; i < cnt; i++) {
-                                                var ch = getChildFn(container, i, NULL);
-                                                var chGo = getGoFn(ch, NULL);
-                                                var chName = (!chGo.isNull()) ? readIl2cppStr(getNameFn(chGo, NULL)) : "(null)";
-                                                var chCached = (!chGo.isNull()) ? chGo.add(0x10).readPointer() : NULL;
-                                                log("[🎵 SLOT_VIEW] child[" + i + "]=" + ch + " go=" + chGo + " name=" + chName + " goCached=" + chCached);
-                                            }
+                                        log("[🎵 SLOT_VIEW] prefab=" + prefab + " m_CachedPtr=" + mPtr);
+                                        if (!mPtr.isNull()) {
+                                            try {
+                                                dontDestroyOnLoadFn(prefab, NULL);
+                                                log("[🛡️ PREFAB SHIELD] Marked prefab DontDestroyOnLoad!");
+                                            } catch (eDd1) { log("[-] Error marking prefab DontDestroyOnLoad: " + eDd1.message); }
+
+                                            try {
+                                                var go = getGoFn(prefab, NULL);
+                                                if (!go.isNull() && !go.add(0x10).readPointer().isNull()) {
+                                                    dontDestroyOnLoadFn(go, NULL);
+                                                    savedValidGo = go;
+                                                    log("[🛡️ PREFAB SHIELD] Marked go=" + go + " DontDestroyOnLoad!");
+
+                                                    var cloneCell = instantiateObjectFn(prefab, NULL);
+                                                    if (!cloneCell.isNull()) {
+                                                        dontDestroyOnLoadFn(cloneCell, NULL);
+                                                        var cloneGo = getGoFn(cloneCell, NULL);
+                                                        if (!cloneGo.isNull()) {
+                                                            dontDestroyOnLoadFn(cloneGo, NULL);
+                                                        }
+                                                        savedCloneCell = cloneCell;
+                                                        slotView.add(0x40).writePointer(cloneCell);
+                                                        log("[🛡️ PREFAB SHIELD] Successfully created & assigned permanent cloneCell=" + cloneCell + " m_CachedPtr=" + cloneCell.add(0x10).readPointer());
+                                                    }
+                                                }
+                                            } catch (eDd2) { log("[-] Error cloning in Awake: " + eDd2.message); }
+
+                                            savedValidPrefab = prefab;
                                         }
                                     }
                                 } catch (eSvAw) {
@@ -23237,7 +23242,23 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                         Interceptor.attach(baseAddr.add(0x1048BC8), { // SelectMusicSlotView.GetCellView
                             onEnter: function (args) {
-                                log("[🎵 SLOT_VIEW GetCellView] slotView=" + args[0] + " scroller=" + args[1] + " dataIdx=" + args[2].toInt32() + " cellIdx=" + args[3].toInt32());
+                                try {
+                                    var slotView = args[0];
+                                    log("[🎵 SLOT_VIEW GetCellView] slotView=" + slotView + " scroller=" + args[1] + " dataIdx=" + args[2].toInt32() + " cellIdx=" + args[3].toInt32());
+                                    var pref = slotView.add(0x40).readPointer();
+                                    var mCached = (!pref.isNull()) ? pref.add(0x10).readPointer() : NULL;
+                                    if (mCached.isNull()) {
+                                        if (savedCloneCell && !savedCloneCell.isNull() && !savedCloneCell.add(0x10).readPointer().isNull()) {
+                                            slotView.add(0x40).writePointer(savedCloneCell);
+                                            log("[🛡️ SLOT_VIEW RESCUE] Restored slotView.cellViewPrefab with saved cloneCell: " + savedCloneCell);
+                                        } else if (savedValidPrefab && !savedValidPrefab.isNull() && !savedValidPrefab.add(0x10).readPointer().isNull()) {
+                                            slotView.add(0x40).writePointer(savedValidPrefab);
+                                            log("[🛡️ SLOT_VIEW RESCUE] Restored slotView.cellViewPrefab with savedValidPrefab: " + savedValidPrefab);
+                                        }
+                                    }
+                                } catch (eSvGcv) {
+                                    log("[-] Error in SlotView GetCellView onEnter: " + eSvGcv.message);
+                                }
                             },
                             onLeave: function (retval) {
                                 log("[🎵 SLOT_VIEW GetCellView] LEAVE retval=" + retval);
@@ -23251,6 +23272,15 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     var cPref = args[1];
                                     var mCached = (!cPref.isNull()) ? cPref.add(0x10).readPointer() : NULL;
                                     log("[🎵 SCROLLER GetCellView] scroller=" + scr + " cellPrefab=" + cPref + " m_CachedPtr=" + mCached);
+                                    if (mCached.isNull()) {
+                                        if (savedCloneCell && !savedCloneCell.isNull() && !savedCloneCell.add(0x10).readPointer().isNull()) {
+                                            args[1] = savedCloneCell;
+                                            log("[🛡️ PREFAB RESCUE] Replaced dead cellPrefab with saved cloneCell: " + savedCloneCell);
+                                        } else if (savedValidPrefab && !savedValidPrefab.isNull() && !savedValidPrefab.add(0x10).readPointer().isNull()) {
+                                            args[1] = savedValidPrefab;
+                                            log("[🛡️ PREFAB RESCUE] Replaced dead cellPrefab with savedValidPrefab: " + savedValidPrefab);
+                                        }
+                                    }
                                 } catch (eScGcv) {
                                     log("[-] Error in SCROLLER GetCellView onEnter: " + eScGcv.message);
                                 }
