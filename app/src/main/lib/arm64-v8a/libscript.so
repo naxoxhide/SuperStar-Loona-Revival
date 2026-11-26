@@ -23542,29 +23542,79 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 }
                             }
                         });
-                        Interceptor.attach(baseAddr.add(0xED6294), {
-                            onEnter: function (args) {
-                                try {
-                                    var uri = readIl2CppString(args[0].add(0x10).readPointer());
-                                    log("[🎼 BGM LOAD] OnLoading_6_Bgm URI=" + uri);
-                                    var minaMod = Process.findModuleByName("libminiaudio.so");
-                                    if (minaMod) {
-                                        Memory.protect(minaMod.base.add(0xBEA0), 4, 'rwx');
-                                        minaMod.base.add(0xBEA0).writeByteArray([0xe0, 0x01, 0xf8, 0x37]); // tbnz w0, #0x1f, #0xbedc (error check)
-                                        Memory.protect(minaMod.base.add(0xBEA0), 4, 'r-x');
+                    var bgmLoadLock = 0;
+                    var bgmLastUri = "";
+                    var bgmLastBufId = -1;
+                    function applyMiniaudioShields() {
+                        try {
+                            var minaMod = Process.findModuleByName("libminiaudio.so");
+                            if (minaMod && !minaMod.isShielded) {
+                                minaMod.isShielded = true;
+                                Memory.protect(minaMod.base.add(0xBEA0), 4, 'rwx');
+                                minaMod.base.add(0xBEA0).writeByteArray([0xe0, 0x01, 0xf8, 0x37]); // tbnz w0, #0x1f, #0xbedc (error check)
+                                Memory.protect(minaMod.base.add(0xBEA0), 4, 'r-x');
 
-                                        Memory.protect(minaMod.base.add(0xBEAC), 4, 'rwx');
-                                        minaMod.base.add(0xBEAC).writeByteArray([0x41, 0x00, 0x80, 0x52]); // mov w1, #2 (stereo channels)
-                                        Memory.protect(minaMod.base.add(0xBEAC), 4, 'r-x');
+                                Memory.protect(minaMod.base.add(0xBEAC), 4, 'rwx');
+                                minaMod.base.add(0xBEAC).writeByteArray([0x41, 0x00, 0x80, 0x52]); // mov w1, #2 (stereo channels)
+                                Memory.protect(minaMod.base.add(0xBEAC), 4, 'r-x');
 
-                                        Memory.protect(minaMod.base.add(0xC110), 4, 'rwx');
-                                        minaMod.base.add(0xC110).writeByteArray([0x83, 0x88, 0x95, 0x52]); // mov w3, #0xac44 (44100 sample rate)
-                                        Memory.protect(minaMod.base.add(0xC110), 4, 'r-x');
-                                        log("[🛡️ MINIAUDIO] Applied audio decoding & channel/rate shields to libminiaudio.so (0xBEA0, 0xBEAC, 0xC110)!");
+                                Memory.protect(minaMod.base.add(0xC110), 4, 'rwx');
+                                minaMod.base.add(0xC110).writeByteArray([0x83, 0x88, 0x95, 0x52]); // mov w3, #0xac44 (44100 sample rate)
+                                Memory.protect(minaMod.base.add(0xC110), 4, 'r-x');
+
+                                var origMinaLoadFromUri = new NativeFunction(minaMod.base.add(0xC16C), "int", ["pointer", "int"]);
+                                Interceptor.replace(minaMod.base.add(0xC16C), keepCb(new NativeCallback(function (uriPtr, uriLen) {
+                                    var uriStr = "";
+                                    try { uriStr = uriPtr.readUtf8String(uriLen); } catch (e) {}
+                                    log("[🎧 MINIAUDIO_LOAD] mina_buffer_load_from_ov_oneshot_from_uri: " + uriStr);
+
+                                    if (bgmLastBufId >= 0 && bgmLastUri === uriStr) {
+                                        log("[🎧 MINIAUDIO_LOAD] Reusing already loaded audio bufferId=" + bgmLastBufId);
+                                        return bgmLastBufId;
                                     }
-                                } catch (eU1) {}
+
+                                    var spinCount = 0;
+                                    while (bgmLoadLock === 1 && spinCount < 100) {
+                                        Thread.sleep(0.05);
+                                        spinCount++;
+                                        if (bgmLastBufId >= 0 && bgmLastUri === uriStr) {
+                                            log("[🎧 MINIAUDIO_LOAD] Concurrent load resolved; reusing bufferId=" + bgmLastBufId);
+                                            return bgmLastBufId;
+                                        }
+                                    }
+                                    bgmLoadLock = 1;
+                                    try {
+                                        var res = origMinaLoadFromUri(uriPtr, uriLen);
+                                        log("[🎧 MINIAUDIO_LOAD] Loaded audio bufferId=" + res);
+                                        if (res >= 0) {
+                                            bgmLastBufId = res;
+                                            bgmLastUri = uriStr;
+                                        }
+                                        return res;
+                                    } catch (eLoad) {
+                                        log("[-] Error in origMinaLoadFromUri: " + eLoad.message);
+                                        return -1;
+                                    } finally {
+                                        bgmLoadLock = 0;
+                                    }
+                                }, "int", ["pointer", "int"])));
+                                log("[🛡️ MINIAUDIO] Applied audio decoding, channel/rate shields & concurrency lock to libminiaudio.so!");
                             }
-                        });
+                        } catch (eMinaShield) {
+                            log("[-] Error applying miniaudio shields: " + eMinaShield.message);
+                        }
+                    }
+                    applyMiniaudioShields();
+
+                    Interceptor.attach(baseAddr.add(0xED6294), {
+                        onEnter: function (args) {
+                            try {
+                                var uri = readIl2CppString(args[0].add(0x10).readPointer());
+                                log("[🎼 BGM LOAD] OnLoading_6_Bgm URI=" + uri);
+                                applyMiniaudioShields();
+                            } catch (eU1) {}
+                        }
+                    });
                         Interceptor.attach(baseAddr.add(0xFD546C), {
                             onEnter: function (args) {
                                 try { log("[🥁 SEQ LOAD] SeqContext.OpenFromUri URI=" + readIl2CppString(args[1])); } catch (eU2) {}
@@ -23666,6 +23716,22 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             Memory.protect(baseAddr.add(0xCE0780), 8, 'rwx');
                             baseAddr.add(0xCE0780).writeByteArray([0xe0, 0x03, 0x1f, 0xaa, 0xc0, 0x03, 0x5f, 0xd6]);
                             log("[🛡️ WORLD_RECORD] Patched WorldRecordControl (0xCE0210, 0xCE0474, 0xCE06A4, 0xCE0780) for offline ResultScene transition!");
+
+                            // 6. ResultScene & ResultControl Bulletproof Shields:
+                            // A. ResultControl.ClearNoteList at 0xF92F84 -> ret (neutralizes NoteList null crash)
+                            Memory.protect(baseAddr.add(0xF92F84), 4, 'rwx');
+                            baseAddr.add(0xF92F84).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
+                            log("[🛡️ RESULT_SHIELD] Patched ResultControl.ClearNoteList at 0xF92F84 (ret)!");
+
+                            // B. ResultScene.InitNote error branch at 0xF94B08 -> b #0xf94aec (safe epilogue exit instead of NullRef exception)
+                            Memory.protect(baseAddr.add(0xF94B08), 4, 'rwx');
+                            baseAddr.add(0xF94B08).writeByteArray([0xf9, 0xff, 0xff, 0x17]);
+                            log("[🛡️ RESULT_SHIELD] Patched ResultScene.InitNote at 0xF94B08 with 'b #0xf94aec' (safe epilogue)!");
+
+                            // C. ResultScene.SetStateLeave at 0xF990EC -> nop (bypasses online league/weekly rank stall and transitions directly to SetStateNextScene)
+                            Memory.protect(baseAddr.add(0xF990EC), 4, 'rwx');
+                            baseAddr.add(0xF990EC).writeByteArray([0x1f, 0x20, 0x03, 0xd5]);
+                            log("[🛡️ RESULT_SHIELD] Patched ResultScene.SetStateLeave at 0xF990EC (nop) for immediate offline scene transition!");
                         } catch (ePatchLoading2) {
                             log("[-] Failed to patch loading/ingame scene opcodes: " + ePatchLoading2.message);
                         }
@@ -23707,6 +23773,40 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         });
                         Interceptor.attach(baseAddr.add(0x149F9F4), { // IngameView.GameFireRun
                             onEnter: function () { log("[🎮 INGAME_LIFECYCLE] IngameView.GameFireRun entered!"); }
+                        });
+
+                        // ResultScene & End of Song Lifecycle
+                        Interceptor.attach(baseAddr.add(0x149C128), { // IngameScene.SetStateStageClear
+                            onEnter: function () {
+                                log("[🏁 INGAME_FINISH] IngameScene.SetStateStageClear entered! Pre-initializing ResultControl.Open()...");
+                                try {
+                                    new NativeFunction(baseAddr.add(0xF93268), "void", [])();
+                                    log("[🏁 INGAME_FINISH] ResultControl.Open() pre-initialized cleanly!");
+                                } catch (ePreRc) {
+                                    log("[-] Error pre-initializing ResultControl.Open: " + ePreRc.message);
+                                }
+                            }
+                        });
+                        Interceptor.attach(baseAddr.add(0xF938BC), { // ResultScene.OnOpen
+                            onEnter: function () {
+                                log("[🏆 RESULT_SCENE] ResultScene.OnOpen entered! Ensuring ResultControl.Open()...");
+                                try {
+                                    new NativeFunction(baseAddr.add(0xF93268), "void", [])();
+                                    log("[🏆 RESULT_SCENE] ResultControl.Open() executed cleanly!");
+                                } catch (eRc) {
+                                    log("[-] Error in ResultControl.Open: " + eRc.message);
+                                }
+                            }
+                        });
+                        Interceptor.attach(baseAddr.add(0xF95F30), { // ResultScene.SetStateCompleteStage
+                            onEnter: function () {
+                                log("[🏆 RESULT_SCENE] ResultScene.SetStateCompleteStage entered -> advancing to stage rewards!");
+                            }
+                        });
+                        Interceptor.attach(baseAddr.add(0xF960CC), { // ResultScene.ResultPlayComplete
+                            onEnter: function (args) {
+                                log("[🏆 RESULT_SCENE] ResultScene.ResultPlayComplete entered! Result=" + args[1].toInt32());
+                            }
                         });
 
                         // Patch 0x14A8968 in IngameView.Update:

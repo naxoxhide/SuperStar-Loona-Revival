@@ -5385,10 +5385,26 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
   - **Transición IngameScene y Activación de Notas (`IngameView.GameFireRun`):**
     - Se validó la entrada exitosa a `IngameScene` (Scene 10) con la pista de ritmo, barra de vida verde, cartas LOONA y marcadores en pantalla.
     - Se neutralizó la espera indefinida en `state = 4 (DelayTime)` parcheando `0x14A8968` en `IngameView.Update` (`b.le #0x14a8974` -> `nop` `0xd503201f`), garantizando la llamada inmediata a `IngameView.GameFireRun` (`0x149F9F4`) y `IngameView.Play(sec)` para disparar la caída de notas rítmicas en `state = 5 (Run)`.
+* **Hitos de Gameplay en Vivo, Pantalla de Resultados y Persistencia Offline:**
+  - **Ejecución de Canción en Tiempo Real (`IngameScene` / Scene 10 en `state = 5 (Run)`):**
+    - Notas circulares individuales y notas de retención (sliders) cayendo fluidamente por los 4 carriles sincronizadas con el beatmap `.seq` y el audio Vorbis.
+    - Detección de toques táctiles vía ADB registrando combos y puntuación acumulativa (superando los 3.120 puntos).
+    - Conclusión limpia al procesar la última nota de la secuencia y disparo de `IngameScene.SetStateStageClear` (`0x149C128`).
+  - **Pantalla de Resultados (`ResultScene` / Scene 11) Blindada al 100%:**
+    - Causa raíz de crash por `NullReferenceException` en `ResultScene.InitNote` (`0xF946A4`) neutralizada:
+      1. Parcheo en `ResultControl.ClearNoteList` (`0xF92F84`) con `ret` (`0xc0, 0x03, 0x5f, 0xd6`).
+      2. Redirección de rama de excepción en `ResultScene.InitNote` (`0xF94B08`) hacia epílogo seguro `0xF94AEC` (`b #0xf94aec`).
+      3. Pre-inicialización nativa de `ResultControl.Open()` (`0xF93268`) en `IngameScene.SetStateStageClear` y `ResultScene.OnOpen`.
+    - Renderizado completo verificado en `qa_result_scene_verified.png`: carátula de LOONA, cartas equipadas, indicadores de rango, puntuación y barra de navegación inferior.
+  - **Persistencia Auténtica de RP y Récords Offline:**
+    - `StageComplete` ejecutado offline con cálculo de Rhythm Points (RP) auténtico: ganancia de +380 RP, actualizando el perfil local `player_profile.json` a `500380 RP`.
+    - Actualización de contadores de reproducción (`mostPlayMusic: { code: 1010, count: 1 }`, `monthlyPlay: 1`) y récords de dificultad (`musicRecords["1010"].easyScoreGrade: 2`).
+  - **Navegación Limpia de Retorno (`SetStateLeave` -> `SetStateNextScene`):**
+    - Neutralizado el bloqueo por validación de ranking de ligas online en `ResultScene.SetStateLeave` (`0xF990EC`): parcheado con `nop` (`0x1f, 0x20, 0x03, 0xd5`).
+    - Las acciones de retorno (`OnSelectMusic` / `OnLobby`) bifurcan directamente a `SetStateNextScene` (`0xF991C0`), ejecutando `FadeOut` y `Scene.SetStateOpenScene` hacia `SelectMusicScene` (Scene 7) o `LobbyScene` (Scene 3) sin fallos ni bloqueos.
+    - Retorno fluido a selección de canciones verificado visualmente en `qa_select_music_returned.png`.
 * **Siguiente Paso Inmediato:**
-  - Compilar APK e instalar en emulador (`127.0.0.1:5555`).
-  - Iniciar partida desde `SelectMusicScene` -> Validar en vivo la pista con notas cayendo en tiempo real (`state = 5`).
-  - Registrar entrada de notas (combo/score) y transición a `ResultScene` (Scene 11).
+  - Inspeccionar y habilitar el botón / funcionalidad de "Favorita" en `InventoryScene` según la solicitud visual del usuario (Favorite Card en Profile).
 
 
 
