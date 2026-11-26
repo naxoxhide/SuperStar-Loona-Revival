@@ -5330,6 +5330,46 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
   - `CardBookScene`: recompensas `RECEIVE` (`+10 Diamonds`, `+2000 RP`), límite máx. 5 favoritos y toggle, `All Cards` (`Popup_CardBook_All`), `Choose Group` (`Custom/Popup_ChangeGroup`) -> `[x x]`, apertura/cierre de `CardInfoPopup` sin superposición fantasma (`[🛡️ ON_SHOW_POPUP SHIELD]`) y retorno limpio a `CardBookMainView` y a la escena previa con `[X]`.
   - Perfil original restaurado y verificado tras pruebas destructivas (`qa11_cb_detail_no_ghost.png`, `qa11_cb_restored.png`, `qa11_inven_settled.png`).
 
+---
+
+### 🎵 CHECKPOINT 36 — Investigación Forense y Planificación Completa del Ciclo de Juego de Canciones (`SelectMusicScene` -> `IngameLoadingScene` -> `IngameScene` -> `ResultScene`) (2026-11-26)
+
+#### 1. Contexto y Requerimiento de Ignacio
+* **Solicitud:** Investigar en profundidad cómo habilitar correcta y completamente la escena de jugar canciones (`SelectMusicScene` y todo su ciclo jugable hasta `ResultScene`) y entregar una lista completa de cada funcionalidad detectada y lo necesario para llevarla al 100% en modo standalone offline.
+
+#### 2. Hallazgos Críticos de Auditoría en Binarios, Dispositivo y APK
+1. **Inventario Completo Verificado de Assets Musicales en [app/src/files/](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/):**
+   - Siguiendo las indicaciones de Ignacio se auditó `app/src/files/` contra las **92 canciones** de `msd.json` y `url_shared_map.json` (**0 archivos faltantes**):
+     - `app/src/files/asiudgasg/asodhsg/woeiurty/`: **34 carátulas de álbum** (`*.i.bytes.png`, `256x256 PNG`).
+     - `app/src/files/asiudgasg/dslkjfsdalhh/`: **95 audios completos `.a.bytes`** (`Ogg Vorbis 44.1 kHz`) + `asdlkasdqoweirypqwier/` (**92 previews `.a.bytes`**) + `uhtngvh/` (**199 SFX/voces**) + `hidhhz/` (**12 archivos**).
+     - `app/src/files/asiudgasg/aweid/`: **277 beatmaps `.seq`** (`_4.seq`, `_7.seq`, `_13.seq` para Easy/Normal/Hard).
+     - `app/src/files/oiuio/`: `tutorial.a.bytes` y `tutorial.seq`; `app/src/files/ehdhxnm/`: `sync`; `app/src/files/aweoihsg/`: 38 SFX de gameplay (`start`, `fever`, `rave1`, `rave4`, `ravefail`, `gameover`, `perfectstage`, `nomiss`, `resultcheer`, `resultscore1s`, `resultscore2s`, `resumebeep`, `bluetooth_sync`, etc.).
+   - El script [deploy_card_assets.py](file:///Users/ignaciorojas/Documents/repos/sslo_apk/tools/deploy/deploy_card_assets.py) solo sincronizaba carpetas de cartas al emulador (`/sdcard/Android/data/com.dalcomsoft.sslo/files/`), motivo por el cual `woeiurty`, `dslkjfsdalhh`, `aweid`, `oiuio` y `ehdhxnm` aún no estaban presentes en BlueStacks. Además las carátulas `*.i.bytes.png` deben normalizarse a `*.i.bytes` al desplegarse.
+2. **Parámetros Oficiales de Headphones Verificados en Binario:**
+   - `UserControl..cctor` (`0xAB653C..0xAB65F0`) y `UserControl.UpdateHeadphone` (`0xAAC034..0xAAC1C4`) definen de fábrica:
+     - **`HeadphoneChargeTermMs` (`static + 0x0`) = `0x493E0` (`300,000 ms` = 5 minutos exactos)** por cada Headphone regenerado.
+     - **`MaxRechagableHeadphone` (`static + 0x10`) = `5`** y **`MaxHeadphone` (`static + 0x78`) = `9999`** (recarga gratuita automática hasta 5, respetando saldos pagados/regalo).
+3. **Sonda Viva en `SelectMusicScene` (`SceneId = 7`) sobre BlueStacks (`PID 1769`):**
+   - Al pulsar `Ready` en Lobby, `Scene.SetStateOpenScene` transiciona a `SceneType: 7` (`SelectMusicScene` `0x6f409f87e0`), dispara `[📡 CLIENT RPC] -> Clazz: Game | Method: getFavorites` (`13:53:43.040`), `GroupControl.Find(0)` (`13:53:43.050`), `TopViewControl.UpdateScene(7)` (`13:53:43.063`) y carga `background_main.png` (`13:53:43.180`).
+   - Acto seguido emite `terminating with uncaught exception of type Il2CppExceptionWrapper` (`13:53:43.195`) y `[🛡️ API EXCEPT] Suppressed ApiExceptControl.Except(NetworkHandler)` (`13:53:43.230`), dejando el indicador de carga girando indefinidamente (`qa_play_probe_selectmusic.png`).
+4. **Causas Raíz Desensambladas en `libil2cpp.so` y Bugs en `libscript.js`:**
+   - **Bloqueo de Entrada en `SelectMusicScene`:** `SetStateLoadingData` (`0x103ECB0`) llama a `FavoriteControl.GetFavoriteDatas` (`0xD2FE08`) -> `Game.getFavorites` (`0xD30520`). El callback `SelectMusicScene.<SetStateLoadingData>b__22_0` (`0xBF2198`, cmp en `0xBF2210: cmp w20, #0x3e8`) **exige estrictamente código `1000` (`0x3E8`)** y un objeto `FavoriteInfo` (`favoriteMusics`, `favoriteGroups`, `playCount`, `oftenPlayGroups`, `oftenPlayMusics`, `worldOftenPlayCount`, `worldFavoriteCount`). Como la RPC falla o no devuelve `1000` offline, nunca invoca `AddStateTask(SetStateWait)` (`0x103EF68`) ni `LoadingIndicator.Complete` (`0xB3E230`). Además `GroupControl.InitFavoriteLocalData` (`0xB9FF50`) tiene parche `RET` y `MusicControl.InitFavoriteLocalData` (`0xAFFD14`) puede recibir nulls.
+   - **Bug de Status Code `0` vs `1000` en `GameControl.StageStart` (`0xD42B80`) y `GameControl.StageComplete` (`0xD4379C`) dentro de [libscript.js](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L19449-L19472):**
+     - `IngameLoadingScene.<>c__DisplayClass17_0` (`0xED5A04: cmp w20, #0x3e8`) exige **`1000`** tras `StageStart(Action<int>)`, no `0`. Al pasar `0`, aborta la carga y vuelve a `SelectMusicScene`. También omite `UserControl.UseHeadphone` (`0xAB3034`).
+     - `ResultScene.ResultPlayComplete` (`0xF961C4: cmp w22, #0x3e8`) exige **`1000`** tras `StageComplete(StageCompleteCallback)`, no `0`. Al pasar `0`, salta a `ApiExceptControl.Except` (`0xF963CC`). Además pasa `list = NULL` (sin recompensas RP en `ProvideControl`) y omite guardar récords vía `GameControl.SetRecord_ForClient` (`0xD3FF40`), `ChallengeMission`, `MyRecord` y perfil local (`player_profile.json`).
+   - **Carga de `.a.bytes` / `.seq` y Verificación de Instalación:**
+     - `InstallMusicAssist.Open` (`0xF188EC`) -> `MusicControl.Data.IsInstalled` (`0xF068F8`) -> `AssetControl.DownloadMusic` (`0xADDED8`) requieren que los assets estén instalados o redirigidos a rutas locales.
+     - `IngameLoadingScene.<OnLoading_6_Bgm>` (`0xED6294`) usa `MiniAudioCS.OpenOneshot(audioUri, streaming)` (`0xCC29D8`) y `<OnLoading_7_SeqContext>` (`0xEDDD14`) usa `MusicControl.Data.SeqDownloadPath(difficult).GetFileInstalledUri()` (`0xF065A0` / `0xD7B2F4`) + `SEQ.SeqContext.OpenFromUri` (`0xFD546C`).
+   - **Dependencias de Red Auxiliares:** `MusicRankingControl.LoadRankData` (`0xB071A4`), `HelpAssist.Open` (`0xBA6DA4`), `ADControl`/`ADAssist` (`0x103F828`/`0x1220A38`), `TakeHeadphoneAssist` (`0xB16E94` -> `LeagueControl`), `Game.setFavorites` (`0xD3076C`), `Game.getMyRecords` / `getMyWorldRecords` (`0xD3C374` / `0xD3C650`).
+
+#### 3. Alcance Confirmado por Ignacio y Siguiente Paso
+* **Decisiones confirmadas:**
+  - Usar el **100% de assets reales** locales encontrados en [app/src/files/](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/) tras desplegarlos a `/sdcard/Android/data/com.dalcomsoft.sslo/files/`.
+  - Consumo normal de Headphones (`UserControl.UseHeadphone`) con regeneración offline nativa cada `300,000 ms` (5 min) hasta tope `5` + ganancia auténtica de RP por puntuación.
+  - Incluir **Challenge Missions** (`GameControl.ChallengeMission`) y dejar `SuperStar League` (`SceneId = 8`) para una tarea dedicada.
+* **Siguiente paso:** Aprobación final del plan actualizado [song_gameplay_plan.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/song_gameplay_plan.md) por Ignacio para generar el commit de checkpoint e iniciar la ejecución.
+
+
 
 
 
