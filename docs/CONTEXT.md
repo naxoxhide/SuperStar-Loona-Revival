@@ -5383,7 +5383,7 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
       1. En `0xBEA0`: `cbnz w0, #0xbedc` (`0x350001e0`), bifurcando de inmediato al retorno limpio `-2` (EOF/complete) sin acceder a la estructura de canales cuando `w0 != 0`.
       2. En `0xBEAC`: `cbz x1, #0xbedc` (`0xb4000181`), resguardo contra puntero nulo.
 * **Siguiente Paso Inmediato:**
-  - Compilar APK e instalar en emulador (`127.0.0.1:5555`).
+  - Reiniciar emulador BlueStacks (congelado por el evento previo de disco lleno en macOS) y reconectar ADB (`127.0.0.1:5555`).
   - Iniciar partida desde `SelectMusicScene` -> Validar transición limpia `IngameLoadingScene` (Scene 9) -> `IngameScene` (Scene 10) con notas cayendo en tiempo real.
 
 
