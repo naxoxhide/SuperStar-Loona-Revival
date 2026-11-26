@@ -23185,6 +23185,16 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                     // 6. Diagnostic trace for SelectMusicScene & IngameLoadingScene & IngameScene & ResultScene
                     try {
+                        var readIl2cppStr = function(strPtr) {
+                            if (!strPtr || strPtr.isNull()) return "(null)";
+                            try {
+                                var len = strPtr.add(0x10).readS32();
+                                return strPtr.add(0x14).readUtf16String(len);
+                            } catch (eStr) { return "(err)"; }
+                        };
+                        var getGoFn = new NativeFunction(baseAddr.add(0x1db6ad4), "pointer", ["pointer", "pointer"]);
+                        var getNameFn = new NativeFunction(baseAddr.add(0x1dc5a54), "pointer", ["pointer", "pointer"]);
+
                         Interceptor.attach(baseAddr.add(0x10489E4), { // SelectMusicSlotView.Awake
                             onEnter: function (args) {
                                 try {
@@ -23195,7 +23205,12 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     log("[🎵 SLOT_VIEW] scroller=" + scroller + " prefab=" + prefab);
                                     if (!prefab.isNull()) {
                                         var mPtr = prefab.add(0x10).readPointer();
-                                        log("[🎵 SLOT_VIEW] prefab.m_CachedPtr=" + mPtr);
+                                        var pKl = prefab.readPointer();
+                                        var pKlName = il2cpp_class_get_name(pKl).readUtf8String();
+                                        var pGo = getGoFn(prefab, NULL);
+                                        var pGoName = (!pGo.isNull()) ? readIl2cppStr(getNameFn(pGo, NULL)) : "(null)";
+                                        var pGoCached = (!pGo.isNull()) ? pGo.add(0x10).readPointer() : NULL;
+                                        log("[🎵 SLOT_VIEW] prefab class=" + pKlName + " m_CachedPtr=" + mPtr + " go=" + pGo + " name=" + pGoName + " goCached=" + pGoCached);
                                     }
                                     if (!scroller.isNull()) {
                                         var container = scroller.add(0xC8).readPointer();
@@ -23207,13 +23222,52 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                             log("[🎵 SLOT_VIEW] container childCount=" + cnt);
                                             for (var i = 0; i < cnt; i++) {
                                                 var ch = getChildFn(container, i, NULL);
-                                                log("[🎵 SLOT_VIEW] child[" + i + "]=" + ch);
+                                                var chGo = getGoFn(ch, NULL);
+                                                var chName = (!chGo.isNull()) ? readIl2cppStr(getNameFn(chGo, NULL)) : "(null)";
+                                                var chCached = (!chGo.isNull()) ? chGo.add(0x10).readPointer() : NULL;
+                                                log("[🎵 SLOT_VIEW] child[" + i + "]=" + ch + " go=" + chGo + " name=" + chName + " goCached=" + chCached);
                                             }
                                         }
                                     }
                                 } catch (eSvAw) {
                                     log("[-] Error in SlotView Awake inspect: " + eSvAw.message);
                                 }
+                            }
+                        });
+
+                        Interceptor.attach(baseAddr.add(0x1048BC8), { // SelectMusicSlotView.GetCellView
+                            onEnter: function (args) {
+                                log("[🎵 SLOT_VIEW GetCellView] slotView=" + args[0] + " scroller=" + args[1] + " dataIdx=" + args[2].toInt32() + " cellIdx=" + args[3].toInt32());
+                            },
+                            onLeave: function (retval) {
+                                log("[🎵 SLOT_VIEW GetCellView] LEAVE retval=" + retval);
+                            }
+                        });
+
+                        Interceptor.attach(baseAddr.add(0x125C3F4), { // EnhancedScroller.GetCellView
+                            onEnter: function (args) {
+                                try {
+                                    var scr = args[0];
+                                    var cPref = args[1];
+                                    var mCached = (!cPref.isNull()) ? cPref.add(0x10).readPointer() : NULL;
+                                    log("[🎵 SCROLLER GetCellView] scroller=" + scr + " cellPrefab=" + cPref + " m_CachedPtr=" + mCached);
+                                } catch (eScGcv) {
+                                    log("[-] Error in SCROLLER GetCellView onEnter: " + eScGcv.message);
+                                }
+                            },
+                            onLeave: function (retval) {
+                                log("[🎵 SCROLLER GetCellView] LEAVE retval=" + retval);
+                            }
+                        });
+
+                        Interceptor.attach(baseAddr.add(0x10BE470), { // Object.Instantiate<GameObject>
+                            onEnter: function (args) {
+                                var orig = args[0];
+                                var mCached = (!orig.isNull()) ? orig.add(0x10).readPointer() : NULL;
+                                log("[🌱 INSTANTIATE] original=" + orig + " m_CachedPtr=" + mCached);
+                            },
+                            onLeave: function (retval) {
+                                log("[🌱 INSTANTIATE] LEAVE retval=" + retval);
                             }
                         });
 
