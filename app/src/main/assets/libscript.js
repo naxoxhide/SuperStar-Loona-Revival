@@ -345,7 +345,7 @@ function initIl2Cpp(module) {
     var il2cpp_thread_attach = getExport("il2cpp_thread_attach", "pointer", ["pointer"]);
     var il2cpp_class_get_nested_types = getExport("il2cpp_class_get_nested_types", "pointer", ["pointer", "pointer"]);
     var il2cpp_class_get_name = getExport("il2cpp_class_get_name", "pointer", ["pointer"]);
-    var il2cpp_gchandle_new = getExport("il2cpp_gchandle_new", "uint32", ["pointer", "bool"]);
+    var il2cpp_gchandle_new = getExport("il2cpp_gchandle_new", "uint32", ["pointer", "int"]);
     var il2cpp_array_new = getExport("il2cpp_array_new", "pointer", ["pointer", "size_t"]);
 
     try {
@@ -2224,14 +2224,22 @@ function initIl2Cpp(module) {
 
                     // Invoke UserControl.Open(player) (RVA 0xAAB0D4)
                     if (userControlOpenFn) {
-                        userControlOpenFn(playerObj);
-                        log("[✅ USER] UserControl.Open(player) executed successfully!");
+                        try {
+                            userControlOpenFn(playerObj);
+                            log("[✅ USER] UserControl.Open(player) executed successfully!");
+                        } catch (eUo) {
+                            log("[-] Non-fatal UserControl.Open warning: " + eUo.message);
+                        }
                     }
 
                     // Invoke UserControl.NotifyUserData() (RVA 0xAAC39C)
                     if (notifyUserDataFn) {
-                        notifyUserDataFn();
-                        log("[📢 USER] UserControl.NotifyUserData() executed successfully!");
+                        try {
+                            notifyUserDataFn();
+                            log("[📢 USER] UserControl.NotifyUserData() executed successfully!");
+                        } catch (eNu) {
+                            log("[-] Non-fatal UserControl.NotifyUserData warning: " + eNu.message);
+                        }
                     }
                 } catch (e) {
                     log("[-] Error in setupUserControl: " + e.message);
@@ -5021,12 +5029,10 @@ function initIl2Cpp(module) {
 
                         // --- Initialize InventoryControl on Lobby startup ---
                         try {
-                            var invenOpenFn = new NativeFunction(baseAddr.add(0xF27AA0), "void", ["pointer"]);
-                            invenOpenFn(NULL);
-                            log("[🃏 INVENTORY] InventoryControl.Open() executed on Lobby init!");
                             populateOfflineInventoryCards();
+                            log("[🃏 INVENTORY] Offline inventory initialized cleanly on Lobby init!");
                         } catch (eInv) {
-                            log("[-] Error calling InventoryControl.Open on Lobby init: " + eInv.message);
+                            log("[-] Error initializing offline Inventory on Lobby init: " + eInv.message);
                         }
 
                         // --- Restore and Activate TopView in LobbyScene ---
@@ -5116,15 +5122,27 @@ function initIl2Cpp(module) {
                 }
 
                 function createDownloadPath(relPath) {
+                    var step = "getClass";
+                    var dp = NULL;
                     try {
                         var klass = getDownloadPathClass();
                         if (!klass || klass.isNull()) return NULL;
-                        var dp = il2cpp_object_new(klass);
-                        if (!dp || dp.isNull()) return NULL;
-                        if (il2cpp_gchandle_new) il2cpp_gchandle_new(dp, 2);
-                        dp.add(0x10).writePointer(createIl2CppString("https://dalcom.local/" + relPath));
-                        dp.add(0x18).writePointer(createIl2CppString(relPath));
-                        dp.add(0x20).writePointer(createIl2CppString("1"));
+                        step = "object_new";
+                        dp = il2cpp_object_new(klass);
+                        if (!dp || dp.isNull() || dp.compare(ptr(0x10000000)) <= 0) {
+                            log("[-] Invalid dp ptr from il2cpp_object_new(" + klass + "): " + dp + " for " + relPath);
+                            return NULL;
+                        }
+                        step = "str_url";
+                        var urlStr = createIl2CppString("https://dalcom.local/" + relPath);
+                        step = "str_rel";
+                        var relStr = createIl2CppString(relPath);
+                        step = "str_ver";
+                        var verStr = createIl2CppString("1");
+                        step = "write_fields";
+                        dp.add(0x10).writePointer(urlStr);
+                        dp.add(0x18).writePointer(relStr);
+                        dp.add(0x20).writePointer(verStr);
                         dp.add(0x28).writeU8(0);
                         dp.add(0x29).writeU8(1); // shared = true (was 0)
                         dp.add(0x2A).writeU8(0);
@@ -5132,7 +5150,7 @@ function initIl2Cpp(module) {
                         dp.add(0x38).writeS32(1); // Texture = 1
                         return dp;
                     } catch (eDp) {
-                        log("[-] Error creating DownloadPath for " + relPath + ": " + eDp.message);
+                        log("[-] Error creating DownloadPath [" + step + " dp=" + dp + "] for " + relPath + ": " + eDp.message);
                         return NULL;
                     }
                 }
@@ -7118,6 +7136,9 @@ function initIl2Cpp(module) {
                                     try { addFn(dictObj, tCode, faTheme, cachedEachThemeDictAdd); } catch (eAddT) {}
                                 }
                             }
+                            if (gCode === 1001) {
+                                log("[🃏 INVENTORY] Built EachThemeBestCardItemList for gCode=" + gCode + " themes=" + tKeys.length + " dict=" + dictObj);
+                            }
                         }
                         return dictObj;
                     } catch (eBtd) {
@@ -7128,7 +7149,7 @@ function initIl2Cpp(module) {
 
                 // 1. GroupItem..ctor (0xB56EF4) - Safe replacement that never throws NullReferenceException
                 try {
-                    Interceptor.replace(baseAddr.add(0xB56EF4), new NativeCallback(function (thisPtr, code, map, subItem, methodInfo) {
+                    Interceptor.replace(baseAddr.add(0xB56EF4), keepCb(new NativeCallback(function (thisPtr, code, map, subItem, methodInfo) {
                         log("[🃏 INVENTORY] Safe GroupItem..ctor executed for code: " + code);
                         try {
                             ensureLoonaMocks();
@@ -7152,7 +7173,7 @@ function initIl2Cpp(module) {
                         } catch (e) {
                             log("[-] Error in GroupItem..ctor replacement: " + e.message);
                         }
-                    }, "void", ["pointer", "int", "pointer", "pointer", "pointer"]));
+                    }, "void", ["pointer", "int", "pointer", "pointer", "pointer"])));
                     log("[+] Interceptor.replace installed on GroupItem..ctor (0xB56EF4)!");
                 } catch (eGic) {
                     log("[-] Error replacing GroupItem..ctor: " + eGic.message);
@@ -8522,6 +8543,14 @@ function initIl2Cpp(module) {
                             try {
                                 setActiveFn(leaderIcon, isLeader ? 1 : 0, NULL);
                             } catch (eLi) {}
+                        }
+
+                        // 10b. toggleLeader (0x88) - sync Unity Toggle without triggering OnValueChangeLeader
+                        var toggleLeaderSel = viewThis.add(0x88).readPointer();
+                        if (!toggleLeaderSel.isNull()) {
+                            try {
+                                new NativeFunction(baseAddr.add(0x21A82E0), "void", ["pointer", "bool", "pointer"])(toggleLeaderSel, isLeader ? 1 : 0, NULL);
+                            } catch (eTls) {}
                         }
 
                         // 11. leaderOnObj (0x90)
@@ -12179,6 +12208,14 @@ function initIl2Cpp(module) {
                                 } catch (eLi) {}
                             }
 
+                            // 9b. toggleLeader (0x88) - sync Unity Toggle without triggering OnValueChangeLeader
+                            var toggleLeaderEq = viewThis.add(0x88).readPointer();
+                            if (!toggleLeaderEq.isNull()) {
+                                try {
+                                    new NativeFunction(baseAddr.add(0x21A82E0), "void", ["pointer", "bool", "pointer"])(toggleLeaderEq, isLeader ? 1 : 0, NULL);
+                                } catch (eTle) {}
+                            }
+
                             // 10. leaderOnObj (0x90)
                             var leaderOnObj = viewThis.add(0x90).readPointer();
                             if (!leaderOnObj.isNull()) {
@@ -15535,11 +15572,14 @@ function initIl2Cpp(module) {
                 } catch (eGlErr) {}
 
                 var isInventoryPopulated = false;
+                var offlineCardItemByObjectId = {};
                 function populateOfflineInventoryCards() {
                     if (isInventoryPopulated) {
-                        log("[🃏 INVENTORY] populateOfflineInventoryCards: already populated, skipping duplicate run!");
+                        try { new NativeFunction(baseAddr.add(0xF2744C), "void", ["bool", "pointer"])(1, NULL); } catch (eIo2) {}
+                        log("[🃏 INVENTORY] populateOfflineInventoryCards: already populated, ensured IsOpened=1!");
                         return;
                     }
+                    offlineCardItemByObjectId = {};
                     log("[🃏 INVENTORY] populateOfflineInventoryCards() starting...");
                     try {
                         isInventoryPopulated = true;
@@ -15573,21 +15613,20 @@ function initIl2Cpp(module) {
                             return;
                         }
 
-                        var cardKlass = NULL;
-                        try {
-                            var cardSlot = baseAddr.add(0x31E62B8).readPointer();
-                            if (!cardSlot.isNull()) cardKlass = cardSlot;
-                        } catch (e1) {}
-                        if (!cardKlass || cardKlass.isNull()) {
+                        var cardKlass = resolveMetadataSlot(0x31E62B8);
+                        if (!cardKlass || cardKlass.isNull() || cardKlass.compare(ptr(0x100000000)) <= 0) {
                             cardKlass = getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.account", "Card");
                         }
+                        if (cardKlass && !cardKlass.isNull()) ensureIl2CppClassInit(cardKlass);
 
                         var cardItemKlass = resolveMetadataSlot(0x31F3060);
+                        if (cardItemKlass && !cardItemKlass.isNull()) ensureIl2CppClassInit(cardItemKlass);
 
                         if (!cardKlass || cardKlass.isNull() || !cardItemKlass || cardItemKlass.isNull()) {
                             log("[-] Could not resolve Card or CardItem class! cardKlass: " + cardKlass + ", cardItemKlass: " + cardItemKlass);
                             return;
                         }
+                        log("[🃏 INVENTORY] Resolved cardKlass=" + cardKlass + ", cardItemKlass=" + cardItemKlass);
                         cachedCardKlass = cardKlass;
                         cachedCardItemKlass = cardItemKlass;
 
@@ -15597,6 +15636,7 @@ function initIl2Cpp(module) {
                         log("[🃏 INVENTORY] Populating " + validCards.length + " LOONA cards into CardMap (" + cardMap + ")...");
                         var addedCount = 0;
                         loonaCardItems = [];
+                        var addCardNativeFn = new NativeFunction(baseAddr.add(0xF2A210), "void", ["pointer", "pointer"]);
 
                         for (var i = 0; i < validCards.length; i++) {
                             var cData = validCards[i];
@@ -15604,7 +15644,7 @@ function initIl2Cpp(module) {
                                 // 1. Create Card managed instance
                                 var cardObj = il2cpp_object_new(cardKlass);
                                 if (il2cpp_gchandle_new && !cardObj.isNull()) {
-                                    il2cpp_gchandle_new(cardObj, 2);
+                                    il2cpp_gchandle_new(cardObj, 0);
                                 }
                                 var objId = int64(cData.objectID || (100000 + i + 1));
                                 var cId = parseInt(cData.cardID || (1001 + i), 10);
@@ -15626,7 +15666,7 @@ function initIl2Cpp(module) {
                                 // 2. Directly construct CardItem managed instance
                                 var cardItemObj = il2cpp_object_new(cardItemKlass);
                                 if (il2cpp_gchandle_new && !cardItemObj.isNull()) {
-                                    il2cpp_gchandle_new(cardItemObj, 2);
+                                    il2cpp_gchandle_new(cardItemObj, 0);
                                 }
                                 cardItemObj.add(0x10).writePointer(cardObj); // <Raw>
                                 var ccd = getOrCreateCardControlData(cId);
@@ -15651,11 +15691,11 @@ function initIl2Cpp(module) {
                                 cardItemObj.add(0x40).writePointer(NULL); // <themeCardItem>
 
                                 loonaCardItems.push(cardItemObj);
+                                offlineCardItemByObjectId[objIdKey(objId)] = cardItemObj;
 
                                 // 3. Add to CardMap Dictionary via Native AddCard (0xF2A210)
                                 try {
-                                    var addCardNativeFn = new NativeFunction(baseAddr.add(0xF2A210), "void", ["pointer"]);
-                                    addCardNativeFn(cardItemObj);
+                                    addCardNativeFn(cardItemObj, NULL);
                                     addedCount++;
                                     log("[🃏 CARD " + (i + 1) + "] Added cardID=" + cId + " grade=" + gr + " lvl=" + lvl + " objID=" + objId);
                                 } catch (eAc) {
@@ -15745,33 +15785,15 @@ function initIl2Cpp(module) {
                                     if (il2cpp_gchandle_new && !groupItemObj.isNull()) {
                                         il2cpp_gchandle_new(groupItemObj, 1);
                                     }
-                                    try {
-                                        var groupItemCtorFn = new NativeFunction(baseAddr.add(0xB56EF4), "void", ["pointer", "int", "pointer", "pointer"]);
-                                        groupItemCtorFn(groupItemObj, gCode, cardMap || NULL, NULL);
-                                    } catch (eGiCtor) {
-                                        log("[-] Warning calling GroupItem..ctor for gCode=" + gCode + ": " + eGiCtor.message);
-                                    }
-
-                                    if (allGroupDataMap[gCode]) {
-                                        groupItemObj.add(0x10).writePointer(allGroupDataMap[gCode]);
-                                    } else if (gCode === 1001 && loonaGroupData) {
-                                        groupItemObj.add(0x10).writePointer(loonaGroupData);
-                                    }
-
-                                    var curFastArr = groupItemObj.add(0x28).readPointer();
-                                    if (curFastArr.isNull() || curFastArr.compare(ptr(0x10000)) <= 0) {
-                                        groupItemObj.add(0x28).writePointer(groupCardFastArray || NULL);
-                                    } else {
-                                        try {
-                                            var curLen = curFastArr.add(0x18).readS32();
-                                            if (curLen === 0 && groupCardFastArray && !groupCardFastArray.isNull()) {
-                                                groupItemObj.add(0x28).writePointer(groupCardFastArray);
-                                            }
-                                        } catch (eFaLen) {
-                                            groupItemObj.add(0x28).writePointer(groupCardFastArray || NULL);
-                                        }
-                                    }
-
+                                    var etDict = (typeof buildGroupEachThemeBestDict === "function") ? buildGroupEachThemeBestDict(gCode) : NULL;
+                                    groupItemObj.add(0x10).writePointer(allGroupDataMap[gCode] || ((gCode === 1001 && loonaGroupData) ? loonaGroupData : NULL));
+                                    groupItemObj.add(0x18).writePointer(NULL);
+                                    groupItemObj.add(0x20).writePointer(NULL);
+                                    groupItemObj.add(0x28).writePointer(groupCardFastArray || NULL);
+                                    groupItemObj.add(0x30).writePointer(etDict || NULL);
+                                    groupItemObj.add(0x38).writeS16(-1);
+                                    groupItemObj.add(0x40).writePointer(NULL);
+                                    groupItemObj.add(0x48).writeS16(-1);
                                     groupItemObj.add(0x4A).writeS16(4);
                                     groupItemObj.add(0x4C).writeS32(0);
                                     groupItemObj.add(0x50).writeS32(gCode);
@@ -15779,7 +15801,7 @@ function initIl2Cpp(module) {
                                     groupItemObj.add(0x58).writeS32(0);
                                     groupItemObj.add(0x5C).writeS32(0);
 
-                                    log("[ALLOC GROUP_ITEM] gCode=" + gCode + " item=" + groupItemObj + " (klass=" + groupItemObj.readPointer() + ") fastArray=" + groupCardFastArray);
+                                    log("[ALLOC GROUP_ITEM] gCode=" + gCode + " item=" + groupItemObj + " (klass=" + groupItemObj.readPointer() + ") fastArray=" + groupCardFastArray + " etDict=" + etDict);
                                     allInvenGroupItems[gCode] = groupItemObj;
                                     if (gCode === 1001) loonaGroupItemObj = groupItemObj;
                                 }
@@ -15807,6 +15829,11 @@ function initIl2Cpp(module) {
                             log("[-] Error synchronizing CardBook: " + cbErr.message);
                         }
 
+                        // Ensure InventoryControl.IsOpened = true (0xF2744C) so FindToCardItem works everywhere (e.g. MY INFO)
+                        try {
+                            new NativeFunction(baseAddr.add(0xF2744C), "void", ["int", "pointer"])(1, NULL);
+                        } catch (eSetOpened) {}
+
                         // Ensure CardBookControl.Info & MyInfo are instantiated for InventoryScene (prevents crash on Equip Theme)
                         try {
                             ensureCardBookControlData();
@@ -15817,6 +15844,50 @@ function initIl2Cpp(module) {
                     } catch (eGen) {
                         log("[-] Error in populateOfflineInventoryCards: " + eGen.message);
                     }
+                }
+
+                // Intercept InventoryControl.Open (0xF27AA0) so returning to Lobby never wipes CardMap via Close()
+                try {
+                    Interceptor.replace(baseAddr.add(0xF27AA0), keepCb(new NativeCallback(function (methodInfo) {
+                        if (!isInventoryPopulated || loonaCardItems.length === 0) {
+                            populateOfflineInventoryCards();
+                        } else {
+                            try { new NativeFunction(baseAddr.add(0xF2744C), "void", ["int", "pointer"])(1, NULL); } catch (eSetOp) {}
+                            try { ensureDisplayGroupList(); } catch (eEdgl) {}
+                        }
+                        log("[🃏 INVENTORY] InventoryControl.Open (0xF27AA0) handled cleanly offline (cards=" + loonaCardItems.length + ")!");
+                    }, "void", ["pointer"])));
+                    log("[+] Interceptor.replace installed on InventoryControl.Open (0xF27AA0)!");
+                } catch (eIco) {
+                    log("[-] Error replacing InventoryControl.Open: " + eIco.message);
+                }
+
+                // Intercept InventoryControl.FindToCardItem (0xF294B8) -> Resolve directly from offline card map for InfoPopup / Equip / LeaderCard
+                try {
+                    Interceptor.replace(baseAddr.add(0xF294B8), keepCb(new NativeCallback(function (code, methodInfo) {
+                        try {
+                            if (!isInventoryPopulated || loonaCardItems.length === 0) {
+                                populateOfflineInventoryCards();
+                            }
+                            var key = objIdKey(code);
+                            if (offlineCardItemByObjectId[key]) return offlineCardItemByObjectId[key];
+                            for (var fi = 0; fi < loonaCardItems.length; fi++) {
+                                var itm = loonaCardItems[fi];
+                                if (!itm || itm.isNull()) continue;
+                                var raw = itm.add(0x10).readPointer();
+                                if (!raw.isNull() && objIdKey(raw.add(0x10).readS64()) === key) {
+                                    offlineCardItemByObjectId[key] = itm;
+                                    return itm;
+                                }
+                            }
+                        } catch (eFtci) {
+                            log("[-] Error in offline FindToCardItem: " + eFtci.message);
+                        }
+                        return NULL;
+                    }, "pointer", ["int64", "pointer"])));
+                    log("[+] Interceptor.replace installed on InventoryControl.FindToCardItem (0xF294B8)!");
+                } catch (eHftci) {
+                    log("[-] Error replacing InventoryControl.FindToCardItem: " + eHftci.message);
                 }
 
                 // Intercept InventoryControl.OpenCard (0xF27DA8) so that native Open() calls our populator directly
@@ -18403,12 +18474,6 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         var curStateLdr = sceneThis.add(0x64).readS32();
                         var sceneView = sceneThis.add(0x48).readPointer();
                         if (!sceneView.isNull()) {
-                            var selectView = sceneView.add(0x48).readPointer();
-                            if (!selectView.isNull()) {
-                                var eqCard = sceneThis.add(0x90).readPointer();
-                                var selParams = safeGetSelectViewData(sceneThis, tCard, NULL, eqCard, 1);
-                                safeRefreshInvenCardSelectView(selectView, selParams);
-                            }
                             if (curStateLdr === 7) {
                                 try {
                                     var eqViewLdr = sceneView.add(0x60).readPointer();
@@ -18419,8 +18484,29 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                         }
                                     }
                                 } catch (eEqLdr) {}
+                            } else {
+                                var selectView = sceneView.add(0x48).readPointer();
+                                if (!selectView.isNull()) {
+                                    var eqCard = sceneThis.add(0x90).readPointer();
+                                    var selParams = safeGetSelectViewData(sceneThis, tCard, NULL, eqCard, 1);
+                                    safeRefreshInvenCardSelectView(selectView, selParams);
+                                }
                             }
                         }
+                        try {
+                            if (isNowLeader) {
+                                var ldrMeta = getCardMetadata(cId);
+                                var ldrAId = (ldrMeta && ldrMeta.artistID) ? ldrMeta.artistID : 1001;
+                                var ldrTId = (ldrMeta && ldrMeta.theme) ? ldrMeta.theme : 1001;
+                                var ldrAMeta = getArtistMetadata(ldrAId);
+                                var ldrTMeta = getThemeMetadata(ldrTId);
+                                var ldrAName = (ldrAMeta && ldrAMeta.name) ? ldrAMeta.name : (artistNamesMap[ldrAId] || "Card");
+                                var ldrTName = (ldrTMeta && ldrTMeta.name) ? ldrTMeta.name : (themeNamesMap[ldrTId] || "");
+                                showOfflineToast("Favorite Card set: " + ldrAName + (ldrTName ? " (" + ldrTName + ")" : ""), 2.0);
+                            } else {
+                                showOfflineToast("Removed Favorite Card.", 1.8);
+                            }
+                        } catch (eLdrToast) {}
                         log("[👑 OFFLINE LEADER] Card ID=" + cId + " (ObjID=" + objIdKey(objId) + ") leader state set to: " + isNowLeader);
                     } catch (eLdr) {
                         log("[-] Error in executeOfflineLeader: " + eLdr.message);
@@ -18882,19 +18968,23 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         executeOfflineLock(activeInventorySceneInstance, null);
                     }, "void", ["pointer", "bool", "pointer"]));
 
-                    // InventoryScene.OnLeaderCard (0x1059F08) & InventoryScene.OnEquipLeaderCard (0x105A428) & InvenCardSelectView.OnValueChangeLeader (0xF23114)
-                    Interceptor.replace(baseAddr.add(0x1059F08), new NativeCallback(function(sceneThis, isLeader, methodInfo) {
+                    // InventoryScene.OnLeaderCard (0x1059F08) & InventoryScene.OnEquipLeaderCard (0x105A428) & InvenCardSelectView.OnValueChangeLeader (0xF23114) & InvenCardEquipView.OnValueChangeLeader (0xF21F80)
+                    Interceptor.replace(baseAddr.add(0x1059F08), keepCb(new NativeCallback(function(sceneThis, isLeader, methodInfo) {
                         log("[👑 NATIVE OnLeaderCard] Intercepted on scene=" + sceneThis);
                         executeOfflineLeader(sceneThis);
-                    }, "void", ["pointer", "bool", "pointer"]));
-                    Interceptor.replace(baseAddr.add(0x105A428), new NativeCallback(function(sceneThis, isLeader, methodInfo) {
+                    }, "void", ["pointer", "bool", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0x105A428), keepCb(new NativeCallback(function(sceneThis, isLeader, methodInfo) {
                         log("[👑 NATIVE OnEquipLeaderCard] Intercepted on scene=" + sceneThis);
                         executeOfflineLeader(sceneThis);
-                    }, "void", ["pointer", "bool", "pointer"]));
-                    Interceptor.replace(baseAddr.add(0xF23114), new NativeCallback(function(viewThis, isLeader, methodInfo) {
-                        log("[👑 UI OnValueChangeLeader] Intercepted on view=" + viewThis);
+                    }, "void", ["pointer", "bool", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xF23114), keepCb(new NativeCallback(function(viewThis, togglePtr, methodInfo) {
+                        log("[👑 UI SelectView.OnValueChangeLeader] Intercepted on view=" + viewThis);
                         executeOfflineLeader(activeInventorySceneInstance);
-                    }, "void", ["pointer", "bool", "pointer"]));
+                    }, "void", ["pointer", "pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xF21F80), keepCb(new NativeCallback(function(viewThis, togglePtr, methodInfo) {
+                        log("[👑 UI EquipView.OnValueChangeLeader] Intercepted on view=" + viewThis);
+                        executeOfflineLeader(activeInventorySceneInstance);
+                    }, "void", ["pointer", "pointer", "pointer"])));
 
                     // Confirmed Individual Card Sell: InventoryScene.OnSellCard (0x10590D8) & InvenCardSelectView.OnSell (0xF22F58)
                     var requestOfflineSellConfirm = function(sceneThis) {
