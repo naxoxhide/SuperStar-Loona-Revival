@@ -23628,6 +23628,27 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             Memory.protect(baseAddr.add(0x14A84E0), 4, 'rwx');
                             baseAddr.add(0x14A84E0).writeByteArray([0x07, 0x00, 0x00, 0x14]);
                             log("[🎮 INGAME_READY] Patched IngameView.GameReady at 0x14A84E0 (b #GameStart)!");
+
+                            // Bulletproof Game Over and FailDataToServer shields for offline song gameplay:
+                            // 1. IngameScene.FailDataToServer at 0x1499994 -> ret (prevents null server dereference at 0x168)
+                            Memory.protect(baseAddr.add(0x1499994), 4, 'rwx');
+                            baseAddr.add(0x1499994).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
+                            log("[🛡️ FAIL_DATA] Patched IngameScene.FailDataToServer at 0x1499994 (ret)!");
+
+                            // 2. IngameView.OnGameOver at 0x14A1F24 -> ret (prevents game over popup and stall)
+                            Memory.protect(baseAddr.add(0x14A1F24), 4, 'rwx');
+                            baseAddr.add(0x14A1F24).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
+                            log("[🛡️ GAME_OVER] Patched IngameView.OnGameOver at 0x14A1F24 (ret)!");
+
+                            // 3. IngameView.get_IsGameOver at 0x14A93E8 -> mov w0, wzr; ret (always false)
+                            Memory.protect(baseAddr.add(0x14A93E8), 8, 'rwx');
+                            baseAddr.add(0x14A93E8).writeByteArray([0xe0, 0x03, 0x1f, 0x2a, 0xc0, 0x03, 0x5f, 0xd6]);
+                            log("[🛡️ IS_GAME_OVER] Patched IngameView.get_IsGameOver at 0x14A93E8 (mov w0, wzr; ret)!");
+
+                            // 4. IngameView.CalcLifeAndFeverState at 0x14A1BB0 -> ret (prevents game over on note miss)
+                            Memory.protect(baseAddr.add(0x14A1BB0), 4, 'rwx');
+                            baseAddr.add(0x14A1BB0).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
+                            log("[🛡️ NO_FAIL] Patched IngameView.CalcLifeAndFeverState at 0x14A1BB0 (ret) for offline Godmode!");
                         } catch (ePatchLoading2) {
                             log("[-] Failed to patch loading/ingame scene opcodes: " + ePatchLoading2.message);
                         }
