@@ -23653,6 +23653,19 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             Memory.protect(baseAddr.add(0x14A1BB0), 4, 'rwx');
                             baseAddr.add(0x14A1BB0).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
                             log("[🛡️ NO_FAIL] Patched IngameView.CalcLifeAndFeverState at 0x14A1BB0 (ret) for offline Godmode!");
+
+                            // 5. WorldRecordControl shields (prevents NullRef in GameControl.SetRecord_ForClient at end of song):
+                            // GetCurrentWorldRecordSeasonCode (0xCE0210, 0xCE0474) -> mov w0, #-1; ret
+                            Memory.protect(baseAddr.add(0xCE0210), 8, 'rwx');
+                            baseAddr.add(0xCE0210).writeByteArray([0x00, 0x00, 0x80, 0x12, 0xc0, 0x03, 0x5f, 0xd6]);
+                            Memory.protect(baseAddr.add(0xCE0474), 8, 'rwx');
+                            baseAddr.add(0xCE0474).writeByteArray([0x00, 0x00, 0x80, 0x12, 0xc0, 0x03, 0x5f, 0xd6]);
+                            // Find (0xCE06A4) & FindSeasonData (0xCE0780) -> mov x0, xzr; ret
+                            Memory.protect(baseAddr.add(0xCE06A4), 8, 'rwx');
+                            baseAddr.add(0xCE06A4).writeByteArray([0xe0, 0x03, 0x1f, 0xaa, 0xc0, 0x03, 0x5f, 0xd6]);
+                            Memory.protect(baseAddr.add(0xCE0780), 8, 'rwx');
+                            baseAddr.add(0xCE0780).writeByteArray([0xe0, 0x03, 0x1f, 0xaa, 0xc0, 0x03, 0x5f, 0xd6]);
+                            log("[🛡️ WORLD_RECORD] Patched WorldRecordControl (0xCE0210, 0xCE0474, 0xCE06A4, 0xCE0780) for offline ResultScene transition!");
                         } catch (ePatchLoading2) {
                             log("[-] Failed to patch loading/ingame scene opcodes: " + ePatchLoading2.message);
                         }
