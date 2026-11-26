@@ -5382,9 +5382,13 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
     - Solución: Se parcheó `libminiaudio.so` tanto en binario como dinámicamente:
       1. En `0xBEA0`: `cbnz w0, #0xbedc` (`0x350001e0`), bifurcando de inmediato al retorno limpio `-2` (EOF/complete) sin acceder a la estructura de canales cuando `w0 != 0`.
       2. En `0xBEAC`: `cbz x1, #0xbedc` (`0xb4000181`), resguardo contra puntero nulo.
+  - **Transición IngameScene y Activación de Notas (`IngameView.GameFireRun`):**
+    - Se validó la entrada exitosa a `IngameScene` (Scene 10) con la pista de ritmo, barra de vida verde, cartas LOONA y marcadores en pantalla.
+    - Se neutralizó la espera indefinida en `state = 4 (DelayTime)` parcheando `0x14A8968` en `IngameView.Update` (`b.le #0x14a8974` -> `nop` `0xd503201f`), garantizando la llamada inmediata a `IngameView.GameFireRun` (`0x149F9F4`) y `IngameView.Play(sec)` para disparar la caída de notas rítmicas en `state = 5 (Run)`.
 * **Siguiente Paso Inmediato:**
-  - Reiniciar emulador BlueStacks (congelado por el evento previo de disco lleno en macOS) y reconectar ADB (`127.0.0.1:5555`).
-  - Iniciar partida desde `SelectMusicScene` -> Validar transición limpia `IngameLoadingScene` (Scene 9) -> `IngameScene` (Scene 10) con notas cayendo en tiempo real.
+  - Compilar APK e instalar en emulador (`127.0.0.1:5555`).
+  - Iniciar partida desde `SelectMusicScene` -> Validar en vivo la pista con notas cayendo en tiempo real (`state = 5`).
+  - Registrar entrada de notas (combo/score) y transición a `ResultScene` (Scene 11).
 
 
 

@@ -23682,6 +23682,17 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             onEnter: function () { log("[🎮 INGAME_LIFECYCLE] IngameView.GameFireRun entered!"); }
                         });
 
+                        // Patch 0x14A8968 in IngameView.Update:
+                        // Original: b.le #0x14a8974 (waits indefinitely if delay time condition fails)
+                        // Patched:  nop (0xd503201f) -> seamless transition from DelayTime (state 4) to GameFireRun (state 5)
+                        try {
+                            Memory.protect(baseAddr.add(0x14A8968), 4, 'rwx');
+                            baseAddr.add(0x14A8968).writeU32(0xD503201F); // nop
+                            log("[🛡️ INGAME_VIEW] Patched 0x14A8968 (b.le -> nop) to guarantee GameFireRun execution!");
+                        } catch (ePatchGfr) {
+                            log("[-] Error patching 0x14A8968: " + ePatchGfr.message);
+                        }
+
                         // IngameLoadingScene Key Milestone monitors
                         Interceptor.attach(baseAddr.add(0xEDD820), {
                             onEnter: function () { log("[⏳ PIPELINE] OnLoading_6_Bgm entered -> loading audio!"); }
