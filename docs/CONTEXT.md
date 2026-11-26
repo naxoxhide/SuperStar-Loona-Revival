@@ -5406,6 +5406,34 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
 * **Siguiente Paso Inmediato:**
   - Inspeccionar y habilitar el botón / funcionalidad de "Favorita" en `InventoryScene` según la solicitud visual del usuario (Favorite Card en Profile).
 
+---
+
+### 🔍 CHECKPOINT 38 — Auditoría Profunda de Integridad del Juego y Regresión Visual post-Song Gameplay Plan (2026-11-27)
+
+#### 1. Contexto y Evidencia Cronológica Verificada
+* **Solicitud de Ignacio (`/plan`):** Analizar de forma profunda y minuciosa la integridad del juego tras el Song Gameplay Plan (`bec9ddd0..19d2a137`), explicando por qué el cliente muestra rectángulo gris en `EntryScene`, pantalla completamente blanca (`#FFFFFF`) en `TitleScene` y fondo negro + barras blancas + bloques sólidos en textos e iconos de `LobbyScene`.
+* **Línea Temporal Exacta en Git y Capturas:**
+  - `b4152ec0` (`19:26`, Nov 26): `qa_gameplay_screen.png` (931 KB), `qa_gameplay_lobby.png` (1.1 MB) y `qa_gameplay_selectmusic.png` (867 KB) tenían UI, fuentes, iconos y fondos 100% nítidos.
+  - `e3ad12ae` (`20:27`, Nov 26): En el build inmediato (`qa_live_lobby.png` `20:30` = 38.7 KB y `qa_live_screen.png` = 10.6 KB) surgió la corrupción visual global exacta reportada en las capturas del usuario. Entre ambos commits únicamente cambió `libscript.js`.
+
+#### 2. Causas Raíz Comprobadas en Binarios, Código y Dispositivo
+1. **P0 — Filtros rígidos `[0x50, 0x80)` en Liveness/GC (`e3ad12ae` / `50e19bed` / `6a3f42bd`):**
+   - Los hooks `0x9F8DCC` (`0xF288E0`, `LivenessCheck`), `0x9F89A4` (`0xD62050`, `LivenessState::TraverseObject` — etiquetado erróneamente como *Boehm GC Object Scanner*), `0x9F8A18` (`0xF28940`, `ArrayLiveness`) y `0x9F8E04` (`0xF289A0`, `TypeHierarchy`) restringieron direcciones de `Il2CppObject*` / `Il2CppClass*` / `typeHierarchy` al rango `[0x50, 0x80)` en bits `[55:32]` sin haber podido leer `/proc/<pid>/maps` (`Permission denied`).
+   - Cuando objetos o metadatos IL2CPP caen fuera de `[0x50, 0x80)`, `Resources.UnloadUnusedAssets()` concluye que ya no están referenciados desde C#, destruye en C++ las texturas de `Font`, `Sprite` y `UIAtlas`, y Unity las sustituye por `Texture2D.whiteTexture` tintado (generando los rectángulos sólidos en `EntryScene`, `#FFFFFF` en `TitleScene` y cuadros/bloques de fuente en `LobbyScene`). Adicionalmente, `bg3.i.bytes.png` en `TitleScene` no fija `HideFlags = 52`.
+2. **P0 — Exposición a `SIGSEGV` en `0xD62050`:** `e3ad12ae` eliminó la guarda de rango de `x0` en `0xD62050`, ejecutando `ldr x8, [x0]` tras solo `cbz x0` (explicando `tombstone_00..02`, muerte de `PID 2915` y salidas al launcher).
+3. **P0 — Video AVPro negro + `GL error 0x502` en `LobbyScene` (`PID 3057`):** `[AVProVideo] Texture ID: 147` falla inmediatamente con `emuglGLESv2_enc: s_glBindTexture:2447 GL error 0x502`; al recibir `FirstFrameReady`, `TopViewControl.UpdateScene` oculta `background_main.png` (`HideBackgroundImage` en `0xB2ED70`), dejando fondo `#000000`.
+4. **P0 — Desincronización de `/sdcard/Android/data/com.dalcomsoft.sslo/files/libscript.js`:** La copia en BlueStacks (`md5 295a7b229a8c846f1ed5d2638f8344cd`, `1,766,410 B`, `23:55`) es anterior al `HEAD` del repo (`md5 7ffe953894ef90b69f30859c6b1a80bb`, `1,769,782 B`, `00:17`, commit `19d2a137`) y sobreescribe al `libscript.so` del APK en tiempo de ejecución.
+5. **P1 — Atajos sin resolver en Gameplay y Resultados:**
+   - `OnLoading_2` (`0xEDA6AC`) y `OnLoading_3` (`0xEDB25C`) anulados (`mov w0, wzr; ret`), dejando cartas in-game como rectángulos rojos/azules (`qa_live_gameplay_now.png`).
+   - `isIngameAsset` en `URLsControl.LoadFrom_File_or_Location` (`0x163A880`) omite `"hcxjx/"` (fondos de canción en partida).
+   - `IngameThemeBonus` (`0x149D854` / `0x149D938`) forzado cerrado.
+   - `IngameView.CalcLifeAndFeverState` (`0x14A1BB0` -> `ret`) anulado junto a `OnGameOver`/`get_IsGameOver` (`Godmode` forzado, sin barra de energía ni Fever reales).
+   - `ResultControl.ClearNoteList` (`0xF92F84`) y `ResultScene.InitNote` (`0xF94B08`) evadidos por null en `NoteList`, con `score=0` visual en paneles.
+   - `libminiaudio.so` parcheado en disco (`0xBEAC` stereo, `0xC110` 44.1 kHz) + caché `bgmLastUri`/`bgmLastBufId` sin invalidación entre canciones.
+
+* **Plan Aprobado:** [song_gameplay_integrity_plan.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/song_gameplay_integrity_plan.md) — Ejecución iniciando por Fase 0 (sonda de memoria real desde el proceso) -> Fase 1 (Liveness/GC + Video/Shaders + Sync) -> Fase 2 (Gameplay/Result auténticos) -> Fase 3 (QA End-to-End).
+
+
 
 
 
