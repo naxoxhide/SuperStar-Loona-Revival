@@ -1160,6 +1160,59 @@ function initIl2Cpp(module) {
             log("[-] Error installing Array Liveness GC shield: " + eArrLiv.message);
         }
 
+        // IL2CPP Liveness Check TypeHierarchy Shield: native direct branch trampoline in libil2cpp .text (at 0xF289A0)
+        // Prevents SIGSEGV at 0x9F8E0C (GetLivenessCheck) when Unity GC dereferences corrupted or non-Il2CppClass typeHierarchy pointers
+        try {
+            var livenessThPatchAddr = baseAddr.add(0x9F8E04);
+            var livenessThTrampAddr = baseAddr.add(0xF289A0);
+
+            // 1. Write native trampoline into unused .text of CardListCompare (0xF289A0):
+            Memory.protect(livenessThTrampAddr, 96, "rwx");
+            var livenessThTrampBytes = [
+                0x08, 0x65, 0x40, 0xf9, // 0xF289A0: ldr x8, [x8, #0xc8]
+                0xa8, 0x02, 0x00, 0xb4, // 0xF289A4: cbz x8, #0xf289f8
+                0x1f, 0x09, 0x40, 0xf2, // 0xF289A8: tst x8, #7
+                0x61, 0x02, 0x00, 0x54, // 0xF289AC: b.ne #0xf289f8
+                0x10, 0xdd, 0x78, 0xd3, // 0xF289B0: lsl x16, x8, #8
+                0x10, 0xfe, 0x68, 0xd3, // 0xF289B4: lsr x16, x16, #40
+                0x10, 0x42, 0x01, 0xd1, // 0xF289B8: sub x16, x16, #0x50
+                0x1f, 0xc2, 0x00, 0xf1, // 0xF289BC: cmp x16, #0x30
+                0xc2, 0x01, 0x00, 0x54, // 0xF289C0: b.hs #0xf289f8
+                0x08, 0x0d, 0x2a, 0x8b, // 0xF289C4: add x8, x8, w10, uxtb #3
+                0x08, 0x21, 0x00, 0xd1, // 0xF289C8: sub x8, x8, #8
+                0x1f, 0x09, 0x40, 0xf2, // 0xF289CC: tst x8, #7
+                0x41, 0x01, 0x00, 0x54, // 0xF289D0: b.ne #0xf289f8
+                0x10, 0xdd, 0x78, 0xd3, // 0xF289D4: lsl x16, x8, #8
+                0x10, 0xfe, 0x68, 0xd3, // 0xF289D8: lsr x16, x16, #40
+                0x10, 0x42, 0x01, 0xd1, // 0xF289DC: sub x16, x16, #0x50
+                0x1f, 0xc2, 0x00, 0xf1, // 0xF289E0: cmp x16, #0x30
+                0xa2, 0x00, 0x00, 0x54, // 0xF289E4: b.hs #0xf289f8
+                0x08, 0x01, 0x40, 0xf9, // 0xF289E8: ldr x8, [x8]
+                0x1f, 0x01, 0x09, 0xeb, // 0xF289EC: cmp x8, x9
+                0x41, 0x00, 0x00, 0x54, // 0xF289F0: b.ne #0xf289f8
+                0x09, 0x41, 0xeb, 0x17, // 0xF289F4: b #0x9f8e18
+                0x24, 0x41, 0xeb, 0x17  // 0xF289F8: b #0x9f8e88
+            ];
+            livenessThTrampAddr.writeByteArray(livenessThTrampBytes);
+            Memory.protect(livenessThTrampAddr, 96, "r-x");
+
+            // 2. Direct branch from 0x9F8E04 to 0xF289A0 (b #0xf289a0 = 0x1414bee7):
+            Memory.protect(livenessThPatchAddr, 20, "rwx");
+            var livenessThPatchBytes = [
+                0xe7, 0xbe, 0x14, 0x14, // 0x9F8E04: b #0xf289a0
+                0x1f, 0x20, 0x03, 0xd5, // 0x9F8E08: nop
+                0x1f, 0x20, 0x03, 0xd5, // 0x9F8E0C: nop
+                0x1f, 0x20, 0x03, 0xd5, // 0x9F8E10: nop
+                0x1f, 0x20, 0x03, 0xd5  // 0x9F8E14: nop
+            ];
+            livenessThPatchAddr.writeByteArray(livenessThPatchBytes);
+            Memory.protect(livenessThPatchAddr, 20, "r-x");
+
+            log("[🛡️ LIVENESS TYPEHIERARCHY GC SHIELD] Successfully installed direct .text trampoline at 0xF289A0 from 0x9F8E04!");
+        } catch (eLivTh) {
+            log("[-] Error installing Liveness TypeHierarchy GC shield: " + eLivTh.message);
+        }
+
         // 0. Comprehensive exception tracers: capture root thrower (0x9F1AC8), null refs (0xA43CC0), __cxa_throw (0xA8A284 / 0x81EF40)
         // 0. Comprehensive exception tracers: capture root thrower (0x9F1AC8), null refs (0xA43CC0), __cxa_throw (0xA8A284), abort
         try {
@@ -23382,6 +23435,27 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             log("[🛡️ SELECT_MUSIC] Patched 0x103FC14: cbz x0, #0x103fc28 (safe StopPreview bypass)");
                         } catch (ePatchGo) {
                             log("[-] Error patching 0x103FC14: " + ePatchGo.message);
+                        }
+
+                        // Bulletproof safety patches for SelectMusicView coroutines:
+                        // 1. SetSortAnimation MoveNext (0xBF41B4): jump to 0xBF4190 (clean exit return false)
+                        // 2. DoSortAnimationStart MoveNext (0xBF3684): jump to 0xBF36B0 (clean exit return false)
+                        // 3. PlayAfterSec MoveNext (0xBF3C64): jump to 0xBF3C48 (clean exit return false)
+                        try {
+                            Memory.protect(baseAddr.add(0xBF41B4), 4, 'rwx');
+                            baseAddr.add(0xBF41B4).writeByteArray([0xf7, 0xff, 0xff, 0x17]); // b #0xbf4190
+                            Memory.protect(baseAddr.add(0xBF41B4), 4, 'r-x');
+
+                            Memory.protect(baseAddr.add(0xBF3684), 4, 'rwx');
+                            baseAddr.add(0xBF3684).writeByteArray([0x0b, 0x00, 0x00, 0x14]); // b #0xbf36b0
+                            Memory.protect(baseAddr.add(0xBF3684), 4, 'r-x');
+
+                            Memory.protect(baseAddr.add(0xBF3C64), 4, 'rwx');
+                            baseAddr.add(0xBF3C64).writeByteArray([0xf9, 0xff, 0xff, 0x17]); // b #0xbf3c48
+                            Memory.protect(baseAddr.add(0xBF3C64), 4, 'r-x');
+                            log("[🛡️ SELECT_MUSIC] Patched SelectMusicView coroutine NRE branches (0xBF41B4, 0xBF3684, 0xBF3C64) -> clean return false!");
+                        } catch (ePatchCoro) {
+                            log("[-] Error patching SelectMusicView coroutines: " + ePatchCoro.message);
                         }
 
                         Interceptor.attach(baseAddr.add(0x1041A78), {

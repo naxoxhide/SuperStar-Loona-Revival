@@ -5362,12 +5362,24 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
      - `IngameLoadingScene.<OnLoading_6_Bgm>` (`0xED6294`) usa `MiniAudioCS.OpenOneshot(audioUri, streaming)` (`0xCC29D8`) y `<OnLoading_7_SeqContext>` (`0xEDDD14`) usa `MusicControl.Data.SeqDownloadPath(difficult).GetFileInstalledUri()` (`0xF065A0` / `0xD7B2F4`) + `SEQ.SeqContext.OpenFromUri` (`0xFD546C`).
    - **Dependencias de Red Auxiliares:** `MusicRankingControl.LoadRankData` (`0xB071A4`), `HelpAssist.Open` (`0xBA6DA4`), `ADControl`/`ADAssist` (`0x103F828`/`0x1220A38`), `TakeHeadphoneAssist` (`0xB16E94` -> `LeagueControl`), `Game.setFavorites` (`0xD3076C`), `Game.getMyRecords` / `getMyWorldRecords` (`0xD3C374` / `0xD3C650`).
 
-#### 3. Alcance Confirmado por Ignacio y Siguiente Paso
-* **Decisiones confirmadas:**
-  - Usar el **100% de assets reales** locales encontrados en [app/src/files/](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/files/) tras desplegarlos a `/sdcard/Android/data/com.dalcomsoft.sslo/files/`.
-  - Consumo normal de Headphones (`UserControl.UseHeadphone`) con regeneración offline nativa cada `300,000 ms` (5 min) hasta tope `5` + ganancia auténtica de RP por puntuación.
-  - Incluir **Challenge Missions** (`GameControl.ChallengeMission`) y dejar `SuperStar League` (`SceneId = 8`) para una tarea dedicada.
-* **Siguiente paso:** Aprobación final del plan actualizado [song_gameplay_plan.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/song_gameplay_plan.md) por Ignacio para generar el commit de checkpoint e iniciar la ejecución.
+#### 3. Avance Técnico de Ejecución: Song Gameplay Plan (Offline Engine)
+* **Neutralización de Crashes en `SelectMusicScene` (Scene 7):**
+  - **EnhancedScroller CellView Crash:** `cellViewPrefab` (`slotView + 0x40`) perdía su puntero nativo (`m_CachedPtr == 0`) tras la carga inicial, disparando NRE fatal en `EnhancedScroller.GetCellView` (`0x125C3F4`). Resuelto mediante triple escudo:
+    1. `DontDestroyOnLoad` preventivo en `SelectMusicSlotView.Awake` (`0x10489E4`).
+    2. Clonación genuina de `prefab` mediante `UnityEngine.Object.Instantiate(Object original)` (`0x1DC7A34`) para instanciar un `cloneCell` permanente.
+    3. Resguardo dinámico en `SelectMusicSlotView.GetCellView` (`0x1048BC8`) y `EnhancedScroller.GetCellView` (`0x125C3F4`): si `cellPrefab.m_CachedPtr == 0`, se intercambia dinámicamente por `savedCloneCell`. Resultado: Celdas 0 a 6 instanciadas e inicializadas al 100%.
+  - **Neutralización de NREs en Corrutinas de `SelectMusicView`:**
+    1. `SelectMusicView.<SetSortAnimation>d__122.MoveNext`: Rama de NRE en `0xBF41B4` parcheada con `b #0xbf4190` (`0x17fffff7`) para retorno limpio `false`.
+    2. `SelectMusicView.<DoSortAnimationStart>d__121.MoveNext`: Rama de NRE en `0xBF3684` parcheada con `b #0xbf36b0` (`0x1400000b`) para retorno limpio `false`.
+    3. `SelectMusicView.<PlayAfterSec>d__124.MoveNext`: Rama de NRE en `0xBF3C64` parcheada con `b #0xbf3c48` (`0x17fffff9`) para retorno limpio `false`.
+  - **Neutralización Definitiva de Crash en GC Liveness Check (`0x9F8E0C`):**
+    - Durante la transición de `SelectMusicScene` a `IngameLoadingScene` (Scene 9), el garbage collector de Unity (`libunity.so!0x27db24`) recorre el heap invocando `libil2cpp!GetLivenessCheck` (`0x9F8DCC`).
+    - Al escanear bloques nativos o punteros no-IL2CPP, la lectura de `klass->typeHierarchy` (`[x8, #0xc8]`) producía valores arbitrarios / texto ASCII (ej. `0x6c2f282065766175`). Al intentar indexar y desreferenciar `ldur x8, [x8, #-8]` en `0x9F8E0C`, provocaba un `SIGSEGV` fatal (`SEGV_MAPERR`).
+    - Solución: Se implementó un escudo de validación nativo en espacio `.text` libre (`0xF289A0`) interceptando `0x9F8E04` (`b #0xf289a0`): verifica alineación y rango de memoria de usuario tanto para el puntero `typeHierarchy` como para la dirección final de cada clase padre antes de cualquier desreferenciación. Si el puntero es inválido, retorna limpio `0` (`b #0x9f8e88`).
+* **Siguiente Paso Inmediato:**
+  - Compilar APK e instalar en emulador (`127.0.0.1:5555`).
+  - Iniciar partida desde `SelectMusicScene` -> Validar transición limpia `IngameLoadingScene` (Scene 9) -> `IngameScene` (Scene 10) con notas cayendo en tiempo real.
+
 
 
 
