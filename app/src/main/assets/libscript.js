@@ -21898,21 +21898,23 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     Interceptor.replace(baseAddr.add(0x163A880), keepCb(new NativeCallback(function (type, filePathPtr, versionPtr, locsPtr, options, order, cbPtr, methodInfo) {
                         var relPath = "";
                         try { if (!filePathPtr.isNull()) relPath = readIl2CppString(filePathPtr); } catch (eS) {}
-                        if (relPath && (relPath.indexOf("asiudgasg/") !== -1 || relPath.indexOf("weoihxd/") !== -1 || relPath.indexOf("halwuiefjs/") !== -1 || relPath.indexOf(".i.bytes") !== -1)) {
+                        // Never mock in-game card textures, audio, sequences or album covers; let native engine load them from disk!
+                        var isIngameAsset = relPath && (relPath.indexOf("wadceg/") !== -1 || relPath.indexOf("woeiurty/") !== -1 || relPath.indexOf("dslkjfsdalhh/") !== -1 || relPath.indexOf("aweid/") !== -1);
+                        if (!isIngameAsset && relPath && (relPath.indexOf("weoihxd/") !== -1 || relPath.indexOf("halwuiefjs/") !== -1)) {
                             var resKlass = getClass("Assembly-CSharp", "", "WWWFile/Result") ||
                                            getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control", "WWWFile/Result") ||
                                            getClass("Assembly-CSharp-firstpass", "", "WWWFile/Result");
-                            var resObj = (resKlass && !resKlass.isNull()) ? il2cpp_object_new(resKlass) : Memory.alloc(0x40);
-                            if (resObj && !resObj.isNull()) {
-                                if (resKlass && !resKlass.isNull()) {
+                            if (resKlass && !resKlass.isNull()) {
+                                var resObj = il2cpp_object_new(resKlass);
+                                if (resObj && !resObj.isNull()) {
                                     if (il2cpp_gchandle_new) il2cpp_gchandle_new(resObj, 2);
                                     try { new NativeFunction(baseAddr.add(0x20D41F4), "void", ["pointer", "pointer"])(resObj, NULL); } catch (eRc) {}
+                                    try { resObj.add(0x20).writeU8(1); } catch (eD) {} // IsNotCanceled = true
+                                    log("[🌐 URLs] LoadFrom_File_or_Location offline hit: " + relPath + " cb=" + cbPtr);
+                                    safeInvokeDelegate1(cbPtr, "pointer", resObj);
+                                    return resObj;
                                 }
-                                try { resObj.add(0x20).writeU8(1); } catch (eD) {} // IsNotCanceled = true
                             }
-                            log("[🌐 URLs] LoadFrom_File_or_Location offline hit: " + relPath + " cb=" + cbPtr);
-                            safeInvokeDelegate1(cbPtr, "pointer", resObj);
-                            return resObj;
                         }
                         return origLoadFromFile(type, filePathPtr, versionPtr, locsPtr, options, order, cbPtr, methodInfo);
                     }, "pointer", ["int", "pointer", "pointer", "pointer", "uint32", "int", "pointer", "pointer"])));
@@ -23584,19 +23586,6 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         });
                         Interceptor.attach(baseAddr.add(0xF7CBDC), {
                             onEnter: function () { log("[🚀 INGAME_TRANSITION] IngameLoadingScene.SetStateGoToIngame entered!"); }
-                        });
-                        Interceptor.attach(baseAddr.add(0x163A880), {
-                            onEnter: function (args) {
-                                try {
-                                    var type = args[0].toInt32();
-                                    var path = (!args[1].isNull()) ? readIl2CppString(args[1]) : "null";
-                                    var ver = (!args[2].isNull()) ? readIl2CppString(args[2]) : "null";
-                                    log("[🖼️ URLS_LOAD] LoadFrom_File_or_Location type=" + type + " path=" + path + " ver=" + ver);
-                                } catch (eUl) {}
-                            },
-                            onLeave: function (retval) {
-                                log("[🖼️ URLS_LOAD] LoadFrom_File_or_Location returned Result=" + retval);
-                            }
                         });
                         // Native memory patches for IngameLoadingScene & IngameScene:
                         // 1. At 0xEDA6AC: OnLoading_2_CardTexture_WaitAndBind.MoveNext -> return false (instant complete, skips texture wait/crash)
