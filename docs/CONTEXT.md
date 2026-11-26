@@ -5376,6 +5376,12 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
     - Durante la transición de `SelectMusicScene` a `IngameLoadingScene` (Scene 9), el garbage collector de Unity (`libunity.so!0x27db24`) recorre el heap invocando `libil2cpp!GetLivenessCheck` (`0x9F8DCC`).
     - Al escanear bloques nativos o punteros no-IL2CPP, la lectura de `klass->typeHierarchy` (`[x8, #0xc8]`) producía valores arbitrarios / texto ASCII (ej. `0x6c2f282065766175`). Al intentar indexar y desreferenciar `ldur x8, [x8, #-8]` en `0x9F8E0C`, provocaba un `SIGSEGV` fatal (`SEGV_MAPERR`).
     - Solución: Se implementó un escudo de validación nativo en espacio `.text` libre (`0xF289A0`) interceptando `0x9F8E04` (`b #0xf289a0`): verifica alineación y rango de memoria de usuario tanto para el puntero `typeHierarchy` como para la dirección final de cada clase padre antes de cualquier desreferenciación. Si el puntero es inválido, retorna limpio `0` (`b #0x9f8e88`).
+  - **Neutralización de Crash en Decodificación de Audio BGM (`libminiaudio.so`!mina_ov_read):**
+    - Durante la carga del archivo de audio Vorbis en `IngameLoadingScene.<OnLoading_6_Bgm>` (`0xED6294`), `libminiaudio.so` invocaba `mina_ov_read` (`0xBE64`).
+    - Al alcanzar el final del stream de audio (EOF, `ov_read == 0` que retorna `w0 = 1`), `mina_ov_read` intentaba leer los canales en `0xBEAC: ldr w1, [x1, #0x10]` usando el handle `[x19]` que se encontraba cerrado/nulo en ese punto, provocando un fallo de desreferenciación nula.
+    - Solución: Se parcheó `libminiaudio.so` tanto en binario como dinámicamente:
+      1. En `0xBEA0`: `cbnz w0, #0xbedc` (`0x350001e0`), bifurcando de inmediato al retorno limpio `-2` (EOF/complete) sin acceder a la estructura de canales cuando `w0 != 0`.
+      2. En `0xBEAC`: `cbz x1, #0xbedc` (`0xb4000181`), resguardo contra puntero nulo.
 * **Siguiente Paso Inmediato:**
   - Compilar APK e instalar en emulador (`127.0.0.1:5555`).
   - Iniciar partida desde `SelectMusicScene` -> Validar transición limpia `IngameLoadingScene` (Scene 9) -> `IngameScene` (Scene 10) con notas cayendo en tiempo real.

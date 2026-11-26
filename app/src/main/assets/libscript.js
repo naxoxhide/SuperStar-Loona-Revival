@@ -23545,6 +23545,17 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 try {
                                     var uri = readIl2CppString(args[0].add(0x10).readPointer());
                                     log("[🎼 BGM LOAD] OnLoading_6_Bgm URI=" + uri);
+                                    var minaMod = Process.findModuleByName("libminiaudio.so");
+                                    if (minaMod) {
+                                        Memory.protect(minaMod.base.add(0xBEA0), 4, 'rwx');
+                                        minaMod.base.add(0xBEA0).writeByteArray([0xe0, 0x01, 0x00, 0x35]); // cbnz w0, #0xbedc
+                                        Memory.protect(minaMod.base.add(0xBEA0), 4, 'r-x');
+
+                                        Memory.protect(minaMod.base.add(0xBEAC), 4, 'rwx');
+                                        minaMod.base.add(0xBEAC).writeByteArray([0x81, 0x01, 0x00, 0xb4]); // cbz x1, #0xbedc
+                                        Memory.protect(minaMod.base.add(0xBEAC), 4, 'r-x');
+                                        log("[🛡️ MINIAUDIO] Applied EOF/Null check patches to libminiaudio.so (0xBEA0, 0xBEAC)!");
+                                    }
                                 } catch (eU1) {}
                             }
                         });
