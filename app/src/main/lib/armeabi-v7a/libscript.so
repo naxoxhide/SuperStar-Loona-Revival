@@ -21898,21 +21898,23 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     Interceptor.replace(baseAddr.add(0x163A880), keepCb(new NativeCallback(function (type, filePathPtr, versionPtr, locsPtr, options, order, cbPtr, methodInfo) {
                         var relPath = "";
                         try { if (!filePathPtr.isNull()) relPath = readIl2CppString(filePathPtr); } catch (eS) {}
-                        if (relPath && (relPath.indexOf("asiudgasg/") !== -1 || relPath.indexOf("weoihxd/") !== -1 || relPath.indexOf("halwuiefjs/") !== -1 || relPath.indexOf(".i.bytes") !== -1)) {
+                        // Never mock in-game card textures, audio, sequences or album covers; let native engine load them from disk!
+                        var isIngameAsset = relPath && (relPath.indexOf("wadceg/") !== -1 || relPath.indexOf("woeiurty/") !== -1 || relPath.indexOf("dslkjfsdalhh/") !== -1 || relPath.indexOf("aweid/") !== -1);
+                        if (!isIngameAsset && relPath && (relPath.indexOf("weoihxd/") !== -1 || relPath.indexOf("halwuiefjs/") !== -1)) {
                             var resKlass = getClass("Assembly-CSharp", "", "WWWFile/Result") ||
                                            getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control", "WWWFile/Result") ||
                                            getClass("Assembly-CSharp-firstpass", "", "WWWFile/Result");
-                            var resObj = (resKlass && !resKlass.isNull()) ? il2cpp_object_new(resKlass) : Memory.alloc(0x40);
-                            if (resObj && !resObj.isNull()) {
-                                if (resKlass && !resKlass.isNull()) {
+                            if (resKlass && !resKlass.isNull()) {
+                                var resObj = il2cpp_object_new(resKlass);
+                                if (resObj && !resObj.isNull()) {
                                     if (il2cpp_gchandle_new) il2cpp_gchandle_new(resObj, 2);
                                     try { new NativeFunction(baseAddr.add(0x20D41F4), "void", ["pointer", "pointer"])(resObj, NULL); } catch (eRc) {}
+                                    try { resObj.add(0x20).writeU8(1); } catch (eD) {} // IsNotCanceled = true
+                                    log("[🌐 URLs] LoadFrom_File_or_Location offline hit: " + relPath + " cb=" + cbPtr);
+                                    safeInvokeDelegate1(cbPtr, "pointer", resObj);
+                                    return resObj;
                                 }
-                                try { resObj.add(0x20).writeU8(1); } catch (eD) {} // IsNotCanceled = true
                             }
-                            log("[🌐 URLs] LoadFrom_File_or_Location offline hit: " + relPath + " cb=" + cbPtr);
-                            safeInvokeDelegate1(cbPtr, "pointer", resObj);
-                            return resObj;
                         }
                         return origLoadFromFile(type, filePathPtr, versionPtr, locsPtr, options, order, cbPtr, methodInfo);
                     }, "pointer", ["int", "pointer", "pointer", "pointer", "uint32", "int", "pointer", "pointer"])));
@@ -23548,13 +23550,17 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     var minaMod = Process.findModuleByName("libminiaudio.so");
                                     if (minaMod) {
                                         Memory.protect(minaMod.base.add(0xBEA0), 4, 'rwx');
-                                        minaMod.base.add(0xBEA0).writeByteArray([0xe0, 0x01, 0x00, 0x35]); // cbnz w0, #0xbedc
+                                        minaMod.base.add(0xBEA0).writeByteArray([0xe0, 0x01, 0xf8, 0x37]); // tbnz w0, #0x1f, #0xbedc (error check)
                                         Memory.protect(minaMod.base.add(0xBEA0), 4, 'r-x');
 
                                         Memory.protect(minaMod.base.add(0xBEAC), 4, 'rwx');
-                                        minaMod.base.add(0xBEAC).writeByteArray([0x81, 0x01, 0x00, 0xb4]); // cbz x1, #0xbedc
+                                        minaMod.base.add(0xBEAC).writeByteArray([0x41, 0x00, 0x80, 0x52]); // mov w1, #2 (stereo channels)
                                         Memory.protect(minaMod.base.add(0xBEAC), 4, 'r-x');
-                                        log("[🛡️ MINIAUDIO] Applied EOF/Null check patches to libminiaudio.so (0xBEA0, 0xBEAC)!");
+
+                                        Memory.protect(minaMod.base.add(0xC110), 4, 'rwx');
+                                        minaMod.base.add(0xC110).writeByteArray([0x83, 0x88, 0x95, 0x52]); // mov w3, #0xac44 (44100 sample rate)
+                                        Memory.protect(minaMod.base.add(0xC110), 4, 'r-x');
+                                        log("[🛡️ MINIAUDIO] Applied audio decoding & channel/rate shields to libminiaudio.so (0xBEA0, 0xBEAC, 0xC110)!");
                                     }
                                 } catch (eU1) {}
                             }
@@ -23584,19 +23590,6 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         });
                         Interceptor.attach(baseAddr.add(0xF7CBDC), {
                             onEnter: function () { log("[🚀 INGAME_TRANSITION] IngameLoadingScene.SetStateGoToIngame entered!"); }
-                        });
-                        Interceptor.attach(baseAddr.add(0x163A880), {
-                            onEnter: function (args) {
-                                try {
-                                    var type = args[0].toInt32();
-                                    var path = (!args[1].isNull()) ? readIl2CppString(args[1]) : "null";
-                                    var ver = (!args[2].isNull()) ? readIl2CppString(args[2]) : "null";
-                                    log("[🖼️ URLS_LOAD] LoadFrom_File_or_Location type=" + type + " path=" + path + " ver=" + ver);
-                                } catch (eUl) {}
-                            },
-                            onLeave: function (retval) {
-                                log("[🖼️ URLS_LOAD] LoadFrom_File_or_Location returned Result=" + retval);
-                            }
                         });
                         // Native memory patches for IngameLoadingScene & IngameScene:
                         // 1. At 0xEDA6AC: OnLoading_2_CardTexture_WaitAndBind.MoveNext -> return false (instant complete, skips texture wait/crash)
@@ -23639,6 +23632,27 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             Memory.protect(baseAddr.add(0x14A84E0), 4, 'rwx');
                             baseAddr.add(0x14A84E0).writeByteArray([0x07, 0x00, 0x00, 0x14]);
                             log("[🎮 INGAME_READY] Patched IngameView.GameReady at 0x14A84E0 (b #GameStart)!");
+
+                            // Bulletproof Game Over and FailDataToServer shields for offline song gameplay:
+                            // 1. IngameScene.FailDataToServer at 0x1499994 -> ret (prevents null server dereference at 0x168)
+                            Memory.protect(baseAddr.add(0x1499994), 4, 'rwx');
+                            baseAddr.add(0x1499994).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
+                            log("[🛡️ FAIL_DATA] Patched IngameScene.FailDataToServer at 0x1499994 (ret)!");
+
+                            // 2. IngameView.OnGameOver at 0x14A1F24 -> ret (prevents game over popup and stall)
+                            Memory.protect(baseAddr.add(0x14A1F24), 4, 'rwx');
+                            baseAddr.add(0x14A1F24).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
+                            log("[🛡️ GAME_OVER] Patched IngameView.OnGameOver at 0x14A1F24 (ret)!");
+
+                            // 3. IngameView.get_IsGameOver at 0x14A93E8 -> mov w0, wzr; ret (always false)
+                            Memory.protect(baseAddr.add(0x14A93E8), 8, 'rwx');
+                            baseAddr.add(0x14A93E8).writeByteArray([0xe0, 0x03, 0x1f, 0x2a, 0xc0, 0x03, 0x5f, 0xd6]);
+                            log("[🛡️ IS_GAME_OVER] Patched IngameView.get_IsGameOver at 0x14A93E8 (mov w0, wzr; ret)!");
+
+                            // 4. IngameView.CalcLifeAndFeverState at 0x14A1BB0 -> ret (prevents game over on note miss)
+                            Memory.protect(baseAddr.add(0x14A1BB0), 4, 'rwx');
+                            baseAddr.add(0x14A1BB0).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
+                            log("[🛡️ NO_FAIL] Patched IngameView.CalcLifeAndFeverState at 0x14A1BB0 (ret) for offline Godmode!");
                         } catch (ePatchLoading2) {
                             log("[-] Failed to patch loading/ingame scene opcodes: " + ePatchLoading2.message);
                         }

@@ -23550,13 +23550,17 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                     var minaMod = Process.findModuleByName("libminiaudio.so");
                                     if (minaMod) {
                                         Memory.protect(minaMod.base.add(0xBEA0), 4, 'rwx');
-                                        minaMod.base.add(0xBEA0).writeByteArray([0xe0, 0x01, 0x00, 0x35]); // cbnz w0, #0xbedc
+                                        minaMod.base.add(0xBEA0).writeByteArray([0xe0, 0x01, 0xf8, 0x37]); // tbnz w0, #0x1f, #0xbedc (error check)
                                         Memory.protect(minaMod.base.add(0xBEA0), 4, 'r-x');
 
                                         Memory.protect(minaMod.base.add(0xBEAC), 4, 'rwx');
-                                        minaMod.base.add(0xBEAC).writeByteArray([0x81, 0x01, 0x00, 0xb4]); // cbz x1, #0xbedc
+                                        minaMod.base.add(0xBEAC).writeByteArray([0x41, 0x00, 0x80, 0x52]); // mov w1, #2 (stereo channels)
                                         Memory.protect(minaMod.base.add(0xBEAC), 4, 'r-x');
-                                        log("[🛡️ MINIAUDIO] Applied EOF/Null check patches to libminiaudio.so (0xBEA0, 0xBEAC)!");
+
+                                        Memory.protect(minaMod.base.add(0xC110), 4, 'rwx');
+                                        minaMod.base.add(0xC110).writeByteArray([0x83, 0x88, 0x95, 0x52]); // mov w3, #0xac44 (44100 sample rate)
+                                        Memory.protect(minaMod.base.add(0xC110), 4, 'r-x');
+                                        log("[🛡️ MINIAUDIO] Applied audio decoding & channel/rate shields to libminiaudio.so (0xBEA0, 0xBEAC, 0xC110)!");
                                     }
                                 } catch (eU1) {}
                             }
