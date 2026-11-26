@@ -1091,6 +1091,75 @@ function initIl2Cpp(module) {
             log("[-] Error installing Liveness GC shield: " + eLiv.message);
         }
 
+        // IL2CPP Array Liveness Check Shield: native direct branch trampoline in libil2cpp .text (at 0xF28940)
+        // Prevents SIGSEGV at 0x9F8A3C (TraverseGenericObject) when Unity GC traverses generic object arrays with non-pointer elements
+        try {
+            var arrayLivenessPatchAddr = baseAddr.add(0x9F8A18);
+            var arrayLivenessTrampAddr = baseAddr.add(0xF28940);
+
+            // 1. Write native trampoline into unused .text of CardListCompare (0xF28940):
+            // 0xF28940: cbz x9, #0xf28990                  (if candidate is null -> skip to 0x9F8A70)
+            // 0xF28944: tst x9, #7                          (if unaligned -> skip)
+            // 0xF28948: b.ne #0xf28990
+            // 0xF2894C: lsl x16, x9, #8                     (clear Scudo tag)
+            // 0xF28950: lsr x16, x16, #40                   (x16 = bits 32-55)
+            // 0xF28954: sub x16, x16, #0x50                 (range check)
+            // 0xF28958: cmp x16, #0x30                      (if not in [0x50, 0x80) -> skip)
+            // 0xF2895C: b.hs #0xf28990
+            // 0xF28960: cbz x10, #0xf2898c                  (if filter_class == null -> accept, jump to 0x9F8A48)
+            // 0xF28964: ldr x11, [x9]                       (load object->klass)
+            // 0xF28968: tbnz w11, #0, #0xf28990             (if bit 0 set -> skip)
+            // 0xF2896C: tst x11, #7                          (if class unaligned -> skip)
+            // 0xF28970: b.ne #0xf28990
+            // 0xF28974: lsl x16, x11, #8                     (clear Scudo tag)
+            // 0xF28978: lsr x16, x16, #40                   (x16 = bits 32-55 of class pointer)
+            // 0xF2897C: sub x16, x16, #0x50                 (range check)
+            // 0xF28980: cmp x16, #0x30                      (if not in [0x50, 0x80) -> skip)
+            // 0xF28984: b.hs #0xf28990
+            // 0xF28988: b #0x9f8a20                        (continue original hierarchy check)
+            // 0xF2898C: b #0x9f8a48                        (target match: accept object)
+            // 0xF28990: b #0x9f8a70                        (skip element)
+            Memory.protect(arrayLivenessTrampAddr, 84, "rwx");
+            var arrayLivenessTrampBytes = [
+                0x89, 0x02, 0x00, 0xb4, // 0xF28940: cbz x9, #0xf28990
+                0x3f, 0x09, 0x40, 0xf2, // 0xF28944: tst x9, #7
+                0x41, 0x02, 0x00, 0x54, // 0xF28948: b.ne #0xf28990
+                0x30, 0xdd, 0x78, 0xd3, // 0xF2894C: lsl x16, x9, #8
+                0x10, 0xfe, 0x68, 0xd3, // 0xF28950: lsr x16, x16, #40
+                0x10, 0x42, 0x01, 0xd1, // 0xF28954: sub x16, x16, #0x50
+                0x1f, 0xc2, 0x00, 0xf1, // 0xF28958: cmp x16, #0x30
+                0xa2, 0x01, 0x00, 0x54, // 0xF2895C: b.hs #0xf28990
+                0x6a, 0x01, 0x00, 0xb4, // 0xF28960: cbz x10, #0xf2898c
+                0x2b, 0x01, 0x40, 0xf9, // 0xF28964: ldr x11, [x9]
+                0x4b, 0x01, 0x00, 0x37, // 0xF28968: tbnz w11, #0, #0xf28990
+                0x7f, 0x09, 0x40, 0xf2, // 0xF2896C: tst x11, #7
+                0x01, 0x01, 0x00, 0x54, // 0xF28970: b.ne #0xf28990
+                0x70, 0xdd, 0x78, 0xd3, // 0xF28974: lsl x16, x11, #8
+                0x10, 0xfe, 0x68, 0xd3, // 0xF28978: lsr x16, x16, #40
+                0x10, 0x42, 0x01, 0xd1, // 0xF2897C: sub x16, x16, #0x50
+                0x1f, 0xc2, 0x00, 0xf1, // 0xF28980: cmp x16, #0x30
+                0x62, 0x00, 0x00, 0x54, // 0xF28984: b.hs #0xf28990
+                0x26, 0x40, 0xeb, 0x17, // 0xF28988: b #0x9f8a20
+                0x2f, 0x40, 0xeb, 0x17, // 0xF2898C: b #0x9f8a48
+                0x38, 0x40, 0xeb, 0x17  // 0xF28990: b #0x9f8a70
+            ];
+            arrayLivenessTrampAddr.writeByteArray(arrayLivenessTrampBytes);
+            Memory.protect(arrayLivenessTrampAddr, 84, "r-x");
+
+            // 2. Direct branch from 0x9F8A18 to 0xF28940 (b #0xf28940 = 0x1414bfca):
+            Memory.protect(arrayLivenessPatchAddr, 8, "rwx");
+            var arrayLivenessPatchBytes = [
+                0xca, 0xbf, 0x14, 0x14, // 0x9F8A18: b #0xf28940
+                0x1f, 0x20, 0x03, 0xd5  // 0x9F8A1C: nop
+            ];
+            arrayLivenessPatchAddr.writeByteArray(arrayLivenessPatchBytes);
+            Memory.protect(arrayLivenessPatchAddr, 8, "r-x");
+
+            log("[🛡️ ARRAY LIVENESS GC SHIELD] Successfully installed direct .text trampoline at 0xF28940 from 0x9F8A18!");
+        } catch (eArrLiv) {
+            log("[-] Error installing Array Liveness GC shield: " + eArrLiv.message);
+        }
+
         // 0. Comprehensive exception tracers: capture root thrower (0x9F1AC8), null refs (0xA43CC0), __cxa_throw (0xA8A284 / 0x81EF40)
         // 0. Comprehensive exception tracers: capture root thrower (0x9F1AC8), null refs (0xA43CC0), __cxa_throw (0xA8A284), abort
         try {
@@ -23124,10 +23193,6 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             onEnter: function () { log("[🎵 SELECT_MUSIC] <SetStateLoadingData>b__1 ENTER!"); },
                             onLeave: function () { log("[🎵 SELECT_MUSIC] <SetStateLoadingData>b__1 LEAVE!"); }
                         });
-                        Interceptor.attach(baseAddr.add(0x10406F8), {
-                            onEnter: function (args) { log("[🎵 SELECT_MUSIC] OnApplySort(idx=" + args[1].toInt32() + ", show=" + args[2].toInt32() + ")"); },
-                            onLeave: function () { log("[🎵 SELECT_MUSIC] OnApplySort LEAVE!"); }
-                        });
                         var emptySortGuard = false;
                         var origSortEmpty = new NativeFunction(baseAddr.add(0x1043DA8), "void", ["pointer", "int32", "pointer"]);
                         Interceptor.replace(baseAddr.add(0x1043DA8), keepCb(new NativeCallback(function (thiz, typeVal, methodInfo) {
@@ -23366,6 +23431,13 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             Memory.protect(baseAddr.add(0x149D938), 16, 'rwx');
                             baseAddr.add(0x149D938).writeByteArray([0x8d, 0x01, 0x00, 0x14]); // b #0x149df6c (jump to Close)
                             log("[🛡️ THEME_BONUS] Patched IngameThemeBonus.Open at 0x149D938 (b #Close)!");
+
+                            // Patch IngameView.GameReady at 0x14A84E0:
+                            // Original: cbz w8, #0x14a84fc (checks static flag at offset 0x25; if 1, returns and leaves state=2)
+                            // Patched:  b #0x14a84fc (0x07, 0x00, 0x00, 0x14) - ALWAYS transition to GameStart!
+                            Memory.protect(baseAddr.add(0x14A84E0), 4, 'rwx');
+                            baseAddr.add(0x14A84E0).writeByteArray([0x07, 0x00, 0x00, 0x14]);
+                            log("[🎮 INGAME_READY] Patched IngameView.GameReady at 0x14A84E0 (b #GameStart)!");
                         } catch (ePatchLoading2) {
                             log("[-] Failed to patch loading/ingame scene opcodes: " + ePatchLoading2.message);
                         }
