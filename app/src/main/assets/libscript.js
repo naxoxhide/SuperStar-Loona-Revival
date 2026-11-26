@@ -1729,7 +1729,42 @@ function initIl2Cpp(module) {
                 if (profile.stats.monthlyMyRecord === undefined) profile.stats.monthlyMyRecord = 0;
                 if (profile.stats.monthlyAttendance === undefined) profile.stats.monthlyAttendance = 1;
                 if (profile.stats.bestCardbook === undefined) profile.stats.bestCardbook = 0;
+                if (!Array.isArray(profile.favoriteMusics)) profile.favoriteMusics = [];
+                if (!Array.isArray(profile.favoriteGroups)) profile.favoriteGroups = [];
+                if (!profile.musicRecords || typeof profile.musicRecords !== "object") profile.musicRecords = {};
+                if (profile.lastHeadphoneChargeMs === undefined || profile.lastHeadphoneChargeMs === null || isNaN(parseInt(profile.lastHeadphoneChargeMs, 10))) {
+                    profile.lastHeadphoneChargeMs = Date.now();
+                }
+                if (profile.challengeMission === undefined) profile.challengeMission = null;
                 return profile;
+            }
+
+            // Headphone offline regeneration: UserControl..cctor uses HeadphoneChargeTermMs = 300,000 ms (5 min), MaxRechagableHeadphone = 5
+            var OFFLINE_HP_TERM_MS = 300000;
+            var OFFLINE_HP_RECHARGE_MAX = 5;
+            function syncOfflineHeadphoneRegen(profile) {
+                if (!profile || typeof profile !== "object") return false;
+                ensureProfileUserFields(profile);
+                var curHp = parseInt(profile.headphone, 10);
+                if (isNaN(curHp)) curHp = 0;
+                var now = Date.now();
+                var lastMs = parseInt(profile.lastHeadphoneChargeMs, 10) || now;
+                if (curHp >= OFFLINE_HP_RECHARGE_MAX) {
+                    if (Math.abs(now - lastMs) > OFFLINE_HP_TERM_MS) {
+                        profile.lastHeadphoneChargeMs = now;
+                    }
+                    return false;
+                }
+                if (now > lastMs) {
+                    var gained = Math.floor((now - lastMs) / OFFLINE_HP_TERM_MS);
+                    if (gained > 0) {
+                        var newHp = Math.min(OFFLINE_HP_RECHARGE_MAX, curHp + gained);
+                        profile.headphone = newHp;
+                        profile.lastHeadphoneChargeMs = (newHp >= OFFLINE_HP_RECHARGE_MAX) ? now : (lastMs + gained * OFFLINE_HP_TERM_MS);
+                        return true;
+                    }
+                }
+                return false;
             }
 
             function savePlayerProfile(profile) {
@@ -2203,10 +2238,19 @@ function initIl2Cpp(module) {
                     playerObj.add(0x54).writeInt((profile.rhythmPoint !== undefined && profile.rhythmPoint !== null && !isNaN(parsedRp)) ? parsedRp : 100000);
                     playerObj.add(0x58).writeInt(0);
 
-                    // headphone: int at 0x5C, freeHeadphone: int at 0x60
+                    // Headphone: split rechargeable freeHeadphone (up to 5) and paid/excess headphone (0x5C paid, 0x60 free, 0x68 lastHeadphoneCharge)
+                    if (syncOfflineHeadphoneRegen(profile)) {
+                        savePlayerProfile(profile);
+                    }
                     var parsedHp = parseInt(profile.headphone, 10);
-                    playerObj.add(0x5C).writeInt((profile.headphone !== undefined && profile.headphone !== null && !isNaN(parsedHp)) ? parsedHp : 50);
-                    playerObj.add(0x60).writeInt(0);
+                    if (isNaN(parsedHp) || parsedHp < 0) parsedHp = 50;
+                    var initFreeHp = Math.min(OFFLINE_HP_RECHARGE_MAX, parsedHp);
+                    var initPaidHp = Math.max(0, parsedHp - initFreeHp);
+                    playerObj.add(0x5C).writeInt(initPaidHp);
+                    playerObj.add(0x60).writeInt(initFreeHp);
+                    try {
+                        playerObj.add(0x68).writeS64(parseInt(profile.lastHeadphoneChargeMs, 10) || Date.now());
+                    } catch (eLh) {}
 
                     // nicknameChanger: int at 0x64
                     playerObj.add(0x64).writeInt(0);
@@ -2557,13 +2601,9 @@ function initIl2Cpp(module) {
                     fadeSetIsActiveFn(0);
                     var fadeCloseFn = new NativeFunction(baseAddr.add(0xD2FAB4), "void", []);
                     fadeCloseFn();
-                    var fadeCompleteFn = new NativeFunction(baseAddr.add(0xD2FC20), "void", []);
-                    fadeCompleteFn();
-                    var fadePurgeFn = new NativeFunction(baseAddr.add(0xD2F078), "void", []);
-                    fadePurgeFn();
                     var fadeStopFn = new NativeFunction(baseAddr.add(0xD2FD24), "void", []);
                     fadeStopFn();
-                    log("[🛡️ FADE DISMISSED] Fade closed & purged!");
+                    log("[🛡️ FADE DISMISSED] Fade closed & deactivated (Fade.instance preserved)!");
                 } catch (e) {
                     log("[-] Error dismissing Fade: " + e.message);
                 }
@@ -4974,7 +5014,8 @@ function initIl2Cpp(module) {
                             log("[-] Error activating VideoControl: " + ve.message);
                         }
 
-                        // 3. Dismiss & Purge Fade Overlay (Screen Veil)
+                        // 3. Dismiss Fade Overlay cleanly WITHOUT purging Fade.instance or deactivating its GameObject
+                        //    (Purging Fade.instance = null breaks Fade.Out/Fade.In callbacks such as SelectMusicScene -> IngameLoadingScene!)
                         try {
                             var fadeSetIsActiveFn = new NativeFunction(baseAddr.add(0xD2EBA8), "void", ["int"]);
                             fadeSetIsActiveFn(0);
@@ -4982,26 +5023,9 @@ function initIl2Cpp(module) {
                             var fadeCloseFn = new NativeFunction(baseAddr.add(0xD2FAB4), "void", []);
                             fadeCloseFn();
 
-                            var fadeCompleteFn = new NativeFunction(baseAddr.add(0xD2FC20), "void", []);
-                            fadeCompleteFn();
-
-                            var fadePurgeFn = new NativeFunction(baseAddr.add(0xD2F078), "void", []);
-                            fadePurgeFn();
-
                             var fadeStopFn = new NativeFunction(baseAddr.add(0xD2FD24), "void", []);
                             fadeStopFn();
-                            log("[🛡️ FADE DISMISSED] Fade.Close, Complete, Purge & Stop called successfully!");
-
-                            var fadeNames = ["Fade", "Fade(Clone)", "ScreenFade", "LoadingFade", "Curtain", "Dim", "Vanish"];
-                            fadeNames.forEach(function (fname) {
-                                try {
-                                    var fgo = findGameObjectFn(createIl2CppString(fname), NULL);
-                                    if (!fgo.isNull()) {
-                                        setActiveFn(fgo, 0);
-                                        log("[🛡️ FADE DISMISSED] Deactivated Fade GameObject: " + fname);
-                                    }
-                                } catch (e) {}
-                            });
+                            log("[🛡️ FADE DISMISSED] Fade.Close & Stop called cleanly (instance preserved)!");
                         } catch (fe) {
                             log("[-] Error dismissing Fade: " + fe.message);
                         }
@@ -5969,6 +5993,16 @@ function initIl2Cpp(module) {
                             var ttd = il2cpp_object_new(ttdKlass);
                             if (il2cpp_gchandle_new && !ttd.isNull()) il2cpp_gchandle_new(ttd, 2);
                             ttd.add(0x10).writeS16(themeTypeCode);
+                            var defGradeC = "http://d3exy8s96shf22.cloudfront.net/resources/images/card_edge/basic/ced_basic_c.png";
+                            var defGradeB = "http://d3exy8s96shf22.cloudfront.net/resources/images/card_edge/basic/ced_basic_b.png";
+                            var defGradeA = "http://d3exy8s96shf22.cloudfront.net/resources/images/card_edge/basic/ced_basic_a.png";
+                            var defGradeS = "http://d3exy8s96shf22.cloudfront.net/resources/images/card_edge/basic/ced_basic_s.png";
+                            var defGradeR = "http://d3exy8s96shf22.cloudfront.net/resources/images/card_edge/basic/ced_basic_r.png";
+                            ttd.add(0x18).writePointer(createIl2CppString(defGradeC));
+                            ttd.add(0x20).writePointer(createIl2CppString(defGradeB));
+                            ttd.add(0x28).writePointer(createIl2CppString(defGradeA));
+                            ttd.add(0x30).writePointer(createIl2CppString(defGradeS));
+                            ttd.add(0x38).writePointer(createIl2CppString(defGradeR));
                             ttObj.add(0x10).writePointer(ttd);
                         }
                         allThemeTypeDataMap[themeTypeCode] = ttObj;
@@ -6527,7 +6561,6 @@ function initIl2Cpp(module) {
                 // Proxy GroupControl.Find (0xB9EF94)
                 try {
                     Interceptor.replace(baseAddr.add(0xB9EF94), new NativeCallback(function (code, methodInfo) {
-                        log("[🔍 GROUP_FIND] GroupControl.Find called with code: " + code);
                         if (code <= 0) return NULL;
                         ensureLoonaMocks();
                         if (allGroupDataMap[code]) return allGroupDataMap[code];
@@ -6621,6 +6654,12 @@ function initIl2Cpp(module) {
                         var baseGc = getBaseGroupCode(gc);
                         return createDownloadPath("asiudgasg/asodhsg/foewghkc/" + baseGc + ".i.bytes");
                     }, "pointer", ["pointer", "pointer"]));
+
+                    // GroupControl.Data.IsDisplayed(DateTime now) (0xCA5600) -> always visible for playable groups offline
+                    Interceptor.replace(baseAddr.add(0xCA5600), new NativeCallback(function (thisPtr, nowVal, methodInfo) {
+                        if (!thisPtr || thisPtr.isNull()) return 0;
+                        return 1;
+                    }, "bool", ["pointer", "int64", "pointer"]));
 
                     log("[+] Interceptor.replace installed on all GroupControl.Data getters!");
                 } catch (eGcg) {
@@ -12373,13 +12412,21 @@ function initIl2Cpp(module) {
                                 try {
                                     var methodPtr = handleResult.add(0x10).readPointer();
                                     var targetObj = handleResult.add(0x20).readPointer();
+                                    var targetClsName = "";
+                                    if (!targetObj.isNull() && il2cpp_class_get_name) {
+                                        try {
+                                            var tCls = targetObj.readPointer();
+                                            if (tCls && !tCls.isNull()) targetClsName = il2cpp_class_get_name(tCls).readUtf8String() || "";
+                                        } catch (eClsN) {}
+                                    }
                                     if (!methodPtr.isNull() && !targetObj.isNull()) {
+                                        var methodRva = methodPtr.sub(baseAddr).toString(16);
                                         var cbFn = new NativeFunction(methodPtr, "void", ["pointer", "int", "pointer", "pointer"]);
                                         var hasTex = (tex && !tex.isNull());
+                                        log("[✅ CDN_CALLBACK] Calling handleResult rva=0x" + methodRva + " targetCls=" + targetClsName + " targetObj=" + targetObj + " rel=" + relPath);
                                         cbFn(targetObj, hasTex ? 1 : 0, hasTex ? tex : NULL, NULL);
-                                        log("[✅ CDN_CALLBACK] Called handleResult for targetObj: " + targetObj + " (success=" + (hasTex ? 1 : 0) + ")");
                                     }
-                                    if (!targetObj.isNull()) {
+                                    if (!targetObj.isNull() && targetClsName === "CardView") {
                                         try {
                                             var setPhotoVisFn = new NativeFunction(baseAddr.add(0x138F3A0), "void", ["pointer", "int", "pointer"]);
                                             setPhotoVisFn(targetObj, 1, NULL);
@@ -15333,6 +15380,9 @@ function initIl2Cpp(module) {
                             } catch (eChkDgl) {}
                         }
                         ensureLoonaMocks();
+                        if (!isInventoryPopulated || Object.keys(allInvenGroupItems).length === 0) {
+                            try { populateOfflineInventoryCards(); } catch (ePopDgl) {}
+                        }
                         var meta = getGlobalMetadata();
                         var playables = (meta && meta.playableGroups) ? meta.playableGroups : PLAYABLE_GROUP_CODES;
                         var groupItems = [];
@@ -15786,13 +15836,18 @@ function initIl2Cpp(module) {
                                         il2cpp_gchandle_new(groupItemObj, 1);
                                     }
                                     var etDict = (typeof buildGroupEachThemeBestDict === "function") ? buildGroupEachThemeBestDict(gCode) : NULL;
+                                    var dummyLiveList = [];
+                                    var memberCount = (artistCodes && artistCodes.length > 0) ? artistCodes.length : 11;
+                                    for (var d = 0; d < memberCount; d++) dummyLiveList.push(NULL);
+                                    var ltFastArray = createFastArray(dummyLiveList, 'livetheme_card');
+
                                     groupItemObj.add(0x10).writePointer(allGroupDataMap[gCode] || ((gCode === 1001 && loonaGroupData) ? loonaGroupData : NULL));
                                     groupItemObj.add(0x18).writePointer(NULL);
                                     groupItemObj.add(0x20).writePointer(NULL);
                                     groupItemObj.add(0x28).writePointer(groupCardFastArray || NULL);
                                     groupItemObj.add(0x30).writePointer(etDict || NULL);
                                     groupItemObj.add(0x38).writeS16(-1);
-                                    groupItemObj.add(0x40).writePointer(NULL);
+                                    groupItemObj.add(0x40).writePointer(ltFastArray || NULL);
                                     groupItemObj.add(0x48).writeS16(-1);
                                     groupItemObj.add(0x4A).writeS16(4);
                                     groupItemObj.add(0x4C).writeS32(0);
@@ -19444,32 +19499,24 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         if (activeInventorySceneInstance) refreshAfterSortOrFilter(activeInventorySceneInstance, false);
                     }, "void", ["pointer", "pointer", "pointer"]));
 
-                    // Gameplay & Stage Network Bypasses for GameControl
+                    // Gameplay & Stage Network Bypasses for GameControl (delegated to full offline Song Gameplay Engine)
                     // GameControl.StageStart (0xD42B80)
-                    Interceptor.replace(baseAddr.add(0xD42B80), new NativeCallback(function(callbackPtr) {
-                        log("[🎵 GAME CONTROL] StageStart intercepted offline! Acknowledging status 0 (Success)...");
-                        try {
-                            if (!callbackPtr.isNull()) {
-                                var cbInvoke = new NativeFunction(callbackPtr.readPointer().add(0x140).readPointer(), "void", ["pointer", "int"]);
-                                cbInvoke(callbackPtr, 0);
-                            }
-                        } catch (eSs) {
-                            log("[-] Error in offline StageStart: " + eSs.message);
+                    Interceptor.replace(baseAddr.add(0xD42B80), new NativeCallback(function(callbackPtr, methodInfo) {
+                        if (typeof handleOfflineStageStart === "function") {
+                            handleOfflineStageStart(callbackPtr);
+                        } else if (callbackPtr && !callbackPtr.isNull()) {
+                            new NativeFunction(baseAddr.add(0x18DDF3C), "void", ["pointer", "int", "pointer"])(callbackPtr, 1000, NULL);
                         }
-                    }, "void", ["pointer"]));
+                    }, "void", ["pointer", "pointer"]));
 
                     // GameControl.StageComplete (0xD4379C)
-                    Interceptor.replace(baseAddr.add(0xD4379C), new NativeCallback(function(callbackPtr) {
-                        log("[🎵 GAME CONTROL] StageComplete intercepted offline! Acknowledging status 0 (Success)...");
-                        try {
-                            if (!callbackPtr.isNull()) {
-                                var cbInvoke = new NativeFunction(callbackPtr.readPointer().add(0x140).readPointer(), "void", ["pointer", "int", "pointer", "int"]);
-                                cbInvoke(callbackPtr, 0, NULL, 0);
-                            }
-                        } catch (eSc) {
-                            log("[-] Error in offline StageComplete: " + eSc.message);
+                    Interceptor.replace(baseAddr.add(0xD4379C), new NativeCallback(function(callbackPtr, methodInfo) {
+                        if (typeof handleOfflineStageComplete === "function") {
+                            handleOfflineStageComplete(callbackPtr);
+                        } else if (callbackPtr && !callbackPtr.isNull()) {
+                            new NativeFunction(baseAddr.add(0xCA10C8), "void", ["pointer", "int", "pointer", "int", "pointer"])(callbackPtr, 1000, NULL, 0, NULL);
                         }
-                    }, "void", ["pointer"]));
+                    }, "void", ["pointer", "pointer"]));
 
                     // ScoreData..ctor (0xD59534)
                     try {
@@ -22223,6 +22270,1185 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     log("[+] Installed complete offline User Profile, Edit, Search, Guide, and Share hooks!");
                 } catch (eProfRpc) {
                     log("[-] Error installing User Profile RPC hooks: " + eProfRpc.message);
+                }
+
+                // =========================================================================
+                // SONG GAMEPLAY OFFLINE ENGINE (SelectMusic -> IngameLoading -> Ingame -> Result)
+                // =========================================================================
+                var offlineChallengeClears = 0;
+                var msdSongMetaCache = null;
+
+                function getMsdSongCatalog() {
+                    if (msdSongMetaCache) return msdSongMetaCache;
+                    msdSongMetaCache = {};
+                    try {
+                        var msdPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/msd.json";
+                        if (fileExists(msdPath)) {
+                            var raw = readTextFile(msdPath);
+                            if (raw) {
+                                if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+                                var arr = JSON.parse(raw);
+                                if (Array.isArray(arr)) {
+                                    for (var i = 0; i < arr.length; i++) {
+                                        var row = arr[i];
+                                        if (row && row.code !== undefined) {
+                                            msdSongMetaCache[parseInt(row.code, 10)] = row;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (eMsd) {
+                        log("[-] Error loading msd.json catalog: " + eMsd.message);
+                    }
+                    return msdSongMetaCache;
+                }
+
+                function makeNullableInt32(val, hasVal) {
+                    if (!hasVal || val === null || val === undefined) return uint64(0);
+                    return uint64("0x100000000").or(uint64((parseInt(val, 10) || 0) >>> 0));
+                }
+
+                function readIl2CppIntListToJs(listPtr) {
+                    var res = [];
+                    if (!listPtr || listPtr.isNull()) return res;
+                    try {
+                        var itemsArr = listPtr.add(0x10).readPointer();
+                        var size = listPtr.add(0x18).readS32();
+                        if (itemsArr && !itemsArr.isNull() && size > 0) {
+                            for (var i = 0; i < size && i < 2048; i++) {
+                                res.push(itemsArr.add(0x20 + i * 4).readS32());
+                            }
+                        }
+                    } catch (eRl) {}
+                    return res;
+                }
+
+                function createManagedShortArray(vals) {
+                    var int16Cls = getClass("mscorlib", "System", "Int16");
+                    var len = vals ? vals.length : 0;
+                    var arr = (il2cpp_array_new && int16Cls && !int16Cls.isNull()) ? il2cpp_array_new(int16Cls, len) : NULL;
+                    if (arr && !arr.isNull()) {
+                        for (var i = 0; i < len; i++) arr.add(0x20 + i * 2).writeS16(parseInt(vals[i], 10) || 0);
+                    }
+                    return arr;
+                }
+
+                function createManagedIntArray(vals) {
+                    var int32Cls = getClass("mscorlib", "System", "Int32");
+                    var len = vals ? vals.length : 0;
+                    var arr = (il2cpp_array_new && int32Cls && !int32Cls.isNull()) ? il2cpp_array_new(int32Cls, len) : NULL;
+                    if (arr && !arr.isNull()) {
+                        for (var i = 0; i < len; i++) arr.add(0x20 + i * 4).writeS32(parseInt(vals[i], 10) || 0);
+                    }
+                    return arr;
+                }
+
+                function createMusicCountInfoArray(entries) {
+                    var mcCls = getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.account", "MusicCountInfo") ||
+                                getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.account", "MusicCountInfo");
+                    var len = entries ? entries.length : 0;
+                    var arr = (il2cpp_array_new && mcCls && !mcCls.isNull()) ? il2cpp_array_new(mcCls, len) : NULL;
+                    if (arr && !arr.isNull()) {
+                        for (var i = 0; i < len; i++) {
+                            var obj = il2cpp_object_new(mcCls);
+                            if (obj && !obj.isNull()) {
+                                obj.add(0x10).writeS16(parseInt(entries[i].code, 10) || 0);
+                                obj.add(0x14).writeS32(parseInt(entries[i].count, 10) || 0);
+                                arr.add(0x20 + i * Process.pointerSize).writePointer(obj);
+                            }
+                        }
+                    }
+                    return arr;
+                }
+
+                function createGroupCountInfoArray(entries) {
+                    var gcCls = getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.account", "GroupCountInfo") ||
+                                getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.account", "GroupCountInfo");
+                    var len = entries ? entries.length : 0;
+                    var arr = (il2cpp_array_new && gcCls && !gcCls.isNull()) ? il2cpp_array_new(gcCls, len) : NULL;
+                    if (arr && !arr.isNull()) {
+                        for (var i = 0; i < len; i++) {
+                            var obj = il2cpp_object_new(gcCls);
+                            if (obj && !obj.isNull()) {
+                                obj.add(0x10).writeS32(parseInt(entries[i].code, 10) || 0);
+                                obj.add(0x14).writeS32(parseInt(entries[i].count, 10) || 0);
+                                arr.add(0x20 + i * Process.pointerSize).writePointer(obj);
+                            }
+                        }
+                    }
+                    return arr;
+                }
+
+                function ensureOfflineRecordControlOpened() {
+                    try {
+                        var isRecOpenFn = new NativeFunction(baseAddr.add(0xF89934), "bool", ["pointer"]);
+                        if (!isRecOpenFn(NULL)) {
+                            // Ensure Storage<short, Record> is opened empty cleanly via RecordControl.Open()
+                            try {
+                                new NativeFunction(baseAddr.add(0xF8A2FC), "void", ["pointer"])(NULL);
+                                log("[🎵 RECORD] RecordControl.Open() executed offline!");
+                            } catch (eRo) {
+                                log("[-] RecordControl.Open warning: " + eRo.message);
+                            }
+                        }
+                    } catch (eRc) {}
+                }
+
+                function ensureOfflineGroupControlOpened() {
+                    try {
+                        var groupCls = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "GroupControl");
+                        if (!groupCls || groupCls.isNull()) return;
+                        ensureIl2CppClassInit(groupCls);
+                        var getMapFn = new NativeFunction(baseAddr.add(0xB9E164), "pointer", ["pointer"]);
+                        var curMap = getMapFn(NULL);
+                        if (!curMap || curMap.isNull()) {
+                            ensureLoonaMocks();
+                            var dictKlass = readGotMetadata(0x3130338);
+                            var ctorInfo = readGotMetadata(0x310AB50);
+                            var addInfo = readGotMetadata(0x3114E18);
+                            var keys = Object.keys(allGroupDataMap);
+                            if (dictKlass && !dictKlass.isNull() && ctorInfo && !ctorInfo.isNull() && addInfo && !addInfo.isNull()) {
+                                var dictObj = il2cpp_object_new(dictKlass);
+                                if (dictObj && !dictObj.isNull()) {
+                                    new NativeFunction(baseAddr.add(0x2368A5C), "void", ["pointer", "int32", "pointer"])(dictObj, Math.max(keys.length, 4), ctorInfo);
+                                    var addFn = new NativeFunction(baseAddr.add(0x236948C), "void", ["pointer", "int32", "pointer", "pointer"]);
+                                    var added = 0;
+                                    for (var gi = 0; gi < keys.length; gi++) {
+                                        var gc = parseInt(keys[gi], 10) || 0;
+                                        var gData = allGroupDataMap[keys[gi]];
+                                        if (gc > 0 && gData && !gData.isNull()) {
+                                            addFn(dictObj, gc, gData, addInfo);
+                                            added++;
+                                        }
+                                    }
+                                    var sf = groupCls.add(0xB8).readPointer();
+                                    if (sf && !sf.isNull()) {
+                                        sf.add(0x00).writeU8(1); // IsDone
+                                        sf.add(0x01).writeU8(1); // IsOpened
+                                        sf.add(0x08).writePointer(dictObj); // Map
+                                        sf.add(0x18).writeS32(added); // GroupCount
+                                    }
+                                    log("[🎸 GROUP] Offline GroupControl.Map populated cleanly (groups=" + added + ")!");
+                                }
+                            }
+                        }
+                        var mMap = new NativeFunction(baseAddr.add(0xAFB730), "pointer", ["pointer"])(NULL);
+                        var mCnt = new NativeFunction(baseAddr.add(0xAFBA60), "int32", ["pointer"])(NULL);
+                        var gCnt = new NativeFunction(baseAddr.add(0xB9E29C), "int32", ["pointer"])(NULL);
+                        log("[🎸 GROUP/MUSIC] Status -> GroupCount=" + gCnt + ", MusicMap=" + mMap + ", MusicCount=" + mCnt);
+                    } catch (eGc) {
+                        log("[-] ensureOfflineGroupControlOpened warning: " + eGc.message);
+                    }
+                }
+
+                function ensureOfflineMusicCatalogOpened() {
+                    try {
+                        var mCntFn = new NativeFunction(baseAddr.add(0xAFBA60), "int32", ["pointer"]);
+                        if (mCntFn(NULL) > 0) return;
+
+                        var msdPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/msd.json";
+                        if (!fileExists(msdPath)) {
+                            log("[-] msd.json missing at " + msdPath);
+                            return;
+                        }
+                        var raw = readTextFile(msdPath);
+                        if (!raw) return;
+                        if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+
+                        var assetCtrlCls = readGotMetadata(0x3107C08);
+                        if (assetCtrlCls && !assetCtrlCls.isNull()) ensureIl2CppClassInit(assetCtrlCls);
+
+                        var mcCCls = readGotMetadata(0x3108128);
+                        if (!mcCCls || mcCCls.isNull()) {
+                            log("[-] MusicControl.<>c metadata not resolved");
+                            return;
+                        }
+                        ensureIl2CppClassInit(mcCCls);
+                        var mcCSf = mcCCls.add(0xB8).readPointer();
+                        var targetC = (!mcCSf.isNull()) ? mcCSf.readPointer() : NULL;
+                        var getKeyDel = (!mcCSf.isNull()) ? mcCSf.add(0x8).readPointer() : NULL;
+                        if (!getKeyDel || getKeyDel.isNull()) {
+                            var gkCls = readGotMetadata(0x3105D20);
+                            var gkMethod = readGotMetadata(0x3149F68);
+                            var gkCtorInfo = readGotMetadata(0x313CE38);
+                            if (gkCls && !gkCls.isNull() && gkMethod && !gkMethod.isNull() && gkCtorInfo && !gkCtorInfo.isNull()) {
+                                var gkClsPtr = gkCls;
+                                // Note: 0xA43CB8 is il2cpp_object_new alias
+                                getKeyDel = il2cpp_object_new(gkClsPtr);
+                                if (getKeyDel && !getKeyDel.isNull()) {
+                                    new NativeFunction(baseAddr.add(0x21E3CFC), "void", ["pointer", "pointer", "pointer", "pointer"])(
+                                        getKeyDel, targetC, gkMethod, gkCtorInfo
+                                    );
+                                    if (!mcCSf.isNull()) mcCSf.add(0x8).writePointer(getKeyDel);
+                                }
+                            }
+                        }
+
+                        var openStorageInfo = readGotMetadata(0x312BBB8);
+                        if (!getKeyDel || getKeyDel.isNull() || !openStorageInfo || openStorageInfo.isNull()) {
+                            log("[-] OpenStorage<short, MusicData> metadata incomplete: gk=" + getKeyDel + " info=" + openStorageInfo);
+                            return;
+                        }
+
+                        var jsonStr = createIl2CppString(raw);
+                        var pathStr = createIl2CppString("msd.json");
+                        var ok = new NativeFunction(baseAddr.add(0x13570D0), "bool", ["pointer", "pointer", "pointer", "pointer"])(
+                            jsonStr, getKeyDel, pathStr, openStorageInfo
+                        );
+                        log("[🎵 CATALOG] AssetControl.OpenStorage<short, MusicData>(msd.json) -> " + ok);
+
+                        // Also populate MusicControl from Storage<short, MusicData> natively
+                        new NativeFunction(baseAddr.add(0xAFBBF8), "void", ["pointer"])(NULL);
+                        log("[🎵 CATALOG] MusicControl.Open() completed! MusicCount=" + mCntFn(NULL));
+                    } catch (eMc) {
+                        log("[-] ensureOfflineMusicCatalogOpened warning: " + eMc.message);
+                    }
+                }
+
+                function ensureOfflineGameConfigOpened() {
+                    try {
+                        var cfgFindMethod = readGotMetadata(0x3130808);
+                        if (cfgFindMethod && !cfgFindMethod.isNull()) {
+                            var existingCfg = new NativeFunction(baseAddr.add(0x1E60E68), "pointer", ["int32", "pointer"])(60006, cfgFindMethod);
+                            if (existingCfg && !existingCfg.isNull()) return;
+                        }
+
+                        var gcdPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/gcd.json";
+                        if (!fileExists(gcdPath)) {
+                            log("[-] gcd.json missing at " + gcdPath);
+                            return;
+                        }
+                        var raw = readTextFile(gcdPath);
+                        if (!raw) return;
+                        if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+
+                        var assetCtrlCls = readGotMetadata(0x3107C08);
+                        if (assetCtrlCls && !assetCtrlCls.isNull()) ensureIl2CppClassInit(assetCtrlCls);
+
+                        var cfCCls = readGotMetadata(0x30F8750);
+                        if (!cfCCls || cfCCls.isNull()) {
+                            log("[-] ConfigControl.<>c metadata not resolved");
+                            return;
+                        }
+                        ensureIl2CppClassInit(cfCCls);
+                        var cfCSf = cfCCls.add(0xB8).readPointer();
+                        var targetC = (!cfCSf.isNull()) ? cfCSf.readPointer() : NULL;
+                        var getKeyDel = (!cfCSf.isNull()) ? cfCSf.add(0x8).readPointer() : NULL;
+                        if (!getKeyDel || getKeyDel.isNull()) {
+                            var gkCls = readGotMetadata(0x31011C0);
+                            var gkMethod = readGotMetadata(0x3144110);
+                            var gkCtorInfo = readGotMetadata(0x3121368);
+                            if (gkCls && !gkCls.isNull() && gkMethod && !gkMethod.isNull() && gkCtorInfo && !gkCtorInfo.isNull()) {
+                                getKeyDel = il2cpp_object_new(gkCls);
+                                if (getKeyDel && !getKeyDel.isNull()) {
+                                    new NativeFunction(baseAddr.add(0x21E40D8), "void", ["pointer", "pointer", "pointer", "pointer"])(
+                                        getKeyDel, targetC, gkMethod, gkCtorInfo
+                                    );
+                                    if (!cfCSf.isNull()) cfCSf.add(0x8).writePointer(getKeyDel);
+                                }
+                            }
+                        }
+
+                        var openStorageInfo = readGotMetadata(0x30D6C20);
+                        if (!getKeyDel || getKeyDel.isNull() || !openStorageInfo || openStorageInfo.isNull()) {
+                            log("[-] OpenStorage<int, GameConfigData> metadata incomplete: gk=" + getKeyDel + " info=" + openStorageInfo);
+                            return;
+                        }
+
+                        var jsonStr = createIl2CppString(raw);
+                        var pathStr = createIl2CppString("gcd.json");
+                        var ok = new NativeFunction(baseAddr.add(0x1357384), "bool", ["pointer", "pointer", "pointer", "pointer"])(
+                            jsonStr, getKeyDel, pathStr, openStorageInfo
+                        );
+                        log("[⚙️ CONFIG] AssetControl.OpenStorage<int, GameConfigData>(gcd.json) -> " + ok);
+                    } catch (eGc) {
+                        log("[-] ensureOfflineGameConfigOpened warning: " + eGc.message);
+                    }
+                }
+
+                function hydrateOfflineRecordsAndFavorites() {
+                    try {
+                        var profile = loadPlayerProfile() || createDefaultProfile("Orbit");
+                        ensureProfileUserFields(profile);
+                        ensureOfflineGameConfigOpened();
+                        ensureOfflineRecordControlOpened();
+                        ensureOfflineGroupControlOpened();
+                        ensureOfflineMusicCatalogOpened();
+
+                        // 1. Hydrate records into GameControl / Storage<short, Record>
+                        var recMap = profile.musicRecords || {};
+                        var setRecFn = new NativeFunction(baseAddr.add(0xD3FF40), "bool", ["int16", "int32", "int64", "uint64", "uint64", "uint64", "bool", "pointer"]);
+                        var playCountEntries = [];
+                        for (var mKey in recMap) {
+                            if (!recMap.hasOwnProperty(mKey)) continue;
+                            var rec = recMap[mKey];
+                            var mCode = parseInt(mKey, 10) || 0;
+                            if (!rec || mCode <= 0) continue;
+                            if ((rec.playCount || 0) > 0) {
+                                playCountEntries.push({ code: mCode, count: rec.playCount });
+                            }
+                            if ((rec.highscore || 0) > 0 || rec.easyScoreGrade !== undefined || rec.normalScoreGrade !== undefined || rec.hardScoreGrade !== undefined) {
+                                try {
+                                    setRecFn(
+                                        mCode,
+                                        parseInt(rec.highscore, 10) || 0,
+                                        int64(String(parseInt(rec.updatedAt, 10) || Date.now())),
+                                        makeNullableInt32(rec.easyScoreGrade, rec.easyScoreGrade !== null && rec.easyScoreGrade !== undefined),
+                                        makeNullableInt32(rec.normalScoreGrade, rec.normalScoreGrade !== null && rec.normalScoreGrade !== undefined),
+                                        makeNullableInt32(rec.hardScoreGrade, rec.hardScoreGrade !== null && rec.hardScoreGrade !== undefined),
+                                        (rec.easyAllPerfect || rec.normalAllPerfect || rec.hardAllPerfect) ? 1 : 0,
+                                        NULL
+                                    );
+                                } catch (eSr) {}
+                            }
+                        }
+
+                        // 2. Sync LoginControl favorite lists
+                        try {
+                            var loginInst = new NativeFunction(baseAddr.add(0xCF4848), "pointer", ["pointer"])(NULL);
+                            if (loginInst && !loginInst.isNull()) {
+                                var mfInts = [];
+                                for (var i = 0; i < profile.favoriteMusics.length; i++) mfInts.push(parseInt(profile.favoriteMusics[i], 10) || 0);
+                                var gfInts = [];
+                                for (var j = 0; j < profile.favoriteGroups.length; j++) gfInts.push(parseInt(profile.favoriteGroups[j], 10) || 0);
+                                new NativeFunction(baseAddr.add(0xCF75A8), "void", ["pointer", "pointer", "pointer"])(loginInst, createManagedList(mfInts, "int"), NULL);
+                                new NativeFunction(baseAddr.add(0xCF78E8), "void", ["pointer", "pointer", "pointer"])(loginInst, createManagedList(gfInts, "int"), NULL);
+                            }
+                        } catch (eLf) {}
+
+                        // 3. Init & populate MusicControl & GroupControl favorites/counts safely
+                        try { new NativeFunction(baseAddr.add(0xAFFD14), "void", ["pointer"])(NULL); } catch (eMfi) {}
+                        try {
+                            var favMusArr = createManagedShortArray(profile.favoriteMusics);
+                            if (favMusArr && !favMusArr.isNull()) new NativeFunction(baseAddr.add(0xAFF7F0), "void", ["pointer", "pointer"])(favMusArr, NULL);
+                        } catch (eSmf) { log("[-] MusicControl.SetFavoriteList warn: " + eSmf.message); }
+                        try {
+                            var favGrpArr = createManagedIntArray(profile.favoriteGroups);
+                            if (favGrpArr && !favGrpArr.isNull()) new NativeFunction(baseAddr.add(0xBA0114), "void", ["pointer", "pointer"])(favGrpArr, NULL);
+                        } catch (eSgf) { log("[-] GroupControl.SetFavoriteList warn: " + eSgf.message); }
+                        try {
+                            var pcArr = createMusicCountInfoArray(playCountEntries);
+                            if (pcArr && !pcArr.isNull()) new NativeFunction(baseAddr.add(0xAFF690), "void", ["pointer", "pointer"])(pcArr, NULL);
+                        } catch (eSpc) { log("[-] MusicControl.SetMusicPlayCount warn: " + eSpc.message); }
+                        try {
+                            var emptyMcArr = createMusicCountInfoArray([]);
+                            var emptyGcArr = createGroupCountInfoArray([]);
+                            if (emptyMcArr && !emptyMcArr.isNull()) {
+                                new NativeFunction(baseAddr.add(0xAFF948), "void", ["pointer", "pointer"])(emptyMcArr, NULL);
+                                new NativeFunction(baseAddr.add(0xAFFBD0), "void", ["pointer", "pointer"])(emptyMcArr, NULL);
+                                new NativeFunction(baseAddr.add(0xAFFA8C), "void", ["pointer", "pointer"])(emptyMcArr, NULL);
+                            }
+                            if (emptyGcArr && !emptyGcArr.isNull()) {
+                                new NativeFunction(baseAddr.add(0xBA020C), "void", ["pointer", "pointer"])(emptyGcArr, NULL);
+                            }
+                        } catch (eEmp) {}
+
+                        // 4. Sync active ChallengeMission if stored in profile
+                        if (profile.challengeMission && profile.challengeMission.musicCode > 0) {
+                            try {
+                                var chCls = getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.account", "Challenge") ||
+                                            getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.account", "Challenge");
+                                if (chCls && !chCls.isNull()) {
+                                    var chObj = il2cpp_object_new(chCls);
+                                    if (chObj && !chObj.isNull()) {
+                                        chObj.add(0x10).writeS16(parseInt(profile.challengeMission.musicCode, 10) || 0);
+                                        chObj.add(0x12).writeS16(parseInt(profile.challengeMission.difficult, 10) || 0);
+                                        chObj.add(0x14).writeS16(1);
+                                        chObj.add(0x18).writeS32(parseInt(profile.challengeMission.targetScore, 10) || 100000);
+                                        chObj.add(0x1C).writeS32(10); // FREE_RHYTHM_POINT
+                                        chObj.add(0x20).writeS16(parseInt(profile.challengeMission.rewardQuantity, 10) || 1500);
+                                        chObj.add(0x22).writeU8(parseInt(profile.challengeMission.remainingCount, 10) || 3);
+                                        new NativeFunction(baseAddr.add(0xCA1718), "void", ["pointer", "pointer"])(chObj, NULL);
+                                    }
+                                }
+                            } catch (eChHyd) {}
+                        }
+                        log("[🎵 HYDRATE] Offline music records & favorites hydrated (favM=" + profile.favoriteMusics.length + ", favG=" + profile.favoriteGroups.length + ", recs=" + Object.keys(recMap).length + ")");
+                    } catch (eHyd) {
+                        log("[-] Error in hydrateOfflineRecordsAndFavorites: " + eHyd.message);
+                    }
+                }
+
+                function createProvideListForRp(entries) {
+                    try {
+                        var listCls = resolveMetadataSlot(0x31E3718);
+                        var ctorMi = resolveMetadataSlot(0x320B770);
+                        var addMi = resolveMetadataSlot(0x320B780);
+                        var pDataCls = resolveMetadataSlot(0x31F4CC8);
+                        var rpCls = getClass("Assembly-CSharp", "com.dalcomsoft.project.client.model.account", "RecentProvide") ||
+                                    getClass("Assembly-CSharp-firstpass", "com.dalcomsoft.project.client.model.account", "RecentProvide");
+                        if (!listCls || listCls.isNull() || !pDataCls || pDataCls.isNull() || !rpCls || rpCls.isNull()) return NULL;
+
+                        var listObj = il2cpp_object_new(listCls);
+                        new NativeFunction(baseAddr.add(0x23CD7B4), "void", ["pointer", "pointer"])(listObj, ctorMi);
+                        var addFn = new NativeFunction(baseAddr.add(0x23CE41C), "void", ["pointer", "pointer", "pointer"]);
+                        var pdCtorFn = new NativeFunction(baseAddr.add(0xBDF4A4), "void", ["pointer", "pointer", "pointer"]);
+
+                        for (var i = 0; i < entries.length; i++) {
+                            var ent = entries[i];
+                            if (!ent || (ent.quantity || 0) <= 0) continue;
+                            var rpObj = il2cpp_object_new(rpCls);
+                            new NativeFunction(baseAddr.add(0xF87928), "void", ["pointer", "pointer"])(rpObj, NULL);
+                            rpObj.add(0x10).writePointer(createIl2CppString(ent.tag || "rhythmPoint"));
+                            rpObj.add(0x18).writeS32(10); // PaymentCategory.FREE_RHYTHM_POINT
+                            rpObj.add(0x1C).writeU8(1);   // Nullable.hasValue = true
+                            rpObj.add(0x20).writeS32(parseInt(ent.quantity, 10) || 0);
+                            rpObj.add(0x30).writeS32(4);  // ProvidableItem_Cash.FREE_RHYTHM_POINT
+
+                            var pdObj = il2cpp_object_new(pDataCls);
+                            pdCtorFn(pdObj, rpObj, NULL);
+                            addFn(listObj, pdObj, addMi);
+                        }
+                        return listObj;
+                    } catch (eCp) {
+                        log("[-] createProvideListForRp error: " + eCp.message);
+                        return NULL;
+                    }
+                }
+
+                function computeScoreGradeEnum(difficult, stars) {
+                    if (stars <= 0) return -1;
+                    var s = Math.max(1, Math.min(3, stars));
+                    if (difficult === 0) return s - 1;      // EASY: 0,1,2
+                    if (difficult === 1) return 3 + (s - 1); // NORMAL: 3,4,5
+                    return 6 + (s - 1);                      // HARD: 6,7,8
+                }
+
+                function computeBestStarsFromRecord(rec) {
+                    var m = 0;
+                    if (!rec) return 0;
+                    var keys = ["easyScoreGrade", "normalScoreGrade", "hardScoreGrade"];
+                    for (var i = 0; i < keys.length; i++) {
+                        var g = rec[keys[i]];
+                        if (g !== null && g !== undefined && g >= 0) {
+                            var s = (g % 3) + 1;
+                            if (s > m) m = s;
+                        }
+                    }
+                    return m;
+                }
+
+                function handleOfflineStageStart(callbackPtr) {
+                    log("[🎵 STAGE START] Handling offline StageStart...");
+                    try {
+                        var isRehearsal = false;
+                        try {
+                            isRehearsal = new NativeFunction(baseAddr.add(0xD3DF14), "bool", ["pointer"])(NULL) !== 0;
+                        } catch (eRh) {}
+
+                        if (!isRehearsal) {
+                            var profile = loadPlayerProfile() || createDefaultProfile("Orbit");
+                            syncOfflineHeadphoneRegen(profile);
+                            var curHp = parseInt(profile.headphone, 10) || 0;
+                            if (curHp < 1) {
+                                log("[🎧 STAGE START] Headphone insufficient (" + curHp + ") -> returning error status!");
+                                safeInvokeActionInt(callbackPtr, -6002);
+                                return;
+                            }
+                            try {
+                                new NativeFunction(baseAddr.add(0xAB3034), "void", ["int", "pointer"])(1, NULL);
+                            } catch (eUh) {
+                                log("[-] UserControl.UseHeadphone fallback deduct: " + eUh.message);
+                            }
+                            profile.headphone = Math.max(0, curHp - 1);
+                            if (profile.headphone < OFFLINE_HP_RECHARGE_MAX && curHp >= OFFLINE_HP_RECHARGE_MAX) {
+                                profile.lastHeadphoneChargeMs = Date.now();
+                            }
+                            savePlayerProfile(profile);
+                            if (globalPlayerObj && !globalPlayerObj.isNull()) {
+                                var freeHp = Math.min(OFFLINE_HP_RECHARGE_MAX, profile.headphone);
+                                var paidHp = Math.max(0, profile.headphone - freeHp);
+                                globalPlayerObj.add(0x5C).writeInt(paidHp);
+                                globalPlayerObj.add(0x60).writeInt(freeHp);
+                                globalPlayerObj.add(0x68).writeS64(profile.lastHeadphoneChargeMs);
+                            }
+                            log("[🎧 STAGE START] Deducted 1 Headphone -> remaining=" + profile.headphone);
+                        } else {
+                            log("[🎵 STAGE START] Rehearsal mode -> 0 Headphones consumed.");
+                        }
+                    } catch (eSs) {
+                        log("[-] Error in handleOfflineStageStart: " + eSs.message);
+                    }
+                    if (callbackPtr && !callbackPtr.isNull()) {
+                        try {
+                            new NativeFunction(baseAddr.add(0x18DDF3C), "void", ["pointer", "int", "pointer"])(callbackPtr, 1000, NULL);
+                            log("[✅ STAGE START] Invoked Action<int>.Invoke cleanly with 1000!");
+                        } catch (eInv) {
+                            log("[-] Direct Action<int>.Invoke error: " + eInv.message + " -> falling back to safeInvokeActionInt");
+                            safeInvokeActionInt(callbackPtr, 1000);
+                        }
+                    }
+                }
+
+                function handleOfflineStageComplete(callbackPtr) {
+                    log("[🎵 STAGE COMPLETE] Handling offline StageComplete...");
+                    var provideList = NULL;
+                    var provideCount = 0;
+                    try {
+                        var profile = loadPlayerProfile() || createDefaultProfile("Orbit");
+                        ensureProfileUserFields(profile);
+
+                        var selMusic = new NativeFunction(baseAddr.add(0xD3E4B8), "pointer", ["pointer"])(NULL);
+                        var musicCode = (!selMusic.isNull()) ? new NativeFunction(baseAddr.add(0xF05A18), "int16", ["pointer", "pointer"])(selMusic, NULL) : 0;
+                        var difficult = new NativeFunction(baseAddr.add(0xD3DC18), "int32", ["pointer"])(NULL);
+                        var isRehearsal = new NativeFunction(baseAddr.add(0xD3DF14), "bool", ["pointer"])(NULL) !== 0;
+                        var resObj = new NativeFunction(baseAddr.add(0xD41A68), "pointer", ["pointer"])(NULL);
+
+                        var totalScore = 0, missCnt = 0, goodCnt = 0, perfCnt = 0, spCnt = 0, starCnt = 3, isAllSp = false;
+                        if (resObj && !resObj.isNull()) {
+                            totalScore = resObj.add(0x3C).readS32();
+                            missCnt = resObj.add(0x18).readS32();
+                            goodCnt = resObj.add(0x1C).readS32();
+                            perfCnt = resObj.add(0x20).readS32();
+                            spCnt = resObj.add(0x24).readS32();
+                            starCnt = resObj.add(0x80).readS32();
+                            isAllSp = resObj.add(0x15).readU8() !== 0;
+                            if (!isAllSp && missCnt === 0 && goodCnt === 0 && perfCnt === 0 && spCnt > 0) {
+                                isAllSp = true;
+                                resObj.add(0x15).writeU8(1);
+                            }
+                            if (starCnt <= 0) {
+                                starCnt = (missCnt === 0) ? 3 : (missCnt <= 5 ? 2 : 1);
+                                resObj.add(0x80).writeS32(starCnt);
+                            }
+                        }
+
+                        var rewardEntries = [];
+                        var totalEarnedRp = 0;
+                        if (!isRehearsal && musicCode > 0) {
+                            var diffBase = (difficult === 2) ? 350 : (difficult === 1 ? 260 : 180);
+                            var baseRp = diffBase + Math.floor(Math.max(0, totalScore) / 8500) + (starCnt * 40) + (missCnt === 0 ? 80 : 0) + (isAllSp ? 120 : 0);
+                            totalEarnedRp += baseRp;
+                            rewardEntries.push({ tag: "rhythmPoint", quantity: baseRp });
+
+                            // Check ChallengeMission
+                            var isChActive = false;
+                            try {
+                                isChActive = new NativeFunction(baseAddr.add(0xCA1A28), "bool", ["int16", "int32", "pointer"])(musicCode, difficult, NULL) !== 0;
+                            } catch (eChC) {}
+                            if (isChActive && profile.challengeMission) {
+                                var chTarget = parseInt(profile.challengeMission.targetScore, 10) || 0;
+                                if (totalScore >= chTarget) {
+                                    var chBonus = parseInt(profile.challengeMission.rewardQuantity, 10) || 1500;
+                                    totalEarnedRp += chBonus;
+                                    rewardEntries.push({ tag: "challenge", quantity: chBonus });
+                                    if (resObj && !resObj.isNull()) resObj.add(0x13).writeU8(1); // IsMissionCompleted = true
+                                    profile.challengeMission = null;
+                                    offlineChallengeClears = 0;
+                                    try { new NativeFunction(baseAddr.add(0xCA201C), "void", ["pointer"])(NULL); } catch (eChClr) {}
+                                    log("[🏆 CHALLENGE CLEARED] +" + chBonus + " RP bonus!");
+                                } else {
+                                    var rem = Math.max(0, (parseInt(profile.challengeMission.remainingCount, 10) || 3) - 1);
+                                    if (rem <= 0) {
+                                        profile.challengeMission = null;
+                                        try { new NativeFunction(baseAddr.add(0xCA201C), "void", ["pointer"])(NULL); } catch (eChClr2) {}
+                                    } else {
+                                        profile.challengeMission.remainingCount = rem;
+                                    }
+                                }
+                            } else {
+                                offlineChallengeClears++;
+                            }
+
+                            // Update song record in profile
+                            var rKey = String(musicCode);
+                            var rec = profile.musicRecords[rKey];
+                            if (!rec) {
+                                rec = { highscore: 0, easyScoreGrade: null, normalScoreGrade: null, hardScoreGrade: null, easyAllPerfect: false, normalAllPerfect: false, hardAllPerfect: false, updatedAt: 0, playCount: 0 };
+                                profile.musicRecords[rKey] = rec;
+                            }
+                            var prevHigh = parseInt(rec.highscore, 10) || 0;
+                            var isNewRec = totalScore > prevHigh;
+                            if (isNewRec) rec.highscore = totalScore;
+                            rec.playCount = (parseInt(rec.playCount, 10) || 0) + 1;
+                            rec.updatedAt = Date.now();
+
+                            var newGrade = computeScoreGradeEnum(difficult, starCnt);
+                            if (difficult === 0) {
+                                if (rec.easyScoreGrade === null || rec.easyScoreGrade === undefined || newGrade > rec.easyScoreGrade) rec.easyScoreGrade = newGrade;
+                                if (isAllSp) rec.easyAllPerfect = true;
+                            } else if (difficult === 1) {
+                                if (rec.normalScoreGrade === null || rec.normalScoreGrade === undefined || newGrade > rec.normalScoreGrade) rec.normalScoreGrade = newGrade;
+                                if (isAllSp) rec.normalAllPerfect = true;
+                            } else {
+                                if (rec.hardScoreGrade === null || rec.hardScoreGrade === undefined || newGrade > rec.hardScoreGrade) rec.hardScoreGrade = newGrade;
+                                if (isAllSp) rec.hardAllPerfect = true;
+                            }
+
+                            if (resObj && !resObj.isNull()) {
+                                resObj.add(0x10).writeU8(1); // IsStageClear
+                                resObj.add(0x11).writeU8(isNewRec ? 1 : 0);
+                            }
+
+                            try {
+                                new NativeFunction(baseAddr.add(0xD3FF40), "bool", ["int16", "int32", "int64", "uint64", "uint64", "uint64", "bool", "pointer"])(
+                                    musicCode,
+                                    rec.highscore,
+                                    int64(String(rec.updatedAt)),
+                                    makeNullableInt32(rec.easyScoreGrade, rec.easyScoreGrade !== null && rec.easyScoreGrade !== undefined),
+                                    makeNullableInt32(rec.normalScoreGrade, rec.normalScoreGrade !== null && rec.normalScoreGrade !== undefined),
+                                    makeNullableInt32(rec.hardScoreGrade, rec.hardScoreGrade !== null && rec.hardScoreGrade !== undefined),
+                                    (rec.easyAllPerfect || rec.normalAllPerfect || rec.hardAllPerfect) ? 1 : 0,
+                                    NULL
+                                );
+                            } catch (eSetRec) {}
+
+                            // Update player profile stats (MY INFO: Best Score & Most Played)
+                            if (totalScore > (parseInt(profile.stats.bestScoreMusic.score, 10) || 0)) {
+                                profile.stats.bestScoreMusic = { code: musicCode, score: totalScore };
+                            }
+                            var topPlayCode = 0, topPlayCount = 0;
+                            for (var kRec in profile.musicRecords) {
+                                if (!profile.musicRecords.hasOwnProperty(kRec)) continue;
+                                var cnt = parseInt(profile.musicRecords[kRec].playCount, 10) || 0;
+                                if (cnt > topPlayCount) {
+                                    topPlayCount = cnt;
+                                    topPlayCode = parseInt(kRec, 10) || 0;
+                                }
+                            }
+                            if (topPlayCode > 0) profile.stats.mostPlayMusic = { code: topPlayCode, count: topPlayCount };
+                            profile.stats.monthlyPlay = (parseInt(profile.stats.monthlyPlay, 10) || 0) + 1;
+                            if (isAllSp) profile.stats.monthlyAllSP = (parseInt(profile.stats.monthlyAllSP, 10) || 0) + 1;
+
+                            // Trigger a random ChallengeMission occasionally on previously played songs
+                            if (!profile.challengeMission && offlineChallengeClears >= 4 && Math.random() < 0.45) {
+                                var catalog = getMsdSongCatalog();
+                                var pool = [];
+                                for (var pk in profile.musicRecords) {
+                                    if (!profile.musicRecords.hasOwnProperty(pk)) continue;
+                                    var pc = parseInt(pk, 10) || 0;
+                                    var meta = catalog[pc];
+                                    if (meta && meta.challengable && (profile.musicRecords[pk].highscore || 0) > 0) {
+                                        pool.push({ code: pc, rec: profile.musicRecords[pk] });
+                                    }
+                                }
+                                if (pool.length > 0) {
+                                    var pick = pool[Math.floor(Math.random() * pool.length)];
+                                    var pickDiff = (pick.rec.hardScoreGrade !== null && pick.rec.hardScoreGrade !== undefined) ? 2 :
+                                                   ((pick.rec.normalScoreGrade !== null && pick.rec.normalScoreGrade !== undefined) ? 1 : 0);
+                                    var target = Math.min(6500000, Math.floor(((pick.rec.highscore || 500000) + 50000) / 10000) * 10000);
+                                    profile.challengeMission = { musicCode: pick.code, difficult: pickDiff, targetScore: target, rewardQuantity: 1500, remainingCount: 3 };
+                                    offlineChallengeClears = 0;
+                                    log("[⚡ CHALLENGE QUEUED] song=" + pick.code + ", diff=" + pickDiff + ", target=" + target);
+                                }
+                            }
+
+                            // Update RP in profile & build ProvideControl list (ProvideControl.AddRewards will also notify/credit in-memory)
+                            profile.rhythmPoint = (parseInt(profile.rhythmPoint, 10) || 0) + totalEarnedRp;
+                            savePlayerProfile(profile);
+
+                            if (rewardEntries.length > 0) {
+                                provideList = createProvideListForRp(rewardEntries);
+                                provideCount = rewardEntries.length;
+                            }
+                            log("[🎵 STAGE COMPLETE] song=" + musicCode + ", diff=" + difficult + ", score=" + totalScore + ", stars=" + starCnt + ", earnedRP=" + totalEarnedRp + ", newRP=" + profile.rhythmPoint);
+                        }
+                    } catch (eSc) {
+                        log("[-] Error in handleOfflineStageComplete: " + eSc.message);
+                    }
+                    safeInvokeDelegate2(callbackPtr, "int", 1000, "pointer", provideList || NULL);
+                }
+
+                // Install Song Gameplay Hooks cleanly
+                try {
+                    // 1. FavoriteControl.GetFavoriteDatas (0xD2FE08) & SetFavoriteDatas (0xD30430) & CheckToSendFavoriteDatas (0xD2FFC4)
+                    Interceptor.replace(baseAddr.add(0xD2FE08), keepCb(new NativeCallback(function (callbackPtr, methodInfo) {
+                        log("[⭐ FAVORITES] FavoriteControl.GetFavoriteDatas intercepted offline!");
+                        hydrateOfflineRecordsAndFavorites();
+                        safeInvokeActionInt(callbackPtr, 1000);
+                    }, "void", ["pointer", "pointer"])));
+
+                    Interceptor.replace(baseAddr.add(0xD30430), keepCb(new NativeCallback(function (cbPtr, mAddPtr, gAddPtr, mRemPtr, gRemPtr, methodInfo) {
+                        try {
+                            var p = loadPlayerProfile() || createDefaultProfile("Orbit");
+                            ensureProfileUserFields(p);
+                            var mAdd = readIl2CppIntListToJs(mAddPtr);
+                            var gAdd = readIl2CppIntListToJs(gAddPtr);
+                            var mRem = readIl2CppIntListToJs(mRemPtr);
+                            var gRem = readIl2CppIntListToJs(gRemPtr);
+                            var i, v;
+                            for (i = 0; i < mAdd.length; i++) { v = mAdd[i]; if (p.favoriteMusics.indexOf(v) === -1) p.favoriteMusics.push(v); }
+                            for (i = 0; i < mRem.length; i++) { v = mRem[i]; p.favoriteMusics = p.favoriteMusics.filter(function(x) { return x !== v; }); }
+                            for (i = 0; i < gAdd.length; i++) { v = gAdd[i]; if (p.favoriteGroups.indexOf(v) === -1) p.favoriteGroups.push(v); }
+                            for (i = 0; i < gRem.length; i++) { v = gRem[i]; p.favoriteGroups = p.favoriteGroups.filter(function(x) { return x !== v; }); }
+                            savePlayerProfile(p);
+                            hydrateOfflineRecordsAndFavorites();
+                            log("[⭐ FAVORITES] Saved favorite changes: musics=" + p.favoriteMusics.length + ", groups=" + p.favoriteGroups.length);
+                        } catch (eSfd) {
+                            log("[-] Error in SetFavoriteDatas offline: " + eSfd.message);
+                        }
+                        if (cbPtr && !cbPtr.isNull()) safeInvokeDelegate1(cbPtr, "pointer", NULL);
+                    }, "void", ["pointer", "pointer", "pointer", "pointer", "pointer", "pointer"])));
+
+                    Interceptor.replace(baseAddr.add(0xD2FFC4), keepCb(new NativeCallback(function (isLoadingCompelte, methodInfo) {
+                        log("[⭐ FAVORITES] CheckToSendFavoriteDatas intercepted cleanly (no network).");
+                    }, "void", ["bool", "pointer"])));
+
+                    // 2. TakeHeadphoneAssist.Open (0xB16E94) & HelpAssist.Open (0xBA6DA4) -> never block SelectMusic entry
+                    Interceptor.replace(baseAddr.add(0xB16E94), keepCb(new NativeCallback(function (cbPtr, methodInfo) {
+                        log("[🎧 LEAGUE GIFT] TakeHeadphoneAssist.Open bypassed cleanly offline!");
+                        try {
+                            if (cbPtr && !cbPtr.isNull()) {
+                                new NativeFunction(baseAddr.add(0xC88DB4), "void", ["pointer", "pointer"])(cbPtr, NULL);
+                            }
+                        } catch (eTha) {}
+                    }, "void", ["pointer", "pointer"])));
+
+                    Interceptor.replace(baseAddr.add(0xBA6DA4), keepCb(new NativeCallback(function (state, cbPtr, methodInfo) {
+                        log("[❓ HELP ASSIST] HelpAssist.Open(" + state + ") bypassed cleanly offline!");
+                        try {
+                            if (cbPtr && !cbPtr.isNull()) {
+                                new NativeFunction(baseAddr.add(0xCA8E34), "void", ["pointer", "pointer"])(cbPtr, NULL);
+                            }
+                        } catch (eHa) {}
+                    }, "void", ["int", "pointer", "pointer"])));
+
+                    // 3. MusicRankingControl.LoadRankData (0xB071A4) -> return offline CreateEmptyRankData cleanly without CDN hang
+                    Interceptor.replace(baseAddr.add(0xB071A4), keepCb(new NativeCallback(function (musicCode, wrCode, needReq, rankType, cbPtr, methodInfo) {
+                        log("[🏆 RANK] MusicRankingControl.LoadRankData(" + (musicCode & 0xFFFF) + ") offline!");
+                        var rData = NULL;
+                        try {
+                            rData = new NativeFunction(baseAddr.add(0xB076F4), "pointer", ["int16", "pointer"])(musicCode, NULL);
+                        } catch (eCr) {
+                            log("[-] CreateEmptyRankData warn: " + eCr.message);
+                        }
+                        if (cbPtr && !cbPtr.isNull()) {
+                            safeInvokeDelegate1(cbPtr, "pointer", rData);
+                        }
+                    }, "void", ["int16", "int16", "bool", "int", "pointer", "pointer"])));
+
+                    // 4. RecordControl.GetMyRecords (0xF8AF28) & GetMyWorldRecords (0xF8B004)
+                    Interceptor.replace(baseAddr.add(0xF8AF28), keepCb(new NativeCallback(function (cbPtr, musicCode, yearPtr, methodInfo) {
+                        safeInvokeActionInt(cbPtr, 1000);
+                    }, "void", ["pointer", "int16", "pointer", "pointer"])));
+
+                    Interceptor.replace(baseAddr.add(0xF8B004), keepCb(new NativeCallback(function (cbPtr, musicCode, wrCode, methodInfo) {
+                        try {
+                            if (cbPtr && !cbPtr.isNull()) {
+                                var mPtr = cbPtr.add(Process.pointerSize * 2).readPointer();
+                                if (!mPtr.isNull()) {
+                                    new NativeFunction(mPtr, "void", ["pointer", "int", "pointer", "int", "int", "int", "pointer", "pointer"])(cbPtr, 1000, NULL, 0, 0, 0, NULL, NULL);
+                                }
+                            }
+                        } catch (eGmw) {}
+                    }, "void", ["pointer", "int16", "int16", "pointer"])));
+
+                    // 5. Headphone persistence & regeneration hooks
+                    Interceptor.attach(baseAddr.add(0xAB3034), {
+                        onLeave: function () {
+                            try {
+                                var freeHp = new NativeFunction(baseAddr.add(0xAB0A50), "int", ["pointer"])(NULL);
+                                var paidHp = new NativeFunction(baseAddr.add(0xAB0844), "int", ["pointer"])(NULL);
+                                var lastMs = new NativeFunction(baseAddr.add(0xAB06A0), "int64", ["pointer"])(NULL);
+                                var p = loadPlayerProfile();
+                                if (p) {
+                                    p.headphone = Math.max(0, freeHp + paidHp);
+                                    p.lastHeadphoneChargeMs = parseInt(lastMs.toString(), 10) || Date.now();
+                                    savePlayerProfile(p);
+                                }
+                            } catch (eUhSync) {}
+                        }
+                    });
+
+                    // 5b. Protect MusicControl.Data.CheckAnniversary (0xF0736C) against DateTime(year-1) ArgumentOutOfRangeException offline
+                    Interceptor.replace(baseAddr.add(0xF0736C), keepCb(new NativeCallback(function (thisPtr, newTime, methodInfo) {
+                        if (thisPtr && !thisPtr.isNull()) {
+                            try {
+                                thisPtr.add(0xE0).writeU8(0);
+                                thisPtr.add(0xE1).writeU8(0);
+                            } catch (eCa) {}
+                        }
+                    }, "void", ["pointer", "bool", "pointer"])));
+
+                    // 5c. AssetControl.DownloadPathExists (0xCD28AC) -> Verify actual File.Exists(path.LocalFilePath) without requiring .ver sidecar files
+                    var dlPathCheckLogs = 0;
+                    Interceptor.replace(baseAddr.add(0xCD28AC), keepCb(new NativeCallback(function (pathPtr, versionPathPtr, methodInfo) {
+                        try {
+                            if (!pathPtr || pathPtr.isNull()) return 0;
+                            var localPathPtr = pathPtr.add(0x18).readPointer();
+                            if (!localPathPtr || localPathPtr.isNull()) return 0;
+                            var exists = new NativeFunction(baseAddr.add(0xD2102C), "bool", ["pointer", "pointer"])(localPathPtr, NULL) !== 0;
+                            if (!exists || dlPathCheckLogs < 12) {
+                                dlPathCheckLogs++;
+                                log("[📁 DL_EXISTS] exists=" + exists + " path=" + readIl2CppString(localPathPtr));
+                            }
+                            return exists ? 1 : 0;
+                        } catch (eDpe) {
+                            return 0;
+                        }
+                    }, "bool", ["pointer", "pointer", "pointer"])));
+
+                    // 5d. AssetControl.SetLastWriteTime (0xAE0048) -> Safe no-op offline (avoids UnauthorizedAccessException on ADB-pushed assets)
+                    Interceptor.replace(baseAddr.add(0xAE0048), keepCb(new NativeCallback(function (filePathPtr, timeVal, methodInfo) {
+                    }, "void", ["pointer", "int64", "pointer"])));
+
+                    // 5e. WorldRecordControl.GetCurrentWorldRecordSeasonCode (0xCE0210) -> return -1 (no active live season offline)
+                    Interceptor.replace(baseAddr.add(0xCE0210), keepCb(new NativeCallback(function (methodInfo) {
+                        return -1;
+                    }, "int16", ["pointer"])));
+
+                    // 5f. ConfigControl.GetSafe(string, GameConfig) (0xDAA674) -> Ensure WORLDRECORD_VER (60006) returns a valid ISO datetime string, preventing FormatException in IngameLoadingScene.SetStateWaiting
+                    var origGetSafeString = new NativeFunction(baseAddr.add(0xDAA674), "pointer", ["pointer", "int32", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xDAA674), keepCb(new NativeCallback(function (defStrPtr, key, methodInfo) {
+                        if (key === 60006 || key === 60002) {
+                            try {
+                                var res = origGetSafeString(defStrPtr, key, methodInfo);
+                                if (res && !res.isNull()) {
+                                    var s = readIl2CppString(res);
+                                    if (s && s.length > 5) return res;
+                                }
+                            } catch (eWr) {}
+                            return createIl2CppString("2020-08-05 14:00:00");
+                        }
+                        try {
+                            var resOther = origGetSafeString(defStrPtr, key, methodInfo);
+                            if (resOther && !resOther.isNull()) return resOther;
+                        } catch (eOther) {}
+                        return defStrPtr;
+                    }, "pointer", ["pointer", "int32", "pointer"])));
+
+                    // 6. Diagnostic trace for SelectMusicScene & IngameLoadingScene & IngameScene & ResultScene
+                    try {
+                        Interceptor.attach(baseAddr.add(0xBF2198), {
+                            onEnter: function (args) { log("[🎵 SELECT_MUSIC] <SetStateLoadingData>b__0 result=" + args[1].toInt32()); },
+                            onLeave: function () { log("[🎵 SELECT_MUSIC] <SetStateLoadingData>b__0 LEAVE!"); }
+                        });
+                        Interceptor.attach(baseAddr.add(0xBF2404), {
+                            onEnter: function () { log("[🎵 SELECT_MUSIC] <SetStateLoadingData>b__1 ENTER!"); },
+                            onLeave: function () { log("[🎵 SELECT_MUSIC] <SetStateLoadingData>b__1 LEAVE!"); }
+                        });
+                        Interceptor.attach(baseAddr.add(0x10406F8), {
+                            onEnter: function (args) { log("[🎵 SELECT_MUSIC] OnApplySort(idx=" + args[1].toInt32() + ", show=" + args[2].toInt32() + ")"); },
+                            onLeave: function () { log("[🎵 SELECT_MUSIC] OnApplySort LEAVE!"); }
+                        });
+                        var emptySortGuard = false;
+                        var origSortEmpty = new NativeFunction(baseAddr.add(0x1043DA8), "void", ["pointer", "int32", "pointer"]);
+                        Interceptor.replace(baseAddr.add(0x1043DA8), keepCb(new NativeCallback(function (thiz, typeVal, methodInfo) {
+                            if (emptySortGuard) {
+                                log("[🛡️ SELECT_MUSIC] Prevented SortEmptyListToDefault recursion!");
+                                return;
+                            }
+                            emptySortGuard = true;
+                            try {
+                                origSortEmpty(thiz, typeVal, methodInfo);
+                            } finally {
+                                emptySortGuard = false;
+                            }
+                        }, "void", ["pointer", "int32", "pointer"])));
+
+                        Interceptor.attach(baseAddr.add(0x1038D84), {
+                            onEnter: function (args) {
+                                this.opt = args[0].toInt32();
+                                this.diff = args[1].toInt32();
+                            },
+                            onLeave: function () {
+                                try {
+                                    var mCnt = new NativeFunction(baseAddr.add(0xAFBA60), "int32", ["pointer"])(NULL);
+                                    var mDisp = new NativeFunction(baseAddr.add(0xAFB7FC), "pointer", ["pointer"])(NULL);
+                                    var mDispCnt = (mDisp && !mDisp.isNull()) ? mDisp.add(0x18).readS32() : -1;
+                                    log("[🎵 SELECT_MUSIC] SelectMusicControl.Open(opt=" + this.opt + ", diff=" + this.diff + ") -> MusicCount=" + mCnt + ", DisplayList=" + mDispCnt);
+                                } catch (eSmc) {}
+                            }
+                        });
+                        function ensureMusicPreviewAssist(sms) {
+                            if (!sms || sms.isNull()) return;
+                            try {
+                                var prev = sms.add(0x50).readPointer();
+                                if (prev.isNull()) {
+                                    var mpaKl = resolveMetadataSlot(0x3110EF8);
+                                    if (mpaKl && !mpaKl.isNull()) {
+                                        var mpa = il2cpp_object_new(mpaKl);
+                                        if (il2cpp_gchandle_new && !mpa.isNull()) il2cpp_gchandle_new(mpa, 2);
+                                        new NativeFunction(baseAddr.add(0xB06870), "void", ["pointer", "pointer"])(mpa, NULL);
+                                        sms.add(0x50).writePointer(mpa);
+                                        log("[✅ SELECT_MUSIC] Instantiated genuine MusicPreviewAssist at " + mpa + " for SelectMusicScene!");
+                                    }
+                                }
+                            } catch (eMpa) {
+                                log("[-] Failed to ensure MusicPreviewAssist: " + eMpa.message);
+                            }
+                        }
+
+                        // Bulletproof safety patches for SelectMusicScene.SelectMusic (0x1041A78):
+                        // 0x1041E40: cbz x0, #0x1041fa8 -> cbz x0, #0x1041f90 (return cleanly if DisplayList null)
+                        // 0x1041E5C: cbz x0, #0x1041fac -> cbz x0, #0x1041f90 (return cleanly if Slot null)
+                        // 0x1041E74: cbz x0, #0x1041fb0 -> cbz x0, #0x1041e84 (skip preview.Play cleanly if null)
+                        // 0x1041E8C: cbz x25, #0x1041fb8 -> cbz x25, #0x1041f90 (return cleanly if MusicData null)
+                        try {
+                            Memory.protect(baseAddr.add(0x1041E40), 0x60, 'rwx');
+                            baseAddr.add(0x1041E40).writeByteArray([0x80, 0x0a, 0x00, 0xb4]);
+                            baseAddr.add(0x1041E5C).writeByteArray([0xa0, 0x09, 0x00, 0xb4]);
+                            baseAddr.add(0x1041E74).writeByteArray([0x80, 0x00, 0x00, 0xb4]);
+                            baseAddr.add(0x1041E8C).writeByteArray([0x39, 0x08, 0x00, 0xb4]);
+                            log("[🛡️ SELECT_MUSIC] Applied all 4 bulletproof safety patches to SelectMusicScene.SelectMusic!");
+                        } catch (ePatchSm) {
+                            log("[-] Error patching SelectMusic: " + ePatchSm.message);
+                        }
+
+                        // Patch 0x103FC14 in SelectMusicScene.SetStateGoToIngame:
+                        // Original: cbz x0, #0x103fcc0 (jump to null ref abort)
+                        // Patched:  cbz x0, #0x103fc28 (jump directly to fade setup, safely skipping preview.Stop)
+                        try {
+                            Memory.protect(baseAddr.add(0x103FC14), 4, 'rwx');
+                            baseAddr.add(0x103FC14).writeByteArray([0xa0, 0x00, 0x00, 0xb4]);
+                            log("[🛡️ SELECT_MUSIC] Patched 0x103FC14: cbz x0, #0x103fc28 (safe StopPreview bypass)");
+                        } catch (ePatchGo) {
+                            log("[-] Error patching 0x103FC14: " + ePatchGo.message);
+                        }
+
+                        Interceptor.attach(baseAddr.add(0x1041A78), {
+                            onEnter: function (args) {
+                                var sms = args[0];
+                                var code = args[1].toInt32();
+                                log("[🎵 SELECT_MUSIC] SelectMusic(sms=" + sms + ", musicCode=" + code + ")");
+                                if (code <= 0) {
+                                    log("[🛡️ SELECT_MUSIC] musicCode <= 0 (" + code + "), overriding to 1001");
+                                    args[1] = ptr(1001);
+                                }
+                                ensureMusicPreviewAssist(sms);
+                            }
+                        });
+
+                        Interceptor.attach(baseAddr.add(0x103ECB0), {
+                            onEnter: function (args) {
+                                log("[🎵 SELECT_MUSIC] SetStateLoadingData entered");
+                                try { populateOfflineInventoryCards(); } catch (ePopSm) {}
+                                try { ensureDisplayGroupList(); } catch (eDglSm) {}
+                                ensureMusicPreviewAssist(args[0]);
+                            }
+                        });
+                        Interceptor.attach(baseAddr.add(0x103EF68), {
+                            onEnter: function () { log("[🎵 SELECT_MUSIC] SetStateWait entered"); }
+                        });
+                        Interceptor.attach(baseAddr.add(0x103F494), {
+                            onEnter: function () { log("[🎵 SELECT_MUSIC] SetStateInstallCheck entered"); }
+                        });
+                        Interceptor.attach(baseAddr.add(0xF188EC), {
+                            onEnter: function () { log("[📦 INSTALL_MUSIC] InstallMusicAssist.Open entered"); }
+                        });
+                        Interceptor.attach(baseAddr.add(0xF068F8), {
+                            onEnter: function (args) { this.md = args[0]; this.diff = args[1].toInt32(); },
+                            onLeave: function (retval) { log("[📦 MUSIC_DATA] IsInstalled(diff=" + this.diff + ") -> " + retval.toInt32()); }
+                        });
+                        Interceptor.attach(baseAddr.add(0x103FB9C), {
+                            onEnter: function (args) {
+                                log("[🚀 START] SelectMusicScene.SetStateGoToIngame entered");
+                                ensureMusicPreviewAssist(args[0]);
+                            }
+                        });
+                        function getFadeInstancePtr() {
+                            try {
+                                var fadeKl = baseAddr.add(0x30D0CB8).readPointer();
+                                if (fadeKl.isNull()) return NULL;
+                                var statics = fadeKl.add(0xB8).readPointer();
+                                if (statics.isNull()) return NULL;
+                                return statics.add(0x18).readPointer();
+                            } catch (eFi) { return NULL; }
+                        }
+                        var actionInvokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer", "pointer"]);
+                        Interceptor.attach(baseAddr.add(0xD2F7B4), {
+                            onEnter: function (args) {
+                                var cb = args[0];
+                                var inst = getFadeInstancePtr();
+                                log("[🎬 FADE] Fade.Out cb=" + cb + " Fade.instance=" + inst);
+                                if (inst.isNull() && cb && !cb.isNull()) {
+                                    this.fallbackCb = cb;
+                                }
+                            },
+                            onLeave: function () {
+                                if (this.fallbackCb) {
+                                    log("[🛡️ FADE] Fade.instance is null -> invoking Fade.Out callback directly!");
+                                    try { actionInvokeFn(this.fallbackCb, NULL); } catch (eFcb) { log("[-] Fade fallback cb error: " + eFcb.message); }
+                                }
+                            }
+                        });
+                        Interceptor.attach(baseAddr.add(0xD2F144), {
+                            onEnter: function (args) {
+                                var cb = args[0];
+                                var inst = getFadeInstancePtr();
+                                log("[🎬 FADE] Fade.In cb=" + cb + " Fade.instance=" + inst);
+                                if (inst.isNull() && cb && !cb.isNull()) {
+                                    this.fallbackCb = cb;
+                                }
+                            },
+                            onLeave: function () {
+                                if (this.fallbackCb) {
+                                    log("[🛡️ FADE] Fade.instance is null -> invoking Fade.In callback directly!");
+                                    try { actionInvokeFn(this.fallbackCb, NULL); } catch (eFcb2) {}
+                                }
+                            }
+                        });
+                        Interceptor.attach(baseAddr.add(0xED6294), {
+                            onEnter: function (args) {
+                                try {
+                                    var uri = readIl2CppString(args[0].add(0x10).readPointer());
+                                    log("[🎼 BGM LOAD] OnLoading_6_Bgm URI=" + uri);
+                                } catch (eU1) {}
+                            }
+                        });
+                        Interceptor.attach(baseAddr.add(0xFD546C), {
+                            onEnter: function (args) {
+                                try { log("[🥁 SEQ LOAD] SeqContext.OpenFromUri URI=" + readIl2CppString(args[1])); } catch (eU2) {}
+                            }
+                        });
+                        Interceptor.attach(baseAddr.add(0xF79C7C), {
+                            onEnter: function () { log("[⏳ LOADING_SCENE] IngameLoadingScene.SetStateWaiting entered"); }
+                        });
+                        Interceptor.attach(baseAddr.add(0xF7CF9C), {
+                            onEnter: function () { log("[⏳ LOADING_SCENE] <SetStateWaiting>b__8_0 entered -> starting pipeline"); }
+                        });
+                        Interceptor.attach(baseAddr.add(0xED5908), {
+                            onEnter: function (args) { log("[⏳ LOADING_SCENE] <SetStateLoadingAndNetwork>b__1 entered, result=" + args[1].toInt32()); }
+                        });
+                        Interceptor.attach(baseAddr.add(0xF7B6D0), {
+                            onEnter: function () { log("[⏳ LOADING_SCENE] IngameLoadingScene.Loading entered -> starting pipeline!"); }
+                        });
+                        Interceptor.attach(baseAddr.add(0xF7CBDC), {
+                            onEnter: function () { log("[🚀 INGAME_TRANSITION] IngameLoadingScene.SetStateGoToIngame entered!"); }
+                        });
+                        Interceptor.attach(baseAddr.add(0x163A880), {
+                            onEnter: function (args) {
+                                try {
+                                    var type = args[0].toInt32();
+                                    var path = (!args[1].isNull()) ? readIl2CppString(args[1]) : "null";
+                                    var ver = (!args[2].isNull()) ? readIl2CppString(args[2]) : "null";
+                                    log("[🖼️ URLS_LOAD] LoadFrom_File_or_Location type=" + type + " path=" + path + " ver=" + ver);
+                                } catch (eUl) {}
+                            },
+                            onLeave: function (retval) {
+                                log("[🖼️ URLS_LOAD] LoadFrom_File_or_Location returned Result=" + retval);
+                            }
+                        });
+                        Interceptor.attach(baseAddr.add(0xEDA6AC), {
+                            onEnter: function (args) {
+                                try {
+                                    var thiz = args[0];
+                                    var state = thiz.add(0x10).readS32();
+                                    var closure = thiz.add(0x28).readPointer();
+                                    var list = (closure && !closure.isNull()) ? closure.add(0x10).readPointer() : NULL;
+                                    var count = (list && !list.isNull()) ? list.add(0x18).readS32() : -1;
+                                    log("[🖼️ TEXTURE_WAIT] OnLoading_2_CardTexture_WaitAndBind state=" + state + " count=" + count);
+                                } catch (eTw) {}
+                            }
+                        });
+                        // Safe dummy WWWFile.Data instance for missing or offline texture requests
+                        var dummyWwwData = Memory.alloc(0x80);
+                        var wwwDataKlass = baseAddr.add(0x30F54B8).readPointer();
+                        dummyWwwData.writePointer(wwwDataKlass);
+                        dummyWwwData.add(0x08).writePointer(NULL);
+                        dummyWwwData.add(0x10).writeInt(1);     // Type = Texture (1)
+                        dummyWwwData.add(0x14).writeU8(1);      // IsDone = true (1)
+                        dummyWwwData.add(0x15).writeU8(0);      // IsSucceed = false (0)
+                        dummyWwwData.add(0x18).writeInt(-1);    // SucceedLocation = -1 (Nullable hasValue = false)
+                        dummyWwwData.add(0x1C).writeInt(0);
+                        dummyWwwData.add(0x20).writeU8(0);
+                        dummyWwwData.add(0x28).writePointer(NULL);
+                        dummyWwwData.add(0x30).writePointer(NULL);
+                        dummyWwwData.add(0x38).writeFloat(1.0);
+                        dummyWwwData.add(0x40).writePointer(NULL);
+
+                        Interceptor.replace(baseAddr.add(0x1EC947C), new NativeCallback(function (thisPtr, methodInfo) {
+                            if (!thisPtr || thisPtr.isNull()) return dummyWwwData;
+                            try {
+                                var refData = thisPtr.add(0x18).readPointer();
+                                if (!refData || refData.isNull() || refData.compare(ptr("0x1000000000")) < 0) {
+                                    log("[🛡️ POOL_OBJ] Returning dummy WWWFile.Data for invalid refData=" + refData + " on thisPtr=" + thisPtr);
+                                    return dummyWwwData;
+                                }
+                                var val = refData.add(0x20).readPointer();
+                                if (!val || val.isNull() || val.compare(ptr("0x1000000000")) < 0) {
+                                    log("[🛡️ POOL_OBJ] Returning dummy WWWFile.Data for invalid val=" + val + " on thisPtr=" + thisPtr);
+                                    return dummyWwwData;
+                                }
+                                var valKlass = val.readPointer();
+                                if (!valKlass || valKlass.isNull() || valKlass.compare(ptr("0x1000000000")) < 0) {
+                                    return dummyWwwData;
+                                }
+                                return val;
+                            } catch (ePo) {
+                                log("[🛡️ POOL_OBJ] Exception in get_Value: " + ePo.message);
+                                return dummyWwwData;
+                            }
+                        }, "pointer", ["pointer", "pointer"]));
+
+                        Interceptor.replace(baseAddr.add(0x2038B8C), new NativeCallback(function (thisPtr, methodInfo) {
+                            if (!thisPtr || thisPtr.isNull() || thisPtr.compare(ptr("0x1000000000")) < 0) {
+                                return dummyWwwData;
+                            }
+                            try {
+                                var val = thisPtr.add(0x20).readPointer();
+                                if (!val || val.isNull() || val.compare(ptr("0x1000000000")) < 0) {
+                                    return dummyWwwData;
+                                }
+                                return val;
+                            } catch (eRd) {
+                                return dummyWwwData;
+                            }
+                        }, "pointer", ["pointer", "pointer"]));
+                        Interceptor.attach(baseAddr.add(0xED76C4), {
+                            onEnter: function (args) {
+                                try {
+                                    var d30 = args[0];
+                                    if (d30 && !d30.isNull()) {
+                                        var gi = d30.add(0x30).readPointer();
+                                        if (gi && !gi.isNull()) {
+                                            var lt = gi.add(0x40).readPointer();
+                                            if (lt.isNull()) {
+                                                log("[🛡️ INGAME_LOAD] gi.LiveThemeItemList is null -> auto-repairing with dummy FastArray!");
+                                                var dummyLive = [];
+                                                for (var i = 0; i < 11; i++) dummyLive.push(NULL);
+                                                var fa = createFastArray(dummyLive, 'livetheme_card');
+                                                gi.add(0x40).writePointer(fa);
+                                            }
+                                        }
+                                    }
+                                } catch (eGip) {}
+                            }
+                        });
+                        Interceptor.attach(baseAddr.add(0xD3EC28), {
+                            onLeave: function (retval) {
+                                var code = retval.toInt32();
+                                if (code <= 0) {
+                                    retval.replace(ptr(1001));
+                                }
+                            }
+                        });
+                        Interceptor.attach(baseAddr.add(0x103A2C4), {
+                            onLeave: function (retval) {
+                                var idx = retval.toInt32();
+                                if (idx < 0) {
+                                    try {
+                                        var mDisp = new NativeFunction(baseAddr.add(0xAFB7FC), "pointer", ["pointer"])(NULL);
+                                        if (mDisp && !mDisp.isNull()) {
+                                            var pool = mDisp.add(0x10).readPointer();
+                                            var count = mDisp.add(0x1C).readS32();
+                                            if (pool && !pool.isNull() && count > 0) {
+                                                for (var i = 0; i < count; i++) {
+                                                    var slot = pool.add(0x20 + i * Process.pointerSize).readPointer();
+                                                    if (slot && !slot.isNull()) {
+                                                        var typ = slot.add(0x14).readS32();
+                                                        if (typ === 1) { // Music
+                                                            retval.replace(ptr(i));
+                                                            return;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } catch (eFdi) {}
+                                    retval.replace(ptr(0));
+                                }
+                            }
+                        });
+                        Interceptor.attach(baseAddr.add(0xEDD5F8), {
+                            onEnter: function () { log("[⏳ LOADING_SCENE] OnLoading_IngameScene_Request entered -> opening IngameScene!"); }
+                        });
+                    } catch (eSmDiag) {}
+
+                    log("[+] Song Gameplay Offline Engine hooks installed cleanly!");
+                } catch (eSongHooks) {
+                    log("[-] Error installing Song Gameplay Offline hooks: " + eSongHooks.message);
                 }
 
                 // Hook LobbyScene.OnOpen (0xB45508)
