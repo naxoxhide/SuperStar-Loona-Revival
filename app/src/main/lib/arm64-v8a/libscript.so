@@ -23332,60 +23332,28 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 } catch (eTw) {}
                             }
                         });
-                        // Safe dummy WWWFile.Data instance for missing or offline texture requests
-                        var dummyWwwData = Memory.alloc(0x80);
-                        var wwwDataKlass = baseAddr.add(0x30F54B8).readPointer();
-                        dummyWwwData.writePointer(wwwDataKlass);
-                        dummyWwwData.add(0x08).writePointer(NULL);
-                        dummyWwwData.add(0x10).writeInt(1);     // Type = Texture (1)
-                        dummyWwwData.add(0x14).writeU8(1);      // IsDone = true (1)
-                        dummyWwwData.add(0x15).writeU8(0);      // IsSucceed = false (0)
-                        dummyWwwData.add(0x18).writeInt(-1);    // SucceedLocation = -1 (Nullable hasValue = false)
-                        dummyWwwData.add(0x1C).writeInt(0);
-                        dummyWwwData.add(0x20).writeU8(0);
-                        dummyWwwData.add(0x28).writePointer(NULL);
-                        dummyWwwData.add(0x30).writePointer(NULL);
-                        dummyWwwData.add(0x38).writeFloat(1.0);
-                        dummyWwwData.add(0x40).writePointer(NULL);
+                        // Native memory patches for IngameLoadingScene:
+                        // 1. At 0xEDA6AC: OnLoading_2_CardTexture_WaitAndBind.MoveNext -> return false (instant complete, skips texture wait/crash)
+                        // 2. At 0xF7D11C: replace VideoControl null check with "mov w0, #1; nop; nop" (prevents video null crash)
+                        try {
+                            Memory.protect(baseAddr.add(0xEDA6AC), 16, 'rwx');
+                            baseAddr.add(0xEDA6AC).writeByteArray([0xe0, 0x03, 0x1f, 0x2a, 0xc0, 0x03, 0x5f, 0xd6]); // mov w0, wzr; ret
+                            log("[🛡️ ONLOADING_2] Patched OnLoading_2 MoveNext with mov w0, wzr; ret (instant complete)!");
 
-                        Interceptor.replace(baseAddr.add(0x1EC947C), new NativeCallback(function (thisPtr, methodInfo) {
-                            if (!thisPtr || thisPtr.isNull()) return dummyWwwData;
-                            try {
-                                var refData = thisPtr.add(0x18).readPointer();
-                                if (!refData || refData.isNull() || refData.compare(ptr("0x1000000000")) < 0) {
-                                    log("[🛡️ POOL_OBJ] Returning dummy WWWFile.Data for invalid refData=" + refData + " on thisPtr=" + thisPtr);
-                                    return dummyWwwData;
-                                }
-                                var val = refData.add(0x20).readPointer();
-                                if (!val || val.isNull() || val.compare(ptr("0x1000000000")) < 0) {
-                                    log("[🛡️ POOL_OBJ] Returning dummy WWWFile.Data for invalid val=" + val + " on thisPtr=" + thisPtr);
-                                    return dummyWwwData;
-                                }
-                                var valKlass = val.readPointer();
-                                if (!valKlass || valKlass.isNull() || valKlass.compare(ptr("0x1000000000")) < 0) {
-                                    return dummyWwwData;
-                                }
-                                return val;
-                            } catch (ePo) {
-                                log("[🛡️ POOL_OBJ] Exception in get_Value: " + ePo.message);
-                                return dummyWwwData;
-                            }
-                        }, "pointer", ["pointer", "pointer"]));
+                            Memory.protect(baseAddr.add(0xF7D11C), 16, 'rwx');
+                            baseAddr.add(0xF7D11C).writeByteArray([0x20, 0x00, 0x80, 0x52, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5]); // mov w0, #1; nop; nop
+                            log("[🛡️ LOADING_SCENE] Patched VideoControl wait check at 0xF7D11C with mov w0, #1!");
+                        } catch (ePatchLoading2) {
+                            log("[-] Failed to patch loading scene opcodes: " + ePatchLoading2.message);
+                        }
 
-                        Interceptor.replace(baseAddr.add(0x2038B8C), new NativeCallback(function (thisPtr, methodInfo) {
-                            if (!thisPtr || thisPtr.isNull() || thisPtr.compare(ptr("0x1000000000")) < 0) {
-                                return dummyWwwData;
-                            }
-                            try {
-                                var val = thisPtr.add(0x20).readPointer();
-                                if (!val || val.isNull() || val.compare(ptr("0x1000000000")) < 0) {
-                                    return dummyWwwData;
-                                }
-                                return val;
-                            } catch (eRd) {
-                                return dummyWwwData;
-                            }
-                        }, "pointer", ["pointer", "pointer"]));
+                        // IngameLoadingScene Key Milestone monitors
+                        Interceptor.attach(baseAddr.add(0xEDD820), {
+                            onEnter: function () { log("[⏳ PIPELINE] OnLoading_6_Bgm entered -> loading audio!"); }
+                        });
+                        Interceptor.attach(baseAddr.add(0xEDDD44), {
+                            onEnter: function () { log("[⏳ PIPELINE] OnLoading_7_SeqContext entered -> loading .seq beatmap!"); }
+                        });
                         Interceptor.attach(baseAddr.add(0xED76C4), {
                             onEnter: function (args) {
                                 try {
