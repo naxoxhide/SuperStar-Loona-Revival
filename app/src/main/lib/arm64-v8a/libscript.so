@@ -1022,57 +1022,39 @@ function initIl2Cpp(module) {
         }
 
         // IL2CPP Liveness Check Shield: native direct branch trampoline in libil2cpp .text (at 0xF288E0)
-        // Prevents SIGSEGV at 0x9F8DE0 (GetLivenessCheck) when Unity engine GC traverses non-Il2CppObject pointers or float values
+        // Prevents SIGSEGV at 0x9F8DE0 (GetLivenessCheck) while keeping all valid user-space Il2CppObject* (including < 0x50_0000_0000) alive
         try {
             var livenessPatchAddr = baseAddr.add(0x9F8DCC);
             var livenessTrampAddr = baseAddr.add(0xF288E0);
 
             // 1. Write native trampoline into unused .text of CardListCompare (0xF288E0):
-            // 0xF288E0: cbz x0, #0xf2892c                  (if null -> return 0)
-            // 0xF288E4: tst x0, #7                          (if unaligned -> return 0)
-            // 0xF288E8: b.ne #0xf2892c
-            // 0xF288EC: lsl x16, x0, #8                     (clear Scudo tag)
-            // 0xF288F0: lsr x16, x16, #40                   (x16 = bits 32-55)
-            // 0xF288F4: sub x16, x16, #0x50                 (range check)
-            // 0xF288F8: cmp x16, #0x30                      (if not in [0x50, 0x80) -> return 0)
-            // 0xF288FC: b.hs #0xf2892c
-            // 0xF28900: ldr x8, [x0]
-            // 0xF28904: mov x19, x0
-            // 0xF28908: tbnz w8, #0, #0xf2892c             (if bit 0 set -> return 0)
-            // 0xF2890C: tst x8, #7                          (if class unaligned -> return 0)
-            // 0xF28910: b.ne #0xf2892c
-            // 0xF28914: lsl x16, x8, #8                     (clear Scudo tag)
-            // 0xF28918: lsr x16, x16, #40                   (x16 = bits 32-55 of class pointer)
-            // 0xF2891C: sub x16, x16, #0x50                 (range check)
-            // 0xF28920: cmp x16, #0x30                      (if not in [0x50, 0x80) -> return 0)
-            // 0xF28924: b.hs #0xf2892c
-            // 0xF28928: b #0x9f8de0                        (continue liveness check)
-            // 0xF2892C: b #0x9f8e88                        (safe ret 0)
-            Memory.protect(livenessTrampAddr, 80, "rwx");
+            // 0xF288E0..0xF28930 (84 bytes < 0xF28940)
+            Memory.protect(livenessTrampAddr, 84, "rwx");
             var livenessTrampBytes = [
-                0x60, 0x02, 0x00, 0xb4, // 0xF288E0: cbz x0, #0xf2892c
+                0x80, 0x02, 0x00, 0xb4, // 0xF288E0: cbz x0, #0xf28930
                 0x1f, 0x08, 0x40, 0xf2, // 0xF288E4: tst x0, #7
-                0x21, 0x02, 0x00, 0x54, // 0xF288E8: b.ne #0xf2892c
-                0x10, 0xdc, 0x78, 0xd3, // 0xF288EC: lsl x16, x0, #8
-                0x10, 0xfe, 0x68, 0xd3, // 0xF288F0: lsr x16, x16, #40
-                0x10, 0x42, 0x01, 0xd1, // 0xF288F4: sub x16, x16, #0x50
-                0x1f, 0xc2, 0x00, 0xf1, // 0xF288F8: cmp x16, #0x30
-                0x82, 0x01, 0x00, 0x54, // 0xF288FC: b.hs #0xf2892c
-                0x08, 0x00, 0x40, 0xf9, // 0xF28900: ldr x8, [x0]
-                0xf3, 0x03, 0x00, 0xaa, // 0xF28904: mov x19, x0
-                0x28, 0x01, 0x00, 0x37, // 0xF28908: tbnz w8, #0, #0xf2892c
-                0x1f, 0x09, 0x40, 0xf2, // 0xF2890C: tst x8, #7
-                0xe1, 0x00, 0x00, 0x54, // 0xF28910: b.ne #0xf2892c
-                0x10, 0xdd, 0x78, 0xd3, // 0xF28914: lsl x16, x8, #8
-                0x10, 0xfe, 0x68, 0xd3, // 0xF28918: lsr x16, x16, #40
-                0x10, 0x42, 0x01, 0xd1, // 0xF2891C: sub x16, x16, #0x50
-                0x1f, 0xc2, 0x00, 0xf1, // 0xF28920: cmp x16, #0x30
-                0x42, 0x00, 0x00, 0x54, // 0xF28924: b.hs #0xf2892c
-                0x2e, 0x41, 0xeb, 0x17, // 0xF28928: b #0x9f8de0
-                0x57, 0x41, 0xeb, 0x17  // 0xF2892C: b #0x9f8e88
+                0x41, 0x02, 0x00, 0x54, // 0xF288E8: b.ne #0xf28930
+                0x10, 0xfc, 0x70, 0xd3, // 0xF288EC: lsr x16, x0, #48
+                0x10, 0x02, 0x00, 0xb5, // 0xF288F0: cbnz x16, #0xf28930 (must be 48-bit canonical)
+                0x10, 0xfc, 0x5c, 0xd3, // 0xF288F4: lsr x16, x0, #28
+                0xd0, 0x01, 0x00, 0xb4, // 0xF288F8: cbz x16, #0xf28930 (>= 0x1000_0000)
+                0x08, 0x00, 0x40, 0xf9, // 0xF288FC: ldr x8, [x0]
+                0xf3, 0x03, 0x00, 0xaa, // 0xF28900: mov x19, x0
+                0x68, 0x01, 0x00, 0x37, // 0xF28904: tbnz w8, #0, #0xf28930 (if bit 0 set -> already marked)
+                0x1f, 0x09, 0x40, 0xf2, // 0xF28908: tst x8, #7
+                0x21, 0x01, 0x00, 0x54, // 0xF2890C: b.ne #0xf28930
+                0x10, 0xdd, 0x60, 0xd3, // 0xF28910: ubfx x16, x8, #32, #24 (clear Scudo tag)
+                0x10, 0x42, 0x00, 0xd1, // 0xF28914: sub x16, x16, #0x10
+                0x1f, 0xc2, 0x01, 0xf1, // 0xF28918: cmp x16, #0x70 ([0x10, 0x80))
+                0xa2, 0x00, 0x00, 0x54, // 0xF2891C: b.hs #0xf28930
+                0x30, 0x41, 0xeb, 0x17, // 0xF28920: b #0x9f8de0
+                0x1f, 0x20, 0x03, 0xd5, // 0xF28924: nop
+                0x1f, 0x20, 0x03, 0xd5, // 0xF28928: nop
+                0x1f, 0x20, 0x03, 0xd5, // 0xF2892C: nop
+                0x56, 0x41, 0xeb, 0x17  // 0xF28930: b #0x9f8e88 (safe ret 0)
             ];
             livenessTrampAddr.writeByteArray(livenessTrampBytes);
-            Memory.protect(livenessTrampAddr, 80, "r-x");
+            Memory.protect(livenessTrampAddr, 84, "r-x");
 
             // 2. Direct branch from 0x9F8DCC to 0xF288E0 (b #0xf288e0 = 0x1414bec5):
             Memory.protect(livenessPatchAddr, 20, "rwx");
@@ -1092,59 +1074,39 @@ function initIl2Cpp(module) {
         }
 
         // IL2CPP Array Liveness Check Shield: native direct branch trampoline in libil2cpp .text (at 0xF28940)
-        // Prevents SIGSEGV at 0x9F8A3C (TraverseGenericObject) when Unity GC traverses generic object arrays with non-pointer elements
+        // Preserves marked array elements (and x11, #-2 instead of skipping bit 0) and accepts all canonical user-space elements >= 0x1000_0000
         try {
             var arrayLivenessPatchAddr = baseAddr.add(0x9F8A18);
             var arrayLivenessTrampAddr = baseAddr.add(0xF28940);
 
-            // 1. Write native trampoline into unused .text of CardListCompare (0xF28940):
-            // 0xF28940: cbz x9, #0xf28990                  (if candidate is null -> skip to 0x9F8A70)
-            // 0xF28944: tst x9, #7                          (if unaligned -> skip)
-            // 0xF28948: b.ne #0xf28990
-            // 0xF2894C: lsl x16, x9, #8                     (clear Scudo tag)
-            // 0xF28950: lsr x16, x16, #40                   (x16 = bits 32-55)
-            // 0xF28954: sub x16, x16, #0x50                 (range check)
-            // 0xF28958: cmp x16, #0x30                      (if not in [0x50, 0x80) -> skip)
-            // 0xF2895C: b.hs #0xf28990
-            // 0xF28960: cbz x10, #0xf2898c                  (if filter_class == null -> accept, jump to 0x9F8A48)
-            // 0xF28964: ldr x11, [x9]                       (load object->klass)
-            // 0xF28968: tbnz w11, #0, #0xf28990             (if bit 0 set -> skip)
-            // 0xF2896C: tst x11, #7                          (if class unaligned -> skip)
-            // 0xF28970: b.ne #0xf28990
-            // 0xF28974: lsl x16, x11, #8                     (clear Scudo tag)
-            // 0xF28978: lsr x16, x16, #40                   (x16 = bits 32-55 of class pointer)
-            // 0xF2897C: sub x16, x16, #0x50                 (range check)
-            // 0xF28980: cmp x16, #0x30                      (if not in [0x50, 0x80) -> skip)
-            // 0xF28984: b.hs #0xf28990
-            // 0xF28988: b #0x9f8a20                        (continue original hierarchy check)
-            // 0xF2898C: b #0x9f8a48                        (target match: accept object)
-            // 0xF28990: b #0x9f8a70                        (skip element)
-            Memory.protect(arrayLivenessTrampAddr, 84, "rwx");
+            Memory.protect(arrayLivenessTrampAddr, 92, "rwx");
             var arrayLivenessTrampBytes = [
-                0x89, 0x02, 0x00, 0xb4, // 0xF28940: cbz x9, #0xf28990
+                0xc9, 0x02, 0x00, 0xb4, // 0xF28940: cbz x9, #0xf28998
                 0x3f, 0x09, 0x40, 0xf2, // 0xF28944: tst x9, #7
-                0x41, 0x02, 0x00, 0x54, // 0xF28948: b.ne #0xf28990
-                0x30, 0xdd, 0x78, 0xd3, // 0xF2894C: lsl x16, x9, #8
-                0x10, 0xfe, 0x68, 0xd3, // 0xF28950: lsr x16, x16, #40
-                0x10, 0x42, 0x01, 0xd1, // 0xF28954: sub x16, x16, #0x50
-                0x1f, 0xc2, 0x00, 0xf1, // 0xF28958: cmp x16, #0x30
-                0xa2, 0x01, 0x00, 0x54, // 0xF2895C: b.hs #0xf28990
-                0x6a, 0x01, 0x00, 0xb4, // 0xF28960: cbz x10, #0xf2898c
-                0x2b, 0x01, 0x40, 0xf9, // 0xF28964: ldr x11, [x9]
-                0x4b, 0x01, 0x00, 0x37, // 0xF28968: tbnz w11, #0, #0xf28990
+                0x81, 0x02, 0x00, 0x54, // 0xF28948: b.ne #0xf28998
+                0x30, 0xfd, 0x70, 0xd3, // 0xF2894C: lsr x16, x9, #48
+                0x50, 0x02, 0x00, 0xb5, // 0xF28950: cbnz x16, #0xf28998 (must be 48-bit canonical)
+                0x30, 0xfd, 0x5c, 0xd3, // 0xF28954: lsr x16, x9, #28
+                0x10, 0x02, 0x00, 0xb4, // 0xF28958: cbz x16, #0xf28998 (>= 0x1000_0000)
+                0xca, 0x01, 0x00, 0xb4, // 0xF2895C: cbz x10, #0xf28994
+                0x2b, 0x01, 0x40, 0xf9, // 0xF28960: ldr x11, [x9]
+                0x6b, 0xf9, 0x7f, 0x92, // 0xF28964: and x11, x11, #-2 (do NOT skip marked elements!)
+                0x8b, 0x01, 0x00, 0xb4, // 0xF28968: cbz x11, #0xf28998
                 0x7f, 0x09, 0x40, 0xf2, // 0xF2896C: tst x11, #7
-                0x01, 0x01, 0x00, 0x54, // 0xF28970: b.ne #0xf28990
-                0x70, 0xdd, 0x78, 0xd3, // 0xF28974: lsl x16, x11, #8
-                0x10, 0xfe, 0x68, 0xd3, // 0xF28978: lsr x16, x16, #40
-                0x10, 0x42, 0x01, 0xd1, // 0xF2897C: sub x16, x16, #0x50
-                0x1f, 0xc2, 0x00, 0xf1, // 0xF28980: cmp x16, #0x30
-                0x62, 0x00, 0x00, 0x54, // 0xF28984: b.hs #0xf28990
-                0x26, 0x40, 0xeb, 0x17, // 0xF28988: b #0x9f8a20
-                0x2f, 0x40, 0xeb, 0x17, // 0xF2898C: b #0x9f8a48
-                0x38, 0x40, 0xeb, 0x17  // 0xF28990: b #0x9f8a70
+                0x41, 0x01, 0x00, 0x54, // 0xF28970: b.ne #0xf28998
+                0x70, 0xdd, 0x60, 0xd3, // 0xF28974: ubfx x16, x11, #32, #24 (clear Scudo tag)
+                0x10, 0x42, 0x00, 0xd1, // 0xF28978: sub x16, x16, #0x10
+                0x1f, 0xc2, 0x01, 0xf1, // 0xF2897C: cmp x16, #0x70 ([0x10, 0x80))
+                0xc2, 0x00, 0x00, 0x54, // 0xF28980: b.hs #0xf28998
+                0x27, 0x40, 0xeb, 0x17, // 0xF28984: b #0x9f8a20
+                0x1f, 0x20, 0x03, 0xd5, // 0xF28988: nop
+                0x1f, 0x20, 0x03, 0xd5, // 0xF2898C: nop
+                0x1f, 0x20, 0x03, 0xd5, // 0xF28990: nop
+                0x2d, 0x40, 0xeb, 0x17, // 0xF28994: b #0x9f8a48
+                0x36, 0x40, 0xeb, 0x17  // 0xF28998: b #0x9f8a70
             ];
             arrayLivenessTrampAddr.writeByteArray(arrayLivenessTrampBytes);
-            Memory.protect(arrayLivenessTrampAddr, 84, "r-x");
+            Memory.protect(arrayLivenessTrampAddr, 92, "r-x");
 
             // 2. Direct branch from 0x9F8A18 to 0xF28940 (b #0xf28940 = 0x1414bfca):
             Memory.protect(arrayLivenessPatchAddr, 8, "rwx");
@@ -1161,40 +1123,39 @@ function initIl2Cpp(module) {
         }
 
         // IL2CPP Liveness Check TypeHierarchy Shield: native direct branch trampoline in libil2cpp .text (at 0xF289A0)
-        // Prevents SIGSEGV at 0x9F8E0C (GetLivenessCheck) when Unity GC dereferences corrupted or non-Il2CppClass typeHierarchy pointers
+        // Widened to [0x10, 0x80) to support all ASLR/Scudo metadata allocations while blocking ASCII/junk pointers
         try {
             var livenessThPatchAddr = baseAddr.add(0x9F8E04);
             var livenessThTrampAddr = baseAddr.add(0xF289A0);
 
-            // 1. Write native trampoline into unused .text of CardListCompare (0xF289A0):
-            Memory.protect(livenessThTrampAddr, 96, "rwx");
+            Memory.protect(livenessThTrampAddr, 92, "rwx");
             var livenessThTrampBytes = [
                 0x08, 0x65, 0x40, 0xf9, // 0xF289A0: ldr x8, [x8, #0xc8]
                 0xa8, 0x02, 0x00, 0xb4, // 0xF289A4: cbz x8, #0xf289f8
                 0x1f, 0x09, 0x40, 0xf2, // 0xF289A8: tst x8, #7
                 0x61, 0x02, 0x00, 0x54, // 0xF289AC: b.ne #0xf289f8
-                0x10, 0xdd, 0x78, 0xd3, // 0xF289B0: lsl x16, x8, #8
-                0x10, 0xfe, 0x68, 0xd3, // 0xF289B4: lsr x16, x16, #40
-                0x10, 0x42, 0x01, 0xd1, // 0xF289B8: sub x16, x16, #0x50
-                0x1f, 0xc2, 0x00, 0xf1, // 0xF289BC: cmp x16, #0x30
-                0xc2, 0x01, 0x00, 0x54, // 0xF289C0: b.hs #0xf289f8
-                0x08, 0x0d, 0x2a, 0x8b, // 0xF289C4: add x8, x8, w10, uxtb #3
-                0x08, 0x21, 0x00, 0xd1, // 0xF289C8: sub x8, x8, #8
-                0x1f, 0x09, 0x40, 0xf2, // 0xF289CC: tst x8, #7
-                0x41, 0x01, 0x00, 0x54, // 0xF289D0: b.ne #0xf289f8
-                0x10, 0xdd, 0x78, 0xd3, // 0xF289D4: lsl x16, x8, #8
-                0x10, 0xfe, 0x68, 0xd3, // 0xF289D8: lsr x16, x16, #40
-                0x10, 0x42, 0x01, 0xd1, // 0xF289DC: sub x16, x16, #0x50
-                0x1f, 0xc2, 0x00, 0xf1, // 0xF289E0: cmp x16, #0x30
-                0xa2, 0x00, 0x00, 0x54, // 0xF289E4: b.hs #0xf289f8
-                0x08, 0x01, 0x40, 0xf9, // 0xF289E8: ldr x8, [x8]
-                0x1f, 0x01, 0x09, 0xeb, // 0xF289EC: cmp x8, x9
-                0x41, 0x00, 0x00, 0x54, // 0xF289F0: b.ne #0xf289f8
-                0x09, 0x41, 0xeb, 0x17, // 0xF289F4: b #0x9f8e18
+                0x10, 0xdd, 0x60, 0xd3, // 0xF289B0: ubfx x16, x8, #32, #24
+                0x10, 0x42, 0x00, 0xd1, // 0xF289B4: sub x16, x16, #0x10
+                0x1f, 0xc2, 0x01, 0xf1, // 0xF289B8: cmp x16, #0x70
+                0xe2, 0x01, 0x00, 0x54, // 0xF289BC: b.hs #0xf289f8
+                0x08, 0x0d, 0x2a, 0x8b, // 0xF289C0: add x8, x8, w10, uxtb #3
+                0x08, 0x21, 0x00, 0xd1, // 0xF289C4: sub x8, x8, #8
+                0x1f, 0x09, 0x40, 0xf2, // 0xF289C8: tst x8, #7
+                0x61, 0x01, 0x00, 0x54, // 0xF289CC: b.ne #0xf289f8
+                0x10, 0xdd, 0x60, 0xd3, // 0xF289D0: ubfx x16, x8, #32, #24
+                0x10, 0x42, 0x00, 0xd1, // 0xF289D4: sub x16, x16, #0x10
+                0x1f, 0xc2, 0x01, 0xf1, // 0xF289D8: cmp x16, #0x70
+                0xe2, 0x00, 0x00, 0x54, // 0xF289DC: b.hs #0xf289f8
+                0x08, 0x01, 0x40, 0xf9, // 0xF289E0: ldr x8, [x8]
+                0x1f, 0x01, 0x09, 0xeb, // 0xF289E4: cmp x8, x9
+                0x81, 0x00, 0x00, 0x54, // 0xF289E8: b.ne #0xf289f8
+                0x0b, 0x41, 0xeb, 0x17, // 0xF289EC: b #0x9f8e18
+                0x1f, 0x20, 0x03, 0xd5, // 0xF289F0: nop
+                0x1f, 0x20, 0x03, 0xd5, // 0xF289F4: nop
                 0x24, 0x41, 0xeb, 0x17  // 0xF289F8: b #0x9f8e88
             ];
             livenessThTrampAddr.writeByteArray(livenessThTrampBytes);
-            Memory.protect(livenessThTrampAddr, 96, "r-x");
+            Memory.protect(livenessThTrampAddr, 92, "r-x");
 
             // 2. Direct branch from 0x9F8E04 to 0xF289A0 (b #0xf289a0 = 0x1414bee7):
             Memory.protect(livenessThPatchAddr, 20, "rwx");
@@ -3188,14 +3149,7 @@ function initIl2Cpp(module) {
                 log("[-] Error attaching failsafe hooks: " + e.message);
             }
 
-            // 3. ImageMerger protection
-            var imgMerger32Ptr = baseAddr.add(0xBAEC88);
-            var imgMerger24Ptr = baseAddr.add(0xBAED3C);
-            var imgMergerAlphaPtr = baseAddr.add(0xBAEDF0);
-            Interceptor.replace(imgMerger32Ptr, new NativeCallback(function (c, cw, x, y, w, h, cs, sx, sy, sw) { return c; }, "pointer", ["pointer", "int", "int", "int", "int", "int", "pointer", "int", "int", "int"]));
-            Interceptor.replace(imgMerger24Ptr, new NativeCallback(function (c, cw, x, y, w, h, cs, sx, sy, sw) { return c; }, "pointer", ["pointer", "int", "int", "int", "int", "int", "pointer", "int", "int", "int"]));
-            Interceptor.replace(imgMergerAlphaPtr, new NativeCallback(function (c, cw, x, y, w, h, cs, sx, sy, sw) { return c; }, "pointer", ["pointer", "int", "int", "int", "int", "int", "pointer", "int", "int", "int"]));
-            log("[+] ImageMerger protected");
+            // 3. Native ImageMerger (0xBAEC88, 0xBAED3C, 0xBAEDF0) left unpatched so OnLoading_2 merges real card portraits & grade borders into UIAtlas!
 
             // 4. ApiExcept bypass
             var apiExceptOpenPtr = baseAddr.add(0x11162C4);
@@ -4051,6 +4005,10 @@ function initIl2Cpp(module) {
                                     var loadImagePtr = baseAddr.add(0x25B3E90);
                                     var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
                                     loadImageFn(texObj, bytesObj);
+                                    try {
+                                        var setHideFlagsFn = new NativeFunction(baseAddr.add(0x1DC7FF4), "void", ["pointer", "int", "pointer"]);
+                                        setHideFlagsFn(texObj, 52, NULL);
+                                    } catch (eTitleDh) {}
                                     if (il2cpp_gchandle_new) il2cpp_gchandle_new(texObj, 2);
                                     cachedTitleTexObj = texObj;
                                     cachedTitleFileName = selectedFileName;
@@ -5288,7 +5246,10 @@ function initIl2Cpp(module) {
                         step = "str_url";
                         var urlStr = createIl2CppString("https://dalcom.local/" + relPath);
                         step = "str_rel";
-                        var relStr = createIl2CppString(relPath);
+                        var fullFilePath = (relPath && relPath.charAt(0) !== "/")
+                            ? ("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/" + relPath)
+                            : relPath;
+                        var relStr = createIl2CppString(fullFilePath);
                         step = "str_ver";
                         var verStr = createIl2CppString("1");
                         step = "write_fields";
@@ -6194,6 +6155,7 @@ function initIl2Cpp(module) {
                                         var aMeta = meta.artists[aCodeStr];
                                         var aObj = il2cpp_object_new(artKlass);
                                         if (il2cpp_gchandle_new && !aObj.isNull()) il2cpp_gchandle_new(aObj, 2);
+                                        aObj.add(0x18).writePointer(createManagedList([], 'int') || NULL); // issueThemeCode
                                         aObj.add(0x20).writePointer(createIl2CppString(aMeta.name || "Artist"));
                                         var sEmptyPath = (aMeta && aMeta.emptyImageSmall) ? aMeta.emptyImageSmall : ("asiudgasg/asodhsg/sdhgauwehdnu/" + aCode + "_s.i.bytes");
                                         var lEmptyPath = (aMeta && aMeta.emptyImageLarge) ? aMeta.emptyImageLarge : ("asiudgasg/asodhsg/sdhgauwehdnu/" + aCode + "_l.i.bytes");
@@ -6222,6 +6184,7 @@ function initIl2Cpp(module) {
                                     if (!loonaArtistDataMap[m.index]) {
                                         var aObj = il2cpp_object_new(artKlass);
                                         if (il2cpp_gchandle_new && !aObj.isNull()) il2cpp_gchandle_new(aObj, 2);
+                                        aObj.add(0x18).writePointer(createManagedList([], 'int') || NULL); // issueThemeCode
                                         aObj.add(0x20).writePointer(createIl2CppString("LOONA"));
                                         var sEmptyPathLoona = "asiudgasg/asodhsg/sdhgauwehdnu/" + (1000 + m.index) + "_s.i.bytes";
                                         var lEmptyPathLoona = "asiudgasg/asodhsg/sdhgauwehdnu/" + (1000 + m.index) + "_l.i.bytes";
@@ -14989,30 +14952,34 @@ function initIl2Cpp(module) {
                         baseAddr.add(0x18ED71C).writeU32(0xD503201F); // nop
                         log("[🛡️ ACTION_INVOKE SHIELD] Patched Action<int, object>.Invoke to safe non-null guard!");
 
-                        // Shield 6: Boehm GC Object Scanner (0x9F89A4) - defend against Scudo tagged pointers in dead objects
-                        Memory.protect(baseAddr.add(0xD62050), 64, "rwx");
-                        baseAddr.add(0xD62050).writeU32(0xB40001C0); // cbz x0, #0xD62088
-                        baseAddr.add(0xD62054).writeU32(0xF9400008); // ldr x8, [x0]
-                        baseAddr.add(0xD62058).writeU32(0x927FF902); // and x2, x8, #0xfffffffffffffffe
-                        baseAddr.add(0xD6205C).writeU32(0xB4000162); // cbz x2, #0xD62088
-                        baseAddr.add(0xD62060).writeU32(0xF240085F); // tst x2, #7
-                        baseAddr.add(0xD62064).writeU32(0x54000121); // b.ne #0xD62088
-                        baseAddr.add(0xD62068).writeU32(0xD378DC4B); // lsl x11, x2, #8
-                        baseAddr.add(0xD6206C).writeU32(0xD368FD6B); // lsr x11, x11, #40
-                        baseAddr.add(0xD62070).writeU32(0xD101416B); // sub x11, x11, #0x50
-                        baseAddr.add(0xD62074).writeU32(0xF100C17F); // cmp x11, #0x30
-                        baseAddr.add(0xD62078).writeU32(0x54000082); // b.hs #0xD62088
-                        baseAddr.add(0xD6207C).writeU32(0xAA0103E3); // mov x3, x1
-                        baseAddr.add(0xD62080).writeU32(0x39402048); // ldrb w8, [x2, #8]
-                        baseAddr.add(0xD62084).writeU32(0x17F25A4C); // b #0x9F89B4
-                        baseAddr.add(0xD62088).writeU32(0xD65F03C0); // ret
-                        baseAddr.add(0xD6208C).writeU32(0xD503201F); // nop
+                        // Shield 6: LivenessState::TraverseObject (0x9F89A4) - validate x0 (>= 0x1000_0000 canonical) and x2 ([0x10, 0x80) Scudo-untagged) at 0xD620B8
+                        Memory.protect(baseAddr.add(0xD620B8), 72, "rwx");
+                        baseAddr.add(0xD620B8).writeU32(0xF240081F); // tst x0, #7
+                        baseAddr.add(0xD620BC).writeU32(0x54000201); // b.ne #0xD620FC
+                        baseAddr.add(0xD620C0).writeU32(0xD370FC0B); // lsr x11, x0, #48
+                        baseAddr.add(0xD620C4).writeU32(0xB50001CB); // cbnz x11, #0xD620FC
+                        baseAddr.add(0xD620C8).writeU32(0xD35CFC0B); // lsr x11, x0, #28
+                        baseAddr.add(0xD620CC).writeU32(0xB400018B); // cbz x11, #0xD620FC
+                        baseAddr.add(0xD620D0).writeU32(0xF9400008); // ldr x8, [x0]
+                        baseAddr.add(0xD620D4).writeU32(0x927FF902); // and x2, x8, #0xfffffffffffffffe
+                        baseAddr.add(0xD620D8).writeU32(0xF240085F); // tst x2, #7
+                        baseAddr.add(0xD620DC).writeU32(0x54000101); // b.ne #0xD620FC
+                        baseAddr.add(0xD620E0).writeU32(0xD360DC4B); // ubfx x11, x2, #32, #24
+                        baseAddr.add(0xD620E4).writeU32(0xD100416B); // sub x11, x11, #0x10
+                        baseAddr.add(0xD620E8).writeU32(0xF101C17F); // cmp x11, #0x70
+                        baseAddr.add(0xD620EC).writeU32(0x54000082); // b.hs #0xD620FC
+                        baseAddr.add(0xD620F0).writeU32(0xAA0103E3); // mov x3, x1
+                        baseAddr.add(0xD620F4).writeU32(0x39402048); // ldrb w8, [x2, #8]
+                        baseAddr.add(0xD620F8).writeU32(0x17F25A2F); // b #0x9F89B4
+                        baseAddr.add(0xD620FC).writeU32(0xD65F03C0); // ret
+                        Memory.protect(baseAddr.add(0xD620B8), 72, "r-x");
                         Memory.protect(baseAddr.add(0x9F89A4), 16, "rwx");
-                        baseAddr.add(0x9F89A4).writeU32(0x140DA5AB); // b #0xD62050
+                        baseAddr.add(0x9F89A4).writeU32(0x140DA5C5); // b #0xD620B8
                         baseAddr.add(0x9F89A8).writeU32(0xD503201F); // nop
                         baseAddr.add(0x9F89AC).writeU32(0xD503201F); // nop
                         baseAddr.add(0x9F89B0).writeU32(0xD503201F); // nop
-                        log("[🛡️ BOEHM_GC SHIELD] Patched GC object scanner (0x9F89A4) to safe Scudo-filtered trampoline!");
+                        Memory.protect(baseAddr.add(0x9F89A4), 16, "r-x");
+                        log("[🛡️ LIVENESS_TRAVERSE SHIELD] Patched Liveness::TraverseObject (0x9F89A4 -> 0xD620B8) with safe x0 & Scudo-untagged x2 guards!");
 
                         // Shield 7: Class::Init (0x9EA96C) - universal shield against Scudo tagged pointers in Graphic.Raycast / type checks
                         Memory.protect(baseAddr.add(0xD62090), 40, "rwx");
@@ -21602,7 +21569,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                 function ensureOfflineLeagueRanking() {
                     try {
                         if (!offlinePersonObj || offlinePersonObj.isNull()) {
-                            var pCls = getClass("Assembly-CSharp", "", "Person") ||
+                            var pCls = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents.model", "Person") ||
+                                       getClass("Assembly-CSharp", "", "Person") ||
                                        getClass("Assembly-CSharp", "com.dalcomsoft.project.app.data", "Person") ||
                                        getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control", "Person");
                             if (pCls && !pCls.isNull()) {
@@ -21613,6 +21581,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         }
                         if (!offlineMyRankingObj || offlineMyRankingObj.isNull()) {
                             var wrCls = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "LeagueControl/WeeklyRanking") ||
+                                        getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents.model", "Ranking") ||
                                         getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control", "LeagueControl/WeeklyRanking") ||
                                         getClass("Assembly-CSharp", "", "LeagueControl/WeeklyRanking") ||
                                         getClass("Assembly-CSharp", "", "Ranking");
@@ -21898,8 +21867,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     Interceptor.replace(baseAddr.add(0x163A880), keepCb(new NativeCallback(function (type, filePathPtr, versionPtr, locsPtr, options, order, cbPtr, methodInfo) {
                         var relPath = "";
                         try { if (!filePathPtr.isNull()) relPath = readIl2CppString(filePathPtr); } catch (eS) {}
-                        // Never mock in-game card textures, audio, sequences or album covers; let native engine load them from disk!
-                        var isIngameAsset = relPath && (relPath.indexOf("wadceg/") !== -1 || relPath.indexOf("woeiurty/") !== -1 || relPath.indexOf("dslkjfsdalhh/") !== -1 || relPath.indexOf("aweid/") !== -1);
+                        // Never mock in-game card textures, song backgrounds (hcxjx), audio, sequences or album covers; let native engine load them from disk!
+                        var isIngameAsset = relPath && (relPath.indexOf("wadceg/") !== -1 || relPath.indexOf("hcxjx/") !== -1 || relPath.indexOf("woeiurty/") !== -1 || relPath.indexOf("dslkjfsdalhh/") !== -1 || relPath.indexOf("aweid/") !== -1);
                         if (!isIngameAsset && relPath && (relPath.indexOf("weoihxd/") !== -1 || relPath.indexOf("halwuiefjs/") !== -1)) {
                             var resKlass = getClass("Assembly-CSharp", "", "WWWFile/Result") ||
                                            getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control", "WWWFile/Result") ||
@@ -22923,7 +22892,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         var musicCode = (!selMusic.isNull()) ? new NativeFunction(baseAddr.add(0xF05A18), "int16", ["pointer", "pointer"])(selMusic, NULL) : 0;
                         var difficult = new NativeFunction(baseAddr.add(0xD3DC18), "int32", ["pointer"])(NULL);
                         var isRehearsal = new NativeFunction(baseAddr.add(0xD3DF14), "bool", ["pointer"])(NULL) !== 0;
-                        var resObj = new NativeFunction(baseAddr.add(0xD41A68), "pointer", ["pointer"])(NULL);
+                        var resObj = new NativeFunction(baseAddr.add(0xD41A04), "pointer", ["pointer"])(NULL);
 
                         var totalScore = 0, missCnt = 0, goodCnt = 0, perfCnt = 0, spCnt = 0, starCnt = 3, isAllSp = false;
                         if (resObj && !resObj.isNull()) {
@@ -23191,23 +23160,46 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         }
                     }, "void", ["pointer", "bool", "pointer"])));
 
-                    // 5c. AssetControl.DownloadPathExists (0xCD28AC) -> Verify actual File.Exists(path.LocalFilePath) without requiring .ver sidecar files
+                    // 5c. AssetControl.DownloadPathExists (0xCD28AC) & WWWFile.FileExists (0xCD2418) -> Verify actual File.Exists without requiring .ver sidecar files
                     var dlPathCheckLogs = 0;
+                    var storageExistsFn = new NativeFunction(baseAddr.add(0xD2102C), "bool", ["pointer", "pointer"]);
+                    var resolveStoragePathPtr = function (rawPathPtr) {
+                        var s = readIl2CppString(rawPathPtr);
+                        if (s && s.charAt(0) !== "/") {
+                            return createIl2CppString("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/" + s);
+                        }
+                        return rawPathPtr;
+                    };
                     Interceptor.replace(baseAddr.add(0xCD28AC), keepCb(new NativeCallback(function (pathPtr, versionPathPtr, methodInfo) {
                         try {
                             if (!pathPtr || pathPtr.isNull()) return 0;
                             var localPathPtr = pathPtr.add(0x18).readPointer();
                             if (!localPathPtr || localPathPtr.isNull()) return 0;
-                            var exists = new NativeFunction(baseAddr.add(0xD2102C), "bool", ["pointer", "pointer"])(localPathPtr, NULL) !== 0;
+                            var resolvedPtr = resolveStoragePathPtr(localPathPtr);
+                            var exists = storageExistsFn(resolvedPtr, NULL) !== 0;
                             if (!exists || dlPathCheckLogs < 12) {
                                 dlPathCheckLogs++;
-                                log("[📁 DL_EXISTS] exists=" + exists + " path=" + readIl2CppString(localPathPtr));
+                                log("[📁 DL_EXISTS] exists=" + exists + " path=" + readIl2CppString(resolvedPtr));
                             }
                             return exists ? 1 : 0;
                         } catch (eDpe) {
                             return 0;
                         }
                     }, "bool", ["pointer", "pointer", "pointer"])));
+
+                    Interceptor.replace(baseAddr.add(0xCD2418), keepCb(new NativeCallback(function (pathPtr, versionPtr, versionPathPtr, methodInfo) {
+                        try {
+                            if (!pathPtr || pathPtr.isNull()) return 0;
+                            var resolvedPtr = resolveStoragePathPtr(pathPtr);
+                            return storageExistsFn(resolvedPtr, NULL) !== 0 ? 1 : 0;
+                        } catch (eWfe) {
+                            return 0;
+                        }
+                    }, "bool", ["pointer", "pointer", "pointer", "pointer"])));
+
+                    // Never delete ADB-pushed local assets during offline WWWFile retries
+                    Interceptor.replace(baseAddr.add(0xCD4960), keepCb(new NativeCallback(function (pathPtr, versionPathPtr, methodInfo) {
+                    }, "void", ["pointer", "pointer", "pointer"])));
 
                     // 5d. AssetControl.SetLastWriteTime (0xAE0048) -> Safe no-op offline (avoids UnauthorizedAccessException on ADB-pushed assets)
                     Interceptor.replace(baseAddr.add(0xAE0048), keepCb(new NativeCallback(function (filePathPtr, timeVal, methodInfo) {
@@ -23502,11 +23494,16 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         });
                         function getFadeInstancePtr() {
                             try {
-                                var fadeKl = baseAddr.add(0x30D0CB8).readPointer();
+                                var fadeSlot = baseAddr.add(0x30D0CB8).readPointer();
+                                if (fadeSlot.isNull()) return NULL;
+                                var fadeKl = fadeSlot.readPointer();
                                 if (fadeKl.isNull()) return NULL;
                                 var statics = fadeKl.add(0xB8).readPointer();
                                 if (statics.isNull()) return NULL;
-                                return statics.add(0x18).readPointer();
+                                var inst = statics.add(0x18).readPointer();
+                                if (inst.isNull()) return NULL;
+                                var isAlive = new NativeFunction(baseAddr.add(0x1DBEEDC), "bool", ["pointer", "pointer"])(inst, NULL);
+                                return isAlive ? inst : NULL;
                             } catch (eFi) { return NULL; }
                         }
                         var actionInvokeFn = new NativeFunction(baseAddr.add(0x1DEBE44), "void", ["pointer", "pointer"]);
@@ -23543,8 +23540,6 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             }
                         });
                     var bgmLoadLock = 0;
-                    var bgmLastUri = "";
-                    var bgmLastBufId = -1;
                     function applyMiniaudioShields() {
                         try {
                             var minaMod = Process.findModuleByName("libminiaudio.so");
@@ -23563,33 +23558,20 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 Memory.protect(minaMod.base.add(0xC110), 4, 'r-x');
 
                                 var origMinaLoadFromUri = new NativeFunction(minaMod.base.add(0xC16C), "int", ["pointer", "int"]);
-                                Interceptor.replace(minaMod.base.add(0xC16C), keepCb(new NativeCallback(function (uriPtr, uriLen) {
+                                Interceptor.replace(minaMod.base.add(0xC16C), keepCb(new NativeCallback(function (uriPtr, arg1) {
                                     var uriStr = "";
-                                    try { uriStr = uriPtr.readUtf8String(uriLen); } catch (e) {}
+                                    try { if (!uriPtr.isNull()) uriStr = uriPtr.readCString(); } catch (e) {}
                                     log("[🎧 MINIAUDIO_LOAD] mina_buffer_load_from_ov_oneshot_from_uri: " + uriStr);
-
-                                    if (bgmLastBufId >= 0 && bgmLastUri === uriStr) {
-                                        log("[🎧 MINIAUDIO_LOAD] Reusing already loaded audio bufferId=" + bgmLastBufId);
-                                        return bgmLastBufId;
-                                    }
 
                                     var spinCount = 0;
                                     while (bgmLoadLock === 1 && spinCount < 100) {
                                         Thread.sleep(0.05);
                                         spinCount++;
-                                        if (bgmLastBufId >= 0 && bgmLastUri === uriStr) {
-                                            log("[🎧 MINIAUDIO_LOAD] Concurrent load resolved; reusing bufferId=" + bgmLastBufId);
-                                            return bgmLastBufId;
-                                        }
                                     }
                                     bgmLoadLock = 1;
                                     try {
-                                        var res = origMinaLoadFromUri(uriPtr, uriLen);
+                                        var res = origMinaLoadFromUri(uriPtr, arg1);
                                         log("[🎧 MINIAUDIO_LOAD] Loaded audio bufferId=" + res);
-                                        if (res >= 0) {
-                                            bgmLastBufId = res;
-                                            bgmLastUri = uriStr;
-                                        }
                                         return res;
                                     } catch (eLoad) {
                                         log("[-] Error in origMinaLoadFromUri: " + eLoad.message);
@@ -23642,39 +23624,19 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             onEnter: function () { log("[🚀 INGAME_TRANSITION] IngameLoadingScene.SetStateGoToIngame entered!"); }
                         });
                         // Native memory patches for IngameLoadingScene & IngameScene:
-                        // 1. At 0xEDA6AC: OnLoading_2_CardTexture_WaitAndBind.MoveNext -> return false (instant complete, skips texture wait/crash)
-                        // 2. At 0xEDB25C: OnLoading_3_CardTexture_RandomSorting.MoveNext -> return false (instant complete, skips texture random sort null crash)
-                        // 3. At 0xF7D11C: replace VideoControl null check with "mov w0, #1; nop; nop" (prevents video null crash)
-                        // 4. At 0x1EEEF98: replace UIFrameAnimationGauge null check with "cbz x20, #0x1eef058" (safe return)
-                        // 5. At 0x1EEEFFC: replace UIFrameAnimationGauge null check with "cbz x0, #0x1eef058" (safe return)
+                        // Restored authentic OnLoading_2 (card texture bind), OnLoading_3 (card random sort), IngameThemeBonus, and CalcLifeAndFeverState!
+                        // Keeping only genuine offline/null protections: VideoControl check, UIFrameAnimationGauge null guards, GameReady, FailDataToServer, WorldRecordControl, ResultScene safe epilogue & SetStateLeave.
                         try {
-                            Memory.protect(baseAddr.add(0xEDA6AC), 16, 'rwx');
-                            baseAddr.add(0xEDA6AC).writeByteArray([0xe0, 0x03, 0x1f, 0x2a, 0xc0, 0x03, 0x5f, 0xd6]); // mov w0, wzr; ret
-                            log("[🛡️ ONLOADING_2] Patched OnLoading_2 MoveNext with mov w0, wzr; ret (instant complete)!");
-
-                            Memory.protect(baseAddr.add(0xEDB25C), 16, 'rwx');
-                            baseAddr.add(0xEDB25C).writeByteArray([0xe0, 0x03, 0x1f, 0x2a, 0xc0, 0x03, 0x5f, 0xd6]); // mov w0, wzr; ret
-                            log("[🛡️ ONLOADING_3] Patched OnLoading_3 MoveNext with mov w0, wzr; ret (instant complete)!");
-
                             Memory.protect(baseAddr.add(0xF7D11C), 16, 'rwx');
                             baseAddr.add(0xF7D11C).writeByteArray([0x20, 0x00, 0x80, 0x52, 0x1f, 0x20, 0x03, 0xd5, 0x1f, 0x20, 0x03, 0xd5]); // mov w0, #1; nop; nop
                             log("[🛡️ LOADING_SCENE] Patched VideoControl wait check at 0xF7D11C with mov w0, #1!");
 
+                            // Null-safe guard in UISprite.set_sprite (0x1EEEF4C) -> safe epilogue exit when sprite/atlas is null
                             Memory.protect(baseAddr.add(0x1EEEF98), 16, 'rwx');
                             baseAddr.add(0x1EEEF98).writeByteArray([0x14, 0x06, 0x00, 0xb4]); // cbz x20, #0x1eef058
-                            log("[🛡️ INGAME_GAUGE] Patched UIFrameAnimationGauge at 0x1EEEF98 with safe exit!");
-
                             Memory.protect(baseAddr.add(0x1EEEFFC), 16, 'rwx');
                             baseAddr.add(0x1EEEFFC).writeByteArray([0xe0, 0x02, 0x00, 0xb4]); // cbz x0, #0x1eef058
-                            log("[🛡️ INGAME_GAUGE] Patched UIFrameAnimationGauge at 0x1EEEFFC with safe exit!");
-
-                            Memory.protect(baseAddr.add(0x149D854), 16, 'rwx');
-                            baseAddr.add(0x149D854).writeByteArray([0xe0, 0x03, 0x1f, 0x2a, 0xc0, 0x03, 0x5f, 0xd6]); // mov w0, wzr; ret
-                            log("[🛡️ THEME_BONUS] Patched IngameThemeBonus.get_IsOpened at 0x149D854 to return false!");
-
-                            Memory.protect(baseAddr.add(0x149D938), 16, 'rwx');
-                            baseAddr.add(0x149D938).writeByteArray([0x8d, 0x01, 0x00, 0x14]); // b #0x149df6c (jump to Close)
-                            log("[🛡️ THEME_BONUS] Patched IngameThemeBonus.Open at 0x149D938 (b #Close)!");
+                            log("[🛡️ UISPRITE] Patched UISprite.set_sprite null guards (0x1EEEF98, 0x1EEEFFC) with safe exit!");
 
                             // Patch IngameView.GameReady at 0x14A84E0:
                             // Original: cbz w8, #0x14a84fc (checks static flag at offset 0x25; if 1, returns and leaves state=2)
@@ -23683,26 +23645,10 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             baseAddr.add(0x14A84E0).writeByteArray([0x07, 0x00, 0x00, 0x14]);
                             log("[🎮 INGAME_READY] Patched IngameView.GameReady at 0x14A84E0 (b #GameStart)!");
 
-                            // Bulletproof Game Over and FailDataToServer shields for offline song gameplay:
-                            // 1. IngameScene.FailDataToServer at 0x1499994 -> ret (prevents null server dereference at 0x168)
+                            // Offline fail protection: block only FailDataToServer HTTP call at 0x1499994; let CalcLifeAndFeverState & OnGameOver run natively!
                             Memory.protect(baseAddr.add(0x1499994), 4, 'rwx');
                             baseAddr.add(0x1499994).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
                             log("[🛡️ FAIL_DATA] Patched IngameScene.FailDataToServer at 0x1499994 (ret)!");
-
-                            // 2. IngameView.OnGameOver at 0x14A1F24 -> ret (prevents game over popup and stall)
-                            Memory.protect(baseAddr.add(0x14A1F24), 4, 'rwx');
-                            baseAddr.add(0x14A1F24).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
-                            log("[🛡️ GAME_OVER] Patched IngameView.OnGameOver at 0x14A1F24 (ret)!");
-
-                            // 3. IngameView.get_IsGameOver at 0x14A93E8 -> mov w0, wzr; ret (always false)
-                            Memory.protect(baseAddr.add(0x14A93E8), 8, 'rwx');
-                            baseAddr.add(0x14A93E8).writeByteArray([0xe0, 0x03, 0x1f, 0x2a, 0xc0, 0x03, 0x5f, 0xd6]);
-                            log("[🛡️ IS_GAME_OVER] Patched IngameView.get_IsGameOver at 0x14A93E8 (mov w0, wzr; ret)!");
-
-                            // 4. IngameView.CalcLifeAndFeverState at 0x14A1BB0 -> ret (prevents game over on note miss)
-                            Memory.protect(baseAddr.add(0x14A1BB0), 4, 'rwx');
-                            baseAddr.add(0x14A1BB0).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
-                            log("[🛡️ NO_FAIL] Patched IngameView.CalcLifeAndFeverState at 0x14A1BB0 (ret) for offline Godmode!");
 
                             // 5. WorldRecordControl shields (prevents NullRef in GameControl.SetRecord_ForClient at end of song):
                             // GetCurrentWorldRecordSeasonCode (0xCE0210, 0xCE0474) -> mov w0, #-1; ret
@@ -23717,13 +23663,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             baseAddr.add(0xCE0780).writeByteArray([0xe0, 0x03, 0x1f, 0xaa, 0xc0, 0x03, 0x5f, 0xd6]);
                             log("[🛡️ WORLD_RECORD] Patched WorldRecordControl (0xCE0210, 0xCE0474, 0xCE06A4, 0xCE0780) for offline ResultScene transition!");
 
-                            // 6. ResultScene & ResultControl Bulletproof Shields:
-                            // A. ResultControl.ClearNoteList at 0xF92F84 -> ret (neutralizes NoteList null crash)
-                            Memory.protect(baseAddr.add(0xF92F84), 4, 'rwx');
-                            baseAddr.add(0xF92F84).writeByteArray([0xc0, 0x03, 0x5f, 0xd6]);
-                            log("[🛡️ RESULT_SHIELD] Patched ResultControl.ClearNoteList at 0xF92F84 (ret)!");
-
-                            // B. ResultScene.InitNote error branch at 0xF94B08 -> b #0xf94aec (safe epilogue exit instead of NullRef exception)
+                            // 6. ResultScene & ResultControl Shields:
+                            // B. ResultScene.InitNote empty-list guard at 0xF94B08 -> b #0xf94aec (safe epilogue exit if NoteList is empty)
                             Memory.protect(baseAddr.add(0xF94B08), 4, 'rwx');
                             baseAddr.add(0xF94B08).writeByteArray([0xf9, 0xff, 0xff, 0x17]);
                             log("[🛡️ RESULT_SHIELD] Patched ResultScene.InitNote at 0xF94B08 with 'b #0xf94aec' (safe epilogue)!");
@@ -23751,8 +23692,23 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                                 }
                             }
                         });
+                        var ensureResultControlOpened = function (ctxLabel) {
+                            try {
+                                var isOpened = new NativeFunction(baseAddr.add(0xF931C8), "bool", ["pointer"])(NULL);
+                                var noteList = new NativeFunction(baseAddr.add(0xF9312C), "pointer", ["pointer"])(NULL);
+                                if (!isOpened || noteList.isNull()) {
+                                    new NativeFunction(baseAddr.add(0xF93268), "void", [])();
+                                    log(ctxLabel + " ResultControl.Open() initialized cleanly (wasOpened=" + isOpened + ")");
+                                }
+                            } catch (eRcInit) {
+                                log("[-] Error in " + ctxLabel + " ResultControl guard: " + eRcInit.message);
+                            }
+                        };
                         Interceptor.attach(baseAddr.add(0x1499844), { // IngameScene.SetStateIngame
-                            onEnter: function () { log("[🎮 INGAME_LIFECYCLE] IngameScene.SetStateIngame entered!"); }
+                            onEnter: function () {
+                                log("[🎮 INGAME_LIFECYCLE] IngameScene.SetStateIngame entered!");
+                                ensureResultControlOpened("[🎮 INGAME_INIT]");
+                            }
                         });
                         Interceptor.attach(baseAddr.add(0x149C048), { // IngameView.Load
                             onEnter: function () { log("[🎮 INGAME_LIFECYCLE] IngameView.Load entered!"); },
@@ -23778,24 +23734,14 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         // ResultScene & End of Song Lifecycle
                         Interceptor.attach(baseAddr.add(0x149C128), { // IngameScene.SetStateStageClear
                             onEnter: function () {
-                                log("[🏁 INGAME_FINISH] IngameScene.SetStateStageClear entered! Pre-initializing ResultControl.Open()...");
-                                try {
-                                    new NativeFunction(baseAddr.add(0xF93268), "void", [])();
-                                    log("[🏁 INGAME_FINISH] ResultControl.Open() pre-initialized cleanly!");
-                                } catch (ePreRc) {
-                                    log("[-] Error pre-initializing ResultControl.Open: " + ePreRc.message);
-                                }
+                                log("[🏁 INGAME_FINISH] IngameScene.SetStateStageClear entered!");
+                                ensureResultControlOpened("[🏁 INGAME_FINISH]");
                             }
                         });
                         Interceptor.attach(baseAddr.add(0xF938BC), { // ResultScene.OnOpen
                             onEnter: function () {
-                                log("[🏆 RESULT_SCENE] ResultScene.OnOpen entered! Ensuring ResultControl.Open()...");
-                                try {
-                                    new NativeFunction(baseAddr.add(0xF93268), "void", [])();
-                                    log("[🏆 RESULT_SCENE] ResultControl.Open() executed cleanly!");
-                                } catch (eRc) {
-                                    log("[-] Error in ResultControl.Open: " + eRc.message);
-                                }
+                                log("[🏆 RESULT_SCENE] ResultScene.OnOpen entered!");
+                                ensureResultControlOpened("[🏆 RESULT_SCENE]");
                             }
                         });
                         Interceptor.attach(baseAddr.add(0xF95F30), { // ResultScene.SetStateCompleteStage
@@ -26817,29 +26763,9 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
         }
     }
 
-    // Proteger ImageMerger contra IndexOutOfRangeException durante la carga in-game
     if (baseAddr) {
         try {
-            var imgMerger32Ptr = baseAddr.add(0xBAEC88);
-            var imgMerger24Ptr = baseAddr.add(0xBAED3C);
-            var imgMergerAlphaPtr = baseAddr.add(0xBAEDF0);
-
-            Interceptor.replace(imgMerger32Ptr, new NativeCallback(function (colors, colorsWidth, x, y, w, h, colors_src, src_x, src_y, src_w) {
-                log("[🎨 IMAGE MERGER] SetPixels32_src32 called, safely bypassed");
-                return colors;
-            }, "pointer", ["pointer", "int", "int", "int", "int", "int", "pointer", "int", "int", "int"]));
-
-            Interceptor.replace(imgMerger24Ptr, new NativeCallback(function (colors, colorsWidth, x, y, w, h, colors_src, src_x, src_y, src_w) {
-                log("[🎨 IMAGE MERGER] SetPixels32_src24 called, safely bypassed");
-                return colors;
-            }, "pointer", ["pointer", "int", "int", "int", "int", "int", "pointer", "int", "int", "int"]));
-
-            Interceptor.replace(imgMergerAlphaPtr, new NativeCallback(function (colors, colorsWidth, x, y, w, h, colors_src, src_x, src_y, src_w) {
-                log("[🎨 IMAGE MERGER] SetPixels32_AlphaBlending called, safely bypassed");
-                return colors;
-            }, "pointer", ["pointer", "int", "int", "int", "int", "int", "pointer", "int", "int", "int"]));
-            log("[+] ImageMerger texture buffers protected against IndexOutOfRangeException!");
-
+            // Native ImageMerger (0xBAEC88, 0xBAED3C, 0xBAEDF0) left unpatched so OnLoading_2 merges real card portraits & grade borders into UIAtlas!
             // Hook RijndaelManaged CreateDecryptor & CreateEncryptor to capture AES Key & IV
             var createDecPtr = baseAddr.add(0x1ADD6C4);
             var createEncPtr = baseAddr.add(0x1ADD560);

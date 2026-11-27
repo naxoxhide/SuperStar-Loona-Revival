@@ -5433,24 +5433,34 @@ Para blindar el binario contra cualquier desbordamiento o puntero corrupto de Sc
 
 * **Plan Aprobado:** [song_gameplay_integrity_plan.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/song_gameplay_integrity_plan.md) — Ejecución iniciando por Fase 0 (sonda de memoria real desde el proceso) -> Fase 1 (Liveness/GC + Video/Shaders + Sync) -> Fase 2 (Gameplay/Result auténticos) -> Fase 3 (QA End-to-End).
 
+---
 
+### ✅ CHECKPOINT 39 — Restauración Completa de Integridad UI, Gameplay Ingame, ResultScene y Quality Gate E2E (2026-11-27)
 
+#### 1. Correcciones de Estabilidad, Gameplay In-Game y Pipeline de Carga
+1. **`IngameLoadingScene.OnLoading_3` (`0xEDB25C`):**
+   - El campo `[ArtistControl.Data + 0x18]` (`issueThemeCode`, `List<int>*`) quedaba en `NULL` en `ensureLoonaMocks()` dentro de [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js). Inicializado con `createManagedList([], 'int')`, eliminando el `NullReferenceException` y logrando que `IngameLoadingDatas.IsSucceed` retorne `1`.
+2. **Rutas Locales (`DownloadPath` + `WWWFile.FileExists`):**
+   - `createDownloadPath()` actualizado para almacenar rutas completas `/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/...` en `dp+0x18`, junto a `AssetControl.DownloadPathExists` (`0xCD28AC`), `WWWFile.FileExists` (`0xCD2418` omitiendo la exigencia de archivos `.ver`) y `WWWFile.RemoveFile` (`0xCD4960` como no-op), habilitando carga offline limpia de retratos (`wadceg/*_s.i.bytes`), marcos R (`aoeiwhslc/uhex/0_r_s.i.bytes`) y fondos musicales (`hcxjx/*.i.bytes`).
+3. **Eliminación de Stubs Duplicados de `ImageMerger`:**
+   - Removidos los dos bloqueos duplicados en `ImageMerger.SetPixels32_src32` (`0xBAEC88`), `SetPixels32_src24` (`0xBAED3C`) y `SetPixels32_AlphaBlending` (`0xBAEDF0`) en [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js), restaurando las texturas reales de cartas R50 en `UIAtlas` durante `OnLoading_2`.
+4. **Doble Disparo de Transición en `Fade.Out` / `Fade.In` (Race Condition en `IngameLoadingScene`):**
+   - `getFadeInstancePtr()` ([`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L23493)) leía `baseAddr.add(0x30D0CB8).readPointer().add(0xB8)` omitiendo la segunda desreferencia (`fadeSlot.readPointer()` hacia `Il2CppClass*`), por lo que devolvía `0x0` cuando `Fade.instance` estaba vivo y re-invocaba inmediatamente el callback además de la ejecución normal de `Fade.Update` (`0xD2F444`), cobrando 2 Headphones y disparando dos corrutinas `IngameLoadingScene` concurrentes que causaban `NullReferenceException` en `OnLoading_11_LongNotes` (`0xED9260`).
+   - Corregido `getFadeInstancePtr()` con doble desreferencia y validación real mediante `UnityEngine.Object.op_Implicit` (`0x1DBEEDC`).
 
+#### 2. Correcciones en `ResultScene` (Score Breakdown, Récords y Popups)
+1. **`GameControl.get_ResultsInstance` (`0xD41A04`) vs `GameControl.OpenResults` (`0xD41A68`):**
+   - `handleOfflineStageComplete` ([`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L22893)) llamaba a `0xD41A68` (`OpenResults`), lo que ejecutaba `CloseResults()` y sobrescribía `[GameControl.StaticFields + 0xA0]` con un `Results` vacío (`TotalScore = 0`, `CardScoresWithScore.Count = 0`), provocando `ArgumentOutOfRangeException` en `ResultScene.SetStateScoreAnim` (`0xF9704C`).
+   - Reemplazado por `0xD41A04` (`GameControl$$get_ResultsInstance`), preservando íntegros los conteos de notas, puntajes por miembro y `TotalScore` escritos por `IngameScene$$WriteResultData` (`0x149AC04`).
+2. **Namespace de `Person` en `ensureOfflineLeagueRanking()`:**
+   - Corregida la búsqueda de clase en [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js#L21572) agregando `"com.dalcomsoft.project.app.control.contents.model"` para `Person`, evitando que `LeagueControl.MyRanking._User` quedara `NULL` y causara `NullReferenceException` (`0xF98C34`) dentro de `ResultScene$$SetStateRankingLeaderCard` (`0xF98908`) al cerrar **My Best Record!**.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#### 3. QA Gate End-to-End en APK Compilado (Sign-Off `PASS ✅`)
+* **Build & Sincronización Limpia:**
+  - `sha256` idéntico (`ef4b6fbe...`) entre [`app/src/main/assets/libscript.js`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/assets/libscript.js), [`app/src/main/lib/arm64-v8a/libscript.so`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/lib/arm64-v8a/libscript.so) y [`app/src/main/lib/armeabi-v7a/libscript.so`](file:///Users/ignaciorojas/Documents/repos/sslo_apk/app/src/main/lib/armeabi-v7a/libscript.so).
+  - APK compilado con `/Users/ignaciorojas/Desktop/gradle-8.7/bin/gradle assembleDebug` (`app/build/outputs/apk/debug/app-debug.apk`, `167,913,731 B`), instalado en BlueStacks (`127.0.0.1:5555`) y verificado **sin override externo** (`/sdcard/Android/data/com.dalcomsoft.sslo/files/libscript.js` eliminado, PID `31997`).
+* **Evidencias Visuales y Funcionales Verificadas:**
+  - **Canción 1 (`1001` — `Hi High [Verse 1]`):** partida completa hasta `ResultScene`, `score=1.224.398`, 2 estrellas (`SUPER PERFECT 26 / PERFECT 95 / GOOD 256 / MISS 1`), `+404 RP` (`501.544 RP`) y popup **My Best Record!**.
+  - **Canción 2 (`1003` — `열기 (HEAT) [Verse 1]`):** carga de audio `1003.a.bytes` vía `libminiaudio.so` `0xC16C` (`bufferId=485`, y `bufferId=413` en el APK limpio) + `1003_4.seq`, `score=1.220.245`, 3 estrellas, `+523 RP` (`502.067 RP`), popup **My Best Record!** -> **New SUPERSTAR** (HyunJin R50) -> desglose animado por carta (`HyunJin 173.693`, `Yves 145.110`, `HeeJin 134.117`) -> retorno limpio vía **Music Select** (`SetStateLeave`) a `SelectMusicScene`.
+  - **Escenas del APK limpio:** `TitleScene`, `LobbyScene` (`main_24.webm`), `InventoryScene` (11 cartas R50 + zoom de detalle), `CardBookScene` (`197/197`, `345/465`), `SelectMusicScene` (récords y estrellas persistidos) e `IngameScene` (`SUPER RAVE`, fondo oficial, notas y barras nítidas).
+  - **Estabilidad y Guardado:** Cero `SIGSEGV`, cero `NullReferenceException`/`ArgumentOutOfRangeException` y cero tombstones; `player_profile.json` validado como JSON íntegro con `rhythmPoint=502067` y `musicRecords` persistidos.
