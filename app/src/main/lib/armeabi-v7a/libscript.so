@@ -139,6 +139,47 @@ try {
         });
     }
 
+    // Native POSIX shield: block unlinking any local asset under asiudgasg/ and capture exact caller backtrace
+    function installProtectedLibcUnlink(exportName, pathArgIdx, argTypes) {
+        try {
+            var fnPtr = Module.findExportByName("libc.so", exportName);
+            if (!fnPtr) return;
+            var origFn = new NativeFunction(fnPtr, "int", argTypes);
+            var cb = keepCb(new NativeCallback(function () {
+                var pathPtr = arguments[pathArgIdx];
+                var pStr = "";
+                try {
+                    if (pathPtr && !pathPtr.isNull()) pStr = pathPtr.readUtf8String() || "";
+                } catch (eRead) {}
+                if (pStr.indexOf("asiudgasg") !== -1) {
+                    var btText = "";
+                    try {
+                        var il2cppMod = Process.findModuleByName("libil2cpp.so");
+                        var bt = Thread.backtrace(this.context, Backtracer.ACCURATE).slice(0, 8);
+                        btText = bt.map(function (addr) {
+                            if (il2cppMod && addr.compare(il2cppMod.base) >= 0 && addr.compare(il2cppMod.base.add(il2cppMod.size)) < 0) {
+                                return "libil2cpp!0x" + addr.sub(il2cppMod.base).toString(16);
+                            }
+                            var mod = Process.findModuleByAddress(addr);
+                            return mod ? (mod.name + "!0x" + addr.sub(mod.base).toString(16)) : addr.toString();
+                        }).join(" <- ");
+                    } catch (eBt) {}
+                    log("[🛡️ LIBC SHIELD] Blocked " + exportName + " on: " + pStr + (btText ? (" | bt: " + btText) : ""));
+                    return 0;
+                }
+                if (argTypes.length === 1) return origFn(arguments[0]);
+                return origFn(arguments[0], arguments[1], arguments[2]);
+            }, "int", argTypes));
+            Interceptor.replace(fnPtr, cb);
+            log("[+] Hooked libc.so!" + exportName + " asset protection shield");
+        } catch (eUnl) {
+            log("[-] Failed to hook libc.so!" + exportName + ": " + eUnl.message);
+        }
+    }
+    installProtectedLibcUnlink("unlink", 0, ["pointer"]);
+    installProtectedLibcUnlink("remove", 0, ["pointer"]);
+    installProtectedLibcUnlink("unlinkat", 1, ["int", "pointer", "int"]);
+
     var connectPtr = Module.findExportByName("libc.so", "connect");
     if (connectPtr) {
         Interceptor.attach(connectPtr, {
@@ -445,6 +486,96 @@ function initIl2Cpp(module) {
             log("[🛡️ LOG SHIELD] Successfully neutralized DebugControl.LogCallback (0x124B5A4) with RET!");
         } catch (eLog) {
             log("[-] Error patching DebugControl.LogCallback: " + eLog.message);
+        }
+
+        /**
+         * Overwrites `.got.plt` entries directly and shields il2cpp file-deletion icalls for offline assets.
+         * Direct GOT patching is required because ARM64-on-x86_64 translators (e.g. libhoudini) can dispatch
+         * `libc.so` calls to host thunks, bypassing inline `Interceptor` hooks placed on bionic exports.
+         */
+        try {
+            function isProtectedAssetPath(p) {
+                return Boolean(p) && p.indexOf("asiudgasg") !== -1;
+            }
+
+            function safeReadCString(ptr) {
+                if (!ptr || ptr.isNull()) return "";
+                try { return ptr.readUtf8String() || ""; } catch (e) { return ""; }
+            }
+
+            function installGotAssetShield(mod, gotOffset, label, argCount) {
+                if (!mod) return;
+                try {
+                    var slot = mod.base.add(gotOffset);
+                    var cur = slot.readPointer();
+                    if (cur.isNull()) return;
+                    var argTypes = argCount === 2 ? ["pointer", "pointer"] : ["pointer"];
+                    var orig = new NativeFunction(cur, "int", argTypes);
+                    var cb = argCount === 2
+                        ? new NativeCallback(function (oldPtr, newPtr) {
+                            var p0 = safeReadCString(oldPtr);
+                            var p1 = safeReadCString(newPtr);
+                            if (isProtectedAssetPath(p0) || isProtectedAssetPath(p1)) {
+                                log("[🛡️ GOT SHIELD] Blocked " + label + " on asset: " + (p0 || p1));
+                                return 0;
+                            }
+                            return orig(oldPtr, newPtr);
+                        }, "int", argTypes)
+                        : new NativeCallback(function (pathPtr) {
+                            var pStr = safeReadCString(pathPtr);
+                            if (isProtectedAssetPath(pStr)) {
+                                log("[🛡️ GOT SHIELD] Blocked " + label + " on asset: " + pStr);
+                                return 0;
+                            }
+                            return orig(pathPtr);
+                        }, "int", argTypes);
+                    Memory.protect(slot, Process.pointerSize, "rw-");
+                    slot.writePointer(keepCb(cb));
+                } catch (eGot) {
+                    log("[-] Error installing GOT shield " + label + ": " + eGot.message);
+                }
+            }
+
+            var gotShields = [
+                { mod: Process.findModuleByAddress(baseAddr), offset: 0x314E628, label: "libil2cpp!unlink", args: 1 },
+                { mod: Process.findModuleByAddress(baseAddr), offset: 0x314EE60, label: "libil2cpp!rename", args: 2 },
+                { mod: Process.findModuleByName("libunity.so"), offset: 0x106D178, label: "libunity!unlink", args: 1 },
+                { mod: Process.findModuleByName("libunity.so"), offset: 0x106D9C0, label: "libunity!remove", args: 1 },
+                { mod: Process.findModuleByName("libunity.so"), offset: 0x106D180, label: "libunity!rename", args: 2 },
+                { mod: Process.findModuleByName("libcrashlytics-common.so"), offset: 0xB8CF0, label: "libcrashlytics!unlink", args: 1 },
+                { mod: Process.findModuleByName("libcrashlytics-common.so"), offset: 0xB8CE0, label: "libcrashlytics!rename", args: 2 }
+            ];
+            for (var gi = 0; gi < gotShields.length; gi++) {
+                var gs = gotShields[gi];
+                installGotAssetShield(gs.mod, gs.offset, gs.label, gs.args);
+            }
+
+            // Shield il2cpp::os::File::DeleteFile icall (0x9D763C: bool(Il2CppString* path, int* error))
+            var origIcallDelete = new NativeFunction(baseAddr.add(0x9D763C), "bool", ["pointer", "pointer"]);
+            Interceptor.replace(baseAddr.add(0x9D763C), keepCb(new NativeCallback(function (strPtr, errPtr) {
+                var s = readIl2CppString(strPtr);
+                if (isProtectedAssetPath(s)) {
+                    log("[🛡️ ICALL SHIELD] Blocked MonoIO.DeleteFile on asset: " + s);
+                    if (errPtr && !errPtr.isNull()) errPtr.writeS32(0);
+                    return 1;
+                }
+                return origIcallDelete(strPtr, errPtr);
+            }, "bool", ["pointer", "pointer"])));
+
+            // Shield FileStream DeleteOnClose unlink site (0x9C86B8)
+            Interceptor.attach(baseAddr.add(0x9C86B8), {
+                onEnter: function (args) {
+                    var p = safeReadCString(args[0]);
+                    if (isProtectedAssetPath(p)) {
+                        log("[🛡️ FILESTREAM SHIELD] Blocked FileStream unlink on asset: " + p);
+                        args[0] = Memory.allocUtf8String("/dev/null/blocked_asset");
+                    }
+                }
+            });
+
+            log("[+] Installed native libil2cpp/libunity GOT & icall asset deletion shields!");
+        } catch (eIcall) {
+            log("[-] Error installing icall/GOT asset shield: " + eIcall.message);
         }
 
         // ==========================================
@@ -11273,18 +11404,11 @@ function initIl2Cpp(module) {
                     if (gc >= 3001 && gc <= 3008) return 3001;
                     if (gc >= 4001 && gc <= 4012) return 4001;
                     if (gc >= 5001 && gc <= 5010) return 5001;
-                    if (gc >= 6001 && gc <= 6008) return 6001;
-                    if (gc >= 7001 && gc <= 7002) return 7001;
-                    if (gc >= 8001 && gc <= 8002) return 8001;
-                    if (gc >= 9001 && gc <= 9002) return 9001;
-                    if (gc >= 10001 && gc <= 10002) return 10001;
-                    if (gc >= 11001 && gc <= 11002) return 11001;
-                    if (gc >= 12001 && gc <= 12002) return 12001;
-                    if (gc >= 13001 && gc <= 13002) return 13001;
-                    if (gc >= 14001 && gc <= 14002) return 14001;
-                    if (gc >= 15001 && gc <= 15002) return 15001;
-                    if (gc >= 16001 && gc <= 16002) return 16001;
-                    if (gc >= 17001 && gc <= 17002) return 17001;
+                    if (gc >= 6001 && gc <= 6010) return 6001;
+                    if (gc >= 7001 && gc <= 17003) {
+                        var soloBase = Math.floor(gc / 1000) * 1000 + 1;
+                        if (gc <= soloBase + 2) return soloBase;
+                    }
                     if (gc >= 18001 && gc <= 18003) return 18001;
                     if (gc >= 19001 && gc <= 19003) return 19001;
                     if (gc >= 20001 && gc <= 20002) return 20001;
@@ -11370,14 +11494,16 @@ function initIl2Cpp(module) {
                             var cand = candidatePaths[cp];
                             if (!cand) continue;
                             try {
-                                var pStr = createIl2CppString(cand);
-                                if (fileExistsFn(pStr, NULL)) {
-                                    foundPath = cand;
-                                    break;
-                                }
+                                // Prefer POSIX access(F_OK) so dangling symlinks do not pass File.Exists and throw FileNotFoundException -> abort()
                                 if (posixAccessFn) {
                                     var cStr = Memory.allocUtf8String(cand);
                                     if (posixAccessFn(cStr, 0) === 0) {
+                                        foundPath = cand;
+                                        break;
+                                    }
+                                } else {
+                                    var pStr = createIl2CppString(cand);
+                                    if (fileExistsFn(pStr, NULL)) {
                                         foundPath = cand;
                                         break;
                                     }
@@ -23197,9 +23323,67 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         }
                     }, "bool", ["pointer", "pointer", "pointer", "pointer"])));
 
-                    // Never delete ADB-pushed local assets during offline WWWFile retries
+                    // Never delete ADB-pushed local assets during offline WWWFile retries or Storage/AssetControl cleanup
                     Interceptor.replace(baseAddr.add(0xCD4960), keepCb(new NativeCallback(function (pathPtr, versionPathPtr, methodInfo) {
                     }, "void", ["pointer", "pointer", "pointer"])));
+
+                    var isProtectedAssetPath = function (pathPtr) {
+                        if (!pathPtr || pathPtr.isNull()) return false;
+                        try {
+                            var s = readIl2CppString(pathPtr);
+                            return !!(s && s.indexOf("asiudgasg") !== -1);
+                        } catch (ePap) {
+                            return false;
+                        }
+                    };
+
+                    var origStorageDeleteFn = new NativeFunction(baseAddr.add(0xD23694), "void", ["pointer", "pointer", "bool", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xD23694), keepCb(new NativeCallback(function (pathPtr, cbPtr, syncVal, methodInfo) {
+                        if (isProtectedAssetPath(pathPtr)) {
+                            log("[🛡️ ASSET SHIELD] Blocked Storage.Delete on: " + readIl2CppString(pathPtr));
+                            if (cbPtr && !cbPtr.isNull()) {
+                                safeInvokeActionInt(cbPtr, 0);
+                            }
+                            return;
+                        }
+                        origStorageDeleteFn(pathPtr, cbPtr, syncVal ? 1 : 0, methodInfo);
+                    }, "void", ["pointer", "pointer", "bool", "pointer"])));
+
+                    var origSystemFileDeleteFn = new NativeFunction(baseAddr.add(0x1F01B4C), "void", ["pointer", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0x1F01B4C), keepCb(new NativeCallback(function (pathPtr, methodInfo) {
+                        if (isProtectedAssetPath(pathPtr)) {
+                            log("[🛡️ ASSET SHIELD] Blocked File.Delete on: " + readIl2CppString(pathPtr));
+                            return;
+                        }
+                        origSystemFileDeleteFn(pathPtr, methodInfo);
+                    }, "void", ["pointer", "pointer"])));
+
+                    var origAcDeleteStrFn = new NativeFunction(baseAddr.add(0xADEC94), "void", ["pointer", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xADEC94), keepCb(new NativeCallback(function (pathPtr, methodInfo) {
+                        if (isProtectedAssetPath(pathPtr)) {
+                            log("[🛡️ ASSET SHIELD] Blocked AssetControl.DeleteFile on: " + readIl2CppString(pathPtr));
+                            return;
+                        }
+                        origAcDeleteStrFn(pathPtr, methodInfo);
+                    }, "void", ["pointer", "pointer"])));
+
+                    var origAcDeleteOldFn = new NativeFunction(baseAddr.add(0xADF480), "void", ["pointer", "int32", "int32", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xADF480), keepCb(new NativeCallback(function (pathPtr, startPos, saveFile, methodInfo) {
+                        if (isProtectedAssetPath(pathPtr)) {
+                            log("[🛡️ ASSET SHIELD] Blocked AssetControl.DeleteFileOld on: " + readIl2CppString(pathPtr));
+                            return;
+                        }
+                        origAcDeleteOldFn(pathPtr, startPos, saveFile, methodInfo);
+                    }, "void", ["pointer", "int32", "int32", "pointer"])));
+
+                    var origAcDeletePeriodFn = new NativeFunction(baseAddr.add(0xADF80C), "void", ["pointer", "int32", "pointer"]);
+                    Interceptor.replace(baseAddr.add(0xADF80C), keepCb(new NativeCallback(function (pathPtr, period, methodInfo) {
+                        if (isProtectedAssetPath(pathPtr)) {
+                            log("[🛡️ ASSET SHIELD] Blocked AssetControl.DeleteFilePeriod on: " + readIl2CppString(pathPtr));
+                            return;
+                        }
+                        origAcDeletePeriodFn(pathPtr, period, methodInfo);
+                    }, "void", ["pointer", "int32", "pointer"])));
 
                     // 5d. AssetControl.SetLastWriteTime (0xAE0048) -> Safe no-op offline (avoids UnauthorizedAccessException on ADB-pushed assets)
                     Interceptor.replace(baseAddr.add(0xAE0048), keepCb(new NativeCallback(function (filePathPtr, timeVal, methodInfo) {
