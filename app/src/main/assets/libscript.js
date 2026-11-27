@@ -1888,7 +1888,7 @@ function initIl2Cpp(module) {
                     ownedProfiles: [],
                     diamond: 10000,
                     rhythmPoint: 100000,
-                    headphone: 50,
+                    headphone: 20,
                     dalcomCoin: 5000,
                     themeChanger: 10,
                     cardInvenMax: 200,
@@ -1959,14 +1959,88 @@ function initIl2Cpp(module) {
                 return profile;
             }
 
-            // Headphone offline regeneration: UserControl..cctor uses HeadphoneChargeTermMs = 300,000 ms (5 min), MaxRechagableHeadphone = 5
-            var OFFLINE_HP_TERM_MS = 300000;
-            var OFFLINE_HP_RECHARGE_MAX = 5;
+            // Headphone offline regeneration & timer config: loaded dynamically from gcd.json (code 3 = 1,200,000 ms, code 6 = 20)
+            var OFFLINE_HP_TERM_MS = 1200000;
+            var OFFLINE_HP_RECHARGE_MAX = 20;
+            var headphoneGcdLoaded = false;
+            var userControlHpConfigSynced = false;
+            var lastRenderedHpRemainSec = -1;
+
+            function loadHeadphoneConfigFromGcd() {
+                if (headphoneGcdLoaded) return;
+                headphoneGcdLoaded = true;
+                try {
+                    var gcdPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/gcd.json";
+                    if (fileExists(gcdPath)) {
+                        var rawGcd = readTextFile(gcdPath);
+                        if (rawGcd) {
+                            var rows = JSON.parse(rawGcd.replace(/^\uFEFF/, ""));
+                            if (Array.isArray(rows)) {
+                                for (var gi = 0; gi < rows.length; gi++) {
+                                    var r = rows[gi];
+                                    if (!r) continue;
+                                    if (r.code === 3 && parseInt(r.integerValue, 10) > 0) {
+                                        OFFLINE_HP_TERM_MS = parseInt(r.integerValue, 10);
+                                    } else if (r.code === 6 && parseInt(r.integerValue, 10) > 0) {
+                                        OFFLINE_HP_RECHARGE_MAX = parseInt(r.integerValue, 10);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (eGcdHp) {}
+                log("[🎧 HP CONFIG] RechargePeriod=" + OFFLINE_HP_TERM_MS + "ms, MaxRechargeable=" + OFFLINE_HP_RECHARGE_MAX);
+            }
+
+            /** Synchronizes native UserControl.HeadphoneChargeTermMs (+0x00) and MaxRechagableHeadphone (+0x10) from gcd.json. */
+            function syncUserControlHeadphoneStaticConfig(forceWrite) {
+                loadHeadphoneConfigFromGcd();
+                try {
+                    var ucClass = getClass("Assembly-CSharp", "com.dalcomsoft.project.app.control.contents", "UserControl");
+                    if (!ucClass || ucClass.isNull()) {
+                        try { ucClass = baseAddr.add(0x3136CD0).readPointer().readPointer(); } catch (eFb) {}
+                    }
+                    if (ucClass && !ucClass.isNull()) {
+                        if ((ucClass.add(0x133).readU8() & 4) !== 0 && ucClass.add(0xE0).readS32() === 0) {
+                            try { new NativeFunction(baseAddr.add(0xA43C9C), "void", ["pointer"])(ucClass); } catch (eInitUc) {}
+                        }
+                        var sf = ucClass.add(0xB8).readPointer();
+                        if (sf && !sf.isNull()) {
+                            var curMax = sf.add(0x10).readS32();
+                            var curTerm = sf.add(0x00).readS64().toNumber();
+                            if (forceWrite || !userControlHpConfigSynced || curMax !== OFFLINE_HP_RECHARGE_MAX || curTerm !== OFFLINE_HP_TERM_MS) {
+                                sf.add(0x00).writeS64(OFFLINE_HP_TERM_MS);
+                                sf.add(0x10).writeS32(OFFLINE_HP_RECHARGE_MAX);
+                                userControlHpConfigSynced = true;
+                                log("[🎧 HP CONFIG] Applied UserControl static fields: term=" + OFFLINE_HP_TERM_MS + "ms, max=" + OFFLINE_HP_RECHARGE_MAX);
+                            }
+                        }
+                    }
+                } catch (eUcSf) {
+                    log("[-] Error in syncUserControlHeadphoneStaticConfig: " + eUcSf.message);
+                }
+            }
+
+            function syncPlayerHeadphoneFields(profile) {
+                if (!profile || !globalPlayerObj || globalPlayerObj.isNull()) return;
+                loadHeadphoneConfigFromGcd();
+                var hp = Math.max(0, parseInt(profile.headphone, 10) || 0);
+                var freeHp = Math.min(OFFLINE_HP_RECHARGE_MAX, hp);
+                var paidHp = Math.max(0, hp - freeHp);
+                var lastMs = parseInt(profile.lastHeadphoneChargeMs, 10) || Date.now();
+                try {
+                    globalPlayerObj.add(0x5C).writeInt(paidHp);
+                    globalPlayerObj.add(0x60).writeInt(freeHp);
+                    globalPlayerObj.add(0x68).writeS64(lastMs);
+                } catch (eSyncHp) {}
+            }
+
             function syncOfflineHeadphoneRegen(profile) {
                 if (!profile || typeof profile !== "object") return false;
+                loadHeadphoneConfigFromGcd();
                 ensureProfileUserFields(profile);
                 var curHp = parseInt(profile.headphone, 10);
-                if (isNaN(curHp)) curHp = 0;
+                if (isNaN(curHp) || curHp < 0) curHp = OFFLINE_HP_RECHARGE_MAX;
                 var now = Date.now();
                 var lastMs = parseInt(profile.lastHeadphoneChargeMs, 10) || now;
                 if (curHp >= OFFLINE_HP_RECHARGE_MAX) {
@@ -1985,6 +2059,129 @@ function initIl2Cpp(module) {
                     }
                 }
                 return false;
+            }
+
+            function getPlayerHeadphone() {
+                try {
+                    var p = loadPlayerProfile();
+                    if (p) {
+                        if (syncOfflineHeadphoneRegen(p)) {
+                            savePlayerProfile(p);
+                        }
+                        syncPlayerHeadphoneFields(p);
+                        var val = parseInt(p.headphone, 10);
+                        return isNaN(val) ? OFFLINE_HP_RECHARGE_MAX : Math.max(0, val);
+                    }
+                } catch (eHp) {}
+                return OFFLINE_HP_RECHARGE_MAX;
+            }
+
+            function refreshTopViewHeadphone() {
+                try {
+                    syncUserControlHeadphoneStaticConfig(false);
+                    var getTopCtrlFn = new NativeFunction(baseAddr.add(0xB13204), "pointer", ["pointer"]);
+                    var topCtrl = getTopCtrlFn(NULL);
+                    if (!topCtrl || topCtrl.isNull()) return;
+                    var topView = topCtrl.add(0x20).readPointer();
+                    if (!topView || topView.isNull()) return;
+
+                    var p = loadPlayerProfile();
+                    var hpVal = getPlayerHeadphone();
+                    var isRem = (hpVal < OFFLINE_HP_RECHARGE_MAX) ? 1 : 0;
+                    var refreshHpFn = new NativeFunction(baseAddr.add(0xB2BF60), "void", ["pointer", "int", "int", "bool", "pointer"]);
+                    refreshHpFn(topView, hpVal, 99999, isRem, NULL);
+
+                    var remainMs = 0;
+                    if (isRem === 1 && p) {
+                        var lastMs = parseInt(p.lastHeadphoneChargeMs, 10) || Date.now();
+                        remainMs = Math.max(0, OFFLINE_HP_TERM_MS - Math.max(0, Date.now() - lastMs));
+                    }
+                    try {
+                        new NativeFunction(baseAddr.add(0xAB1DDC), "void", ["int64", "pointer"])(int64(String(remainMs)), NULL);
+                    } catch (eSetRem) {}
+                    try {
+                        new NativeFunction(baseAddr.add(0xB2E270), "void", ["pointer", "pointer", "pointer"])(topCtrl, NULL, NULL);
+                    } catch (eOnRem) {}
+                } catch (eRhp) {}
+            }
+
+            function consumeOfflineHeadphone(amount) {
+                var amt = parseInt(amount, 10) || 0;
+                if (amt <= 0) return true;
+                try {
+                    loadHeadphoneConfigFromGcd();
+                    var profile = loadPlayerProfile() || createDefaultProfile("Orbit");
+                    syncOfflineHeadphoneRegen(profile);
+                    var curHp = Math.max(0, parseInt(profile.headphone, 10) || 0);
+                    if (curHp < amt) {
+                        syncPlayerHeadphoneFields(profile);
+                        return false;
+                    }
+                    var newHp = curHp - amt;
+                    profile.headphone = newHp;
+                    if (newHp < OFFLINE_HP_RECHARGE_MAX && curHp >= OFFLINE_HP_RECHARGE_MAX) {
+                        profile.lastHeadphoneChargeMs = Date.now();
+                    } else if (newHp >= OFFLINE_HP_RECHARGE_MAX) {
+                        profile.lastHeadphoneChargeMs = Date.now();
+                    }
+                    lastRenderedHpRemainSec = -1;
+                    savePlayerProfile(profile);
+                    syncPlayerHeadphoneFields(profile);
+                    updateOfflineHeadphoneTimer(true);
+                    refreshTopViewHeadphone();
+                    log("[🎧 HEADPHONE] Consumed " + amt + " -> remaining=" + newHp);
+                    return true;
+                } catch (eCons) {
+                    log("[-] Error in consumeOfflineHeadphone: " + eCons.message);
+                    return false;
+                }
+            }
+
+            /** Periodic tick backing UserControl.UpdateHeadphone: grants recharged HP and updates TopView countdown at 1Hz. */
+            function updateOfflineHeadphoneTimer(forced) {
+                try {
+                    var sid = (typeof globalSceneId !== "undefined") ? globalSceneId : 0;
+                    if (!forced && (sid === 0 || sid === 1 || sid === 2 || sid === 9 || sid === 10)) return;
+                    syncUserControlHeadphoneStaticConfig(false);
+
+                    var p = loadPlayerProfile();
+                    if (!p) return;
+                    var changed = syncOfflineHeadphoneRegen(p);
+                    if (changed) {
+                        savePlayerProfile(p);
+                        syncPlayerHeadphoneFields(p);
+                        lastRenderedHpRemainSec = -1;
+                        refreshTopViewHeadphone();
+                        log("[🎧 REGEN] Headphone regenerated -> current=" + p.headphone);
+                    }
+                    var curHp = Math.max(0, parseInt(p.headphone, 10) || 0);
+                    if (curHp >= OFFLINE_HP_RECHARGE_MAX) {
+                        if (lastRenderedHpRemainSec !== 0 || forced) {
+                            lastRenderedHpRemainSec = 0;
+                            try {
+                                new NativeFunction(baseAddr.add(0xAB1DDC), "void", ["int64", "pointer"])(int64(0), NULL);
+                            } catch (eZero) {}
+                        }
+                        return;
+                    }
+                    var now = Date.now();
+                    var lastMs = parseInt(p.lastHeadphoneChargeMs, 10) || now;
+                    var remainMs = Math.max(0, OFFLINE_HP_TERM_MS - Math.max(0, now - lastMs));
+                    var remainSec = Math.ceil(remainMs / 1000);
+                    if (forced || remainSec !== lastRenderedHpRemainSec) {
+                        lastRenderedHpRemainSec = remainSec;
+                        try {
+                            new NativeFunction(baseAddr.add(0xAB1DDC), "void", ["int64", "pointer"])(int64(String(remainMs)), NULL);
+                        } catch (eSetMs) {}
+                        try {
+                            var getTopCtrlFn = new NativeFunction(baseAddr.add(0xB13204), "pointer", ["pointer"]);
+                            var topCtrl = getTopCtrlFn(NULL);
+                            if (topCtrl && !topCtrl.isNull()) {
+                                new NativeFunction(baseAddr.add(0xB2E270), "void", ["pointer", "pointer", "pointer"])(topCtrl, NULL, NULL);
+                            }
+                        } catch (eRefRem) {}
+                    }
+                } catch (eTick) {}
             }
 
             function savePlayerProfile(profile) {
@@ -2128,7 +2325,7 @@ function initIl2Cpp(module) {
                     if (p) {
                         var rpVal = (p.rhythmPoint !== undefined) ? parseInt(p.rhythmPoint) : 500000;
                         var diaVal = (p.diamond !== undefined) ? parseInt(p.diamond) : 10000;
-                        var hpVal = (p.headphone !== undefined) ? parseInt(p.headphone) : 50;
+                        var hpVal = getPlayerHeadphone();
 
                         try {
                             var refreshRpFn = new NativeFunction(baseAddr.add(0xB2BE9C), "void", ["pointer", "int", "int", "pointer"]);
@@ -2141,8 +2338,13 @@ function initIl2Cpp(module) {
                         } catch (e2) {}
 
                         try {
-                            var refreshHpFn = new NativeFunction(baseAddr.add(0xB2BF60), "void", ["pointer", "int", "int", "pointer"]);
-                            refreshHpFn(topView, hpVal, 20, NULL);
+                            syncUserControlHeadphoneStaticConfig(false);
+                            var hpIsRem = (hpVal < OFFLINE_HP_RECHARGE_MAX) ? 1 : 0;
+                            var refreshHpFn = new NativeFunction(baseAddr.add(0xB2BF60), "void", ["pointer", "int", "int", "bool", "pointer"]);
+                            refreshHpFn(topView, hpVal, 99999, hpIsRem, NULL);
+                            if (hpIsRem === 1) {
+                                updateOfflineHeadphoneTimer(true);
+                            }
                         } catch (e3) {}
 
                         try {
@@ -2458,12 +2660,13 @@ function initIl2Cpp(module) {
                     playerObj.add(0x54).writeInt((profile.rhythmPoint !== undefined && profile.rhythmPoint !== null && !isNaN(parsedRp)) ? parsedRp : 100000);
                     playerObj.add(0x58).writeInt(0);
 
-                    // Headphone: split rechargeable freeHeadphone (up to 5) and paid/excess headphone (0x5C paid, 0x60 free, 0x68 lastHeadphoneCharge)
+                    // Headphone: split rechargeable freeHeadphone (up to MaxRechagableHeadphone=20) and paid/excess headphone (0x5C paid, 0x60 free, 0x68 lastHeadphoneCharge)
+                    syncUserControlHeadphoneStaticConfig(true);
                     if (syncOfflineHeadphoneRegen(profile)) {
                         savePlayerProfile(profile);
                     }
                     var parsedHp = parseInt(profile.headphone, 10);
-                    if (isNaN(parsedHp) || parsedHp < 0) parsedHp = 50;
+                    if (isNaN(parsedHp) || parsedHp < 0) parsedHp = OFFLINE_HP_RECHARGE_MAX;
                     var initFreeHp = Math.min(OFFLINE_HP_RECHARGE_MAX, parsedHp);
                     var initPaidHp = Math.max(0, parsedHp - initFreeHp);
                     playerObj.add(0x5C).writeInt(initPaidHp);
@@ -2495,6 +2698,7 @@ function initIl2Cpp(module) {
                             log("[-] Non-fatal UserControl.Open warning: " + eUo.message);
                         }
                     }
+                    syncUserControlHeadphoneStaticConfig(true);
 
                     // Invoke UserControl.NotifyUserData() (RVA 0xAAC39C)
                     if (notifyUserDataFn) {
@@ -2546,9 +2750,9 @@ function initIl2Cpp(module) {
                 Interceptor.replace(baseAddr.add(0xAAE40C), new NativeCallback(function () {
                     return ptr(0);
                 }, "pointer", []));
-                Interceptor.replace(baseAddr.add(0xAAC034), new NativeCallback(function (forced) {
-                    return;
-                }, "void", ["bool"]));
+                Interceptor.replace(baseAddr.add(0xAAC034), keepCb(new NativeCallback(function (forced) {
+                    updateOfflineHeadphoneTimer(!!forced);
+                }, "void", ["bool"])));
 
                 // Nickname & Special User Type null guards
                 try {
@@ -2630,9 +2834,54 @@ function initIl2Cpp(module) {
                             return 0;
                         }
                     }, "int", ["int", "pointer"])));
-                    // Headphones
-                    Interceptor.replace(baseAddr.add(0xAB0C5C), keepCb(new NativeCallback(function (methodInfo) { return 20; }, "int", ["pointer"])));
-                    Interceptor.replace(baseAddr.add(0xAB0D7C), keepCb(new NativeCallback(function (amount, methodInfo) { return 1; }, "int", ["int", "pointer"])));
+                    // Headphones: real balance, recharge timer, and persistent consumption
+                    syncUserControlHeadphoneStaticConfig(true);
+                    try {
+                        Interceptor.attach(baseAddr.add(0xAB64F0), {
+                            onLeave: function () {
+                                syncUserControlHeadphoneStaticConfig(true);
+                            }
+                        });
+                    } catch (eUcCctor) {}
+                    try {
+                        Interceptor.attach(baseAddr.add(0xB2E148), {
+                            onEnter: function () {
+                                syncUserControlHeadphoneStaticConfig(false);
+                            }
+                        });
+                    } catch (eTopHpHook) {}
+                    Interceptor.replace(baseAddr.add(0xAB0C5C), keepCb(new NativeCallback(function (methodInfo) {
+                        syncUserControlHeadphoneStaticConfig(false);
+                        return getPlayerHeadphone();
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB0A50), keepCb(new NativeCallback(function (methodInfo) {
+                        var hp = getPlayerHeadphone();
+                        return Math.min(OFFLINE_HP_RECHARGE_MAX, hp);
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB0844), keepCb(new NativeCallback(function (methodInfo) {
+                        var hp = getPlayerHeadphone();
+                        return Math.max(0, hp - OFFLINE_HP_RECHARGE_MAX);
+                    }, "int", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB06A0), keepCb(new NativeCallback(function (methodInfo) {
+                        var p = loadPlayerProfile();
+                        var ms = (p && p.lastHeadphoneChargeMs) ? parseInt(p.lastHeadphoneChargeMs, 10) : Date.now();
+                        return int64(String(isNaN(ms) ? Date.now() : ms));
+                    }, "int64", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0xAB0D7C), keepCb(new NativeCallback(function (amount, methodInfo) {
+                        return consumeOfflineHeadphone(amount) ? 1 : 0;
+                    }, "int", ["int", "pointer"])));
+
+                    // Fallback wall-clock CurrentTimeMs when TimeControl.IsSynced is false offline
+                    try {
+                        var origCurrentTimeMsFn = new NativeFunction(baseAddr.add(0xB1D2CC), "int64", ["pointer"]);
+                        Interceptor.replace(baseAddr.add(0xB1D2CC), keepCb(new NativeCallback(function (methodInfo) {
+                            var res = origCurrentTimeMsFn(methodInfo);
+                            if (res.compare(int64(0)) < 0) {
+                                return int64(String(Date.now()));
+                            }
+                            return res;
+                        }, "int64", ["pointer"])));
+                    } catch (eTimeMs) {}
                     // Inventory capacity
                     Interceptor.replace(baseAddr.add(0xAB1B4C), keepCb(new NativeCallback(function (methodInfo) { return 0; }, "int", ["pointer"])));
                     // Dalcom Coins
@@ -22963,32 +23212,14 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         } catch (eRh) {}
 
                         if (!isRehearsal) {
-                            var profile = loadPlayerProfile() || createDefaultProfile("Orbit");
-                            syncOfflineHeadphoneRegen(profile);
-                            var curHp = parseInt(profile.headphone, 10) || 0;
-                            if (curHp < 1) {
-                                log("[🎧 STAGE START] Headphone insufficient (" + curHp + ") -> returning error status!");
+                            var hpBefore = getPlayerHeadphone();
+                            if (hpBefore < 1) {
+                                log("[🎧 STAGE START] Headphone insufficient (" + hpBefore + ") -> returning error status!");
                                 safeInvokeActionInt(callbackPtr, -6002);
                                 return;
                             }
-                            try {
-                                new NativeFunction(baseAddr.add(0xAB3034), "void", ["int", "pointer"])(1, NULL);
-                            } catch (eUh) {
-                                log("[-] UserControl.UseHeadphone fallback deduct: " + eUh.message);
-                            }
-                            profile.headphone = Math.max(0, curHp - 1);
-                            if (profile.headphone < OFFLINE_HP_RECHARGE_MAX && curHp >= OFFLINE_HP_RECHARGE_MAX) {
-                                profile.lastHeadphoneChargeMs = Date.now();
-                            }
-                            savePlayerProfile(profile);
-                            if (globalPlayerObj && !globalPlayerObj.isNull()) {
-                                var freeHp = Math.min(OFFLINE_HP_RECHARGE_MAX, profile.headphone);
-                                var paidHp = Math.max(0, profile.headphone - freeHp);
-                                globalPlayerObj.add(0x5C).writeInt(paidHp);
-                                globalPlayerObj.add(0x60).writeInt(freeHp);
-                                globalPlayerObj.add(0x68).writeS64(profile.lastHeadphoneChargeMs);
-                            }
-                            log("[🎧 STAGE START] Deducted 1 Headphone -> remaining=" + profile.headphone);
+                            consumeOfflineHeadphone(1);
+                            log("[🎧 STAGE START] Deducted 1 Headphone -> remaining=" + getPlayerHeadphone());
                         } else {
                             log("[🎵 STAGE START] Rehearsal mode -> 0 Headphones consumed.");
                         }
@@ -23259,20 +23490,10 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         } catch (eGmw) {}
                     }, "void", ["pointer", "int16", "int16", "pointer"])));
 
-                    // 5. Headphone persistence & regeneration hooks
+                    // 5. Headphone config sync after UserControl.Open (0xAAB0D4) / UseHeadphone (0xAB3034)
                     Interceptor.attach(baseAddr.add(0xAB3034), {
                         onLeave: function () {
-                            try {
-                                var freeHp = new NativeFunction(baseAddr.add(0xAB0A50), "int", ["pointer"])(NULL);
-                                var paidHp = new NativeFunction(baseAddr.add(0xAB0844), "int", ["pointer"])(NULL);
-                                var lastMs = new NativeFunction(baseAddr.add(0xAB06A0), "int64", ["pointer"])(NULL);
-                                var p = loadPlayerProfile();
-                                if (p) {
-                                    p.headphone = Math.max(0, freeHp + paidHp);
-                                    p.lastHeadphoneChargeMs = parseInt(lastMs.toString(), 10) || Date.now();
-                                    savePlayerProfile(p);
-                                }
-                            } catch (eUhSync) {}
+                            updateOfflineHeadphoneTimer(true);
                         }
                     });
 
