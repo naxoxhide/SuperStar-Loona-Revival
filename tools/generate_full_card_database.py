@@ -48,10 +48,17 @@ def main():
     lcd_map = {item["code"]: item for item in lcd}
 
     print("[2/5] Compiling groups and artists...")
+    playable_groups = list(PLAYABLE_GROUPS)
+    for g in grd:
+        gcode = g.get("code", 0)
+        an = g.get("analyticsData") or ""
+        if gcode >= 22001 and gcode < 30000 and gcode % 1000 == 1 and "(Event)" not in an and gcode not in playable_groups:
+            playable_groups.append(gcode)
+
     groups_dict = {}
     for g in grd:
         code = g["code"]
-        if code in PLAYABLE_GROUPS:
+        if code in playable_groups:
             loc = lcd_map.get(g.get("localeName", 0), {})
             name = loc.get("enUS") or g.get("analyticsData") or f"Group {code}"
             emb_url = g.get("emblemImage")
@@ -71,17 +78,19 @@ def main():
     for a in atd:
         code = a["code"]
         grp = a.get("group")
-        if grp in PLAYABLE_GROUPS:
+        if grp in playable_groups:
             loc = lcd_map.get(a.get("localeName", 0), {})
             name = loc.get("enUS") or a.get("analyticsData") or f"Artist {code}"
+            em_s = clean_path(usm.get(a.get("emptyImageSmall"), f"asodhsg/sdhgauwehdnu/{code}_s.i.bytes"))
+            em_l = clean_path(usm.get(a.get("emptyImageLarge"), f"asodhsg/sdhgauwehdnu/{code}_l.i.bytes"))
             artists_dict[str(code)] = {
                 "code": code,
                 "group": grp,
                 "name": name,
                 "analyticsData": a.get("analyticsData"),
                 "orderIndex": a.get("orderIndex", 0),
-                "emptyImageSmall": "asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_s.i.bytes",
-                "emptyImageLarge": "asiudgasg/asodhsg/sdhgauwehdnu/artistEmpty_l.i.bytes",
+                "emptyImageSmall": em_s,
+                "emptyImageLarge": em_l,
             }
             if str(grp) in groups_dict and code not in groups_dict[str(grp)]["artistCodes"]:
                 groups_dict[str(grp)]["artistCodes"].append(code)
@@ -159,7 +168,7 @@ def main():
 
     # Save card_metadata_map.json
     metadata_map = {
-        "playableGroups": PLAYABLE_GROUPS,
+        "playableGroups": playable_groups,
         "groups": groups_dict,
         "artists": artists_dict,
         "themes": themes_dict,
@@ -204,7 +213,7 @@ def main():
         normal_by_group_artist.setdefault(key, []).append(c)
 
     # For each group, equip 1 normal card per slot
-    for g_code in PLAYABLE_GROUPS:
+    for g_code in playable_groups:
         g_data = groups_dict.get(str(g_code), {})
         art_codes = g_data.get("artistCodes", [])
         equiped_cards_map[str(g_code)] = []
@@ -236,7 +245,7 @@ def main():
                 equipped_obj_ids.add(obj_id)
                 equiped_cards_map[str(g_code)].append(obj_id)
 
-    print(f"  Equipped cards created: {len(equipped_obj_ids)} across {len(PLAYABLE_GROUPS)} groups")
+    print(f"  Equipped cards created: {len(equipped_obj_ids)} across {len(playable_groups)} groups")
 
     # 2. Add unequipped normal cards (both normal and prism)
     # Each normal card (not already equipped) added with Option A grade distribution

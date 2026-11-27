@@ -6098,7 +6098,67 @@ function initIl2Cpp(module) {
                 }
 
                 var cddCache = null;
+                var tmdCache = null;
+                var grdCache = null;
+                var atdCache = null;
+                var lcdNameCache = null;
                 var urlToCardMap = {};
+                var sharedUrlToLocalMap = null;
+                var sharedUrlByFilenameMap = null;
+
+                function getSharedUrlMaps() {
+                    if (sharedUrlToLocalMap) return { full: sharedUrlToLocalMap, byName: sharedUrlByFilenameMap };
+                    sharedUrlToLocalMap = {};
+                    sharedUrlByFilenameMap = {};
+                    try {
+                        var rawUsm = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/url_shared_map.json");
+                        if (rawUsm) {
+                            var uObj = JSON.parse(rawUsm);
+                            for (var uk in uObj) {
+                                if (!uObj.hasOwnProperty(uk)) continue;
+                                var rel = String(uObj[uk] || "");
+                                if (!rel) continue;
+                                if (rel.indexOf("asiudgasg/") !== 0) rel = "asiudgasg/" + rel;
+                                var cleanUk = uk.split("?")[0];
+                                sharedUrlToLocalMap[cleanUk] = rel;
+                                var fn = cleanUk.split("/").pop();
+                                if (fn && !sharedUrlByFilenameMap[fn]) sharedUrlByFilenameMap[fn] = rel;
+                            }
+                        }
+                    } catch (eUsm) {}
+                    return { full: sharedUrlToLocalMap, byName: sharedUrlByFilenameMap };
+                }
+
+                function resolveSharedUrlRelPath(fullUrl, fallbackRel) {
+                    if (!fullUrl) return fallbackRel;
+                    var maps = getSharedUrlMaps();
+                    var clean = String(fullUrl).split("?")[0];
+                    if (maps.full[clean]) return maps.full[clean];
+                    var fn = clean.split("/").pop();
+                    if (fn && maps.byName[fn]) return maps.byName[fn];
+                    return fallbackRel;
+                }
+
+                function getLocaleNameFromLcd(localeCode, fallbackName) {
+                    if (!localeCode) return fallbackName;
+                    if (!lcdNameCache) {
+                        lcdNameCache = {};
+                        try {
+                            var rawLcd = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/lcd.json");
+                            if (rawLcd) {
+                                var lArr = JSON.parse(rawLcd);
+                                for (var li = 0; li < lArr.length; li++) {
+                                    var row = lArr[li];
+                                    if (row && row.code !== undefined) {
+                                        lcdNameCache[row.code] = row.enUS || row.koKR || "";
+                                    }
+                                }
+                            }
+                        } catch (eLcdMeta) {}
+                    }
+                    return lcdNameCache[localeCode] || fallbackName;
+                }
+
                 function getCardMetadata(cardId) {
                     var meta = getGlobalMetadata();
                     if (meta && meta.cards && meta.cards[cardId]) {
@@ -6118,7 +6178,23 @@ function initIl2Cpp(module) {
                                 urlToCardMap = {};
                                 for (var i = 0; i < arr.length; i++) {
                                     var item = arr[i];
-                                    cddCache[item.code] = item;
+                                    var normalized = {
+                                        code: item.code,
+                                        groupID: item.groupID,
+                                        group: item.groupID,
+                                        artistID: item.artistID,
+                                        theme: item.theme,
+                                        type: item.type || 0,
+                                        isPrism: item.type === 1,
+                                        material: item.material || 0,
+                                        isMaterial: item.material === 1,
+                                        intensifyPercentage: item.intensifyPercentage || 0,
+                                        cardImageSmall: item.cardImageSmall,
+                                        cardImageLarge: item.cardImageLarge,
+                                        smallImagePath: resolveSharedUrlRelPath(item.cardImageSmall, "asiudgasg/asodhsg/wadceg/" + item.code + "_s.i.bytes"),
+                                        largeImagePath: resolveSharedUrlRelPath(item.cardImageLarge, "asiudgasg/asodhsg/wadceg/" + item.code + "_l.i.bytes")
+                                    };
+                                    cddCache[item.code] = normalized;
                                     if (item.cardImageSmall) {
                                         var sUrl = item.cardImageSmall.split("?")[0];
                                         urlToCardMap[sUrl] = { cId: item.code, type: "s" };
@@ -6154,6 +6230,29 @@ function initIl2Cpp(module) {
                     if (meta && meta.themes && meta.themes[themeId]) {
                         return meta.themes[themeId];
                     }
+                    if (!tmdCache) {
+                        tmdCache = {};
+                        try {
+                            var rawTmd = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/tmd.json");
+                            if (rawTmd) {
+                                var tArr = JSON.parse(rawTmd);
+                                for (var ti = 0; ti < tArr.length; ti++) {
+                                    var t = tArr[ti];
+                                    tmdCache[t.code] = {
+                                        code: t.code,
+                                        name: getLocaleNameFromLcd(t.localeName, t.analyticsData || ("Theme " + t.code)),
+                                        limitedType: t.limitedType || 0,
+                                        themeTypeCode: t.themeTypeCode || 0,
+                                        themePercentage: t.themePercentage || 20,
+                                        cardbookMarkCode: t.cardbookMarkCode || null,
+                                        smallImagePath: resolveSharedUrlRelPath(t.nameImageSmall, "asiudgasg/asodhsg/agewfcbxhaa/" + t.code + "_s.i.bytes"),
+                                        largeImagePath: resolveSharedUrlRelPath(t.nameImageLarge, "asiudgasg/asodhsg/agewfcbxhaa/" + t.code + "_l.i.bytes")
+                                    };
+                                }
+                            }
+                        } catch (eTmd) {}
+                    }
+                    if (tmdCache && tmdCache[themeId]) return tmdCache[themeId];
                     return {
                         code: themeId,
                         name: "Theme " + themeId,
@@ -6170,6 +6269,27 @@ function initIl2Cpp(module) {
                     if (meta && meta.groups && meta.groups[groupId]) {
                         return meta.groups[groupId];
                     }
+                    if (!grdCache) {
+                        grdCache = {};
+                        try {
+                            var rawGrd = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/grd.json");
+                            if (rawGrd) {
+                                var gArr = JSON.parse(rawGrd);
+                                for (var gi = 0; gi < gArr.length; gi++) {
+                                    var g = gArr[gi];
+                                    grdCache[g.code] = {
+                                        code: g.code,
+                                        name: getLocaleNameFromLcd(g.localeName, g.analyticsData || ("Group " + g.code)),
+                                        equipableSlot: g.equipableSlot || 11,
+                                        orderIndex: g.orderIndex || 0,
+                                        integrateCode: g.integrateCode || null,
+                                        emblemPath: resolveSharedUrlRelPath(g.emblemImage, "asiudgasg/asodhsg/aweoijs/" + g.code + ".i.bytes")
+                                    };
+                                }
+                            }
+                        } catch (eGrd) {}
+                    }
+                    if (grdCache && grdCache[groupId]) return grdCache[groupId];
                     return {
                         code: groupId,
                         name: "LOONA",
@@ -6183,6 +6303,27 @@ function initIl2Cpp(module) {
                     if (meta && meta.artists && meta.artists[artistId]) {
                         return meta.artists[artistId];
                     }
+                    if (!atdCache) {
+                        atdCache = {};
+                        try {
+                            var rawAtd = readTextFile("/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/sdisgkdc/atd.json");
+                            if (rawAtd) {
+                                var aArr = JSON.parse(rawAtd);
+                                for (var ai = 0; ai < aArr.length; ai++) {
+                                    var a = aArr[ai];
+                                    atdCache[a.code] = {
+                                        code: a.code,
+                                        group: a.group || 1001,
+                                        name: getLocaleNameFromLcd(a.localeName, a.analyticsData || ("Artist " + a.code)),
+                                        orderIndex: a.orderIndex || 0,
+                                        emptyImageSmall: resolveSharedUrlRelPath(a.emptyImageSmall, "asiudgasg/asodhsg/sdhgauwehdnu/" + a.code + "_s.i.bytes"),
+                                        emptyImageLarge: resolveSharedUrlRelPath(a.emptyImageLarge, "asiudgasg/asodhsg/sdhgauwehdnu/" + a.code + "_l.i.bytes")
+                                    };
+                                }
+                            }
+                        } catch (eAtd) {}
+                    }
+                    if (atdCache && atdCache[artistId]) return atdCache[artistId];
                     return {
                         code: artistId,
                         name: "Artist " + artistId,
@@ -6666,8 +6807,7 @@ function initIl2Cpp(module) {
                         var tObj = il2cpp_object_new(thmKlass);
                         if (il2cpp_gchandle_new && !tObj.isNull()) il2cpp_gchandle_new(tObj, 2);
 
-                        var meta = getGlobalMetadata();
-                        var tMeta = (meta && meta.themes) ? meta.themes[themeId] : null;
+                        var tMeta = getThemeMetadata(themeId);
                         var sPath = tMeta ? tMeta.smallImagePath : ("asiudgasg/asodhsg/agewfcbxhaa/" + themeId + "_s.i.bytes");
                         var lPath = tMeta ? tMeta.largeImagePath : ("asiudgasg/asodhsg/agewfcbxhaa/" + themeId + "_l.i.bytes");
                         var tName = tMeta ? tMeta.name : ("Theme " + themeId);
@@ -6680,8 +6820,25 @@ function initIl2Cpp(module) {
                         tObj.add(0x40).writePointer(createDownloadPath(lPath));
 
                         // Populate CardBookMarkList for theme badges (Limited, Event, Original) with genuine managed list
-                        if (cardbookThemeBadges && cardbookThemeBadges[themeId]) {
-                            var bCodes = cardbookThemeBadges[themeId];
+                        var bCodes = (cardbookThemeBadges && cardbookThemeBadges[themeId]) ? cardbookThemeBadges[themeId] : null;
+                        if (!bCodes && tMeta) {
+                            bCodes = [];
+                            if (tMeta.limitedType === 1) bCodes.push(901);
+                            else if (tMeta.limitedType === 2) bCodes.push(902);
+                            if (tMeta.cardbookMarkCode) {
+                                try {
+                                    var parsedMarks = (typeof tMeta.cardbookMarkCode === "string") ? JSON.parse(tMeta.cardbookMarkCode) : tMeta.cardbookMarkCode;
+                                    if (Array.isArray(parsedMarks)) {
+                                        for (var pm = 0; pm < parsedMarks.length; pm++) {
+                                            if (parsedMarks[pm] >= 901 && parsedMarks[pm] <= 903 && bCodes.indexOf(parsedMarks[pm]) === -1) {
+                                                bCodes.push(parsedMarks[pm]);
+                                            }
+                                        }
+                                    }
+                                } catch (ePm) {}
+                            }
+                        }
+                        if (bCodes && bCodes.length > 0) {
                             var bPaths = [];
                             for (var bi = 0; bi < bCodes.length; bi++) {
                                 bPaths.push("asiudgasg/asodhsg/bhfbfhbf/" + bCodes[bi] + ".i.bytes");
@@ -11662,6 +11819,13 @@ function initIl2Cpp(module) {
                     if (gc >= 19001 && gc <= 19003) return 19001;
                     if (gc >= 20001 && gc <= 20002) return 20001;
                     if (gc >= 21001 && gc <= 21002) return 21001;
+                    var directEmb = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/aweoijs/" + gc + ".i.bytes";
+                    if (fileExists(directEmb) || fileExists(directEmb + ".png")) return gc;
+                    var gMetaBase = getGroupMetadata(gc);
+                    if (gMetaBase && gMetaBase.integrateCode) return parseInt(gMetaBase.integrateCode, 10) || gc;
+                    var unitBase = Math.floor(gc / 1000) * 1000 + 1;
+                    var unitEmb = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/aweoijs/" + unitBase + ".i.bytes";
+                    if (fileExists(unitEmb) || fileExists(unitEmb + ".png")) return unitBase;
                     return gc;
                 }
 
@@ -12807,6 +12971,9 @@ function initIl2Cpp(module) {
                                                 var uInfo = urlToCardMap[cleanUrl];
                                                 var uFolder = "wadceg";
                                                 relPath = "asiudgasg/asodhsg/" + uFolder + "/" + uInfo.cId + "_" + uInfo.type + ".i.bytes";
+                                            } else {
+                                                var sharedHit = resolveSharedUrlRelPath(cleanUrl, "");
+                                                if (sharedHit) relPath = sharedHit;
                                             }
                                         }
                                     }
@@ -16151,7 +16318,7 @@ function initIl2Cpp(module) {
                         cachedCardItemKlass = cardItemKlass;
 
                         var validCards = profile.inventoryCards.filter(function(c) {
-                            return c && c.cardID >= 1001 && c.cardID <= 30005;
+                            return c && parseInt(c.cardID, 10) >= 1001;
                         });
                         log("[🃏 INVENTORY] Populating " + validCards.length + " LOONA cards into CardMap (" + cardMap + ")...");
                         var addedCount = 0;
@@ -16196,7 +16363,7 @@ function initIl2Cpp(module) {
                                 cardItemObj.add(0x24).writeU32(0x3F800000); // 1.0f
                                 cardItemObj.add(0x28).writeS32(getCardSellPrice(gr)); // <SellPrice>
                                 var meta = getCardMetadata(cId);
-                                var isMat = (cData.isMaterial || (meta && meta.isMaterial) || (cId >= 30001 && cId <= 30005));
+                                var isMat = (cData.isMaterial || (meta && (meta.isMaterial || meta.material === 1)) || (cId >= 30001 && cId <= 30099));
                                 cardItemObj.add(0x2C).writeU8(isMat ? 1 : 0); // isMaterial
                                 var gCode = (meta && (meta.groupID || meta.group)) ? (meta.groupID || meta.group) : 1001;
                                 var tCode = (meta && meta.theme) ? meta.theme : 1001;
@@ -16237,7 +16404,9 @@ function initIl2Cpp(module) {
                             var itm = loonaCardItems[k];
                             var r = itm.add(0x10).readPointer();
                             var cid = r.add(0x20).readS32();
-                            var mIdx = ((cid - 1001) % 11);
+                            var cmEq = getCardMetadata(cid);
+                            if (!cmEq || (cmEq.groupID || cmEq.group) !== 1001) continue;
+                            var mIdx = cmEq.artistID ? ((cmEq.artistID - 1001) % 11) : ((cid - 1001) % 11);
                             var isEq = (r.add(0x28).readU8() === 1);
                             if (isEq && !memberFilled[mIdx]) {
                                 loonaEquippedCards.push(itm);
@@ -16248,7 +16417,9 @@ function initIl2Cpp(module) {
                             var itm = loonaCardItems[k];
                             var r = itm.add(0x10).readPointer();
                             var cid = r.add(0x20).readS32();
-                            var mIdx = ((cid - 1001) % 11);
+                            var cmEq2 = getCardMetadata(cid);
+                            if (!cmEq2 || (cmEq2.groupID || cmEq2.group) !== 1001) continue;
+                            var mIdx = cmEq2.artistID ? ((cmEq2.artistID - 1001) % 11) : ((cid - 1001) % 11);
                             if (!memberFilled[mIdx]) {
                                 loonaEquippedCards.push(itm);
                                 memberFilled[mIdx] = true;
@@ -19322,8 +19493,10 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                         var pick = candidates[Math.floor(Math.random() * candidates.length)];
                         var newCid = pick.cardId;
-                        var oldThemeName = themeNamesMap[curThemeId] || ("Theme " + curThemeId);
-                        var newThemeName = themeNamesMap[pick.themeId] || ("Theme " + pick.themeId);
+                        var oldTm = getThemeMetadata(curThemeId);
+                        var newTm = getThemeMetadata(pick.themeId);
+                        var oldThemeName = (oldTm && oldTm.name && oldTm.name !== ("Theme " + curThemeId)) ? oldTm.name : (themeNamesMap[curThemeId] || ("Theme " + curThemeId));
+                        var newThemeName = (newTm && newTm.name && newTm.name !== ("Theme " + pick.themeId)) ? newTm.name : (themeNamesMap[pick.themeId] || ("Theme " + pick.themeId));
 
                         profile.themeChanger = curTcCount - 1;
                         if (isProfileLeaderCard(profile, curCid, objId) && typeof profile.leaderCard === "object" && profile.leaderCard !== null) {
@@ -19396,7 +19569,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
 
                         var curCid = raw.add(0x20).readS32();
                         var meta = getCardMetadata(curCid);
-                        var isMat = (tCard.add(0x2C).readU8() === 1) || (meta && meta.isMaterial) || (curCid >= 30001 && curCid <= 30005);
+                        var isMat = (tCard.add(0x2C).readU8() === 1) || (meta && (meta.isMaterial || meta.material === 1)) || (curCid >= 30001 && curCid <= 30099);
                         if (isMat) {
                             showOfflineToast("Material cards cannot use Theme Exchanger.", 2.0);
                             return;
@@ -19426,7 +19599,8 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                             showOfflineToast("This group has only one normal theme.", 2.0);
                             return;
                         }
-                        var curThemeName = themeNamesMap[curThemeId] || ("Theme " + curThemeId);
+                        var curTmReq = getThemeMetadata(curThemeId);
+                        var curThemeName = (curTmReq && curTmReq.name && curTmReq.name !== ("Theme " + curThemeId)) ? curTmReq.name : (themeNamesMap[curThemeId] || ("Theme " + curThemeId));
                         openOfflineConfirmPopup(
                             "Theme Exchange",
                             "Use 1 Theme Exchanger (Owned: " + curTcCount + ") to change '" + curThemeName + "' to another random normal theme?",
