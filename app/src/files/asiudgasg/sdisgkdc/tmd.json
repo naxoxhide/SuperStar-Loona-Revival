@@ -1681,5 +1681,22 @@
     "limitedType": 0,
     "themeTypeCode": 0,
     "localeName": 10012107
+  },
+  {
+    "nameImageSmall": "http://d3exy8s96shf22.cloudfront.net/resources/images/theme/theme_s_chuu.png?v=22083001",
+    "analyticsData": "Chuu_Chuu",
+    "code": 22001,
+    "nameImageLarge": "http://d3exy8s96shf22.cloudfront.net/resources/images/theme/theme_l_chuu.png?v=22083001",
+    "rehearsalTheme": false,
+    "cardbookMarkCode": "[904]",
+    "effectType": 0,
+    "nameImageZoom": null,
+    "specialType": null,
+    "themePercentage": 20,
+    "selectRate": 1.0,
+    "orderIndex": 0,
+    "limitedType": 0,
+    "themeTypeCode": 0,
+    "localeName": 10012201
   }
 ]

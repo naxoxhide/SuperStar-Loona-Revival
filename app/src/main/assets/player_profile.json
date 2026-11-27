@@ -1568,6 +1568,48 @@
     },
     {
       "objectID": 100112,
+      "cardID": 22001,
+      "grade": 4,
+      "level": 50,
+      "energy": 100,
+      "score": 199,
+      "isEquip": true,
+      "isLock": true,
+      "isPrism": false,
+      "themeID": 22001,
+      "groupID": 22001,
+      "artistID": 22001
+    },
+    {
+      "objectID": 100113,
+      "cardID": 22002,
+      "grade": 4,
+      "level": 50,
+      "energy": 100,
+      "score": 199,
+      "isEquip": true,
+      "isLock": true,
+      "isPrism": false,
+      "themeID": 22001,
+      "groupID": 22001,
+      "artistID": 22002
+    },
+    {
+      "objectID": 100114,
+      "cardID": 22003,
+      "grade": 4,
+      "level": 50,
+      "energy": 100,
+      "score": 199,
+      "isEquip": true,
+      "isLock": true,
+      "isPrism": false,
+      "themeID": 22001,
+      "groupID": 22001,
+      "artistID": 22003
+    },
+    {
+      "objectID": 100115,
       "cardID": 1001,
       "grade": 3,
       "level": 1,
@@ -1581,7 +1623,7 @@
       "artistID": 1001
     },
     {
-      "objectID": 100113,
+      "objectID": 100116,
       "cardID": 1002,
       "grade": 0,
       "level": 1,
@@ -1595,7 +1637,7 @@
       "artistID": 1002
     },
     {
-      "objectID": 100114,
+      "objectID": 100117,
       "cardID": 1003,
       "grade": 0,
       "level": 1,
@@ -1609,7 +1651,7 @@
       "artistID": 1003
     },
     {
-      "objectID": 100115,
+      "objectID": 100118,
       "cardID": 1004,
       "grade": 1,
       "level": 1,
@@ -1623,7 +1665,7 @@
       "artistID": 1004
     },
     {
-      "objectID": 100116,
+      "objectID": 100119,
       "cardID": 1005,
       "grade": 0,
       "level": 1,
@@ -1637,7 +1679,7 @@
       "artistID": 1005
     },
     {
-      "objectID": 100117,
+      "objectID": 100120,
       "cardID": 1006,
       "grade": 3,
       "level": 1,
@@ -1651,7 +1693,7 @@
       "artistID": 1006
     },
     {
-      "objectID": 100118,
+      "objectID": 100121,
       "cardID": 1007,
       "grade": 0,
       "level": 1,
@@ -1665,7 +1707,7 @@
       "artistID": 1007
     },
     {
-      "objectID": 100119,
+      "objectID": 100122,
       "cardID": 1008,
       "grade": 0,
       "level": 1,
@@ -1679,7 +1721,7 @@
       "artistID": 1008
     },
     {
-      "objectID": 100120,
+      "objectID": 100123,
       "cardID": 1009,
       "grade": 2,
       "level": 1,
@@ -1693,7 +1735,7 @@
       "artistID": 1009
     },
     {
-      "objectID": 100121,
+      "objectID": 100124,
       "cardID": 1010,
       "grade": 0,
       "level": 1,
@@ -1707,7 +1749,7 @@
       "artistID": 1010
     },
     {
-      "objectID": 100122,
+      "objectID": 100125,
       "cardID": 1011,
       "grade": 0,
       "level": 1,
@@ -1721,7 +1763,7 @@
       "artistID": 1011
     },
     {
-      "objectID": 100123,
+      "objectID": 100126,
       "cardID": 1012,
       "grade": 1,
       "level": 1,
@@ -1735,7 +1777,7 @@
       "artistID": 1001
     },
     {
-      "objectID": 100124,
+      "objectID": 100127,
       "cardID": 1013,
       "grade": 0,
       "level": 1,
@@ -1749,7 +1791,7 @@
       "artistID": 1002
     },
     {
-      "objectID": 100125,
+      "objectID": 100128,
       "cardID": 1014,
       "grade": 0,
       "level": 1,
@@ -1763,7 +1805,7 @@
       "artistID": 1003
     },
     {
-      "objectID": 100126,
+      "objectID": 100129,
       "cardID": 1015,
       "grade": 1,
       "level": 1,
@@ -1777,7 +1819,7 @@
       "artistID": 1004
     },
     {
-      "objectID": 100127,
+      "objectID": 100130,
       "cardID": 1016,
       "grade": 2,
       "level": 1,
@@ -1791,7 +1833,7 @@
       "artistID": 1005
     },
     {
-      "objectID": 100128,
+      "objectID": 100131,
       "cardID": 1017,
       "grade": 1,
       "level": 1,
@@ -1805,7 +1847,7 @@
       "artistID": 1006
     },
     {
-      "objectID": 100129,
+      "objectID": 100132,
       "cardID": 1018,
       "grade": 0,
       "level": 1,
@@ -1819,7 +1861,7 @@
       "artistID": 1007
     },
     {
-      "objectID": 100130,
+      "objectID": 100133,
       "cardID": 1019,
       "grade": 0,
       "level": 1,
@@ -1833,7 +1875,7 @@
       "artistID": 1008
     },
     {
-      "objectID": 100131,
+      "objectID": 100134,
       "cardID": 1020,
       "grade": 2,
       "level": 1,
@@ -1847,7 +1889,7 @@
       "artistID": 1009
     },
     {
-      "objectID": 100132,
+      "objectID": 100135,
       "cardID": 1021,
       "grade": 0,
       "level": 1,
@@ -1861,7 +1903,7 @@
       "artistID": 1010
     },
     {
-      "objectID": 100133,
+      "objectID": 100136,
       "cardID": 1022,
       "grade": 1,
       "level": 1,
@@ -1875,7 +1917,7 @@
       "artistID": 1011
     },
     {
-      "objectID": 100134,
+      "objectID": 100137,
       "cardID": 1111,
       "grade": 0,
       "level": 1,
@@ -1889,7 +1931,7 @@
       "artistID": 1001
     },
     {
-      "objectID": 100135,
+      "objectID": 100138,
       "cardID": 1112,
       "grade": 1,
       "level": 1,
@@ -1903,7 +1945,7 @@
       "artistID": 1002
     },
     {
-      "objectID": 100136,
+      "objectID": 100139,
       "cardID": 1113,
       "grade": 1,
       "level": 1,
@@ -1917,7 +1959,7 @@
       "artistID": 1003
     },
     {
-      "objectID": 100137,
+      "objectID": 100140,
       "cardID": 1114,
       "grade": 0,
       "level": 1,
@@ -1931,7 +1973,7 @@
       "artistID": 1004
     },
     {
-      "objectID": 100138,
+      "objectID": 100141,
       "cardID": 1115,
       "grade": 1,
       "level": 1,
@@ -1945,7 +1987,7 @@
       "artistID": 1005
     },
     {
-      "objectID": 100139,
+      "objectID": 100142,
       "cardID": 1116,
       "grade": 0,
       "level": 1,
@@ -1959,7 +2001,7 @@
       "artistID": 1006
     },
     {
-      "objectID": 100140,
+      "objectID": 100143,
       "cardID": 1117,
       "grade": 0,
       "level": 1,
@@ -1973,7 +2015,7 @@
       "artistID": 1007
     },
     {
-      "objectID": 100141,
+      "objectID": 100144,
       "cardID": 1118,
       "grade": 3,
       "level": 1,
@@ -1987,7 +2029,7 @@
       "artistID": 1008
     },
     {
-      "objectID": 100142,
+      "objectID": 100145,
       "cardID": 1119,
       "grade": 0,
       "level": 1,
@@ -2001,7 +2043,7 @@
       "artistID": 1009
     },
     {
-      "objectID": 100143,
+      "objectID": 100146,
       "cardID": 1120,
       "grade": 2,
       "level": 1,
@@ -2015,7 +2057,7 @@
       "artistID": 1010
     },
     {
-      "objectID": 100144,
+      "objectID": 100147,
       "cardID": 1121,
       "grade": 1,
       "level": 1,
@@ -2029,7 +2071,7 @@
       "artistID": 1011
     },
     {
-      "objectID": 100145,
+      "objectID": 100148,
       "cardID": 1122,
       "grade": 0,
       "level": 1,
@@ -2043,7 +2085,7 @@
       "artistID": 1001
     },
     {
-      "objectID": 100146,
+      "objectID": 100149,
       "cardID": 1123,
       "grade": 0,
       "level": 1,
@@ -2057,7 +2099,7 @@
       "artistID": 1002
     },
     {
-      "objectID": 100147,
+      "objectID": 100150,
       "cardID": 1124,
       "grade": 0,
       "level": 1,
@@ -2071,7 +2113,7 @@
       "artistID": 1003
     },
     {
-      "objectID": 100148,
+      "objectID": 100151,
       "cardID": 1125,
       "grade": 1,
       "level": 1,
@@ -2085,7 +2127,7 @@
       "artistID": 1004
     },
     {
-      "objectID": 100149,
+      "objectID": 100152,
       "cardID": 1126,
       "grade": 4,
       "level": 1,
@@ -2099,7 +2141,7 @@
       "artistID": 1005
     },
     {
-      "objectID": 100150,
+      "objectID": 100153,
       "cardID": 1127,
       "grade": 0,
       "level": 1,
@@ -2113,7 +2155,7 @@
       "artistID": 1006
     },
     {
-      "objectID": 100151,
+      "objectID": 100154,
       "cardID": 1128,
       "grade": 4,
       "level": 8,
@@ -2127,7 +2169,7 @@
       "artistID": 1007
     },
     {
-      "objectID": 100152,
+      "objectID": 100155,
       "cardID": 1129,
       "grade": 1,
       "level": 1,
@@ -2141,7 +2183,7 @@
       "artistID": 1008
     },
     {
-      "objectID": 100153,
+      "objectID": 100156,
       "cardID": 1130,
       "grade": 0,
       "level": 1,
@@ -2155,7 +2197,7 @@
       "artistID": 1009
     },
     {
-      "objectID": 100154,
+      "objectID": 100157,
       "cardID": 1131,
       "grade": 1,
       "level": 1,
@@ -2169,7 +2211,7 @@
       "artistID": 1010
     },
     {
-      "objectID": 100155,
+      "objectID": 100158,
       "cardID": 1132,
       "grade": 0,
       "level": 1,
@@ -2183,7 +2225,7 @@
       "artistID": 1011
     },
     {
-      "objectID": 100156,
+      "objectID": 100159,
       "cardID": 2001,
       "grade": 1,
       "level": 1,
@@ -2197,7 +2239,7 @@
       "artistID": 2001
     },
     {
-      "objectID": 100157,
+      "objectID": 100160,
       "cardID": 2002,
       "grade": 1,
       "level": 1,
@@ -2211,7 +2253,7 @@
       "artistID": 2002
     },
     {
-      "objectID": 100158,
+      "objectID": 100161,
       "cardID": 2003,
       "grade": 1,
       "level": 1,
@@ -2225,7 +2267,7 @@
       "artistID": 2003
     },
     {
-      "objectID": 100159,
+      "objectID": 100162,
       "cardID": 2004,
       "grade": 0,
       "level": 1,
@@ -2239,7 +2281,7 @@
       "artistID": 2004
     },
     {
-      "objectID": 100160,
+      "objectID": 100163,
       "cardID": 2005,
       "grade": 2,
       "level": 1,
@@ -2253,7 +2295,7 @@
       "artistID": 2005
     },
     {
-      "objectID": 100161,
+      "objectID": 100164,
       "cardID": 2006,
       "grade": 0,
       "level": 1,
@@ -2267,7 +2309,7 @@
       "artistID": 2006
     },
     {
-      "objectID": 100162,
+      "objectID": 100165,
       "cardID": 2007,
       "grade": 1,
       "level": 1,
@@ -2281,7 +2323,7 @@
       "artistID": 2007
     },
     {
-      "objectID": 100163,
+      "objectID": 100166,
       "cardID": 2008,
       "grade": 1,
       "level": 1,
@@ -2295,7 +2337,7 @@
       "artistID": 2008
     },
     {
-      "objectID": 100164,
+      "objectID": 100167,
       "cardID": 2009,
       "grade": 0,
       "level": 1,
@@ -2309,7 +2351,7 @@
       "artistID": 2009
     },
     {
-      "objectID": 100165,
+      "objectID": 100168,
       "cardID": 2010,
       "grade": 1,
       "level": 1,
@@ -2323,7 +2365,7 @@
       "artistID": 2010
     },
     {
-      "objectID": 100166,
+      "objectID": 100169,
       "cardID": 2011,
       "grade": 2,
       "level": 1,
@@ -2337,7 +2379,7 @@
       "artistID": 2011
     },
     {
-      "objectID": 100167,
+      "objectID": 100170,
       "cardID": 2012,
       "grade": 1,
       "level": 1,
@@ -2351,7 +2393,7 @@
       "artistID": 2001
     },
     {
-      "objectID": 100168,
+      "objectID": 100171,
       "cardID": 2013,
       "grade": 0,
       "level": 1,
@@ -2365,7 +2407,7 @@
       "artistID": 2002
     },
     {
-      "objectID": 100169,
+      "objectID": 100172,
       "cardID": 2014,
       "grade": 1,
       "level": 1,
@@ -2379,7 +2421,7 @@
       "artistID": 2003
     },
     {
-      "objectID": 100170,
+      "objectID": 100173,
       "cardID": 2015,
       "grade": 3,
       "level": 1,
@@ -2393,7 +2435,7 @@
       "artistID": 2004
     },
     {
-      "objectID": 100171,
+      "objectID": 100174,
       "cardID": 2016,
       "grade": 1,
       "level": 1,
@@ -2407,7 +2449,7 @@
       "artistID": 2005
     },
     {
-      "objectID": 100172,
+      "objectID": 100175,
       "cardID": 2017,
       "grade": 0,
       "level": 1,
@@ -2421,7 +2463,7 @@
       "artistID": 2006
     },
     {
-      "objectID": 100173,
+      "objectID": 100176,
       "cardID": 2018,
       "grade": 1,
       "level": 1,
@@ -2435,7 +2477,7 @@
       "artistID": 2007
     },
     {
-      "objectID": 100174,
+      "objectID": 100177,
       "cardID": 2019,
       "grade": 0,
       "level": 1,
@@ -2449,7 +2491,7 @@
       "artistID": 2008
     },
     {
-      "objectID": 100175,
+      "objectID": 100178,
       "cardID": 2020,
       "grade": 3,
       "level": 1,
@@ -2463,7 +2505,7 @@
       "artistID": 2009
     },
     {
-      "objectID": 100176,
+      "objectID": 100179,
       "cardID": 2021,
       "grade": 2,
       "level": 1,
@@ -2477,7 +2519,7 @@
       "artistID": 2010
     },
     {
-      "objectID": 100177,
+      "objectID": 100180,
       "cardID": 2022,
       "grade": 1,
       "level": 1,
@@ -2491,7 +2533,7 @@
       "artistID": 2011
     },
     {
-      "objectID": 100178,
+      "objectID": 100181,
       "cardID": 2111,
       "grade": 1,
       "level": 1,
@@ -2505,7 +2547,7 @@
       "artistID": 2001
     },
     {
-      "objectID": 100179,
+      "objectID": 100182,
       "cardID": 2112,
       "grade": 2,
       "level": 1,
@@ -2519,7 +2561,7 @@
       "artistID": 2002
     },
     {
-      "objectID": 100180,
+      "objectID": 100183,
       "cardID": 2113,
       "grade": 2,
       "level": 1,
@@ -2533,7 +2575,7 @@
       "artistID": 2003
     },
     {
-      "objectID": 100181,
+      "objectID": 100184,
       "cardID": 2114,
       "grade": 3,
       "level": 1,
@@ -2547,7 +2589,7 @@
       "artistID": 2004
     },
     {
-      "objectID": 100182,
+      "objectID": 100185,
       "cardID": 2115,
       "grade": 3,
       "level": 1,
@@ -2561,7 +2603,7 @@
       "artistID": 2005
     },
     {
-      "objectID": 100183,
+      "objectID": 100186,
       "cardID": 2116,
       "grade": 0,
       "level": 1,
@@ -2575,7 +2617,7 @@
       "artistID": 2006
     },
     {
-      "objectID": 100184,
+      "objectID": 100187,
       "cardID": 2117,
       "grade": 3,
       "level": 1,
@@ -2589,7 +2631,7 @@
       "artistID": 2007
     },
     {
-      "objectID": 100185,
+      "objectID": 100188,
       "cardID": 2118,
       "grade": 0,
       "level": 1,
@@ -2603,7 +2645,7 @@
       "artistID": 2008
     },
     {
-      "objectID": 100186,
+      "objectID": 100189,
       "cardID": 2119,
       "grade": 3,
       "level": 1,
@@ -2617,7 +2659,7 @@
       "artistID": 2009
     },
     {
-      "objectID": 100187,
+      "objectID": 100190,
       "cardID": 2120,
       "grade": 0,
       "level": 1,
@@ -2631,7 +2673,7 @@
       "artistID": 2010
     },
     {
-      "objectID": 100188,
+      "objectID": 100191,
       "cardID": 2121,
       "grade": 4,
       "level": 18,
@@ -2645,7 +2687,7 @@
       "artistID": 2011
     },
     {
-      "objectID": 100189,
+      "objectID": 100192,
       "cardID": 2122,
       "grade": 0,
       "level": 1,
@@ -2659,7 +2701,7 @@
       "artistID": 2001
     },
     {
-      "objectID": 100190,
+      "objectID": 100193,
       "cardID": 2123,
       "grade": 2,
       "level": 1,
@@ -2673,7 +2715,7 @@
       "artistID": 2002
     },
     {
-      "objectID": 100191,
+      "objectID": 100194,
       "cardID": 2124,
       "grade": 1,
       "level": 1,
@@ -2687,7 +2729,7 @@
       "artistID": 2003
     },
     {
-      "objectID": 100192,
+      "objectID": 100195,
       "cardID": 2125,
       "grade": 0,
       "level": 1,
@@ -2701,7 +2743,7 @@
       "artistID": 2004
     },
     {
-      "objectID": 100193,
+      "objectID": 100196,
       "cardID": 2126,
       "grade": 1,
       "level": 1,
@@ -2715,7 +2757,7 @@
       "artistID": 2005
     },
     {
-      "objectID": 100194,
+      "objectID": 100197,
       "cardID": 2127,
       "grade": 1,
       "level": 1,
@@ -2729,7 +2771,7 @@
       "artistID": 2006
     },
     {
-      "objectID": 100195,
+      "objectID": 100198,
       "cardID": 2128,
       "grade": 0,
       "level": 1,
@@ -2743,7 +2785,7 @@
       "artistID": 2007
     },
     {
-      "objectID": 100196,
+      "objectID": 100199,
       "cardID": 2129,
       "grade": 0,
       "level": 1,
@@ -2757,7 +2799,7 @@
       "artistID": 2008
     },
     {
-      "objectID": 100197,
+      "objectID": 100200,
       "cardID": 2130,
       "grade": 1,
       "level": 1,
@@ -2771,7 +2813,7 @@
       "artistID": 2009
     },
     {
-      "objectID": 100198,
+      "objectID": 100201,
       "cardID": 2131,
       "grade": 0,
       "level": 1,
@@ -2785,7 +2827,7 @@
       "artistID": 2010
     },
     {
-      "objectID": 100199,
+      "objectID": 100202,
       "cardID": 2132,
       "grade": 0,
       "level": 1,
@@ -2799,7 +2841,7 @@
       "artistID": 2011
     },
     {
-      "objectID": 100200,
+      "objectID": 100203,
       "cardID": 3001,
       "grade": 2,
       "level": 1,
@@ -2813,7 +2855,7 @@
       "artistID": 3001
     },
     {
-      "objectID": 100201,
+      "objectID": 100204,
       "cardID": 3002,
       "grade": 0,
       "level": 1,
@@ -2827,7 +2869,7 @@
       "artistID": 3002
     },
     {
-      "objectID": 100202,
+      "objectID": 100205,
       "cardID": 3003,
       "grade": 1,
       "level": 1,
@@ -2841,7 +2883,7 @@
       "artistID": 3003
     },
     {
-      "objectID": 100203,
+      "objectID": 100206,
       "cardID": 3004,
       "grade": 1,
       "level": 1,
@@ -2855,7 +2897,7 @@
       "artistID": 3004
     },
     {
-      "objectID": 100204,
+      "objectID": 100207,
       "cardID": 3005,
       "grade": 3,
       "level": 1,
@@ -2869,7 +2911,7 @@
       "artistID": 3005
     },
     {
-      "objectID": 100205,
+      "objectID": 100208,
       "cardID": 3006,
       "grade": 1,
       "level": 1,
@@ -2883,7 +2925,7 @@
       "artistID": 3006
     },
     {
-      "objectID": 100206,
+      "objectID": 100209,
       "cardID": 3007,
       "grade": 3,
       "level": 1,
@@ -2897,7 +2939,7 @@
       "artistID": 3007
     },
     {
-      "objectID": 100207,
+      "objectID": 100210,
       "cardID": 3008,
       "grade": 4,
       "level": 11,
@@ -2911,7 +2953,7 @@
       "artistID": 3008
     },
     {
-      "objectID": 100208,
+      "objectID": 100211,
       "cardID": 3009,
       "grade": 0,
       "level": 1,
@@ -2925,7 +2967,7 @@
       "artistID": 3009
     },
     {
-      "objectID": 100209,
+      "objectID": 100212,
       "cardID": 3010,
       "grade": 0,
       "level": 1,
@@ -2939,7 +2981,7 @@
       "artistID": 3010
     },
     {
-      "objectID": 100210,
+      "objectID": 100213,
       "cardID": 3011,
       "grade": 0,
       "level": 1,
@@ -2953,7 +2995,7 @@
       "artistID": 3001
     },
     {
-      "objectID": 100211,
+      "objectID": 100214,
       "cardID": 3012,
       "grade": 0,
       "level": 1,
@@ -2967,7 +3009,7 @@
       "artistID": 3002
     },
     {
-      "objectID": 100212,
+      "objectID": 100215,
       "cardID": 3013,
       "grade": 0,
       "level": 1,
@@ -2981,7 +3023,7 @@
       "artistID": 3003
     },
     {
-      "objectID": 100213,
+      "objectID": 100216,
       "cardID": 3014,
       "grade": 3,
       "level": 1,
@@ -2995,7 +3037,7 @@
       "artistID": 3004
     },
     {
-      "objectID": 100214,
+      "objectID": 100217,
       "cardID": 3015,
       "grade": 1,
       "level": 1,
@@ -3009,7 +3051,7 @@
       "artistID": 3005
     },
     {
-      "objectID": 100215,
+      "objectID": 100218,
       "cardID": 3016,
       "grade": 0,
       "level": 1,
@@ -3023,7 +3065,7 @@
       "artistID": 3006
     },
     {
-      "objectID": 100216,
+      "objectID": 100219,
       "cardID": 3017,
       "grade": 2,
       "level": 1,
@@ -3037,7 +3079,7 @@
       "artistID": 3007
     },
     {
-      "objectID": 100217,
+      "objectID": 100220,
       "cardID": 3018,
       "grade": 0,
       "level": 1,
@@ -3051,7 +3093,7 @@
       "artistID": 3008
     },
     {
-      "objectID": 100218,
+      "objectID": 100221,
       "cardID": 3019,
       "grade": 1,
       "level": 1,
@@ -3065,7 +3107,7 @@
       "artistID": 3009
     },
     {
-      "objectID": 100219,
+      "objectID": 100222,
       "cardID": 3020,
       "grade": 1,
       "level": 1,
@@ -3079,7 +3121,7 @@
       "artistID": 3010
     },
     {
-      "objectID": 100220,
+      "objectID": 100223,
       "cardID": 3021,
       "grade": 1,
       "level": 1,
@@ -3093,7 +3135,7 @@
       "artistID": 3001
     },
     {
-      "objectID": 100221,
+      "objectID": 100224,
       "cardID": 3022,
       "grade": 1,
       "level": 1,
@@ -3107,7 +3149,7 @@
       "artistID": 3002
     },
     {
-      "objectID": 100222,
+      "objectID": 100225,
       "cardID": 3023,
       "grade": 0,
       "level": 1,
@@ -3121,7 +3163,7 @@
       "artistID": 3003
     },
     {
-      "objectID": 100223,
+      "objectID": 100226,
       "cardID": 3024,
       "grade": 0,
       "level": 1,
@@ -3135,7 +3177,7 @@
       "artistID": 3004
     },
     {
-      "objectID": 100224,
+      "objectID": 100227,
       "cardID": 3025,
       "grade": 1,
       "level": 1,
@@ -3149,7 +3191,7 @@
       "artistID": 3005
     },
     {
-      "objectID": 100225,
+      "objectID": 100228,
       "cardID": 3026,
       "grade": 3,
       "level": 1,
@@ -3163,7 +3205,7 @@
       "artistID": 3006
     },
     {
-      "objectID": 100226,
+      "objectID": 100229,
       "cardID": 3027,
       "grade": 1,
       "level": 1,
@@ -3177,7 +3219,7 @@
       "artistID": 3007
     },
     {
-      "objectID": 100227,
+      "objectID": 100230,
       "cardID": 3028,
       "grade": 0,
       "level": 1,
@@ -3191,7 +3233,7 @@
       "artistID": 3008
     },
     {
-      "objectID": 100228,
+      "objectID": 100231,
       "cardID": 3029,
       "grade": 4,
       "level": 18,
@@ -3205,7 +3247,7 @@
       "artistID": 3009
     },
     {
-      "objectID": 100229,
+      "objectID": 100232,
       "cardID": 3030,
       "grade": 1,
       "level": 1,
@@ -3219,7 +3261,7 @@
       "artistID": 3010
     },
     {
-      "objectID": 100230,
+      "objectID": 100233,
       "cardID": 3031,
       "grade": 1,
       "level": 1,
@@ -3233,7 +3275,7 @@
       "artistID": 3001
     },
     {
-      "objectID": 100231,
+      "objectID": 100234,
       "cardID": 3032,
       "grade": 0,
       "level": 1,
@@ -3247,7 +3289,7 @@
       "artistID": 3002
     },
     {
-      "objectID": 100232,
+      "objectID": 100235,
       "cardID": 3033,
       "grade": 1,
       "level": 1,
@@ -3261,7 +3303,7 @@
       "artistID": 3003
     },
     {
-      "objectID": 100233,
+      "objectID": 100236,
       "cardID": 3034,
       "grade": 2,
       "level": 1,
@@ -3275,7 +3317,7 @@
       "artistID": 3004
     },
     {
-      "objectID": 100234,
+      "objectID": 100237,
       "cardID": 3035,
       "grade": 0,
       "level": 1,
@@ -3289,7 +3331,7 @@
       "artistID": 3005
     },
     {
-      "objectID": 100235,
+      "objectID": 100238,
       "cardID": 3036,
       "grade": 1,
       "level": 1,
@@ -3303,7 +3345,7 @@
       "artistID": 3006
     },
     {
-      "objectID": 100236,
+      "objectID": 100239,
       "cardID": 3037,
       "grade": 1,
       "level": 1,
@@ -3317,7 +3359,7 @@
       "artistID": 3007
     },
     {
-      "objectID": 100237,
+      "objectID": 100240,
       "cardID": 3038,
       "grade": 1,
       "level": 1,
@@ -3331,7 +3373,7 @@
       "artistID": 3008
     },
     {
-      "objectID": 100238,
+      "objectID": 100241,
       "cardID": 3039,
       "grade": 3,
       "level": 1,
@@ -3345,7 +3387,7 @@
       "artistID": 3009
     },
     {
-      "objectID": 100239,
+      "objectID": 100242,
       "cardID": 3040,
       "grade": 1,
       "level": 1,
@@ -3359,7 +3401,7 @@
       "artistID": 3010
     },
     {
-      "objectID": 100240,
+      "objectID": 100243,
       "cardID": 4001,
       "grade": 0,
       "level": 1,
@@ -3373,7 +3415,7 @@
       "artistID": 4001
     },
     {
-      "objectID": 100241,
+      "objectID": 100244,
       "cardID": 4002,
       "grade": 0,
       "level": 1,
@@ -3387,7 +3429,7 @@
       "artistID": 4002
     },
     {
-      "objectID": 100242,
+      "objectID": 100245,
       "cardID": 4003,
       "grade": 1,
       "level": 1,
@@ -3401,7 +3443,7 @@
       "artistID": 4003
     },
     {
-      "objectID": 100243,
+      "objectID": 100246,
       "cardID": 4004,
       "grade": 3,
       "level": 1,
@@ -3415,7 +3457,7 @@
       "artistID": 4004
     },
     {
-      "objectID": 100244,
+      "objectID": 100247,
       "cardID": 4005,
       "grade": 0,
       "level": 1,
@@ -3429,7 +3471,7 @@
       "artistID": 4005
     },
     {
-      "objectID": 100245,
+      "objectID": 100248,
       "cardID": 4006,
       "grade": 2,
       "level": 1,
@@ -3443,7 +3485,7 @@
       "artistID": 4006
     },
     {
-      "objectID": 100246,
+      "objectID": 100249,
       "cardID": 4007,
       "grade": 2,
       "level": 1,
@@ -3457,7 +3499,7 @@
       "artistID": 4007
     },
     {
-      "objectID": 100247,
+      "objectID": 100250,
       "cardID": 4008,
       "grade": 1,
       "level": 1,
@@ -3471,7 +3513,7 @@
       "artistID": 4008
     },
     {
-      "objectID": 100248,
+      "objectID": 100251,
       "cardID": 4009,
       "grade": 3,
       "level": 1,
@@ -3485,7 +3527,7 @@
       "artistID": 4009
     },
     {
-      "objectID": 100249,
+      "objectID": 100252,
       "cardID": 4010,
       "grade": 1,
       "level": 1,
@@ -3499,7 +3541,7 @@
       "artistID": 4010
     },
     {
-      "objectID": 100250,
+      "objectID": 100253,
       "cardID": 4011,
       "grade": 0,
       "level": 1,
@@ -3513,7 +3555,7 @@
       "artistID": 4001
     },
     {
-      "objectID": 100251,
+      "objectID": 100254,
       "cardID": 4012,
       "grade": 2,
       "level": 1,
@@ -3527,7 +3569,7 @@
       "artistID": 4002
     },
     {
-      "objectID": 100252,
+      "objectID": 100255,
       "cardID": 4013,
       "grade": 0,
       "level": 1,
@@ -3541,7 +3583,7 @@
       "artistID": 4003
     },
     {
-      "objectID": 100253,
+      "objectID": 100256,
       "cardID": 4014,
       "grade": 2,
       "level": 1,
@@ -3555,7 +3597,7 @@
       "artistID": 4004
     },
     {
-      "objectID": 100254,
+      "objectID": 100257,
       "cardID": 4015,
       "grade": 0,
       "level": 1,
@@ -3569,7 +3611,7 @@
       "artistID": 4005
     },
     {
-      "objectID": 100255,
+      "objectID": 100258,
       "cardID": 4016,
       "grade": 0,
       "level": 1,
@@ -3583,7 +3625,7 @@
       "artistID": 4006
     },
     {
-      "objectID": 100256,
+      "objectID": 100259,
       "cardID": 4017,
       "grade": 1,
       "level": 1,
@@ -3597,7 +3639,7 @@
       "artistID": 4007
     },
     {
-      "objectID": 100257,
+      "objectID": 100260,
       "cardID": 4018,
       "grade": 0,
       "level": 1,
@@ -3611,7 +3653,7 @@
       "artistID": 4008
     },
     {
-      "objectID": 100258,
+      "objectID": 100261,
       "cardID": 4019,
       "grade": 1,
       "level": 1,
@@ -3625,7 +3667,7 @@
       "artistID": 4009
     },
     {
-      "objectID": 100259,
+      "objectID": 100262,
       "cardID": 4020,
       "grade": 2,
       "level": 1,
@@ -3639,7 +3681,7 @@
       "artistID": 4010
     },
     {
-      "objectID": 100260,
+      "objectID": 100263,
       "cardID": 4141,
       "grade": 3,
       "level": 1,
@@ -3653,7 +3695,7 @@
       "artistID": 4001
     },
     {
-      "objectID": 100261,
+      "objectID": 100264,
       "cardID": 4142,
       "grade": 0,
       "level": 1,
@@ -3667,7 +3709,7 @@
       "artistID": 4002
     },
     {
-      "objectID": 100262,
+      "objectID": 100265,
       "cardID": 4143,
       "grade": 2,
       "level": 1,
@@ -3681,7 +3723,7 @@
       "artistID": 4003
     },
     {
-      "objectID": 100263,
+      "objectID": 100266,
       "cardID": 4144,
       "grade": 0,
       "level": 1,
@@ -3695,7 +3737,7 @@
       "artistID": 4004
     },
     {
-      "objectID": 100264,
+      "objectID": 100267,
       "cardID": 4145,
       "grade": 2,
       "level": 1,
@@ -3709,7 +3751,7 @@
       "artistID": 4005
     },
     {
-      "objectID": 100265,
+      "objectID": 100268,
       "cardID": 4146,
       "grade": 0,
       "level": 1,
@@ -3723,7 +3765,7 @@
       "artistID": 4006
     },
     {
-      "objectID": 100266,
+      "objectID": 100269,
       "cardID": 4147,
       "grade": 4,
       "level": 13,
@@ -3737,7 +3779,7 @@
       "artistID": 4007
     },
     {
-      "objectID": 100267,
+      "objectID": 100270,
       "cardID": 4148,
       "grade": 1,
       "level": 1,
@@ -3751,7 +3793,7 @@
       "artistID": 4008
     },
     {
-      "objectID": 100268,
+      "objectID": 100271,
       "cardID": 4149,
       "grade": 0,
       "level": 1,
@@ -3765,7 +3807,7 @@
       "artistID": 4009
     },
     {
-      "objectID": 100269,
+      "objectID": 100272,
       "cardID": 4150,
       "grade": 0,
       "level": 1,
@@ -3779,7 +3821,7 @@
       "artistID": 4010
     },
     {
-      "objectID": 100270,
+      "objectID": 100273,
       "cardID": 4151,
       "grade": 2,
       "level": 1,
@@ -3793,7 +3835,7 @@
       "artistID": 4001
     },
     {
-      "objectID": 100271,
+      "objectID": 100274,
       "cardID": 4152,
       "grade": 1,
       "level": 1,
@@ -3807,7 +3849,7 @@
       "artistID": 4002
     },
     {
-      "objectID": 100272,
+      "objectID": 100275,
       "cardID": 4153,
       "grade": 3,
       "level": 1,
@@ -3821,7 +3863,7 @@
       "artistID": 4003
     },
     {
-      "objectID": 100273,
+      "objectID": 100276,
       "cardID": 4154,
       "grade": 2,
       "level": 1,
@@ -3835,7 +3877,7 @@
       "artistID": 4004
     },
     {
-      "objectID": 100274,
+      "objectID": 100277,
       "cardID": 4155,
       "grade": 1,
       "level": 1,
@@ -3849,7 +3891,7 @@
       "artistID": 4005
     },
     {
-      "objectID": 100275,
+      "objectID": 100278,
       "cardID": 4156,
       "grade": 2,
       "level": 1,
@@ -3863,7 +3905,7 @@
       "artistID": 4006
     },
     {
-      "objectID": 100276,
+      "objectID": 100279,
       "cardID": 4157,
       "grade": 1,
       "level": 1,
@@ -3877,7 +3919,7 @@
       "artistID": 4007
     },
     {
-      "objectID": 100277,
+      "objectID": 100280,
       "cardID": 4158,
       "grade": 3,
       "level": 1,
@@ -3891,7 +3933,7 @@
       "artistID": 4008
     },
     {
-      "objectID": 100278,
+      "objectID": 100281,
       "cardID": 4159,
       "grade": 0,
       "level": 1,
@@ -3905,7 +3947,7 @@
       "artistID": 4009
     },
     {
-      "objectID": 100279,
+      "objectID": 100282,
       "cardID": 4160,
       "grade": 1,
       "level": 1,
@@ -3919,7 +3961,7 @@
       "artistID": 4010
     },
     {
-      "objectID": 100280,
+      "objectID": 100283,
       "cardID": 5001,
       "grade": 1,
       "level": 1,
@@ -3933,7 +3975,7 @@
       "artistID": 5001
     },
     {
-      "objectID": 100281,
+      "objectID": 100284,
       "cardID": 5002,
       "grade": 1,
       "level": 1,
@@ -3947,7 +3989,7 @@
       "artistID": 5002
     },
     {
-      "objectID": 100282,
+      "objectID": 100285,
       "cardID": 5003,
       "grade": 1,
       "level": 1,
@@ -3961,7 +4003,7 @@
       "artistID": 5003
     },
     {
-      "objectID": 100283,
+      "objectID": 100286,
       "cardID": 5004,
       "grade": 1,
       "level": 1,
@@ -3975,7 +4017,7 @@
       "artistID": 5004
     },
     {
-      "objectID": 100284,
+      "objectID": 100287,
       "cardID": 5005,
       "grade": 0,
       "level": 1,
@@ -3989,7 +4031,7 @@
       "artistID": 5005
     },
     {
-      "objectID": 100285,
+      "objectID": 100288,
       "cardID": 5006,
       "grade": 0,
       "level": 1,
@@ -4003,7 +4045,7 @@
       "artistID": 5006
     },
     {
-      "objectID": 100286,
+      "objectID": 100289,
       "cardID": 5007,
       "grade": 0,
       "level": 1,
@@ -4017,7 +4059,7 @@
       "artistID": 5007
     },
     {
-      "objectID": 100287,
+      "objectID": 100290,
       "cardID": 5008,
       "grade": 2,
       "level": 1,
@@ -4031,7 +4073,7 @@
       "artistID": 5008
     },
     {
-      "objectID": 100288,
+      "objectID": 100291,
       "cardID": 5009,
       "grade": 0,
       "level": 1,
@@ -4045,7 +4087,7 @@
       "artistID": 5009
     },
     {
-      "objectID": 100289,
+      "objectID": 100292,
       "cardID": 5010,
       "grade": 0,
       "level": 1,
@@ -4059,7 +4101,7 @@
       "artistID": 5010
     },
     {
-      "objectID": 100290,
+      "objectID": 100293,
       "cardID": 5011,
       "grade": 1,
       "level": 1,
@@ -4073,7 +4115,7 @@
       "artistID": 5011
     },
     {
-      "objectID": 100291,
+      "objectID": 100294,
       "cardID": 5012,
       "grade": 0,
       "level": 1,
@@ -4087,7 +4129,7 @@
       "artistID": 5001
     },
     {
-      "objectID": 100292,
+      "objectID": 100295,
       "cardID": 5013,
       "grade": 0,
       "level": 1,
@@ -4101,7 +4143,7 @@
       "artistID": 5002
     },
     {
-      "objectID": 100293,
+      "objectID": 100296,
       "cardID": 5014,
       "grade": 1,
       "level": 1,
@@ -4115,7 +4157,7 @@
       "artistID": 5003
     },
     {
-      "objectID": 100294,
+      "objectID": 100297,
       "cardID": 5015,
       "grade": 0,
       "level": 1,
@@ -4129,7 +4171,7 @@
       "artistID": 5004
     },
     {
-      "objectID": 100295,
+      "objectID": 100298,
       "cardID": 5016,
       "grade": 0,
       "level": 1,
@@ -4143,7 +4185,7 @@
       "artistID": 5005
     },
     {
-      "objectID": 100296,
+      "objectID": 100299,
       "cardID": 5017,
       "grade": 1,
       "level": 1,
@@ -4157,7 +4199,7 @@
       "artistID": 5006
     },
     {
-      "objectID": 100297,
+      "objectID": 100300,
       "cardID": 5018,
       "grade": 3,
       "level": 1,
@@ -4171,7 +4213,7 @@
       "artistID": 5007
     },
     {
-      "objectID": 100298,
+      "objectID": 100301,
       "cardID": 5019,
       "grade": 3,
       "level": 1,
@@ -4185,7 +4227,7 @@
       "artistID": 5008
     },
     {
-      "objectID": 100299,
+      "objectID": 100302,
       "cardID": 5020,
       "grade": 1,
       "level": 1,
@@ -4199,7 +4241,7 @@
       "artistID": 5009
     },
     {
-      "objectID": 100300,
+      "objectID": 100303,
       "cardID": 5021,
       "grade": 0,
       "level": 1,
@@ -4213,7 +4255,7 @@
       "artistID": 5010
     },
     {
-      "objectID": 100301,
+      "objectID": 100304,
       "cardID": 5022,
       "grade": 0,
       "level": 1,
@@ -4227,7 +4269,7 @@
       "artistID": 5011
     },
     {
-      "objectID": 100302,
+      "objectID": 100305,
       "cardID": 6001,
       "grade": 2,
       "level": 1,
@@ -4241,7 +4283,7 @@
       "artistID": 6001
     },
     {
-      "objectID": 100303,
+      "objectID": 100306,
       "cardID": 6002,
       "grade": 1,
       "level": 1,
@@ -4255,7 +4297,7 @@
       "artistID": 6002
     },
     {
-      "objectID": 100304,
+      "objectID": 100307,
       "cardID": 6003,
       "grade": 1,
       "level": 1,
@@ -4269,7 +4311,7 @@
       "artistID": 6003
     },
     {
-      "objectID": 100305,
+      "objectID": 100308,
       "cardID": 6004,
       "grade": 1,
       "level": 1,
@@ -4283,7 +4325,7 @@
       "artistID": 6004
     },
     {
-      "objectID": 100306,
+      "objectID": 100309,
       "cardID": 6005,
       "grade": 2,
       "level": 1,
@@ -4297,7 +4339,7 @@
       "artistID": 6005
     },
     {
-      "objectID": 100307,
+      "objectID": 100310,
       "cardID": 6006,
       "grade": 2,
       "level": 1,
@@ -4311,7 +4353,7 @@
       "artistID": 6006
     },
     {
-      "objectID": 100308,
+      "objectID": 100311,
       "cardID": 6007,
       "grade": 1,
       "level": 1,
@@ -4325,7 +4367,7 @@
       "artistID": 6007
     },
     {
-      "objectID": 100309,
+      "objectID": 100312,
       "cardID": 6008,
       "grade": 2,
       "level": 1,
@@ -4339,7 +4381,7 @@
       "artistID": 6008
     },
     {
-      "objectID": 100310,
+      "objectID": 100313,
       "cardID": 6009,
       "grade": 3,
       "level": 1,
@@ -4353,7 +4395,7 @@
       "artistID": 6009
     },
     {
-      "objectID": 100311,
+      "objectID": 100314,
       "cardID": 6010,
       "grade": 0,
       "level": 1,
@@ -4367,7 +4409,7 @@
       "artistID": 6010
     },
     {
-      "objectID": 100312,
+      "objectID": 100315,
       "cardID": 6011,
       "grade": 0,
       "level": 1,
@@ -4381,7 +4423,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100313,
+      "objectID": 100316,
       "cardID": 6012,
       "grade": 1,
       "level": 1,
@@ -4395,7 +4437,7 @@
       "artistID": 6001
     },
     {
-      "objectID": 100314,
+      "objectID": 100317,
       "cardID": 6013,
       "grade": 0,
       "level": 1,
@@ -4409,7 +4451,7 @@
       "artistID": 6002
     },
     {
-      "objectID": 100315,
+      "objectID": 100318,
       "cardID": 6014,
       "grade": 4,
       "level": 13,
@@ -4423,7 +4465,7 @@
       "artistID": 6003
     },
     {
-      "objectID": 100316,
+      "objectID": 100319,
       "cardID": 6015,
       "grade": 0,
       "level": 1,
@@ -4437,7 +4479,7 @@
       "artistID": 6004
     },
     {
-      "objectID": 100317,
+      "objectID": 100320,
       "cardID": 6016,
       "grade": 0,
       "level": 1,
@@ -4451,7 +4493,7 @@
       "artistID": 6005
     },
     {
-      "objectID": 100318,
+      "objectID": 100321,
       "cardID": 6017,
       "grade": 0,
       "level": 1,
@@ -4465,7 +4507,7 @@
       "artistID": 6006
     },
     {
-      "objectID": 100319,
+      "objectID": 100322,
       "cardID": 6018,
       "grade": 0,
       "level": 1,
@@ -4479,7 +4521,7 @@
       "artistID": 6007
     },
     {
-      "objectID": 100320,
+      "objectID": 100323,
       "cardID": 6019,
       "grade": 2,
       "level": 1,
@@ -4493,7 +4535,7 @@
       "artistID": 6008
     },
     {
-      "objectID": 100321,
+      "objectID": 100324,
       "cardID": 6020,
       "grade": 1,
       "level": 1,
@@ -4507,7 +4549,7 @@
       "artistID": 6009
     },
     {
-      "objectID": 100322,
+      "objectID": 100325,
       "cardID": 6021,
       "grade": 2,
       "level": 1,
@@ -4521,7 +4563,7 @@
       "artistID": 6010
     },
     {
-      "objectID": 100323,
+      "objectID": 100326,
       "cardID": 6022,
       "grade": 0,
       "level": 1,
@@ -4535,7 +4577,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100324,
+      "objectID": 100327,
       "cardID": 6045,
       "grade": 0,
       "level": 1,
@@ -4549,7 +4591,7 @@
       "artistID": 6001
     },
     {
-      "objectID": 100325,
+      "objectID": 100328,
       "cardID": 6046,
       "grade": 0,
       "level": 1,
@@ -4563,7 +4605,7 @@
       "artistID": 6002
     },
     {
-      "objectID": 100326,
+      "objectID": 100329,
       "cardID": 6047,
       "grade": 0,
       "level": 1,
@@ -4577,7 +4619,7 @@
       "artistID": 6003
     },
     {
-      "objectID": 100327,
+      "objectID": 100330,
       "cardID": 6048,
       "grade": 0,
       "level": 1,
@@ -4591,7 +4633,7 @@
       "artistID": 6004
     },
     {
-      "objectID": 100328,
+      "objectID": 100331,
       "cardID": 6049,
       "grade": 3,
       "level": 1,
@@ -4605,7 +4647,7 @@
       "artistID": 6005
     },
     {
-      "objectID": 100329,
+      "objectID": 100332,
       "cardID": 6050,
       "grade": 0,
       "level": 1,
@@ -4619,7 +4661,7 @@
       "artistID": 6006
     },
     {
-      "objectID": 100330,
+      "objectID": 100333,
       "cardID": 6051,
       "grade": 1,
       "level": 1,
@@ -4633,7 +4675,7 @@
       "artistID": 6007
     },
     {
-      "objectID": 100331,
+      "objectID": 100334,
       "cardID": 6052,
       "grade": 1,
       "level": 1,
@@ -4647,7 +4689,7 @@
       "artistID": 6008
     },
     {
-      "objectID": 100332,
+      "objectID": 100335,
       "cardID": 6053,
       "grade": 1,
       "level": 1,
@@ -4661,7 +4703,7 @@
       "artistID": 6009
     },
     {
-      "objectID": 100333,
+      "objectID": 100336,
       "cardID": 6054,
       "grade": 0,
       "level": 1,
@@ -4675,7 +4717,7 @@
       "artistID": 6010
     },
     {
-      "objectID": 100334,
+      "objectID": 100337,
       "cardID": 6055,
       "grade": 0,
       "level": 1,
@@ -4689,7 +4731,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100335,
+      "objectID": 100338,
       "cardID": 6056,
       "grade": 1,
       "level": 1,
@@ -4703,7 +4745,7 @@
       "artistID": 6001
     },
     {
-      "objectID": 100336,
+      "objectID": 100339,
       "cardID": 6057,
       "grade": 0,
       "level": 1,
@@ -4717,7 +4759,7 @@
       "artistID": 6002
     },
     {
-      "objectID": 100337,
+      "objectID": 100340,
       "cardID": 6058,
       "grade": 1,
       "level": 1,
@@ -4731,7 +4773,7 @@
       "artistID": 6003
     },
     {
-      "objectID": 100338,
+      "objectID": 100341,
       "cardID": 6059,
       "grade": 1,
       "level": 1,
@@ -4745,7 +4787,7 @@
       "artistID": 6004
     },
     {
-      "objectID": 100339,
+      "objectID": 100342,
       "cardID": 6060,
       "grade": 0,
       "level": 1,
@@ -4759,7 +4801,7 @@
       "artistID": 6005
     },
     {
-      "objectID": 100340,
+      "objectID": 100343,
       "cardID": 6061,
       "grade": 0,
       "level": 1,
@@ -4773,7 +4815,7 @@
       "artistID": 6006
     },
     {
-      "objectID": 100341,
+      "objectID": 100344,
       "cardID": 6062,
       "grade": 1,
       "level": 1,
@@ -4787,7 +4829,7 @@
       "artistID": 6007
     },
     {
-      "objectID": 100342,
+      "objectID": 100345,
       "cardID": 6063,
       "grade": 0,
       "level": 1,
@@ -4801,7 +4843,7 @@
       "artistID": 6008
     },
     {
-      "objectID": 100343,
+      "objectID": 100346,
       "cardID": 6064,
       "grade": 1,
       "level": 1,
@@ -4815,7 +4857,7 @@
       "artistID": 6009
     },
     {
-      "objectID": 100344,
+      "objectID": 100347,
       "cardID": 6065,
       "grade": 1,
       "level": 1,
@@ -4829,7 +4871,7 @@
       "artistID": 6010
     },
     {
-      "objectID": 100345,
+      "objectID": 100348,
       "cardID": 6066,
       "grade": 0,
       "level": 1,
@@ -4843,7 +4885,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100346,
+      "objectID": 100349,
       "cardID": 6111,
       "grade": 2,
       "level": 1,
@@ -4857,7 +4899,7 @@
       "artistID": 6001
     },
     {
-      "objectID": 100347,
+      "objectID": 100350,
       "cardID": 6112,
       "grade": 4,
       "level": 2,
@@ -4871,7 +4913,7 @@
       "artistID": 6002
     },
     {
-      "objectID": 100348,
+      "objectID": 100351,
       "cardID": 6113,
       "grade": 0,
       "level": 1,
@@ -4885,7 +4927,7 @@
       "artistID": 6003
     },
     {
-      "objectID": 100349,
+      "objectID": 100352,
       "cardID": 6114,
       "grade": 0,
       "level": 1,
@@ -4899,7 +4941,7 @@
       "artistID": 6004
     },
     {
-      "objectID": 100350,
+      "objectID": 100353,
       "cardID": 6115,
       "grade": 3,
       "level": 1,
@@ -4913,7 +4955,7 @@
       "artistID": 6005
     },
     {
-      "objectID": 100351,
+      "objectID": 100354,
       "cardID": 6116,
       "grade": 1,
       "level": 1,
@@ -4927,7 +4969,7 @@
       "artistID": 6006
     },
     {
-      "objectID": 100352,
+      "objectID": 100355,
       "cardID": 6117,
       "grade": 2,
       "level": 1,
@@ -4941,7 +4983,7 @@
       "artistID": 6007
     },
     {
-      "objectID": 100353,
+      "objectID": 100356,
       "cardID": 6118,
       "grade": 2,
       "level": 1,
@@ -4955,7 +4997,7 @@
       "artistID": 6008
     },
     {
-      "objectID": 100354,
+      "objectID": 100357,
       "cardID": 6119,
       "grade": 2,
       "level": 1,
@@ -4969,7 +5011,7 @@
       "artistID": 6009
     },
     {
-      "objectID": 100355,
+      "objectID": 100358,
       "cardID": 6120,
       "grade": 1,
       "level": 1,
@@ -4983,7 +5025,7 @@
       "artistID": 6010
     },
     {
-      "objectID": 100356,
+      "objectID": 100359,
       "cardID": 6121,
       "grade": 2,
       "level": 1,
@@ -4997,7 +5039,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100357,
+      "objectID": 100360,
       "cardID": 6122,
       "grade": 0,
       "level": 1,
@@ -5011,7 +5053,7 @@
       "artistID": 6001
     },
     {
-      "objectID": 100358,
+      "objectID": 100361,
       "cardID": 6123,
       "grade": 1,
       "level": 1,
@@ -5025,7 +5067,7 @@
       "artistID": 6002
     },
     {
-      "objectID": 100359,
+      "objectID": 100362,
       "cardID": 6124,
       "grade": 1,
       "level": 1,
@@ -5039,7 +5081,7 @@
       "artistID": 6003
     },
     {
-      "objectID": 100360,
+      "objectID": 100363,
       "cardID": 6125,
       "grade": 1,
       "level": 1,
@@ -5053,7 +5095,7 @@
       "artistID": 6004
     },
     {
-      "objectID": 100361,
+      "objectID": 100364,
       "cardID": 6126,
       "grade": 0,
       "level": 1,
@@ -5067,7 +5109,7 @@
       "artistID": 6005
     },
     {
-      "objectID": 100362,
+      "objectID": 100365,
       "cardID": 6127,
       "grade": 2,
       "level": 1,
@@ -5081,7 +5123,7 @@
       "artistID": 6006
     },
     {
-      "objectID": 100363,
+      "objectID": 100366,
       "cardID": 6128,
       "grade": 0,
       "level": 1,
@@ -5095,7 +5137,7 @@
       "artistID": 6007
     },
     {
-      "objectID": 100364,
+      "objectID": 100367,
       "cardID": 6129,
       "grade": 0,
       "level": 1,
@@ -5109,7 +5151,7 @@
       "artistID": 6008
     },
     {
-      "objectID": 100365,
+      "objectID": 100368,
       "cardID": 6130,
       "grade": 1,
       "level": 1,
@@ -5123,7 +5165,7 @@
       "artistID": 6009
     },
     {
-      "objectID": 100366,
+      "objectID": 100369,
       "cardID": 6131,
       "grade": 0,
       "level": 1,
@@ -5137,7 +5179,7 @@
       "artistID": 6010
     },
     {
-      "objectID": 100367,
+      "objectID": 100370,
       "cardID": 6132,
       "grade": 2,
       "level": 1,
@@ -5151,7 +5193,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100368,
+      "objectID": 100371,
       "cardID": 6177,
       "grade": 0,
       "level": 1,
@@ -5165,7 +5207,7 @@
       "artistID": 6001
     },
     {
-      "objectID": 100369,
+      "objectID": 100372,
       "cardID": 6178,
       "grade": 0,
       "level": 1,
@@ -5179,7 +5221,7 @@
       "artistID": 6002
     },
     {
-      "objectID": 100370,
+      "objectID": 100373,
       "cardID": 6179,
       "grade": 1,
       "level": 1,
@@ -5193,7 +5235,7 @@
       "artistID": 6003
     },
     {
-      "objectID": 100371,
+      "objectID": 100374,
       "cardID": 6180,
       "grade": 1,
       "level": 1,
@@ -5207,7 +5249,7 @@
       "artistID": 6004
     },
     {
-      "objectID": 100372,
+      "objectID": 100375,
       "cardID": 6181,
       "grade": 2,
       "level": 1,
@@ -5221,7 +5263,7 @@
       "artistID": 6005
     },
     {
-      "objectID": 100373,
+      "objectID": 100376,
       "cardID": 6182,
       "grade": 1,
       "level": 1,
@@ -5235,7 +5277,7 @@
       "artistID": 6006
     },
     {
-      "objectID": 100374,
+      "objectID": 100377,
       "cardID": 6183,
       "grade": 4,
       "level": 13,
@@ -5249,7 +5291,7 @@
       "artistID": 6007
     },
     {
-      "objectID": 100375,
+      "objectID": 100378,
       "cardID": 6184,
       "grade": 3,
       "level": 1,
@@ -5263,7 +5305,7 @@
       "artistID": 6008
     },
     {
-      "objectID": 100376,
+      "objectID": 100379,
       "cardID": 6185,
       "grade": 2,
       "level": 1,
@@ -5277,7 +5319,7 @@
       "artistID": 6009
     },
     {
-      "objectID": 100377,
+      "objectID": 100380,
       "cardID": 6186,
       "grade": 0,
       "level": 1,
@@ -5291,7 +5333,7 @@
       "artistID": 6010
     },
     {
-      "objectID": 100378,
+      "objectID": 100381,
       "cardID": 6187,
       "grade": 2,
       "level": 1,
@@ -5305,7 +5347,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100379,
+      "objectID": 100382,
       "cardID": 6188,
       "grade": 0,
       "level": 1,
@@ -5319,7 +5361,7 @@
       "artistID": 6001
     },
     {
-      "objectID": 100380,
+      "objectID": 100383,
       "cardID": 6189,
       "grade": 2,
       "level": 1,
@@ -5333,7 +5375,7 @@
       "artistID": 6002
     },
     {
-      "objectID": 100381,
+      "objectID": 100384,
       "cardID": 6190,
       "grade": 1,
       "level": 1,
@@ -5347,7 +5389,7 @@
       "artistID": 6003
     },
     {
-      "objectID": 100382,
+      "objectID": 100385,
       "cardID": 6191,
       "grade": 1,
       "level": 1,
@@ -5361,7 +5403,7 @@
       "artistID": 6004
     },
     {
-      "objectID": 100383,
+      "objectID": 100386,
       "cardID": 6192,
       "grade": 3,
       "level": 1,
@@ -5375,7 +5417,7 @@
       "artistID": 6005
     },
     {
-      "objectID": 100384,
+      "objectID": 100387,
       "cardID": 6193,
       "grade": 1,
       "level": 1,
@@ -5389,7 +5431,7 @@
       "artistID": 6006
     },
     {
-      "objectID": 100385,
+      "objectID": 100388,
       "cardID": 6194,
       "grade": 1,
       "level": 1,
@@ -5403,7 +5445,7 @@
       "artistID": 6007
     },
     {
-      "objectID": 100386,
+      "objectID": 100389,
       "cardID": 6195,
       "grade": 4,
       "level": 17,
@@ -5417,7 +5459,7 @@
       "artistID": 6008
     },
     {
-      "objectID": 100387,
+      "objectID": 100390,
       "cardID": 6196,
       "grade": 3,
       "level": 1,
@@ -5431,7 +5473,7 @@
       "artistID": 6009
     },
     {
-      "objectID": 100388,
+      "objectID": 100391,
       "cardID": 6197,
       "grade": 1,
       "level": 1,
@@ -5445,7 +5487,7 @@
       "artistID": 6010
     },
     {
-      "objectID": 100389,
+      "objectID": 100392,
       "cardID": 6198,
       "grade": 0,
       "level": 1,
@@ -5459,7 +5501,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100390,
+      "objectID": 100393,
       "cardID": 7001,
       "grade": 2,
       "level": 1,
@@ -5473,7 +5515,7 @@
       "artistID": 7001
     },
     {
-      "objectID": 100391,
+      "objectID": 100394,
       "cardID": 7002,
       "grade": 3,
       "level": 1,
@@ -5487,7 +5529,7 @@
       "artistID": 7002
     },
     {
-      "objectID": 100392,
+      "objectID": 100395,
       "cardID": 7003,
       "grade": 0,
       "level": 1,
@@ -5501,7 +5543,7 @@
       "artistID": 7003
     },
     {
-      "objectID": 100393,
+      "objectID": 100396,
       "cardID": 7004,
       "grade": 0,
       "level": 1,
@@ -5515,7 +5557,7 @@
       "artistID": 7001
     },
     {
-      "objectID": 100394,
+      "objectID": 100397,
       "cardID": 7005,
       "grade": 1,
       "level": 1,
@@ -5529,7 +5571,7 @@
       "artistID": 7002
     },
     {
-      "objectID": 100395,
+      "objectID": 100398,
       "cardID": 7006,
       "grade": 1,
       "level": 1,
@@ -5543,7 +5585,7 @@
       "artistID": 7003
     },
     {
-      "objectID": 100396,
+      "objectID": 100399,
       "cardID": 8001,
       "grade": 1,
       "level": 1,
@@ -5557,7 +5599,7 @@
       "artistID": 8001
     },
     {
-      "objectID": 100397,
+      "objectID": 100400,
       "cardID": 8002,
       "grade": 3,
       "level": 1,
@@ -5571,7 +5613,7 @@
       "artistID": 8002
     },
     {
-      "objectID": 100398,
+      "objectID": 100401,
       "cardID": 8003,
       "grade": 1,
       "level": 1,
@@ -5585,7 +5627,7 @@
       "artistID": 8003
     },
     {
-      "objectID": 100399,
+      "objectID": 100402,
       "cardID": 8004,
       "grade": 1,
       "level": 1,
@@ -5599,7 +5641,7 @@
       "artistID": 8001
     },
     {
-      "objectID": 100400,
+      "objectID": 100403,
       "cardID": 8005,
       "grade": 1,
       "level": 1,
@@ -5613,7 +5655,7 @@
       "artistID": 8002
     },
     {
-      "objectID": 100401,
+      "objectID": 100404,
       "cardID": 8006,
       "grade": 0,
       "level": 1,
@@ -5627,7 +5669,7 @@
       "artistID": 8003
     },
     {
-      "objectID": 100402,
+      "objectID": 100405,
       "cardID": 9001,
       "grade": 0,
       "level": 1,
@@ -5641,7 +5683,7 @@
       "artistID": 9001
     },
     {
-      "objectID": 100403,
+      "objectID": 100406,
       "cardID": 9002,
       "grade": 0,
       "level": 1,
@@ -5655,7 +5697,7 @@
       "artistID": 9002
     },
     {
-      "objectID": 100404,
+      "objectID": 100407,
       "cardID": 9003,
       "grade": 1,
       "level": 1,
@@ -5669,7 +5711,7 @@
       "artistID": 9003
     },
     {
-      "objectID": 100405,
+      "objectID": 100408,
       "cardID": 9004,
       "grade": 3,
       "level": 1,
@@ -5683,7 +5725,7 @@
       "artistID": 9001
     },
     {
-      "objectID": 100406,
+      "objectID": 100409,
       "cardID": 9005,
       "grade": 3,
       "level": 1,
@@ -5697,7 +5739,7 @@
       "artistID": 9002
     },
     {
-      "objectID": 100407,
+      "objectID": 100410,
       "cardID": 9006,
       "grade": 2,
       "level": 1,
@@ -5711,7 +5753,7 @@
       "artistID": 9003
     },
     {
-      "objectID": 100408,
+      "objectID": 100411,
       "cardID": 10001,
       "grade": 2,
       "level": 1,
@@ -5725,7 +5767,7 @@
       "artistID": 10001
     },
     {
-      "objectID": 100409,
+      "objectID": 100412,
       "cardID": 10002,
       "grade": 0,
       "level": 1,
@@ -5739,7 +5781,7 @@
       "artistID": 10002
     },
     {
-      "objectID": 100410,
+      "objectID": 100413,
       "cardID": 10003,
       "grade": 2,
       "level": 1,
@@ -5753,7 +5795,7 @@
       "artistID": 10003
     },
     {
-      "objectID": 100411,
+      "objectID": 100414,
       "cardID": 10004,
       "grade": 0,
       "level": 1,
@@ -5767,7 +5809,7 @@
       "artistID": 10001
     },
     {
-      "objectID": 100412,
+      "objectID": 100415,
       "cardID": 10005,
       "grade": 1,
       "level": 1,
@@ -5781,7 +5823,7 @@
       "artistID": 10002
     },
     {
-      "objectID": 100413,
+      "objectID": 100416,
       "cardID": 10006,
       "grade": 0,
       "level": 1,
@@ -5795,7 +5837,7 @@
       "artistID": 10003
     },
     {
-      "objectID": 100414,
+      "objectID": 100417,
       "cardID": 11001,
       "grade": 0,
       "level": 1,
@@ -5809,7 +5851,7 @@
       "artistID": 11001
     },
     {
-      "objectID": 100415,
+      "objectID": 100418,
       "cardID": 11002,
       "grade": 1,
       "level": 1,
@@ -5823,7 +5865,7 @@
       "artistID": 11002
     },
     {
-      "objectID": 100416,
+      "objectID": 100419,
       "cardID": 11003,
       "grade": 1,
       "level": 1,
@@ -5837,7 +5879,7 @@
       "artistID": 11003
     },
     {
-      "objectID": 100417,
+      "objectID": 100420,
       "cardID": 11004,
       "grade": 2,
       "level": 1,
@@ -5851,7 +5893,7 @@
       "artistID": 11001
     },
     {
-      "objectID": 100418,
+      "objectID": 100421,
       "cardID": 11005,
       "grade": 1,
       "level": 1,
@@ -5865,7 +5907,7 @@
       "artistID": 11002
     },
     {
-      "objectID": 100419,
+      "objectID": 100422,
       "cardID": 11006,
       "grade": 1,
       "level": 1,
@@ -5879,7 +5921,7 @@
       "artistID": 11003
     },
     {
-      "objectID": 100420,
+      "objectID": 100423,
       "cardID": 12001,
       "grade": 0,
       "level": 1,
@@ -5893,7 +5935,7 @@
       "artistID": 12001
     },
     {
-      "objectID": 100421,
+      "objectID": 100424,
       "cardID": 12002,
       "grade": 0,
       "level": 1,
@@ -5907,7 +5949,7 @@
       "artistID": 12002
     },
     {
-      "objectID": 100422,
+      "objectID": 100425,
       "cardID": 12003,
       "grade": 2,
       "level": 1,
@@ -5921,7 +5963,7 @@
       "artistID": 12003
     },
     {
-      "objectID": 100423,
+      "objectID": 100426,
       "cardID": 12004,
       "grade": 1,
       "level": 1,
@@ -5935,7 +5977,7 @@
       "artistID": 12001
     },
     {
-      "objectID": 100424,
+      "objectID": 100427,
       "cardID": 12005,
       "grade": 0,
       "level": 1,
@@ -5949,7 +5991,7 @@
       "artistID": 12002
     },
     {
-      "objectID": 100425,
+      "objectID": 100428,
       "cardID": 12006,
       "grade": 0,
       "level": 1,
@@ -5963,7 +6005,7 @@
       "artistID": 12003
     },
     {
-      "objectID": 100426,
+      "objectID": 100429,
       "cardID": 13001,
       "grade": 4,
       "level": 5,
@@ -5977,7 +6019,7 @@
       "artistID": 13001
     },
     {
-      "objectID": 100427,
+      "objectID": 100430,
       "cardID": 13002,
       "grade": 3,
       "level": 1,
@@ -5991,7 +6033,7 @@
       "artistID": 13002
     },
     {
-      "objectID": 100428,
+      "objectID": 100431,
       "cardID": 13003,
       "grade": 2,
       "level": 1,
@@ -6005,7 +6047,7 @@
       "artistID": 13003
     },
     {
-      "objectID": 100429,
+      "objectID": 100432,
       "cardID": 13004,
       "grade": 3,
       "level": 1,
@@ -6019,7 +6061,7 @@
       "artistID": 13001
     },
     {
-      "objectID": 100430,
+      "objectID": 100433,
       "cardID": 13005,
       "grade": 2,
       "level": 1,
@@ -6033,7 +6075,7 @@
       "artistID": 13002
     },
     {
-      "objectID": 100431,
+      "objectID": 100434,
       "cardID": 13006,
       "grade": 2,
       "level": 1,
@@ -6047,7 +6089,7 @@
       "artistID": 13003
     },
     {
-      "objectID": 100432,
+      "objectID": 100435,
       "cardID": 14001,
       "grade": 0,
       "level": 1,
@@ -6061,7 +6103,7 @@
       "artistID": 14001
     },
     {
-      "objectID": 100433,
+      "objectID": 100436,
       "cardID": 14002,
       "grade": 0,
       "level": 1,
@@ -6075,7 +6117,7 @@
       "artistID": 14002
     },
     {
-      "objectID": 100434,
+      "objectID": 100437,
       "cardID": 14003,
       "grade": 4,
       "level": 2,
@@ -6089,7 +6131,7 @@
       "artistID": 14003
     },
     {
-      "objectID": 100435,
+      "objectID": 100438,
       "cardID": 14004,
       "grade": 1,
       "level": 1,
@@ -6103,7 +6145,7 @@
       "artistID": 14001
     },
     {
-      "objectID": 100436,
+      "objectID": 100439,
       "cardID": 14005,
       "grade": 2,
       "level": 1,
@@ -6117,7 +6159,7 @@
       "artistID": 14002
     },
     {
-      "objectID": 100437,
+      "objectID": 100440,
       "cardID": 14006,
       "grade": 2,
       "level": 1,
@@ -6131,7 +6173,7 @@
       "artistID": 14003
     },
     {
-      "objectID": 100438,
+      "objectID": 100441,
       "cardID": 15001,
       "grade": 1,
       "level": 1,
@@ -6145,7 +6187,7 @@
       "artistID": 15001
     },
     {
-      "objectID": 100439,
+      "objectID": 100442,
       "cardID": 15002,
       "grade": 0,
       "level": 1,
@@ -6159,7 +6201,7 @@
       "artistID": 15002
     },
     {
-      "objectID": 100440,
+      "objectID": 100443,
       "cardID": 15003,
       "grade": 3,
       "level": 1,
@@ -6173,7 +6215,7 @@
       "artistID": 15003
     },
     {
-      "objectID": 100441,
+      "objectID": 100444,
       "cardID": 15004,
       "grade": 1,
       "level": 1,
@@ -6187,7 +6229,7 @@
       "artistID": 15001
     },
     {
-      "objectID": 100442,
+      "objectID": 100445,
       "cardID": 15005,
       "grade": 1,
       "level": 1,
@@ -6201,7 +6243,7 @@
       "artistID": 15002
     },
     {
-      "objectID": 100443,
+      "objectID": 100446,
       "cardID": 15006,
       "grade": 0,
       "level": 1,
@@ -6215,7 +6257,7 @@
       "artistID": 15003
     },
     {
-      "objectID": 100444,
+      "objectID": 100447,
       "cardID": 16001,
       "grade": 1,
       "level": 1,
@@ -6229,7 +6271,7 @@
       "artistID": 16001
     },
     {
-      "objectID": 100445,
+      "objectID": 100448,
       "cardID": 16002,
       "grade": 1,
       "level": 1,
@@ -6243,7 +6285,7 @@
       "artistID": 16002
     },
     {
-      "objectID": 100446,
+      "objectID": 100449,
       "cardID": 16003,
       "grade": 2,
       "level": 1,
@@ -6257,7 +6299,7 @@
       "artistID": 16003
     },
     {
-      "objectID": 100447,
+      "objectID": 100450,
       "cardID": 16004,
       "grade": 3,
       "level": 1,
@@ -6271,7 +6313,7 @@
       "artistID": 16001
     },
     {
-      "objectID": 100448,
+      "objectID": 100451,
       "cardID": 16005,
       "grade": 0,
       "level": 1,
@@ -6285,7 +6327,7 @@
       "artistID": 16002
     },
     {
-      "objectID": 100449,
+      "objectID": 100452,
       "cardID": 16006,
       "grade": 1,
       "level": 1,
@@ -6299,7 +6341,7 @@
       "artistID": 16003
     },
     {
-      "objectID": 100450,
+      "objectID": 100453,
       "cardID": 17001,
       "grade": 4,
       "level": 13,
@@ -6313,7 +6355,7 @@
       "artistID": 17001
     },
     {
-      "objectID": 100451,
+      "objectID": 100454,
       "cardID": 17002,
       "grade": 0,
       "level": 1,
@@ -6327,7 +6369,7 @@
       "artistID": 17002
     },
     {
-      "objectID": 100452,
+      "objectID": 100455,
       "cardID": 17003,
       "grade": 0,
       "level": 1,
@@ -6341,7 +6383,7 @@
       "artistID": 17003
     },
     {
-      "objectID": 100453,
+      "objectID": 100456,
       "cardID": 17004,
       "grade": 1,
       "level": 1,
@@ -6355,7 +6397,7 @@
       "artistID": 17001
     },
     {
-      "objectID": 100454,
+      "objectID": 100457,
       "cardID": 17005,
       "grade": 0,
       "level": 1,
@@ -6369,7 +6411,7 @@
       "artistID": 17002
     },
     {
-      "objectID": 100455,
+      "objectID": 100458,
       "cardID": 17006,
       "grade": 0,
       "level": 1,
@@ -6383,7 +6425,7 @@
       "artistID": 17003
     },
     {
-      "objectID": 100456,
+      "objectID": 100459,
       "cardID": 18001,
       "grade": 1,
       "level": 1,
@@ -6397,7 +6439,7 @@
       "artistID": 18001
     },
     {
-      "objectID": 100457,
+      "objectID": 100460,
       "cardID": 18002,
       "grade": 1,
       "level": 1,
@@ -6411,7 +6453,7 @@
       "artistID": 18002
     },
     {
-      "objectID": 100458,
+      "objectID": 100461,
       "cardID": 18003,
       "grade": 0,
       "level": 1,
@@ -6425,7 +6467,7 @@
       "artistID": 18003
     },
     {
-      "objectID": 100459,
+      "objectID": 100462,
       "cardID": 18004,
       "grade": 2,
       "level": 1,
@@ -6439,7 +6481,7 @@
       "artistID": 18004
     },
     {
-      "objectID": 100460,
+      "objectID": 100463,
       "cardID": 18005,
       "grade": 1,
       "level": 1,
@@ -6453,7 +6495,7 @@
       "artistID": 18001
     },
     {
-      "objectID": 100461,
+      "objectID": 100464,
       "cardID": 18006,
       "grade": 0,
       "level": 1,
@@ -6467,7 +6509,7 @@
       "artistID": 18002
     },
     {
-      "objectID": 100462,
+      "objectID": 100465,
       "cardID": 18007,
       "grade": 1,
       "level": 1,
@@ -6481,7 +6523,7 @@
       "artistID": 18003
     },
     {
-      "objectID": 100463,
+      "objectID": 100466,
       "cardID": 18008,
       "grade": 3,
       "level": 1,
@@ -6495,7 +6537,7 @@
       "artistID": 18004
     },
     {
-      "objectID": 100464,
+      "objectID": 100467,
       "cardID": 18017,
       "grade": 2,
       "level": 1,
@@ -6509,7 +6551,7 @@
       "artistID": 18001
     },
     {
-      "objectID": 100465,
+      "objectID": 100468,
       "cardID": 18018,
       "grade": 3,
       "level": 1,
@@ -6523,7 +6565,7 @@
       "artistID": 18002
     },
     {
-      "objectID": 100466,
+      "objectID": 100469,
       "cardID": 18019,
       "grade": 0,
       "level": 1,
@@ -6537,7 +6579,7 @@
       "artistID": 18003
     },
     {
-      "objectID": 100467,
+      "objectID": 100470,
       "cardID": 18020,
       "grade": 1,
       "level": 1,
@@ -6551,7 +6593,7 @@
       "artistID": 18004
     },
     {
-      "objectID": 100468,
+      "objectID": 100471,
       "cardID": 18021,
       "grade": 0,
       "level": 1,
@@ -6565,7 +6607,7 @@
       "artistID": 18001
     },
     {
-      "objectID": 100469,
+      "objectID": 100472,
       "cardID": 18022,
       "grade": 1,
       "level": 1,
@@ -6579,7 +6621,7 @@
       "artistID": 18002
     },
     {
-      "objectID": 100470,
+      "objectID": 100473,
       "cardID": 18023,
       "grade": 0,
       "level": 1,
@@ -6593,7 +6635,7 @@
       "artistID": 18003
     },
     {
-      "objectID": 100471,
+      "objectID": 100474,
       "cardID": 18024,
       "grade": 2,
       "level": 1,
@@ -6607,7 +6649,7 @@
       "artistID": 18004
     },
     {
-      "objectID": 100472,
+      "objectID": 100475,
       "cardID": 19001,
       "grade": 0,
       "level": 1,
@@ -6621,7 +6663,7 @@
       "artistID": 19001
     },
     {
-      "objectID": 100473,
+      "objectID": 100476,
       "cardID": 19002,
       "grade": 0,
       "level": 1,
@@ -6635,7 +6677,7 @@
       "artistID": 19002
     },
     {
-      "objectID": 100474,
+      "objectID": 100477,
       "cardID": 19003,
       "grade": 0,
       "level": 1,
@@ -6649,7 +6691,7 @@
       "artistID": 19003
     },
     {
-      "objectID": 100475,
+      "objectID": 100478,
       "cardID": 19004,
       "grade": 0,
       "level": 1,
@@ -6663,7 +6705,7 @@
       "artistID": 19004
     },
     {
-      "objectID": 100476,
+      "objectID": 100479,
       "cardID": 19005,
       "grade": 1,
       "level": 1,
@@ -6677,7 +6719,7 @@
       "artistID": 19001
     },
     {
-      "objectID": 100477,
+      "objectID": 100480,
       "cardID": 19006,
       "grade": 2,
       "level": 1,
@@ -6691,7 +6733,7 @@
       "artistID": 19002
     },
     {
-      "objectID": 100478,
+      "objectID": 100481,
       "cardID": 19007,
       "grade": 2,
       "level": 1,
@@ -6705,7 +6747,7 @@
       "artistID": 19003
     },
     {
-      "objectID": 100479,
+      "objectID": 100482,
       "cardID": 19008,
       "grade": 1,
       "level": 1,
@@ -6719,7 +6761,7 @@
       "artistID": 19004
     },
     {
-      "objectID": 100480,
+      "objectID": 100483,
       "cardID": 19017,
       "grade": 0,
       "level": 1,
@@ -6733,7 +6775,7 @@
       "artistID": 19001
     },
     {
-      "objectID": 100481,
+      "objectID": 100484,
       "cardID": 19018,
       "grade": 0,
       "level": 1,
@@ -6747,7 +6789,7 @@
       "artistID": 19002
     },
     {
-      "objectID": 100482,
+      "objectID": 100485,
       "cardID": 19019,
       "grade": 3,
       "level": 1,
@@ -6761,7 +6803,7 @@
       "artistID": 19003
     },
     {
-      "objectID": 100483,
+      "objectID": 100486,
       "cardID": 19020,
       "grade": 1,
       "level": 1,
@@ -6775,7 +6817,7 @@
       "artistID": 19004
     },
     {
-      "objectID": 100484,
+      "objectID": 100487,
       "cardID": 19021,
       "grade": 1,
       "level": 1,
@@ -6789,7 +6831,7 @@
       "artistID": 19001
     },
     {
-      "objectID": 100485,
+      "objectID": 100488,
       "cardID": 19022,
       "grade": 0,
       "level": 1,
@@ -6803,7 +6845,7 @@
       "artistID": 19002
     },
     {
-      "objectID": 100486,
+      "objectID": 100489,
       "cardID": 19023,
       "grade": 1,
       "level": 1,
@@ -6817,7 +6859,7 @@
       "artistID": 19003
     },
     {
-      "objectID": 100487,
+      "objectID": 100490,
       "cardID": 19024,
       "grade": 2,
       "level": 1,
@@ -6831,7 +6873,7 @@
       "artistID": 19004
     },
     {
-      "objectID": 100488,
+      "objectID": 100491,
       "cardID": 20001,
       "grade": 0,
       "level": 1,
@@ -6845,7 +6887,7 @@
       "artistID": 20001
     },
     {
-      "objectID": 100489,
+      "objectID": 100492,
       "cardID": 20002,
       "grade": 1,
       "level": 1,
@@ -6859,7 +6901,7 @@
       "artistID": 20002
     },
     {
-      "objectID": 100490,
+      "objectID": 100493,
       "cardID": 20003,
       "grade": 1,
       "level": 1,
@@ -6873,7 +6915,7 @@
       "artistID": 20003
     },
     {
-      "objectID": 100491,
+      "objectID": 100494,
       "cardID": 20004,
       "grade": 2,
       "level": 1,
@@ -6887,7 +6929,7 @@
       "artistID": 20001
     },
     {
-      "objectID": 100492,
+      "objectID": 100495,
       "cardID": 20005,
       "grade": 1,
       "level": 1,
@@ -6901,7 +6943,7 @@
       "artistID": 20002
     },
     {
-      "objectID": 100493,
+      "objectID": 100496,
       "cardID": 20006,
       "grade": 4,
       "level": 18,
@@ -6915,7 +6957,7 @@
       "artistID": 20003
     },
     {
-      "objectID": 100494,
+      "objectID": 100497,
       "cardID": 21001,
       "grade": 0,
       "level": 1,
@@ -6929,7 +6971,7 @@
       "artistID": 21001
     },
     {
-      "objectID": 100495,
+      "objectID": 100498,
       "cardID": 21002,
       "grade": 3,
       "level": 1,
@@ -6943,7 +6985,7 @@
       "artistID": 21002
     },
     {
-      "objectID": 100496,
+      "objectID": 100499,
       "cardID": 21003,
       "grade": 3,
       "level": 1,
@@ -6957,7 +6999,7 @@
       "artistID": 21003
     },
     {
-      "objectID": 100497,
+      "objectID": 100500,
       "cardID": 21004,
       "grade": 4,
       "level": 20,
@@ -6971,7 +7013,7 @@
       "artistID": 21001
     },
     {
-      "objectID": 100498,
+      "objectID": 100501,
       "cardID": 21005,
       "grade": 1,
       "level": 1,
@@ -6985,7 +7027,7 @@
       "artistID": 21002
     },
     {
-      "objectID": 100499,
+      "objectID": 100502,
       "cardID": 21006,
       "grade": 0,
       "level": 1,
@@ -6999,7 +7041,7 @@
       "artistID": 21003
     },
     {
-      "objectID": 100500,
+      "objectID": 100503,
       "cardID": 21007,
       "grade": 1,
       "level": 1,
@@ -7013,7 +7055,7 @@
       "artistID": 21001
     },
     {
-      "objectID": 100501,
+      "objectID": 100504,
       "cardID": 21008,
       "grade": 1,
       "level": 1,
@@ -7027,7 +7069,7 @@
       "artistID": 21002
     },
     {
-      "objectID": 100502,
+      "objectID": 100505,
       "cardID": 21009,
       "grade": 0,
       "level": 1,
@@ -7041,7 +7083,7 @@
       "artistID": 21003
     },
     {
-      "objectID": 100503,
+      "objectID": 100506,
       "cardID": 21010,
       "grade": 0,
       "level": 1,
@@ -7055,7 +7097,7 @@
       "artistID": 21001
     },
     {
-      "objectID": 100504,
+      "objectID": 100507,
       "cardID": 21011,
       "grade": 0,
       "level": 1,
@@ -7069,7 +7111,7 @@
       "artistID": 21002
     },
     {
-      "objectID": 100505,
+      "objectID": 100508,
       "cardID": 21012,
       "grade": 3,
       "level": 1,
@@ -7083,8 +7125,22 @@
       "artistID": 21003
     },
     {
-      "objectID": 100506,
-      "cardID": 16003,
+      "objectID": 100509,
+      "cardID": 22001,
+      "grade": 2,
+      "level": 1,
+      "energy": 100,
+      "score": 150,
+      "isEquip": false,
+      "isLock": false,
+      "isPrism": false,
+      "themeID": 22001,
+      "groupID": 22001,
+      "artistID": 22001
+    },
+    {
+      "objectID": 100510,
+      "cardID": 22002,
       "grade": 0,
       "level": 1,
       "energy": 100,
@@ -7092,40 +7148,68 @@
       "isEquip": false,
       "isLock": false,
       "isPrism": false,
-      "themeID": 16001,
-      "groupID": 16001,
-      "artistID": 16003
+      "themeID": 22001,
+      "groupID": 22001,
+      "artistID": 22002
     },
     {
-      "objectID": 100507,
-      "cardID": 18003,
+      "objectID": 100511,
+      "cardID": 22003,
+      "grade": 3,
+      "level": 1,
+      "energy": 100,
+      "score": 175,
+      "isEquip": false,
+      "isLock": false,
+      "isPrism": false,
+      "themeID": 22001,
+      "groupID": 22001,
+      "artistID": 22003
+    },
+    {
+      "objectID": 100512,
+      "cardID": 22004,
       "grade": 1,
+      "level": 1,
+      "energy": 100,
+      "score": 125,
+      "isEquip": false,
+      "isLock": false,
+      "isPrism": true,
+      "themeID": 22001,
+      "groupID": 22001,
+      "artistID": 22001
+    },
+    {
+      "objectID": 100513,
+      "cardID": 22005,
+      "grade": 0,
       "level": 1,
       "energy": 100,
       "score": 100,
       "isEquip": false,
       "isLock": false,
-      "isPrism": false,
-      "themeID": 18001,
-      "groupID": 18001,
-      "artistID": 18003
+      "isPrism": true,
+      "themeID": 22001,
+      "groupID": 22001,
+      "artistID": 22002
     },
     {
-      "objectID": 100508,
-      "cardID": 4008,
+      "objectID": 100514,
+      "cardID": 22006,
       "grade": 1,
       "level": 1,
       "energy": 100,
-      "score": 100,
+      "score": 125,
       "isEquip": false,
       "isLock": false,
-      "isPrism": false,
-      "themeID": 4001,
-      "groupID": 4001,
-      "artistID": 4008
+      "isPrism": true,
+      "themeID": 22001,
+      "groupID": 22001,
+      "artistID": 22003
     },
     {
-      "objectID": 100509,
+      "objectID": 100515,
       "cardID": 3003,
       "grade": 0,
       "level": 1,
@@ -7139,7 +7223,7 @@
       "artistID": 3003
     },
     {
-      "objectID": 100510,
+      "objectID": 100516,
       "cardID": 19002,
       "grade": 0,
       "level": 1,
@@ -7153,7 +7237,7 @@
       "artistID": 19002
     },
     {
-      "objectID": 100511,
+      "objectID": 100517,
       "cardID": 5010,
       "grade": 0,
       "level": 1,
@@ -7167,7 +7251,7 @@
       "artistID": 5010
     },
     {
-      "objectID": 100512,
+      "objectID": 100518,
       "cardID": 4147,
       "grade": 1,
       "level": 1,
@@ -7181,7 +7265,7 @@
       "artistID": 4007
     },
     {
-      "objectID": 100513,
+      "objectID": 100519,
       "cardID": 2121,
       "grade": 1,
       "level": 1,
@@ -7195,7 +7279,7 @@
       "artistID": 2011
     },
     {
-      "objectID": 100514,
+      "objectID": 100520,
       "cardID": 4001,
       "grade": 1,
       "level": 1,
@@ -7209,7 +7293,7 @@
       "artistID": 4001
     },
     {
-      "objectID": 100515,
+      "objectID": 100521,
       "cardID": 4005,
       "grade": 1,
       "level": 1,
@@ -7223,7 +7307,7 @@
       "artistID": 4005
     },
     {
-      "objectID": 100516,
+      "objectID": 100522,
       "cardID": 21007,
       "grade": 1,
       "level": 1,
@@ -7237,7 +7321,7 @@
       "artistID": 21001
     },
     {
-      "objectID": 100517,
+      "objectID": 100523,
       "cardID": 6011,
       "grade": 1,
       "level": 1,
@@ -7251,7 +7335,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100518,
+      "objectID": 100524,
       "cardID": 6005,
       "grade": 1,
       "level": 1,
@@ -7265,7 +7349,7 @@
       "artistID": 6005
     },
     {
-      "objectID": 100519,
+      "objectID": 100525,
       "cardID": 3021,
       "grade": 0,
       "level": 1,
@@ -7279,7 +7363,7 @@
       "artistID": 3001
     },
     {
-      "objectID": 100520,
+      "objectID": 100526,
       "cardID": 5003,
       "grade": 1,
       "level": 1,
@@ -7293,7 +7377,7 @@
       "artistID": 5003
     },
     {
-      "objectID": 100521,
+      "objectID": 100527,
       "cardID": 6113,
       "grade": 0,
       "level": 1,
@@ -7307,7 +7391,7 @@
       "artistID": 6003
     },
     {
-      "objectID": 100522,
+      "objectID": 100528,
       "cardID": 2114,
       "grade": 1,
       "level": 1,
@@ -7321,7 +7405,7 @@
       "artistID": 2004
     },
     {
-      "objectID": 100523,
+      "objectID": 100529,
       "cardID": 19001,
       "grade": 1,
       "level": 1,
@@ -7335,7 +7419,7 @@
       "artistID": 19001
     },
     {
-      "objectID": 100524,
+      "objectID": 100530,
       "cardID": 3029,
       "grade": 0,
       "level": 1,
@@ -7349,7 +7433,7 @@
       "artistID": 3009
     },
     {
-      "objectID": 100525,
+      "objectID": 100531,
       "cardID": 5006,
       "grade": 0,
       "level": 1,
@@ -7363,7 +7447,7 @@
       "artistID": 5006
     },
     {
-      "objectID": 100526,
+      "objectID": 100532,
       "cardID": 2119,
       "grade": 1,
       "level": 1,
@@ -7377,7 +7461,7 @@
       "artistID": 2009
     },
     {
-      "objectID": 100527,
+      "objectID": 100533,
       "cardID": 6121,
       "grade": 0,
       "level": 1,
@@ -7391,7 +7475,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100528,
+      "objectID": 100534,
       "cardID": 6007,
       "grade": 1,
       "level": 1,
@@ -7405,7 +7489,7 @@
       "artistID": 6007
     },
     {
-      "objectID": 100529,
+      "objectID": 100535,
       "cardID": 10002,
       "grade": 1,
       "level": 1,
@@ -7419,7 +7503,7 @@
       "artistID": 10002
     },
     {
-      "objectID": 100530,
+      "objectID": 100536,
       "cardID": 6178,
       "grade": 1,
       "level": 1,
@@ -7433,7 +7517,7 @@
       "artistID": 6002
     },
     {
-      "objectID": 100531,
+      "objectID": 100537,
       "cardID": 6051,
       "grade": 0,
       "level": 1,
@@ -7447,7 +7531,7 @@
       "artistID": 6007
     },
     {
-      "objectID": 100532,
+      "objectID": 100538,
       "cardID": 11003,
       "grade": 0,
       "level": 1,
@@ -7461,7 +7545,7 @@
       "artistID": 11003
     },
     {
-      "objectID": 100533,
+      "objectID": 100539,
       "cardID": 13002,
       "grade": 0,
       "level": 1,
@@ -7475,7 +7559,7 @@
       "artistID": 13002
     },
     {
-      "objectID": 100534,
+      "objectID": 100540,
       "cardID": 19020,
       "grade": 0,
       "level": 1,
@@ -7489,7 +7573,7 @@
       "artistID": 19004
     },
     {
-      "objectID": 100535,
+      "objectID": 100541,
       "cardID": 2117,
       "grade": 0,
       "level": 1,
@@ -7503,7 +7587,7 @@
       "artistID": 2007
     },
     {
-      "objectID": 100536,
+      "objectID": 100542,
       "cardID": 1117,
       "grade": 1,
       "level": 1,
@@ -7517,7 +7601,7 @@
       "artistID": 1007
     },
     {
-      "objectID": 100537,
+      "objectID": 100543,
       "cardID": 8003,
       "grade": 1,
       "level": 1,
@@ -7531,7 +7615,7 @@
       "artistID": 8003
     },
     {
-      "objectID": 100538,
+      "objectID": 100544,
       "cardID": 3007,
       "grade": 1,
       "level": 1,
@@ -7545,7 +7629,7 @@
       "artistID": 3007
     },
     {
-      "objectID": 100539,
+      "objectID": 100545,
       "cardID": 1117,
       "grade": 0,
       "level": 1,
@@ -7559,7 +7643,7 @@
       "artistID": 1007
     },
     {
-      "objectID": 100540,
+      "objectID": 100546,
       "cardID": 2112,
       "grade": 0,
       "level": 1,
@@ -7573,7 +7657,7 @@
       "artistID": 2002
     },
     {
-      "objectID": 100541,
+      "objectID": 100547,
       "cardID": 6177,
       "grade": 0,
       "level": 1,
@@ -7587,7 +7671,7 @@
       "artistID": 6001
     },
     {
-      "objectID": 100542,
+      "objectID": 100548,
       "cardID": 10002,
       "grade": 1,
       "level": 1,
@@ -7601,7 +7685,7 @@
       "artistID": 10002
     },
     {
-      "objectID": 100543,
+      "objectID": 100549,
       "cardID": 2007,
       "grade": 1,
       "level": 1,
@@ -7615,7 +7699,7 @@
       "artistID": 2007
     },
     {
-      "objectID": 100544,
+      "objectID": 100550,
       "cardID": 1112,
       "grade": 0,
       "level": 1,
@@ -7629,7 +7713,7 @@
       "artistID": 1002
     },
     {
-      "objectID": 100545,
+      "objectID": 100551,
       "cardID": 2114,
       "grade": 0,
       "level": 1,
@@ -7643,7 +7727,7 @@
       "artistID": 2004
     },
     {
-      "objectID": 100546,
+      "objectID": 100552,
       "cardID": 7003,
       "grade": 1,
       "level": 1,
@@ -7657,7 +7741,7 @@
       "artistID": 7003
     },
     {
-      "objectID": 100547,
+      "objectID": 100553,
       "cardID": 6187,
       "grade": 1,
       "level": 1,
@@ -7671,7 +7755,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100548,
+      "objectID": 100554,
       "cardID": 3001,
       "grade": 1,
       "level": 1,
@@ -7685,7 +7769,7 @@
       "artistID": 3001
     },
     {
-      "objectID": 100549,
+      "objectID": 100555,
       "cardID": 4004,
       "grade": 0,
       "level": 1,
@@ -7699,7 +7783,7 @@
       "artistID": 4004
     },
     {
-      "objectID": 100550,
+      "objectID": 100556,
       "cardID": 16001,
       "grade": 1,
       "level": 1,
@@ -7713,7 +7797,7 @@
       "artistID": 16001
     },
     {
-      "objectID": 100551,
+      "objectID": 100557,
       "cardID": 2010,
       "grade": 1,
       "level": 1,
@@ -7727,7 +7811,7 @@
       "artistID": 2010
     },
     {
-      "objectID": 100552,
+      "objectID": 100558,
       "cardID": 6055,
       "grade": 0,
       "level": 1,
@@ -7741,7 +7825,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100553,
+      "objectID": 100559,
       "cardID": 3021,
       "grade": 0,
       "level": 1,
@@ -7755,7 +7839,7 @@
       "artistID": 3001
     },
     {
-      "objectID": 100554,
+      "objectID": 100560,
       "cardID": 9002,
       "grade": 0,
       "level": 1,
@@ -7769,7 +7853,7 @@
       "artistID": 9002
     },
     {
-      "objectID": 100555,
+      "objectID": 100561,
       "cardID": 6047,
       "grade": 0,
       "level": 1,
@@ -7783,7 +7867,7 @@
       "artistID": 6003
     },
     {
-      "objectID": 100556,
+      "objectID": 100562,
       "cardID": 1120,
       "grade": 1,
       "level": 1,
@@ -7797,7 +7881,7 @@
       "artistID": 1010
     },
     {
-      "objectID": 100557,
+      "objectID": 100563,
       "cardID": 1011,
       "grade": 1,
       "level": 1,
@@ -7811,7 +7895,7 @@
       "artistID": 1011
     },
     {
-      "objectID": 100558,
+      "objectID": 100564,
       "cardID": 16002,
       "grade": 0,
       "level": 1,
@@ -7825,7 +7909,7 @@
       "artistID": 16002
     },
     {
-      "objectID": 100559,
+      "objectID": 100565,
       "cardID": 12003,
       "grade": 0,
       "level": 1,
@@ -7839,7 +7923,7 @@
       "artistID": 12003
     },
     {
-      "objectID": 100560,
+      "objectID": 100566,
       "cardID": 6183,
       "grade": 1,
       "level": 1,
@@ -7853,7 +7937,7 @@
       "artistID": 6007
     },
     {
-      "objectID": 100561,
+      "objectID": 100567,
       "cardID": 3007,
       "grade": 1,
       "level": 1,
@@ -7867,7 +7951,7 @@
       "artistID": 3007
     },
     {
-      "objectID": 100562,
+      "objectID": 100568,
       "cardID": 18002,
       "grade": 0,
       "level": 1,
@@ -7881,7 +7965,7 @@
       "artistID": 18002
     },
     {
-      "objectID": 100563,
+      "objectID": 100569,
       "cardID": 6009,
       "grade": 1,
       "level": 1,
@@ -7895,7 +7979,7 @@
       "artistID": 6009
     },
     {
-      "objectID": 100564,
+      "objectID": 100570,
       "cardID": 1119,
       "grade": 1,
       "level": 1,
@@ -7909,7 +7993,7 @@
       "artistID": 1009
     },
     {
-      "objectID": 100565,
+      "objectID": 100571,
       "cardID": 1008,
       "grade": 0,
       "level": 1,
@@ -7923,7 +8007,7 @@
       "artistID": 1008
     },
     {
-      "objectID": 100566,
+      "objectID": 100572,
       "cardID": 2119,
       "grade": 0,
       "level": 1,
@@ -7937,7 +8021,7 @@
       "artistID": 2009
     },
     {
-      "objectID": 100567,
+      "objectID": 100573,
       "cardID": 6009,
       "grade": 1,
       "level": 1,
@@ -7951,7 +8035,7 @@
       "artistID": 6009
     },
     {
-      "objectID": 100568,
+      "objectID": 100574,
       "cardID": 6187,
       "grade": 0,
       "level": 1,
@@ -7965,7 +8049,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100569,
+      "objectID": 100575,
       "cardID": 14002,
       "grade": 0,
       "level": 1,
@@ -7979,7 +8063,7 @@
       "artistID": 14002
     },
     {
-      "objectID": 100570,
+      "objectID": 100576,
       "cardID": 6011,
       "grade": 1,
       "level": 1,
@@ -7993,7 +8077,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100571,
+      "objectID": 100577,
       "cardID": 6010,
       "grade": 0,
       "level": 1,
@@ -8007,7 +8091,7 @@
       "artistID": 6010
     },
     {
-      "objectID": 100572,
+      "objectID": 100578,
       "cardID": 7003,
       "grade": 1,
       "level": 1,
@@ -8021,7 +8105,7 @@
       "artistID": 7003
     },
     {
-      "objectID": 100573,
+      "objectID": 100579,
       "cardID": 6112,
       "grade": 0,
       "level": 1,
@@ -8035,7 +8119,7 @@
       "artistID": 6002
     },
     {
-      "objectID": 100574,
+      "objectID": 100580,
       "cardID": 19019,
       "grade": 1,
       "level": 1,
@@ -8049,7 +8133,7 @@
       "artistID": 19003
     },
     {
-      "objectID": 100575,
+      "objectID": 100581,
       "cardID": 4146,
       "grade": 0,
       "level": 1,
@@ -8063,7 +8147,7 @@
       "artistID": 4006
     },
     {
-      "objectID": 100576,
+      "objectID": 100582,
       "cardID": 5011,
       "grade": 0,
       "level": 1,
@@ -8077,7 +8161,7 @@
       "artistID": 5011
     },
     {
-      "objectID": 100577,
+      "objectID": 100583,
       "cardID": 5006,
       "grade": 0,
       "level": 1,
@@ -8091,7 +8175,7 @@
       "artistID": 5006
     },
     {
-      "objectID": 100578,
+      "objectID": 100584,
       "cardID": 6008,
       "grade": 1,
       "level": 1,
@@ -8105,7 +8189,7 @@
       "artistID": 6008
     },
     {
-      "objectID": 100579,
+      "objectID": 100585,
       "cardID": 19017,
       "grade": 0,
       "level": 1,
@@ -8119,7 +8203,7 @@
       "artistID": 19001
     },
     {
-      "objectID": 100580,
+      "objectID": 100586,
       "cardID": 3029,
       "grade": 0,
       "level": 1,
@@ -8133,7 +8217,7 @@
       "artistID": 3009
     },
     {
-      "objectID": 100581,
+      "objectID": 100587,
       "cardID": 2119,
       "grade": 1,
       "level": 1,
@@ -8147,7 +8231,7 @@
       "artistID": 2009
     },
     {
-      "objectID": 100582,
+      "objectID": 100588,
       "cardID": 14003,
       "grade": 0,
       "level": 1,
@@ -8161,7 +8245,7 @@
       "artistID": 14003
     },
     {
-      "objectID": 100583,
+      "objectID": 100589,
       "cardID": 2008,
       "grade": 1,
       "level": 1,
@@ -8175,7 +8259,7 @@
       "artistID": 2008
     },
     {
-      "objectID": 100584,
+      "objectID": 100590,
       "cardID": 4150,
       "grade": 0,
       "level": 1,
@@ -8189,7 +8273,7 @@
       "artistID": 4010
     },
     {
-      "objectID": 100585,
+      "objectID": 100591,
       "cardID": 6116,
       "grade": 0,
       "level": 1,
@@ -8203,7 +8287,7 @@
       "artistID": 6006
     },
     {
-      "objectID": 100586,
+      "objectID": 100592,
       "cardID": 6052,
       "grade": 0,
       "level": 1,
@@ -8217,7 +8301,7 @@
       "artistID": 6008
     },
     {
-      "objectID": 100587,
+      "objectID": 100593,
       "cardID": 17002,
       "grade": 0,
       "level": 1,
@@ -8231,7 +8315,7 @@
       "artistID": 17002
     },
     {
-      "objectID": 100588,
+      "objectID": 100594,
       "cardID": 4007,
       "grade": 0,
       "level": 1,
@@ -8245,7 +8329,7 @@
       "artistID": 4007
     },
     {
-      "objectID": 100589,
+      "objectID": 100595,
       "cardID": 18020,
       "grade": 1,
       "level": 1,
@@ -8259,7 +8343,7 @@
       "artistID": 18004
     },
     {
-      "objectID": 100590,
+      "objectID": 100596,
       "cardID": 2111,
       "grade": 0,
       "level": 1,
@@ -8273,7 +8357,7 @@
       "artistID": 2001
     },
     {
-      "objectID": 100591,
+      "objectID": 100597,
       "cardID": 6183,
       "grade": 1,
       "level": 1,
@@ -8287,7 +8371,7 @@
       "artistID": 6007
     },
     {
-      "objectID": 100592,
+      "objectID": 100598,
       "cardID": 17002,
       "grade": 0,
       "level": 1,
@@ -8301,7 +8385,7 @@
       "artistID": 17002
     },
     {
-      "objectID": 100593,
+      "objectID": 100599,
       "cardID": 18018,
       "grade": 0,
       "level": 1,
@@ -8315,7 +8399,7 @@
       "artistID": 18002
     },
     {
-      "objectID": 100594,
+      "objectID": 100600,
       "cardID": 13003,
       "grade": 0,
       "level": 1,
@@ -8329,7 +8413,7 @@
       "artistID": 13003
     },
     {
-      "objectID": 100595,
+      "objectID": 100601,
       "cardID": 1119,
       "grade": 0,
       "level": 1,
@@ -8343,7 +8427,7 @@
       "artistID": 1009
     },
     {
-      "objectID": 100596,
+      "objectID": 100602,
       "cardID": 6186,
       "grade": 0,
       "level": 1,
@@ -8357,7 +8441,7 @@
       "artistID": 6010
     },
     {
-      "objectID": 100597,
+      "objectID": 100603,
       "cardID": 2011,
       "grade": 0,
       "level": 1,
@@ -8371,7 +8455,7 @@
       "artistID": 2011
     },
     {
-      "objectID": 100598,
+      "objectID": 100604,
       "cardID": 4008,
       "grade": 0,
       "level": 1,
@@ -8385,7 +8469,7 @@
       "artistID": 4008
     },
     {
-      "objectID": 100599,
+      "objectID": 100605,
       "cardID": 3003,
       "grade": 0,
       "level": 1,
@@ -8399,7 +8483,7 @@
       "artistID": 3003
     },
     {
-      "objectID": 100600,
+      "objectID": 100606,
       "cardID": 14003,
       "grade": 0,
       "level": 1,
@@ -8413,7 +8497,7 @@
       "artistID": 14003
     },
     {
-      "objectID": 100601,
+      "objectID": 100607,
       "cardID": 3010,
       "grade": 0,
       "level": 1,
@@ -8427,7 +8511,7 @@
       "artistID": 3010
     },
     {
-      "objectID": 100602,
+      "objectID": 100608,
       "cardID": 6180,
       "grade": 1,
       "level": 1,
@@ -8441,7 +8525,7 @@
       "artistID": 6004
     },
     {
-      "objectID": 100603,
+      "objectID": 100609,
       "cardID": 2117,
       "grade": 1,
       "level": 1,
@@ -8455,7 +8539,7 @@
       "artistID": 2007
     },
     {
-      "objectID": 100604,
+      "objectID": 100610,
       "cardID": 19018,
       "grade": 0,
       "level": 1,
@@ -8469,7 +8553,7 @@
       "artistID": 19002
     },
     {
-      "objectID": 100605,
+      "objectID": 100611,
       "cardID": 6179,
       "grade": 1,
       "level": 1,
@@ -8483,7 +8567,7 @@
       "artistID": 6003
     },
     {
-      "objectID": 100606,
+      "objectID": 100612,
       "cardID": 4146,
       "grade": 1,
       "level": 1,
@@ -8497,7 +8581,7 @@
       "artistID": 4006
     },
     {
-      "objectID": 100607,
+      "objectID": 100613,
       "cardID": 2004,
       "grade": 1,
       "level": 1,
@@ -8511,7 +8595,7 @@
       "artistID": 2004
     },
     {
-      "objectID": 100608,
+      "objectID": 100614,
       "cardID": 2119,
       "grade": 1,
       "level": 1,
@@ -8525,7 +8609,7 @@
       "artistID": 2009
     },
     {
-      "objectID": 100609,
+      "objectID": 100615,
       "cardID": 5003,
       "grade": 0,
       "level": 1,
@@ -8539,7 +8623,7 @@
       "artistID": 5003
     },
     {
-      "objectID": 100610,
+      "objectID": 100616,
       "cardID": 6187,
       "grade": 1,
       "level": 1,
@@ -8553,7 +8637,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100611,
+      "objectID": 100617,
       "cardID": 2001,
       "grade": 0,
       "level": 1,
@@ -8567,7 +8651,7 @@
       "artistID": 2001
     },
     {
-      "objectID": 100612,
+      "objectID": 100618,
       "cardID": 5007,
       "grade": 0,
       "level": 1,
@@ -8581,7 +8665,7 @@
       "artistID": 5007
     },
     {
-      "objectID": 100613,
+      "objectID": 100619,
       "cardID": 2111,
       "grade": 0,
       "level": 1,
@@ -8595,7 +8679,7 @@
       "artistID": 2001
     },
     {
-      "objectID": 100614,
+      "objectID": 100620,
       "cardID": 12001,
       "grade": 0,
       "level": 1,
@@ -8609,7 +8693,7 @@
       "artistID": 12001
     },
     {
-      "objectID": 100615,
+      "objectID": 100621,
       "cardID": 6049,
       "grade": 1,
       "level": 1,
@@ -8623,8 +8707,8 @@
       "artistID": 6005
     },
     {
-      "objectID": 100616,
-      "cardID": 15002,
+      "objectID": 100622,
+      "cardID": 22003,
       "grade": 0,
       "level": 1,
       "energy": 100,
@@ -8632,12 +8716,12 @@
       "isEquip": false,
       "isLock": false,
       "isPrism": false,
-      "themeID": 15001,
-      "groupID": 15001,
-      "artistID": 15002
+      "themeID": 22001,
+      "groupID": 22001,
+      "artistID": 22003
     },
     {
-      "objectID": 100617,
+      "objectID": 100623,
       "cardID": 14002,
       "grade": 1,
       "level": 1,
@@ -8651,7 +8735,7 @@
       "artistID": 14002
     },
     {
-      "objectID": 100618,
+      "objectID": 100624,
       "cardID": 6120,
       "grade": 0,
       "level": 1,
@@ -8665,7 +8749,7 @@
       "artistID": 6010
     },
     {
-      "objectID": 100619,
+      "objectID": 100625,
       "cardID": 19001,
       "grade": 0,
       "level": 1,
@@ -8679,7 +8763,7 @@
       "artistID": 19001
     },
     {
-      "objectID": 100620,
+      "objectID": 100626,
       "cardID": 3029,
       "grade": 0,
       "level": 1,
@@ -8693,7 +8777,7 @@
       "artistID": 3009
     },
     {
-      "objectID": 100621,
+      "objectID": 100627,
       "cardID": 4148,
       "grade": 0,
       "level": 1,
@@ -8707,7 +8791,7 @@
       "artistID": 4008
     },
     {
-      "objectID": 100622,
+      "objectID": 100628,
       "cardID": 1006,
       "grade": 0,
       "level": 1,
@@ -8721,7 +8805,7 @@
       "artistID": 1006
     },
     {
-      "objectID": 100623,
+      "objectID": 100629,
       "cardID": 3025,
       "grade": 0,
       "level": 1,
@@ -8735,7 +8819,7 @@
       "artistID": 3005
     },
     {
-      "objectID": 100624,
+      "objectID": 100630,
       "cardID": 4001,
       "grade": 1,
       "level": 1,
@@ -8749,7 +8833,7 @@
       "artistID": 4001
     },
     {
-      "objectID": 100625,
+      "objectID": 100631,
       "cardID": 18018,
       "grade": 0,
       "level": 1,
@@ -8763,7 +8847,7 @@
       "artistID": 18002
     },
     {
-      "objectID": 100626,
+      "objectID": 100632,
       "cardID": 6051,
       "grade": 0,
       "level": 1,
@@ -8777,7 +8861,7 @@
       "artistID": 6007
     },
     {
-      "objectID": 100627,
+      "objectID": 100633,
       "cardID": 6046,
       "grade": 0,
       "level": 1,
@@ -8791,7 +8875,7 @@
       "artistID": 6002
     },
     {
-      "objectID": 100628,
+      "objectID": 100634,
       "cardID": 6054,
       "grade": 0,
       "level": 1,
@@ -8805,7 +8889,7 @@
       "artistID": 6010
     },
     {
-      "objectID": 100629,
+      "objectID": 100635,
       "cardID": 10001,
       "grade": 1,
       "level": 1,
@@ -8819,7 +8903,7 @@
       "artistID": 10001
     },
     {
-      "objectID": 100630,
+      "objectID": 100636,
       "cardID": 12003,
       "grade": 0,
       "level": 1,
@@ -8833,7 +8917,7 @@
       "artistID": 12003
     },
     {
-      "objectID": 100631,
+      "objectID": 100637,
       "cardID": 14001,
       "grade": 0,
       "level": 1,
@@ -8847,7 +8931,7 @@
       "artistID": 14001
     },
     {
-      "objectID": 100632,
+      "objectID": 100638,
       "cardID": 16003,
       "grade": 0,
       "level": 1,
@@ -8861,7 +8945,7 @@
       "artistID": 16003
     },
     {
-      "objectID": 100633,
+      "objectID": 100639,
       "cardID": 4142,
       "grade": 1,
       "level": 1,
@@ -8875,7 +8959,7 @@
       "artistID": 4002
     },
     {
-      "objectID": 100634,
+      "objectID": 100640,
       "cardID": 3005,
       "grade": 0,
       "level": 1,
@@ -8889,7 +8973,7 @@
       "artistID": 3005
     },
     {
-      "objectID": 100635,
+      "objectID": 100641,
       "cardID": 4142,
       "grade": 0,
       "level": 1,
@@ -8903,7 +8987,7 @@
       "artistID": 4002
     },
     {
-      "objectID": 100636,
+      "objectID": 100642,
       "cardID": 3008,
       "grade": 1,
       "level": 1,
@@ -8917,7 +9001,7 @@
       "artistID": 3008
     },
     {
-      "objectID": 100637,
+      "objectID": 100643,
       "cardID": 1112,
       "grade": 1,
       "level": 1,
@@ -8931,7 +9015,7 @@
       "artistID": 1002
     },
     {
-      "objectID": 100638,
+      "objectID": 100644,
       "cardID": 6187,
       "grade": 0,
       "level": 1,
@@ -8945,7 +9029,7 @@
       "artistID": 6011
     },
     {
-      "objectID": 100639,
+      "objectID": 100645,
       "cardID": 6117,
       "grade": 0,
       "level": 1,
@@ -8959,7 +9043,7 @@
       "artistID": 6007
     },
     {
-      "objectID": 100640,
+      "objectID": 100646,
       "cardID": 15003,
       "grade": 0,
       "level": 1,
@@ -8973,22 +9057,8 @@
       "artistID": 15003
     },
     {
-      "objectID": 100641,
-      "cardID": 5001,
-      "grade": 1,
-      "level": 1,
-      "energy": 100,
-      "score": 100,
-      "isEquip": false,
-      "isLock": false,
-      "isPrism": false,
-      "themeID": 5001,
-      "groupID": 5001,
-      "artistID": 5001
-    },
-    {
-      "objectID": 100642,
-      "cardID": 17001,
+      "objectID": 100647,
+      "cardID": 22001,
       "grade": 0,
       "level": 1,
       "energy": 100,
@@ -8996,12 +9066,26 @@
       "isEquip": false,
       "isLock": false,
       "isPrism": false,
-      "themeID": 17001,
-      "groupID": 17001,
-      "artistID": 17001
+      "themeID": 22001,
+      "groupID": 22001,
+      "artistID": 22001
     },
     {
-      "objectID": 100643,
+      "objectID": 100648,
+      "cardID": 13003,
+      "grade": 0,
+      "level": 1,
+      "energy": 100,
+      "score": 100,
+      "isEquip": false,
+      "isLock": false,
+      "isPrism": false,
+      "themeID": 13001,
+      "groupID": 13001,
+      "artistID": 13003
+    },
+    {
+      "objectID": 100649,
       "cardID": 6001,
       "grade": 0,
       "level": 1,
@@ -9015,7 +9099,7 @@
       "artistID": 6001
     },
     {
-      "objectID": 100644,
+      "objectID": 100650,
       "cardID": 6009,
       "grade": 1,
       "level": 1,
@@ -9029,7 +9113,7 @@
       "artistID": 6009
     },
     {
-      "objectID": 100645,
+      "objectID": 100651,
       "cardID": 4145,
       "grade": 0,
       "level": 1,
@@ -9043,7 +9127,7 @@
       "artistID": 4005
     },
     {
-      "objectID": 100646,
+      "objectID": 100652,
       "cardID": 2117,
       "grade": 0,
       "level": 1,
@@ -9057,7 +9141,7 @@
       "artistID": 2007
     },
     {
-      "objectID": 100647,
+      "objectID": 100653,
       "cardID": 3005,
       "grade": 0,
       "level": 1,
@@ -9071,7 +9155,7 @@
       "artistID": 3005
     },
     {
-      "objectID": 100648,
+      "objectID": 100654,
       "cardID": 8001,
       "grade": 0,
       "level": 1,
@@ -9085,7 +9169,7 @@
       "artistID": 8001
     },
     {
-      "objectID": 100649,
+      "objectID": 100655,
       "cardID": 2121,
       "grade": 0,
       "level": 1,
@@ -9099,7 +9183,7 @@
       "artistID": 2011
     },
     {
-      "objectID": 100650,
+      "objectID": 100656,
       "cardID": 4001,
       "grade": 0,
       "level": 1,
@@ -9113,7 +9197,7 @@
       "artistID": 4001
     },
     {
-      "objectID": 100651,
+      "objectID": 100657,
       "cardID": 17002,
       "grade": 1,
       "level": 1,
@@ -9127,7 +9211,7 @@
       "artistID": 17002
     },
     {
-      "objectID": 100652,
+      "objectID": 100658,
       "cardID": 19004,
       "grade": 0,
       "level": 1,
@@ -9141,7 +9225,7 @@
       "artistID": 19004
     },
     {
-      "objectID": 100653,
+      "objectID": 100659,
       "cardID": 20001,
       "grade": 1,
       "level": 1,
@@ -9155,7 +9239,7 @@
       "artistID": 20001
     },
     {
-      "objectID": 100654,
+      "objectID": 100660,
       "cardID": 6006,
       "grade": 0,
       "level": 1,
@@ -9169,7 +9253,7 @@
       "artistID": 6006
     },
     {
-      "objectID": 100655,
+      "objectID": 100661,
       "cardID": 6004,
       "grade": 0,
       "level": 1,
@@ -9183,98 +9267,8 @@
       "artistID": 6004
     },
     {
-      "objectID": 100656,
-      "cardID": 30001,
-      "grade": 0,
-      "level": 1,
-      "energy": 100,
-      "score": 100,
-      "isEquip": false,
-      "isLock": false,
-      "isPrism": false,
-      "material": 1,
-      "intensifyPercentage": 100,
-      "groupID": 0,
-      "artistID": 0
-    },
-    {
-      "objectID": 100657,
-      "cardID": 30001,
-      "grade": 0,
-      "level": 1,
-      "energy": 100,
-      "score": 100,
-      "isEquip": false,
-      "isLock": false,
-      "isPrism": false,
-      "material": 1,
-      "intensifyPercentage": 100,
-      "groupID": 0,
-      "artistID": 0
-    },
-    {
-      "objectID": 100658,
-      "cardID": 30001,
-      "grade": 0,
-      "level": 1,
-      "energy": 100,
-      "score": 100,
-      "isEquip": false,
-      "isLock": false,
-      "isPrism": false,
-      "material": 1,
-      "intensifyPercentage": 100,
-      "groupID": 0,
-      "artistID": 0
-    },
-    {
-      "objectID": 100659,
-      "cardID": 30002,
-      "grade": 0,
-      "level": 1,
-      "energy": 100,
-      "score": 100,
-      "isEquip": false,
-      "isLock": false,
-      "isPrism": false,
-      "material": 1,
-      "intensifyPercentage": 70,
-      "groupID": 0,
-      "artistID": 0
-    },
-    {
-      "objectID": 100660,
-      "cardID": 30002,
-      "grade": 0,
-      "level": 1,
-      "energy": 100,
-      "score": 100,
-      "isEquip": false,
-      "isLock": false,
-      "isPrism": false,
-      "material": 1,
-      "intensifyPercentage": 70,
-      "groupID": 0,
-      "artistID": 0
-    },
-    {
-      "objectID": 100661,
-      "cardID": 30002,
-      "grade": 0,
-      "level": 1,
-      "energy": 100,
-      "score": 100,
-      "isEquip": false,
-      "isLock": false,
-      "isPrism": false,
-      "material": 1,
-      "intensifyPercentage": 70,
-      "groupID": 0,
-      "artistID": 0
-    },
-    {
       "objectID": 100662,
-      "cardID": 30003,
+      "cardID": 6177,
       "grade": 0,
       "level": 1,
       "energy": 100,
@@ -9282,14 +9276,13 @@
       "isEquip": false,
       "isLock": false,
       "isPrism": false,
-      "material": 1,
-      "intensifyPercentage": 50,
-      "groupID": 0,
-      "artistID": 0
+      "themeID": 6009,
+      "groupID": 6001,
+      "artistID": 6001
     },
     {
       "objectID": 100663,
-      "cardID": 30003,
+      "cardID": 2117,
       "grade": 0,
       "level": 1,
       "energy": 100,
@@ -9297,14 +9290,13 @@
       "isEquip": false,
       "isLock": false,
       "isPrism": false,
-      "material": 1,
-      "intensifyPercentage": 50,
-      "groupID": 0,
-      "artistID": 0
+      "themeID": 2006,
+      "groupID": 2001,
+      "artistID": 2007
     },
     {
       "objectID": 100664,
-      "cardID": 30003,
+      "cardID": 2114,
       "grade": 0,
       "level": 1,
       "energy": 100,
@@ -9312,14 +9304,13 @@
       "isEquip": false,
       "isLock": false,
       "isPrism": false,
-      "material": 1,
-      "intensifyPercentage": 50,
-      "groupID": 0,
-      "artistID": 0
+      "themeID": 2006,
+      "groupID": 2001,
+      "artistID": 2004
     },
     {
       "objectID": 100665,
-      "cardID": 30004,
+      "cardID": 30001,
       "grade": 0,
       "level": 1,
       "energy": 100,
@@ -9328,13 +9319,13 @@
       "isLock": false,
       "isPrism": false,
       "material": 1,
-      "intensifyPercentage": 30,
+      "intensifyPercentage": 100,
       "groupID": 0,
       "artistID": 0
     },
     {
       "objectID": 100666,
-      "cardID": 30004,
+      "cardID": 30001,
       "grade": 0,
       "level": 1,
       "energy": 100,
@@ -9343,12 +9334,117 @@
       "isLock": false,
       "isPrism": false,
       "material": 1,
-      "intensifyPercentage": 30,
+      "intensifyPercentage": 100,
       "groupID": 0,
       "artistID": 0
     },
     {
       "objectID": 100667,
+      "cardID": 30001,
+      "grade": 0,
+      "level": 1,
+      "energy": 100,
+      "score": 100,
+      "isEquip": false,
+      "isLock": false,
+      "isPrism": false,
+      "material": 1,
+      "intensifyPercentage": 100,
+      "groupID": 0,
+      "artistID": 0
+    },
+    {
+      "objectID": 100668,
+      "cardID": 30002,
+      "grade": 0,
+      "level": 1,
+      "energy": 100,
+      "score": 100,
+      "isEquip": false,
+      "isLock": false,
+      "isPrism": false,
+      "material": 1,
+      "intensifyPercentage": 70,
+      "groupID": 0,
+      "artistID": 0
+    },
+    {
+      "objectID": 100669,
+      "cardID": 30002,
+      "grade": 0,
+      "level": 1,
+      "energy": 100,
+      "score": 100,
+      "isEquip": false,
+      "isLock": false,
+      "isPrism": false,
+      "material": 1,
+      "intensifyPercentage": 70,
+      "groupID": 0,
+      "artistID": 0
+    },
+    {
+      "objectID": 100670,
+      "cardID": 30002,
+      "grade": 0,
+      "level": 1,
+      "energy": 100,
+      "score": 100,
+      "isEquip": false,
+      "isLock": false,
+      "isPrism": false,
+      "material": 1,
+      "intensifyPercentage": 70,
+      "groupID": 0,
+      "artistID": 0
+    },
+    {
+      "objectID": 100671,
+      "cardID": 30003,
+      "grade": 0,
+      "level": 1,
+      "energy": 100,
+      "score": 100,
+      "isEquip": false,
+      "isLock": false,
+      "isPrism": false,
+      "material": 1,
+      "intensifyPercentage": 50,
+      "groupID": 0,
+      "artistID": 0
+    },
+    {
+      "objectID": 100672,
+      "cardID": 30003,
+      "grade": 0,
+      "level": 1,
+      "energy": 100,
+      "score": 100,
+      "isEquip": false,
+      "isLock": false,
+      "isPrism": false,
+      "material": 1,
+      "intensifyPercentage": 50,
+      "groupID": 0,
+      "artistID": 0
+    },
+    {
+      "objectID": 100673,
+      "cardID": 30003,
+      "grade": 0,
+      "level": 1,
+      "energy": 100,
+      "score": 100,
+      "isEquip": false,
+      "isLock": false,
+      "isPrism": false,
+      "material": 1,
+      "intensifyPercentage": 50,
+      "groupID": 0,
+      "artistID": 0
+    },
+    {
+      "objectID": 100674,
       "cardID": 30004,
       "grade": 0,
       "level": 1,
@@ -9363,7 +9459,37 @@
       "artistID": 0
     },
     {
-      "objectID": 100668,
+      "objectID": 100675,
+      "cardID": 30004,
+      "grade": 0,
+      "level": 1,
+      "energy": 100,
+      "score": 100,
+      "isEquip": false,
+      "isLock": false,
+      "isPrism": false,
+      "material": 1,
+      "intensifyPercentage": 30,
+      "groupID": 0,
+      "artistID": 0
+    },
+    {
+      "objectID": 100676,
+      "cardID": 30004,
+      "grade": 0,
+      "level": 1,
+      "energy": 100,
+      "score": 100,
+      "isEquip": false,
+      "isLock": false,
+      "isPrism": false,
+      "material": 1,
+      "intensifyPercentage": 30,
+      "groupID": 0,
+      "artistID": 0
+    },
+    {
+      "objectID": 100677,
       "cardID": 30005,
       "grade": 0,
       "level": 1,
@@ -9378,7 +9504,7 @@
       "artistID": 0
     },
     {
-      "objectID": 100669,
+      "objectID": 100678,
       "cardID": 30005,
       "grade": 0,
       "level": 1,
@@ -9393,7 +9519,7 @@
       "artistID": 0
     },
     {
-      "objectID": 100670,
+      "objectID": 100679,
       "cardID": 30005,
       "grade": 0,
       "level": 1,
@@ -9561,6 +9687,11 @@
       100109,
       100110,
       100111
+    ],
+    "22001": [
+      100112,
+      100113,
+      100114
     ]
   }
 }

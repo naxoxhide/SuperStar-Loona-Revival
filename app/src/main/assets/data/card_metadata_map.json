@@ -20,7 +20,8 @@
     18001,
     19001,
     20001,
-    21001
+    21001,
+    22001
   ],
   "groups": {
     "1001": {
@@ -483,6 +484,22 @@
         21001,
         21002,
         21003
+      ]
+    },
+    "22001": {
+      "code": 22001,
+      "name": "Chuu",
+      "analyticsData": "Chuu",
+      "equipableSlot": 3,
+      "emblemPath": "asiudgasg/asodhsg/aweoijs/22001.i.bytes",
+      "orderIndex": 21,
+      "themeCodes": [
+        22001
+      ],
+      "artistCodes": [
+        22001,
+        22002,
+        22003
       ]
     }
   },
@@ -1485,6 +1502,33 @@
       "orderIndex": 2,
       "emptyImageSmall": "asiudgasg/asodhsg/sdhgauwehdnu/21003_s.i.bytes",
       "emptyImageLarge": "asiudgasg/asodhsg/sdhgauwehdnu/21003_l.i.bytes"
+    },
+    "22001": {
+      "code": 22001,
+      "group": 22001,
+      "name": "Chuu",
+      "analyticsData": "Chuu_Chuu Vocal",
+      "orderIndex": 0,
+      "emptyImageSmall": "asiudgasg/asodhsg/sdhgauwehdnu/22001_s.i.bytes",
+      "emptyImageLarge": "asiudgasg/asodhsg/sdhgauwehdnu/22001_l.i.bytes"
+    },
+    "22002": {
+      "code": 22002,
+      "group": 22001,
+      "name": "Chuu",
+      "analyticsData": "Chuu_Chuu Dance",
+      "orderIndex": 1,
+      "emptyImageSmall": "asiudgasg/asodhsg/sdhgauwehdnu/22002_s.i.bytes",
+      "emptyImageLarge": "asiudgasg/asodhsg/sdhgauwehdnu/22002_l.i.bytes"
+    },
+    "22003": {
+      "code": 22003,
+      "group": 22001,
+      "name": "Chuu",
+      "analyticsData": "Chuu_Chuu Rhythm",
+      "orderIndex": 2,
+      "emptyImageSmall": "asiudgasg/asodhsg/sdhgauwehdnu/22003_s.i.bytes",
+      "emptyImageLarge": "asiudgasg/asodhsg/sdhgauwehdnu/22003_l.i.bytes"
     }
   },
   "themes": {
@@ -2575,6 +2619,17 @@
       "themePercentage": 20,
       "smallImagePath": "asiudgasg/asodhsg/agewfcbxhaa/21002_s.i.bytes",
       "largeImagePath": "asiudgasg/asodhsg/agewfcbxhaa/21002_l.i.bytes",
+      "cardbookMarkCode": "[904]"
+    },
+    "22001": {
+      "code": 22001,
+      "name": "Chuu",
+      "analyticsData": "Chuu_Chuu",
+      "limitedType": 0,
+      "themeTypeCode": 0,
+      "themePercentage": 20,
+      "smallImagePath": "asiudgasg/asodhsg/agewfcbxhaa/22001_s.i.bytes",
+      "largeImagePath": "asiudgasg/asodhsg/agewfcbxhaa/22001_l.i.bytes",
       "cardbookMarkCode": "[904]"
     }
   },
@@ -19269,6 +19324,72 @@
       "intensifyPercentage": 10,
       "smallImagePath": "asiudgasg/asodhsg/wadceg/30005_s.i.bytes",
       "largeImagePath": "asiudgasg/asodhsg/wadceg/30005_l.i.bytes"
+    },
+    "22001": {
+      "code": 22001,
+      "groupID": 22001,
+      "artistID": 22001,
+      "theme": 22001,
+      "type": 0,
+      "material": 0,
+      "intensifyPercentage": 0,
+      "smallImagePath": "asiudgasg/asodhsg/wadceg/22001_s.i.bytes",
+      "largeImagePath": "asiudgasg/asodhsg/wadceg/22001_l.i.bytes"
+    },
+    "22002": {
+      "code": 22002,
+      "groupID": 22001,
+      "artistID": 22002,
+      "theme": 22001,
+      "type": 0,
+      "material": 0,
+      "intensifyPercentage": 0,
+      "smallImagePath": "asiudgasg/asodhsg/wadceg/22002_s.i.bytes",
+      "largeImagePath": "asiudgasg/asodhsg/wadceg/22002_l.i.bytes"
+    },
+    "22003": {
+      "code": 22003,
+      "groupID": 22001,
+      "artistID": 22003,
+      "theme": 22001,
+      "type": 0,
+      "material": 0,
+      "intensifyPercentage": 0,
+      "smallImagePath": "asiudgasg/asodhsg/wadceg/22003_s.i.bytes",
+      "largeImagePath": "asiudgasg/asodhsg/wadceg/22003_l.i.bytes"
+    },
+    "22004": {
+      "code": 22004,
+      "groupID": 22001,
+      "artistID": 22001,
+      "theme": 22001,
+      "type": 1,
+      "material": 0,
+      "intensifyPercentage": 0,
+      "smallImagePath": "asiudgasg/asodhsg/wadceg/22004_s.i.bytes",
+      "largeImagePath": "asiudgasg/asodhsg/wadceg/22004_l.i.bytes"
+    },
+    "22005": {
+      "code": 22005,
+      "groupID": 22001,
+      "artistID": 22002,
+      "theme": 22001,
+      "type": 1,
+      "material": 0,
+      "intensifyPercentage": 0,
+      "smallImagePath": "asiudgasg/asodhsg/wadceg/22005_s.i.bytes",
+      "largeImagePath": "asiudgasg/asodhsg/wadceg/22005_l.i.bytes"
+    },
+    "22006": {
+      "code": 22006,
+      "groupID": 22001,
+      "artistID": 22003,
+      "theme": 22001,
+      "type": 1,
+      "material": 0,
+      "intensifyPercentage": 0,
+      "smallImagePath": "asiudgasg/asodhsg/wadceg/22006_s.i.bytes",
+      "largeImagePath": "asiudgasg/asodhsg/wadceg/22006_l.i.bytes"
     }
   }
 }

@@ -1546,5 +1546,23 @@
     "localeName": 10000033,
     "secondOrderIndex": 50,
     "emblemImage": "http://d3exy8s96shf22.cloudfront.net/resources/images/emblem/emblem_max_match.png?v=22083001"
+  },
+  {
+    "profileGroupName": 10060143,
+    "analyticsData": "Chuu",
+    "bestCardbookImage": "http://d3exy8s96shf22.cloudfront.net/resources/images/card_book/cardbook_mybg_chuu.png?v=22083001",
+    "groupType": 0,
+    "code": 22001,
+    "integrateCode": null,
+    "displayStartAt": null,
+    "emblemIndex": null,
+    "emblemBuiltInResId": null,
+    "equipableSlot": 3,
+    "cardLocaleName": 10070143,
+    "orderIndex": 21,
+    "displayEndAt": null,
+    "localeName": 10000145,
+    "secondOrderIndex": 11,
+    "emblemImage": "http://d3exy8s96shf22.cloudfront.net/resources/images/emblem/emblem_chuu.png?v=22083001"
   }
 ]

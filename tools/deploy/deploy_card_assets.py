@@ -15,6 +15,10 @@ DIRS_TO_SYNC = [
     "sdhgauwehdnu",
     "aoeiwhslc",
     "aweoijs",
+    "vhydigygvd",
+    "agewfcbxhaa",
+    "foewghkc",
+    "xcvzbnsdosi",
 ]
 
 def main():

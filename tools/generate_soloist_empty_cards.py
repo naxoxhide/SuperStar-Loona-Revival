@@ -35,6 +35,7 @@ SOLOISTS = [
     (15001, 15003, 15013), # Yves (Baby Apple)
     (16001, 16003, 16013), # Go Won (My Fairy)
     (17001, 17003, 17013), # Olivia Hye (Olivia Honey)
+    (22001, 22001, 22001), # Chuu (Chuu)
 ]
 
 def generate_empty_cards():
