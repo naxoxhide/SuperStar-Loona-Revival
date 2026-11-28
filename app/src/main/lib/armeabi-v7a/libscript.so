@@ -5496,8 +5496,7 @@ function initIl2Cpp(module) {
                             log("[-] Error dismissing Fade: " + fe.message);
                         }
 
-                        // --- Submenu Customization: Ocultar botón de Ranking (-League / Weekly League) ---
-                        // (Para reactivar el botón de Ranking en el Lobby, comenta este bloque o cambia el valor a 1)
+                        // --- Submenu Customization: Mostrar botón de Ranking (-League / Weekly League) ---
                         try {
                             var leaguePaths = [
                                 "LobbyScene/Buttons/RightMenu/-extraMenu/BtnMyLobby/-League",
@@ -5508,13 +5507,13 @@ function initIl2Cpp(module) {
                                 try {
                                     var lgo = findGameObjectFn(createIl2CppString(lpath), NULL);
                                     if (!lgo.isNull()) {
-                                        setActiveFn(lgo, 0); // 0 = Ocultar / 1 = Mostrar
-                                        log("[🏆 SUBMENU] Ranking button (-League) hidden successfully! (" + lpath + ")");
+                                        setActiveFn(lgo, 1); // 1 = Mostrar icono de League en Lobby
+                                        log("[🏆 SUBMENU] Ranking button (-League) restored successfully! (" + lpath + ")");
                                     }
                                 } catch (e) {}
                             });
                         } catch (eLeague) {
-                            log("[-] Error hiding -League ranking button: " + eLeague.message);
+                            log("[-] Error restoring -League ranking button: " + eLeague.message);
                         }
 
                         // --- Initialize InventoryControl on Lobby startup ---
@@ -16719,8 +16718,7 @@ function initIl2Cpp(module) {
                     log("[-] Error replacing OpenGroup: " + eOgr.message);
                 }
 
-                // --- Hook LobbyView.OnRightMenu (0xCEE6FC) to keep Ranking hidden ---
-                // (Para reactivar el botón de Ranking en el Lobby, comenta este hook)
+                // --- Hook LobbyView.OnRightMenu (0xCEE6FC) to keep League icon visible ---
                 try {
                     Interceptor.attach(baseAddr.add(0xCEE6FC), {
                         onEnter: function (args) {
@@ -16728,7 +16726,7 @@ function initIl2Cpp(module) {
                                 var leagueGo = findGameObjectFn(createIl2CppString("LobbyScene/Buttons/RightMenu/-extraMenu/BtnMyLobby/-League"), NULL);
                                 if (leagueGo.isNull()) leagueGo = findGameObjectFn(createIl2CppString("-League"), NULL);
                                 if (!leagueGo.isNull()) {
-                                    setActiveFn(leagueGo, 0); // 0 = Ocultar
+                                    setActiveFn(leagueGo, 1); // 1 = Mostrar
                                 }
                             } catch (e) {}
                         }
@@ -20014,6 +20012,39 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     Interceptor.replace(baseAddr.add(0x1060B98), helpNoticeCb); // InventoryView.OnInventoryHelp
                     Interceptor.replace(baseAddr.add(0x11D23A0), helpNoticeCb); // CardBookScene.OnHelp
                     Interceptor.replace(baseAddr.add(0x11CC010), helpNoticeCb); // CardBookDetailPopup.OnHelp
+
+                    // League offline notices (LobbyScene RightMenu / MyLobby, SelectMusicScene shield, & LeagueAssist fallback)
+                    function triggerLeagueOfflinePopup(tag) {
+                        log("[🏆 LEAGUE] " + tag + " -> opening Shop-style offline notice popup");
+                        try { new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"])(createIl2CppString("btn_touch"), NULL); } catch (e) {}
+                        openOfflineNoticePopup("League (Offline Mode)", "Weekly League is not available in offline standalone mode yet.");
+                    }
+                    Interceptor.replace(baseAddr.add(0xCEF5A8), keepCb(new NativeCallback(function(viewThis, go, methodInfo) {
+                        triggerLeagueOfflinePopup("LobbyView.OnWeeklyLeague");
+                    }, "void", ["pointer", "pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xB440A8), keepCb(new NativeCallback(function(viewThis, go, methodInfo) {
+                        triggerLeagueOfflinePopup("LobbyMyLobbyView.OnLeague");
+                    }, "void", ["pointer", "pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xB0A87C), keepCb(new NativeCallback(function(assistThis, methodInfo) {
+                        triggerLeagueOfflinePopup("MyLobbyAssist.OnLeague");
+                    }, "void", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0x1045EF8), keepCb(new NativeCallback(function(sceneThis, methodInfo) {
+                        triggerLeagueOfflinePopup("SelectMusicScene.OnWeeklyLeague");
+                    }, "void", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0x1046DAC), keepCb(new NativeCallback(function(sceneThis, methodInfo) {
+                        triggerLeagueOfflinePopup("SelectMusicScene.OnWeekly");
+                    }, "void", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0x1065DF0), keepCb(new NativeCallback(function(methodInfo) {
+                        triggerLeagueOfflinePopup("LeagueControl.OnWeeklyLeague");
+                    }, "void", ["pointer"])));
+                    Interceptor.replace(baseAddr.add(0x10621D4), keepCb(new NativeCallback(function(type, callback, methodInfo) {
+                        triggerLeagueOfflinePopup("LeagueAssist.Open(type=" + type + ")");
+                    }, "void", ["int", "pointer", "pointer"])));
+                    Interceptor.attach(baseAddr.add(0xCEF144), {
+                        onEnter: function() {
+                            log("[🏆 LOBBY_UI] LobbyView.OnClickMyLobby triggered!");
+                        }
+                    });
 
                     // InventoryScene.OnSelectMusic (0x105CD68) -> verify clean Music transition
                     Interceptor.attach(baseAddr.add(0x105CD68), {
