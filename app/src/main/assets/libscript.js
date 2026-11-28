@@ -12081,7 +12081,9 @@ function initIl2Cpp(module) {
                                     var tierRawImg = view.add(0x68).readPointer();
                                     if (!tierRawImg.isNull()) {
                                         var gLetter = (gr === 4) ? "r" : (gr === 3) ? "s" : (gr === 2) ? "a" : (gr === 1) ? "b" : "c";
-                                        var tierTex = loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gLetter + "_s.i.bytes");
+                                        var tierRelPath = (gr === 1) ? "0b_s.i.bytes" : ("0_" + gLetter + "_s.i.bytes");
+                                        var tierTex = loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/" + tierRelPath) ||
+                                                      loadLocalTexture2D("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gLetter + "_s.i.bytes");
                                         if (tierTex && !tierTex.isNull()) {
                                             setTextureFn(tierRawImg, tierTex, NULL);
                                             setEnabledFn(tierRawImg, 1, NULL);
@@ -13080,6 +13082,108 @@ function initIl2Cpp(module) {
                     log("[+] Interceptor.replace installed on URLsControl.SetCdnTexture (0x163A9E8)!");
                 } catch (eHsct) {
                     log("[-] Error replacing SetCdnTexture: " + eHsct.message);
+                }
+
+                // 10b. Guard WWWManaged.<>c__DisplayClass3_0.<SetCdnTexture>b__0 (0x20D49B0)
+                // Prevents pending async WWWFile loads for unvarianted tier URLs (e.g. ced_basic_s.png -> 0_s_l.i.bytes 226x318)
+                // from overwriting CardSmallView.tier and stretching its RectTransform over neighbor carousel cells.
+                try {
+                    var smallTierGetTexFn = new NativeFunction(baseAddr.add(0x194C06C), "pointer", ["pointer", "pointer"]);
+                    var smallTierSetTexFn = new NativeFunction(baseAddr.add(0x194C074), "void", ["pointer", "pointer", "pointer"]);
+                    var smallTierSetNativeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer", "pointer"]);
+                    var smallTierTexWidthFn = new NativeFunction(baseAddr.add(0x181A1C0), "int", ["pointer", "pointer"]);
+                    var smallTierTexHeightFn = new NativeFunction(baseAddr.add(0x181A240), "int", ["pointer", "pointer"]);
+                    var smallTierDataFpFn = new NativeFunction(baseAddr.add(0xD7ACFC), "pointer", ["pointer", "pointer"]);
+                    var b47_1Addr = baseAddr.add(0x139490C);
+
+                    Interceptor.attach(baseAddr.add(0x20D49B0), {
+                        onEnter: function (args) {
+                            this.smallTierImg = NULL;
+                            this.smallFilePath = "";
+                            this.smallGradeLetter = "";
+                            try {
+                                var dc3 = args[0];
+                                if (!dc3 || dc3.isNull()) return;
+                                var hr = dc3.add(0x30).readPointer();
+                                if (!hr || hr.isNull()) return;
+                                var invPtr = hr.add(0x10).readPointer();
+                                var tgtObj = hr.add(0x20).readPointer();
+                                if (invPtr.isNull() || !invPtr.equals(b47_1Addr) || tgtObj.isNull()) return;
+                                var clsName = il2cpp_class_get_name ? (il2cpp_class_get_name(tgtObj.readPointer()).readUtf8String() || "") : "";
+                                if (clsName !== "CardSmallView") return;
+
+                                this.smallTierImg = dc3.add(0x10).readPointer();
+                                var ret = args[1];
+                                if (ret && !ret.isNull()) {
+                                    var rd = ret.add(0x18).readPointer();
+                                    if (rd && !rd.isNull()) {
+                                        try {
+                                            var dObj = rd.add(0x20).readPointer();
+                                            if (dObj && !dObj.isNull()) {
+                                                var fpPtr = smallTierDataFpFn(dObj, NULL);
+                                                if (fpPtr && !fpPtr.isNull()) {
+                                                    this.smallFilePath = readIl2CppString(fpPtr) || "";
+                                                }
+                                            }
+                                        } catch (eFp) {}
+                                        try {
+                                            var kPtr = rd.add(0x18).readPointer();
+                                            var kStr = (kPtr && !kPtr.isNull()) ? (readIl2CppString(kPtr) || "") : "";
+                                            var km = kStr.match(/ced_[^_]+_([rsabc])(?:[._]|$)/i);
+                                            if (km) this.smallGradeLetter = km[1].toLowerCase();
+                                        } catch (eKey) {}
+                                    }
+                                }
+                                if (!this.smallGradeLetter) {
+                                    var prm = tgtObj.add(0x48).readPointer();
+                                    if (prm && !prm.isNull()) {
+                                        var pGr = prm.add(0x3C).readS32();
+                                        this.smallGradeLetter = (pGr === 4) ? "r" : (pGr === 3) ? "s" : (pGr === 2) ? "a" : (pGr === 1) ? "b" : "c";
+                                    }
+                                }
+                            } catch (eSmEnt) {}
+                        },
+                        onLeave: function () {
+                            try {
+                                if (!this.smallTierImg || this.smallTierImg.isNull()) return;
+                                var curTex = smallTierGetTexFn(this.smallTierImg, NULL);
+                                if (!curTex || curTex.isNull()) return;
+                                var tw = smallTierTexWidthFn(curTex, NULL);
+                                var th = smallTierTexHeightFn(curTex, NULL);
+                                if (tw !== 226 || th !== 318) return;
+
+                                var candidates = [];
+                                if (this.smallFilePath) {
+                                    var um = this.smallFilePath.match(/asiudgasg\/asodhsg\/aoeiwhslc\/uhex\/([^\/]+)\.i\.bytes$/i);
+                                    if (um) {
+                                        var bn = um[1];
+                                        if (/c_l$/i.test(bn)) {
+                                            candidates.push("asiudgasg/asodhsg/aoeiwhslc/uhex/" + bn.replace(/c_l$/i, "_c_s") + ".i.bytes");
+                                        } else if (/_l$/i.test(bn)) {
+                                            candidates.push("asiudgasg/asodhsg/aoeiwhslc/uhex/" + bn.replace(/_l$/i, "_s") + ".i.bytes");
+                                        }
+                                    }
+                                }
+                                var gl = this.smallGradeLetter || "c";
+                                candidates.push((gl === "b") ? "asiudgasg/asodhsg/aoeiwhslc/uhex/0b_s.i.bytes" : ("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gl + "_s.i.bytes"));
+                                if (gl !== "b") candidates.push("asiudgasg/asodhsg/aoeiwhslc/uhex/0_" + gl + "_s.i.bytes");
+
+                                var smallTex = null;
+                                for (var ci = 0; ci < candidates.length; ci++) {
+                                    smallTex = loadLocalTexture2D(candidates[ci]);
+                                    if (smallTex && !smallTex.isNull()) break;
+                                }
+                                if (smallTex && !smallTex.isNull()) {
+                                    smallTierSetTexFn(this.smallTierImg, smallTex, NULL);
+                                    smallTierSetNativeFn(this.smallTierImg, NULL);
+                                    log("[🛡️ SMALL_TIER_FIX] Normalized 226x318 async frame -> 116x156 (" + candidates[0] + ")");
+                                }
+                            } catch (eSmLv) {}
+                        }
+                    });
+                    log("[+] Interceptor.attach installed on WWWManaged.<SetCdnTexture>b__0 (0x20D49B0)!");
+                } catch (eSmHook) {
+                    log("[-] Error attaching small tier guard on 0x20D49B0: " + eSmHook.message);
                 }
 
                 // CardBook Protocol Offline Handlers
