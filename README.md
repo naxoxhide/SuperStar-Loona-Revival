@@ -1,155 +1,166 @@
 # 🌟 SuperStar LOONA Revival
 
-> Proyecto de ingeniería inversa, emulación de servidor y preservación para el videojuego móvil rítmico **SuperStar LOONA** (`com.dalcomsoft.sslo`), desarrollado originalmente por Dalcomsoft sobre Unity IL2CPP.
+> Reverse engineering, standalone offline engine preservation, and client reconstruction project for **SuperStar LOONA** (`com.dalcomsoft.sslo`), originally developed by Dalcomsoft on Unity IL2CPP.
 
 ---
 
-## 📌 Visión General
+## 📌 Overview
 
 > [!IMPORTANT]
-> **Enfoque Primordial: 100% Standalone Offline (On-Device)**  
-> El objetivo central y directriz técnica obligatoria del proyecto es convertir a **SuperStar LOONA** en un juego **completamente autónomo y offline**, eliminando cualquier dependencia de servidores remotos en la nube, APIs externas o conexión a internet obligatoria.  
-> Toda la lógica de autenticación, perfil del jugador, inventario, equipamiento de cartas, álbum CardBook y gameplay rítmico se resuelve y procesa directamente en el cliente mediante instrumentación en memoria (IL2CPP / Frida Gadget) y almacenamiento local.
+> **100% Standalone Offline Architecture (On-Device)**  
+> Following the permanent shutdown of Dalcomsoft's official servers, this project converts **SuperStar LOONA** into a **fully self-contained offline game**.  
+> Authentication, user profile persistence, inventory management, card upgrading/equipping, Card Book collections, music selection, rhythm gameplay, and result scoring all execute locally on-device via Frida Gadget + IL2CPP memory instrumentation (`libscript.so`) and local JSON tables—requiring **zero external servers or internet access**.
 
-Tras el cierre definitivo de los servidores oficiales de Dalcomsoft, este proyecto restaura la jugabilidad completa del cliente a través de una arquitectura integral:
+### Core Engineering Pillars
 
-1. **Modo Standalone Offline en Cliente (Core):**
-   - Intercepción de llamadas de red internas (`BestHTTP`, `URLsControl`, `WWWFile`) para suministrar respuestas simuladas en memoria y cargar texturas directamente desde el almacenamiento local (`wadceg`, `aoeiwhslc/uhex`).
-   - Gestión y persistencia del estado de usuario (cartas obtenidas, inventario OT12, cartas equipadas, canciones desbloqueadas) sin depender de backend externo.
-2. **Mock Server Local (Herramienta de Desarrollo y Pruebas):**
-   - Emulación de rutas API REST/JSON y endpoints de Dalcomsoft en Python para investigación de payloads, extracción de modelos y soporte durante el desarrollo.
-3. **Motor de Criptografía de Datos Dalcomsoft:**
-   - Decodificación y re-serialización del formato propietario binario `.bin` (AES-128-CBC con ofuscación por bloques y validación de hash) para archivos de configuración como `msd.bin`, `lbg.bin`, `cdd.bin`, `ttd.bin`, `url_shared_map.bin`, etc.
-4. **Parches de Cliente e Instrumentación IL2CPP:**
-   - Desensamblado y mapeo de símbolos en ARM64 / ARMv7 mediante Il2CppDumper, Ghidra e IDA Pro.
-   - Inyección de Frida Gadget para bypass de SSL Pinning, bypass de caídas de futex/deadlock, inyección de texturas nativas con `SetNativeSize`, y neutralización de excepciones de ciclo de vida (`LobbyScene` [3] ⇄ `InventoryScene` [4] ⇄ `CardBookScene` [5] ⇄ `IngameScene` [10]).
-5. **Reconstrucción del Cliente Android:**
-   - Proyecto Gradle estructurado para compilar, firmar y empaquetar el APK modificado con librerías nativas integradas y scripts autónomos.
+1. **On-Device Standalone Offline Engine (`app/src/main/assets/libscript.js`):**
+   - Intercepts internal networking (`BestHTTP`, `URLsControl`, `WWWFile`, `AssetControl`) to resolve requests directly against local storage (`/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/`).
+   - Persists full player state (`player_profile.json`, equipped cards across all 22 OT12/sub-unit/soloist groups, card levels/grades, RP, Diamonds, headphones, clear scores, favorite groups, and Lobby wallpaper).
+2. **Dalcomsoft Cryptography & Data Tooling (`tools/crypto/`, `tools/deploy/`):**
+   - Decodes and inspects Dalcomsoft's `.bin` configuration tables (`msd`, `cdd`, `tmd`, `gcd`, `atd`, `cbd`, `cid`, `lbg`, `prd`, `url_shared_map`, etc.) into structured JSON tables under `asiudgasg/sdisgkdc/`.
+3. **IL2CPP Instrumentation & Client Patches:**
+   - ARM64 / ARMv7 symbol analysis via `dump/dump.cs` (`il2cpp_runtime_invoke`, native RVA trampolines, GOT metadata patching, `libunity.so` TLS/crash shields, `libminiaudio.so` Vorbis audio sample-rate & EOF shields).
+4. **Dual-Flavor Android Build (`dev` & `standalone`):**
+   - Fast iterative `dev` APK (~159 MB) for emulator/ADB workflows.
+   - Self-contained `standalone` APK (~823 MB) bundling **7,378** actively used game assets with automatic first-launch extraction (`StandaloneSetupActivity`)—ready to install directly on physical Android phones without `adb push`.
 
 ---
 
-## 📁 Estructura del Repositorio
+## ✅ Implemented Features & Recent Progress
+
+- **Title & Lobby Scenes:**
+  - Instant offline auto-login and `TOUCH TO START` transition into `LobbyScene`.
+  - Crisp `1024x1024` wallpaper rendering (`mipChain = false`, `FilterMode.Bilinear`, `TextureWrapMode.Clamp`, `anisoLevel = 8`) with dynamic Canvas-based `1:1` cover sizing on both Title (`kswoks/bg0..bg7`) and Lobby (`weoihxd/*_l.i.bytes`).
+  - Restored full left & right diamond menus including **League** and **Shop**, backed by unified native modal notices (`"Shop (Offline Mode)"` and `"League (Offline Mode)"`) across Lobby, Select Music, Inventory, Card Book, Profile Purchase, and Wallpaper Edit.
+- **Inventory, Power Up & Card Book:**
+  - Dynamic multi-slot rendering supporting 12-member (`[X X]`, `[+ +]`), sub-unit (`1/3`, `ODD EYE CIRCLE`, `yyxy`), and soloist groups (3–11 slots), including custom `EmptyCard` placeholders and normalized `_l` (`226x318`) / `_s` (`116x156`) tier frames.
+  - Full **Equip**, **Auto Equip**, **Unequip All**, **Card Lock**, **Favorite Card**, **Power Up**, **S5 → R1 Upgrade** (up to `R50`), **Theme Exchanger**, and **Bundle Sell** with persistent **RP** and **Diamond** accounting.
+  - Complete **Card Book** browsing, normal & prism views, theme/card collection point tiers (`cac.json`), and up to 5 favorite groups.
+- **Rhythm Gameplay & Result Screen:**
+  - Offline playback across **92 tracks** (`SelectMusicScene` → `IngameLoadingScene` → `IngameScene` → `ResultScene`), loading `.a.bytes` Vorbis audio and `.seq` beatmaps natively.
+  - **Chuu Integration:** Added Chuu (`22001..22006`) across `lcd.json`, `grd.json`, `atd.json`, `tmd.json`, `cdd.json`, `prd.json`, and `msd.json`, making ***Heart Attack (츄) [Verse 1]*** playable end-to-end with Vocal/Dance/Rhythm cards, handwritten/regular logos, album cover, in-game background, and result cards.
+  - Persistent high scores, rainbow clear stars, RP rewards, and authentic headphone consumption (`20/20` max, `20-minute` recharge timer persisted offline).
+- **User Profile & Lobby Wallpapers:**
+  - Full `My Info` and `Edit My Info` flows: nickname, status message, profile colors, Favorite Card/Theme, `76` Lobby wallpapers (`11` free base), and `329` profile avatars (including 3 distinct circular avatars for Chuu).
+
+---
+
+## 📸 Screenshots
+
+| Title Screen (`TOUCH TO START`) | Lobby (`weoihxd` + League & Shop) |
+| :---: | :---: |
+| ![Title Screen](docs/walkthroughs/media/title_screen.png) | ![Lobby Screen](docs/walkthroughs/media/lobby_screen.png) |
+
+| Inventory (`[X X]` OT11 R50 Equipped) | Card Book (`Chuu`) |
+| :---: | :---: |
+| ![Inventory Screen](docs/walkthroughs/media/inventory_ot11_xx.png) | ![Card Book Chuu](docs/walkthroughs/media/cardbook_chuu.png) |
+
+| Music Select (`Heart Attack - Chuu`) | Rhythm Gameplay (`IngameScene`) |
+| :---: | :---: |
+| ![SelectMusic Chuu](docs/walkthroughs/media/selectmusic_chuu.png) | ![Gameplay Heart Attack](docs/walkthroughs/media/gameplay_heart_attack.png) |
+
+| Result Screen (`CLEARED` & RP Sync) | Profile Selector (`Chuu` Avatars) |
+| :---: | :---: |
+| ![Result Screen](docs/walkthroughs/media/result_heart_attack.png) | ![Profile Chuu Avatars](docs/walkthroughs/media/profile_chuu_avatars.png) |
+
+---
+
+## 📁 Repository Structure
 
 ```text
-├── .agents/                        # Reglas operativas (AGENTS.md) y skills de ingeniería para agentes IA
-│   └── skills/                     # Procedimientos especializados (criptografía, reversing, conventional-commit)
-├── app/                            # Código fuente del cliente Android reconstruido (Java, Smali, Assets, Libs nativas)
-│   ├── src/main/                   # Manifiesto, librerías nativas (libil2cpp.so, libscript.so), recursos y assets
-│   └── src/files/                  # Cache local de metadatos del juego y texturas descifradas de Dalcomsoft
-├── data/                           # Tablas de metadatos y definiciones deserializadas
-│   └── tables/                     # atd.json (artistas), cdd.json (cartas), grd.json (grupos)
-├── docs/                           # Fuente de verdad acumulativa y documentación técnica
-│   ├── CONTEXT.md                  # Registro continuo de ingeniería, offsets, análisis de red y diseño
-│   └── walkthroughs/               # Hitos cronológicos documentados con capturas en media/
-├── dump/                           # Dumps de IL2CPP y scripts de desensamblado
-│   ├── dump.cs, il2cpp.h           # Símbolos y cabeceras de tipos C++ / C#
-│   ├── script.json, stringliteral  # Metadatos para desensambladores
-│   ├── DummyDll/                   # DLLs gestionadas reconstruidas para análisis estático
-│   └── scripts/                    # Scripts de integración y loaders para Ghidra e IDA Pro
-├── server/                         # Servidor mock local en Python (FastAPI) y rutas estáticas
-│   ├── app/                        # Endpoints emulados (auth, lobby, inventory, cardbook, etc.)
-│   ├── static/                     # Archivos estáticos y binarios servidos al cliente
-│   └── run.py                      # Punto de entrada del servidor mock
-├── tools/                          # Suite modular de herramientas CLI y automatización
-│   ├── crypto/                     # Criptografía AES-128-CBC de Dalcomsoft (decrypt_dalcom.py)
-│   ├── deploy/                     # Sincronización al emulador Android (deploy_card_assets.py)
-│   ├── patch/                      # Utilidades de corrección de código decompilado Java/Unity
-│   └── reversing/                  # Extracción de metadatos y normalización de assets
-├── build.gradle                    # Configuración de compilación raíz de Gradle
-├── settings.gradle                 # Declaración de módulos del proyecto (:app)
-├── gradle.properties               # Propiedades de JVM y flags de compilación
-└── skills-lock.json                # Lockfile de dependencias de skills para agentes
+├── .agents/                          # Operational rules (AGENTS.md), agent roles & specialized skills
+├── app/
+│   ├── build.gradle                  # Gradle config with 'dev' and 'standalone' distribution flavors
+│   ├── src/
+│   │   ├── main/
+│   │   │   ├── assets/               # Patched libscript.js, default player_profile.json, data/, bgm/, soundfx/
+│   │   │   ├── java/com/unity3d/player/
+│   │   │   │   ├── StandaloneSetupActivity.java  # First-launch async zip extractor for standalone APK
+│   │   │   │   └── UnityPlayerActivity.java      # Original Unity/Frida host activity
+│   │   │   └── lib/                  # Native libs (arm64-v8a / armeabi-v7a: libil2cpp.so, libfrida-gadget.so, libscript.so)
+│   │   └── files/                    # Decrypted local tables, cards, logos, wallpapers, audio (.a.bytes), beatmaps (.seq)
+├── data/                             # Intermediate JSON card/metadata tables
+├── docs/
+│   ├── CONTEXT.md                    # Cumulative engineering log & reverse-engineering knowledge base
+│   ├── CARDS_INTEGRATION_GUIDE.md    # Step-by-step guide to integrate new groups/themes/cards
+│   ├── SONGS_INTEGRATION_GUIDE.md    # Step-by-step guide to integrate playable songs & .seq charts
+│   └── walkthroughs/                 # Chronological milestone reports and screenshots (media/)
+├── dump/                             # Il2CppDumper outputs (dump.cs, il2cpp.h, script.json, DummyDll/)
+├── server/                           # Legacy Python mock server (development/research reference)
+├── tools/
+│   ├── crypto/decrypt_dalcom.py      # Dalcomsoft .bin encryption/decryption CLI
+│   ├── deploy/
+│   │   ├── build_standalone_assets.py # Selective standalone APK packager (filters unused assets & signs APK)
+│   │   ├── deploy_card_assets.py     # ADB tar sync for card/book/UI textures
+│   │   └── deploy_music_assets.py    # ADB tar sync for songs, beatmaps, covers & in-game backgrounds
+│   └── ...                           # Auditing, database generation & patching scripts
+├── build.gradle
+├── gradle.properties
+└── settings.gradle
 ```
 
 ---
 
-## 🛠️ Requisitos Previos
+## 🛠️ Prerequisites & Build Guide
 
-- **Python 3.10+**
-- **Android SDK & Command Line Tools** (con `adb` en el PATH)
-- **Java Development Kit (JDK 17)**
-- **Frida & Frida-Tools:**
-  ```bash
-  pip install frida frida-tools
-  ```
-- **Dispositivo o Emulador Android:**
-  - Arquitectura soportada: `arm64-v8a` / `armeabi-v7a` (con root para inyección de Frida).
+### Requirements
+- **Android SDK & Build Tools** (`adb`, `zipalign`, `apksigner` configured in `local.properties`)
+- **Gradle 8.7** & **JDK 17+**
+- **Python 3.10+** (for asset sync and packaging scripts)
+- **Supported Android ABIs:** `arm64-v8a` & `armeabi-v7a` (`minSdk 24` / Android 7.0+)
 
----
+### Option A: Self-Contained Mobile APK (`standalone` — No `adb push` Needed)
 
-## 🚀 Puesta en Marcha
-
-### 1. Iniciar el Servidor Mock Local
+Builds `app-dev-debug.apk`, packages only the **7,378 active assets** (excluding ~625 MB of unused online store/event/raw assets and macOS metadata, without POSIX symlinks for FUSE/sdcardfs compatibility), aligns, and debug-signs the mobile APK:
 
 ```bash
-cd server
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python run.py
+gradle assembleDevDebug
+python3 tools/deploy/build_standalone_assets.py --package-apk
 ```
 
-El servidor escuchará por defecto en `http://0.0.0.0:8000` (o el puerto asignado en la configuración).
+Output: `app/build/outputs/apk/standalone/debug/app-standalone-debug.apk` (~823 MB).  
+Install directly on a physical device or emulator—on first launch, `StandaloneSetupActivity` extracts assets once into `Android/data/com.dalcomsoft.sslo/files/` while preserving any existing `player_profile.json`.
 
-### 2. Sincronizar Assets al Dispositivo/Emulador
-
-Asegúrate de que tu emulador o dispositivo esté conectado vía `adb`:
-
-```bash
-adb devices
-python tools/deploy/deploy_card_assets.py
-```
-
-### 3. Compilar el Cliente Android (APK)
+### Option B: Fast Developer Workflow (`dev` + ADB Asset Sync)
 
 ```bash
-./gradlew assembleDebug
-```
-
-El APK resultante se generará en `app/build/outputs/apk/debug/app-debug.apk`.
-
-### 4. Ejecutar Frida para Redirección e Inyección de Parches
-
-Con el servidor mock corriendo y el emulador activo:
-
-```bash
-frida -U -f com.dalcomsoft.sslo -l tools/frida_agent.js
+gradle assembleDevDebug
+adb install -r app/build/outputs/apk/dev/debug/app-dev-debug.apk
+python3 tools/deploy/deploy_card_assets.py
+python3 tools/deploy/deploy_music_assets.py
 ```
 
 ---
 
-## 🔐 Criptografía Dalcomsoft
+## 🔐 Dalcomsoft Data Cryptography
 
-Los archivos `.bin` de configuración (`msd.bin`, `lbg.bin`, `cdd.bin`) utilizan un esquema de cifrado propietario basado en:
-- Cifrado simétrico **AES-128-CBC**.
-- Vector de Inicialización (IV) y Clave derivados internamente por el motor de Dalcomsoft.
-- Rotación y ofuscación de encabezados para validación de integridad.
-
-Para inspeccionar o modificar datos de canciones o cartas:
+Configuration tables in `app/src/files/asiudgasg/sdisgkdc/*.bin` use Dalcomsoft's AES-128-CBC binary serialization format:
 
 ```bash
-# Desencriptar binario a JSON legible
-python tools/decrypt_dalcom.py decrypt app/src/files/asiudgasg/sdisgkdc/msd.bin msd.json
+# Decrypt binary table to editable JSON
+python3 tools/crypto/decrypt_dalcom.py decrypt app/src/files/asiudgasg/sdisgkdc/msd.bin msd.json
 
-# Re-encriptar JSON modificado a binario para el cliente
-python tools/decrypt_dalcom.py encrypt msd.json msd.bin
+# Re-encrypt modified JSON back to .bin
+python3 tools/crypto/decrypt_dalcom.py encrypt msd.json msd.bin
 ```
 
----
-
-## 🤖 Directrices para Agentes de IA
-
-Este repositorio incluye una suite de reglas y habilidades en `.agents/`:
-- **[.agents/AGENTS.md](.agents/AGENTS.md):** Reglas operativas estrictas, incluyendo la actualización obligatoria de `docs/CONTEXT.md` en cada iteración.
-- **[.agents/skills/](.agents/skills/):** Procedimientos documentados para ingeniería inversa, bypass de red y criptografía de Dalcomsoft.
-
-> Nota: Los archivos de trabajo efímeros, transcripciones, capturas temporales y caches de IDEs de IA están excluidos del control de versiones mediante `.gitignore`.
+For adding new artists, cards, and playable tracks, see:
+- [docs/CARDS_INTEGRATION_GUIDE.md](docs/CARDS_INTEGRATION_GUIDE.md)
+- [docs/SONGS_INTEGRATION_GUIDE.md](docs/SONGS_INTEGRATION_GUIDE.md)
 
 ---
 
-## ⚖️ Aviso Legal y Propiedad Intelectual
+## 🤖 AI Agent Guidelines
 
-Este proyecto ha sido desarrollado exclusivamente con fines educativos, de investigación técnica y de preservación histórica de software. 
+This repository enforces structured multi-agent workflows documented in:
+- [.agents/AGENTS.md](.agents/AGENTS.md) — Mandatory operating rules, Git checkpoints, and continuous updates to `docs/CONTEXT.md`.
+- [.agents/skills/](.agents/skills/) — Specialized domain playbooks (Dalcomsoft reversing, decryption, network bypass, QA automation, Conventional Commits).
 
-- Todos los activos visuales, pistas de audio, marcas registradas y derechos de autor pertenecen a **Dalcomsoft Inc.** y las respectivas agencias de representación artística (**Blockberry Creative**, **MODHAUS**).
-- No se comercializa ni se persigue lucro directo o indirecto con este código.
+---
+
+## ⚖️ Legal Notice & Intellectual Property
+
+This project is strictly for educational, software preservation, and reverse-engineering research purposes.
+
+- All visual assets, audio tracks, trademarks, and copyrights belong to **Dalcomsoft Inc.** and the respective artists/agencies (**Blockberry Creative**, **MODHAUS**).
+- No commercial use or monetization is intended.

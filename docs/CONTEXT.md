@@ -6,6 +6,13 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ✅ CHECKPOINT 44 — Limpieza de Cachés, Actualización de README en Inglés con Capturas, Push Remoto y Rama `feat/shop` (2026-11-28)
+- **Limpieza de disco en macOS:** Eliminadas las cachés `~/Library/Caches/JetBrains` (`1.2 GB`) y `~/Library/Caches/ms-playwright` (`1.9 GB`), recuperando hasta **`5.5 GiB`** libres en `/System/Volumes/Data`.
+- **Actualización de [README.md](file:///Users/ignaciorojas/Documents/repos/sslo_apk/README.md) en inglés y galería en [docs/walkthroughs/media/](file:///Users/ignaciorojas/Documents/repos/sslo_apk/docs/walkthroughs/media):**
+  - Reescrito completamente en inglés documentando la arquitectura 100% standalone offline en dispositivo, sistemas implementados (Title/Lobby nítidos, pop-ups de Shop y League, Inventory/PowerUp/CardBook, integración completa de Chuu y *Heart Attack* jugable, perfiles/wallpapers y build dual `dev` / `standalone`).
+  - Incorporadas 8 capturas verificadas de QA (`title_screen.png`, `lobby_screen.png`, `inventory_ot11_xx.png`, `cardbook_chuu.png`, `selectmusic_chuu.png`, `gameplay_heart_attack.png`, `result_heart_attack.png`, `profile_chuu_avatars.png`).
+- **Control de versiones:** Publicación de `feat/card-ui` en `origin/feat/card-ui` y creación/push de la nueva rama `feat/shop` (`origin/feat/shop`).
+
 ### ✅ CHECKPOINT 43 — Pop-ups Offline Unificados de Shop y APK `standalone` Autocontenida para Dispositivo Móvil (2026-11-28)
 Siguiendo [standalone_apk_and_lobby_shop_plan.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/standalone_apk_and_lobby_shop_plan.md) (walkthrough visual: [walkthrough_standalone_and_lobby_shop.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/walkthrough_standalone_and_lobby_shop.md)):
 1. **Unificación de Pop-ups Offline de Shop (`libscript.js`):**
