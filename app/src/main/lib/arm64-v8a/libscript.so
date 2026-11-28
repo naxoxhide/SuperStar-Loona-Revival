@@ -4234,19 +4234,53 @@ function initIl2Cpp(module) {
                     }
                 }
 
+                function createCrispTextureFromBytes(bytesObj, persistent) {
+                    if (!bytesObj || bytesObj.isNull()) return NULL;
+                    try {
+                        var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
+                        if (!tex2dClass || tex2dClass.isNull()) return NULL;
+                        var texObj = il2cpp_object_new(tex2dClass);
+                        if (!texObj || texObj.isNull()) return NULL;
+
+                        // Texture2D..ctor(width, height, TextureFormat.RGBA32=4, mipChain=false) -> 0x181B634 avoids mipmap pixelation
+                        var texCtorFn = new NativeFunction(baseAddr.add(0x181B634), "void", ["pointer", "int", "int", "int", "bool", "pointer"]);
+                        texCtorFn(texObj, 2, 2, 4, 0, NULL);
+
+                        var loadImageFn = new NativeFunction(baseAddr.add(0x25B3E90), "bool", ["pointer", "pointer", "pointer"]);
+                        if (!loadImageFn(texObj, bytesObj, NULL)) return NULL;
+
+                        try {
+                            new NativeFunction(baseAddr.add(0x181A580), "void", ["pointer", "int", "pointer"])(texObj, 1, NULL); // Bilinear
+                            new NativeFunction(baseAddr.add(0x181A340), "void", ["pointer", "int", "pointer"])(texObj, 1, NULL); // Clamp
+                            new NativeFunction(baseAddr.add(0x181A610), "void", ["pointer", "int", "pointer"])(texObj, 8, NULL); // Aniso = 8
+                        } catch (eTexOpts) {}
+
+                        if (persistent) {
+                            try {
+                                new NativeFunction(baseAddr.add(0x1DC7FF4), "void", ["pointer", "int", "pointer"])(texObj, 52, NULL);
+                            } catch (eDh) {}
+                            if (il2cpp_gchandle_new) il2cpp_gchandle_new(texObj, 2);
+                        }
+                        return texObj;
+                    } catch (eCrisp) {
+                        log("[-] Error in createCrispTextureFromBytes: " + eCrisp.message);
+                        return NULL;
+                    }
+                }
+
                 function ensureBackgroundHierarchyActive(rawImage, bgInstance, isTitleBg) {
                     try {
                         if (isTitleBg === undefined) {
                             isTitleBg = (globalSceneId === 2 || globalSceneId === 0);
                         }
-                        var targetW = 1280.0;
-                        var targetH = isTitleBg ? 1280.0 : 640.0;
 
                         var getGoFn = new NativeFunction(baseAddr.add(0x1DB6AD4), "pointer", ["pointer", "pointer"]);
                         var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer", "pointer"]);
                         var getParentFn = new NativeFunction(baseAddr.add(0x180E87C), "pointer", ["pointer", "pointer"]);
                         var setActiveFn = new NativeFunction(baseAddr.add(0x1DBADF4), "void", ["pointer", "int", "pointer"]);
                         var getNameFn = new NativeFunction(baseAddr.add(0x1DC5A54), "pointer", ["pointer", "pointer"]);
+                        var getCanvasFn = new NativeFunction(baseAddr.add(0x16148BC), "pointer", ["pointer", "pointer"]);
+                        var getRectFn = new NativeFunction(baseAddr.add(0x180D73C), "void", ["pointer", "pointer"]);
 
                         // DisplayUGUI and VideoPlayer are kept ACTIVE for native hardware video playback
 
@@ -4270,6 +4304,29 @@ function initIl2Cpp(module) {
                         var rawGo = getGoFn(rawImage, NULL);
                         if (rawGo && !rawGo.isNull()) setActiveFn(rawGo, 1, NULL);
 
+                        // Measure real Canvas dimensions (e.g. 1136x639 / 1137.78x640) instead of hardcoding 1280 over-zoom
+                        var canvasW = 1137.78;
+                        var canvasH = 640.0;
+                        try {
+                            var cv = getCanvasFn(rawImage, NULL);
+                            if (cv && !cv.isNull()) {
+                                var cvTr = getTransformFn(cv, NULL);
+                                if (cvTr && !cvTr.isNull()) {
+                                    var cr4 = Memory.alloc(16);
+                                    getRectFn(cvTr, cr4);
+                                    var rw = cr4.add(8).readFloat();
+                                    var rh = cr4.add(12).readFloat();
+                                    if (rw > 100.0 && rh > 100.0) {
+                                        canvasW = rw;
+                                        canvasH = rh;
+                                    }
+                                }
+                            }
+                        } catch (eCvRect) {}
+
+                        var targetW = isTitleBg ? Math.max(canvasW, canvasH) : canvasW;
+                        var targetH = isTitleBg ? Math.max(canvasW, canvasH) : canvasH;
+
                         rawImage.add(0x20).writeFloat(1.0);
                         rawImage.add(0x24).writeFloat(1.0);
                         rawImage.add(0x28).writeFloat(1.0);
@@ -4283,10 +4340,10 @@ function initIl2Cpp(module) {
 
                         var tr = getTransformFn(rawImage, NULL);
 
-                        // Apply centered cover: 1280x1280 (1:1 Aspect Fill for title) or 1280x640 (2:1 for video)
+                        // Fit 1:1 square cover cleanly to exact Canvas width (zero horizontal crop / excess zoom)
                         applyCenterCoverTransform(tr, targetW, targetH);
 
-                        // Traverse ancestors: ensure Background and Layout are centered and full-size
+                        // Traverse ancestors: ensure Background and Layout match full Canvas cleanly
                         var pTr = tr;
                         var maxDepth = 5;
                         while (pTr && !pTr.isNull() && maxDepth-- > 0) {
@@ -4297,7 +4354,7 @@ function initIl2Cpp(module) {
                                 setActiveFn(pGo, 1, NULL);
                                 var pName = readIl2CppString(getNameFn(pGo, NULL));
                                 if (pName === "Background" || pName === "Layout") {
-                                    applyCenterCoverTransform(parent, targetW, targetH);
+                                    applyCenterCoverTransform(parent, canvasW, canvasH);
                                 }
                             }
                             pTr = parent;
@@ -4377,21 +4434,11 @@ function initIl2Cpp(module) {
                                 }
 
                                 if (bytesObj && !bytesObj.isNull()) {
-                                    var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
-                                    texObj = il2cpp_object_new(tex2dClass);
-                                    var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
-                                    texCtorFn(texObj, 2, 2, NULL);
-
-                                    var loadImagePtr = baseAddr.add(0x25B3E90);
-                                    var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
-                                    loadImageFn(texObj, bytesObj);
-                                    try {
-                                        var setHideFlagsFn = new NativeFunction(baseAddr.add(0x1DC7FF4), "void", ["pointer", "int", "pointer"]);
-                                        setHideFlagsFn(texObj, 52, NULL);
-                                    } catch (eTitleDh) {}
-                                    if (il2cpp_gchandle_new) il2cpp_gchandle_new(texObj, 2);
-                                    cachedTitleTexObj = texObj;
-                                    cachedTitleFileName = selectedFileName;
+                                    texObj = createCrispTextureFromBytes(bytesObj, true);
+                                    if (texObj && !texObj.isNull()) {
+                                        cachedTitleTexObj = texObj;
+                                        cachedTitleFileName = selectedFileName;
+                                    }
                                 }
                             }
                         } else if (globalSceneId === 3) {
@@ -4409,14 +4456,7 @@ function initIl2Cpp(module) {
                             exc.writePointer(NULL);
                             var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
                             if (bytesObj && !bytesObj.isNull()) {
-                                var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
-                                texObj = il2cpp_object_new(tex2dClass);
-                                var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
-                                texCtorFn(texObj, 2, 2, NULL);
-
-                                var loadImagePtr = baseAddr.add(0x25B3E90);
-                                var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
-                                loadImageFn(texObj, bytesObj);
+                                texObj = createCrispTextureFromBytes(bytesObj, false);
                             }
                         } else {
                             // Non-title scene: clear title cache so next visit gets new random
@@ -4433,14 +4473,7 @@ function initIl2Cpp(module) {
                                 exc.writePointer(NULL);
                                 var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
                                 if (bytesObj && !bytesObj.isNull()) {
-                                    var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
-                                    texObj = il2cpp_object_new(tex2dClass);
-                                    var texCtorFn = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
-                                    texCtorFn(texObj, 2, 2, NULL);
-
-                                    var loadImagePtr = baseAddr.add(0x25B3E90);
-                                    var loadImageFn = new NativeFunction(loadImagePtr, "int", ["pointer", "pointer"]);
-                                    loadImageFn(texObj, bytesObj);
+                                    texObj = createCrispTextureFromBytes(bytesObj, false);
                                 }
                             }
 
@@ -5268,17 +5301,9 @@ function initIl2Cpp(module) {
                                             var bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, argsRead, exc);
 
                                             if (!bytesObj.isNull()) {
-                                                var tex2dClass = getClass("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
-                                                var texObj = il2cpp_object_new(tex2dClass);
-                                                
-                                                // Call Texture2D..ctor(int width, int height) at RVA 0x181B6BC directly
-                                                var texCtorNative = new NativeFunction(baseAddr.add(0x181B6BC), "void", ["pointer", "int", "int", "pointer"]);
-                                                texCtorNative(texObj, 2, 2, NULL);
-
-                                                // Call ImageConversion.LoadImage(tex, bytes) at RVA 0x25B3E90
-                                                var loadImageFn = new NativeFunction(baseAddr.add(0x25B3E90), "int", ["pointer", "pointer", "pointer"]);
-                                                var loadSuccess = loadImageFn(texObj, bytesObj, NULL);
-                                                log("[🎨 LOBBY BG] Official weoihxd background (" + chosenBgId + ") loaded: " + loadSuccess + " (tex: " + texObj + ")");
+                                                var texObj = createCrispTextureFromBytes(bytesObj, true);
+                                                var loadSuccess = (texObj && !texObj.isNull()) ? 1 : 0;
+                                                log("[🎨 LOBBY BG] Official weoihxd background (" + chosenBgId + ") loaded: " + loadSuccess + " (tex: " + texObj + ", mipChain=false, Aniso=8)");
 
                                                 if (loadSuccess) {
                                                     // RawImage.set_texture(tex) at RVA 0x194C074
@@ -5299,17 +5324,12 @@ function initIl2Cpp(module) {
                                                         log("[🎨 LOBBY BG] Disabled raycastTarget on memberImg!");
                                                     } catch (re) {}
 
-                                                    // Adjust RectTransform dimensions: inspect initial and apply native dimensions
+                                                    // Adjust RectTransform dimensions cleanly via shared applyCenterCoverTransform
                                                     try {
                                                         var getTransformFn = new NativeFunction(baseAddr.add(0x1DB6A94), "pointer", ["pointer"]);
-                                                        var setNativeSizeFn = new NativeFunction(baseAddr.add(0x194C1C8), "void", ["pointer"]);
-                                                        var setSizeDeltaFn = new NativeFunction(baseAddr.add(0x180DC18), "void", ["pointer", "float", "float"]);
-                                                        var setAnchoredPosFn = new NativeFunction(baseAddr.add(0x180DACC), "void", ["pointer", "float", "float"]);
-
                                                         var memberViewRt = getTransformFn(memberView);
                                                         var memberRt = getTransformFn(memberImg);
 
-                                                        // Get dynamic canvas width from memberViewRt (which spans the full screen with anchors (0,0) to (1,1))
                                                         var r4 = Memory.alloc(16);
                                                         var gRect = new NativeFunction(baseAddr.add(0x180D73C), "void", ["pointer", "pointer"]);
                                                         gRect(memberViewRt, r4);
@@ -5317,15 +5337,9 @@ function initIl2Cpp(module) {
                                                         var cHeight = r4.add(12).readFloat();
                                                         log("[🎨 LOBBY BG] memberViewRt canvas dimensions: " + cWidth + " x " + cHeight);
 
-                                                        // In Dalcom's CanvasScaler (refHeight: 640), Canvas units are scaled to physical screen by 1.6875x.
-                                                        // Setting sizeDelta to the canvas width (e.g. 1137.78 for 16:9) guarantees:
-                                                        // 1. Exactly 100% screen width coverage (0 side gaps).
-                                                        // 2. Exact 1:1 aspect ratio (width == height).
-                                                        // 3. No excessive digital zoom (avoids the previous 3240px upscale bug).
-                                                        var targetSize = (cWidth > 100.0) ? cWidth : 1137.78;
-                                                        setSizeDeltaFn(memberRt, targetSize, targetSize);
-                                                        setAnchoredPosFn(memberRt, 0.0, 0.0);
-                                                        log("[🎨 LOBBY BG] memberRt calibrated to: " + targetSize + " x " + targetSize + " in Canvas Units (zero side gaps, pixel-perfect 1:1)!");
+                                                        var targetSize = (cWidth > 100.0) ? Math.max(cWidth, cHeight) : 1137.78;
+                                                        applyCenterCoverTransform(memberRt, targetSize, targetSize);
+                                                        log("[🎨 LOBBY BG] memberRt calibrated to: " + targetSize + " x " + targetSize + " in Canvas Units (zero side gaps, 1:1 cover)!");
                                                     } catch (re) {
                                                         log("[-] Error sizing memberRt: " + re.message);
                                                     }

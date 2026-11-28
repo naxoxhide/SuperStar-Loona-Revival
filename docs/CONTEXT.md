@@ -6,6 +6,18 @@ Este documento es la **fuente de verdad técnica acumulativa** del proyecto de r
 
 ## 📌 Estado de la Ejecución y Avances Recientes (Revival Standalone Offline)
 
+### ✅ CHECKPOINT 42 — Resolución Nativa (`mipChain=false`) y Dimensionamiento Dinámico de Wallpapers en TitleScene y LobbyScene (2026-11-28)
+- **Causa raíz identificada (análisis ARM64 en `libil2cpp.so` + inspección en vivo BlueStacks):**
+  1. **Generación de mipmaps y filtrado subóptimo:** Los cargadores de fondo en `TitleScene` y `LobbyScene` (`app/src/main/assets/libscript.js`) instanciaban `Texture2D..ctor(int, int)` (`0x181B6BC`), el cual genera cadena completa de mipmaps (`Texture.GenerateAllMips = -1`, `1024 -> 512 -> ...`) con `anisoLevel = 1` por defecto, degradando nitidez al escalar texturas cuadradas `1024x1024` (`kswoks/bg0..bg7` y `weoihxd/*_l.i.bytes`). En contraste, el motor Dalcom nativo (`BackgroundImage`, `WWWManaged`) utiliza `Texture2D..ctor(int, int, TextureFormat, bool mipChain)` (`0x181B634`) con `TextureFormat.RGBA32` (`4`) y `mipChain = false`.
+  2. **Sobre-zoom horizontal en `TitleScene`:** `ensureBackgroundHierarchyActive` fijaba `1280.0 x 1280.0` de manera estática sobre el `RawImage` de `BackgroundImage` (`0xE93AAC`), aun cuando su `Canvas` padre real mide `1136.0 x 639.0` en la resolución actual (`~12.5%` de zoom excedente y recorte lateral respecto al ancho del Canvas).
+- **Correcciones implementadas en `app/src/main/assets/libscript.js`:**
+  - Helper compartido `createCrispTextureFromBytes(bytesObj, persistent)` que construye texturas vía `0x181B634` (`RGBA32`, `mipChain = false`), decodifica bytes con `ImageConversion.LoadImage` (`0x25B3E90`), fuerza `FilterMode.Bilinear` (`1`, `0x181A580`), `TextureWrapMode.Clamp` (`1`, `0x181A340`), `anisoLevel = 8` (`0x181A610`), `HideFlags(52)` (`0x1DC7FF4`) y retención mediante `il2cpp_gchandle_new`.
+  - Actualización de `ensureBackgroundHierarchyActive` para medir las dimensiones reales del `Canvas` padre vía `Graphic.get_canvas()` (`0x16148BC`), `Component.get_transform()` (`0x1DB6A94`) y `RectTransform.get_rect_Injected` (`0x180D73C`), ajustando `Background`/`Layout` a `canvasW x canvasH` (`1136.0 x 639.0`) y `backgroundRawImage` a `Math.max(canvasW, canvasH)` (`1136.0 x 1136.0`).
+  - Migración de `loadAndApplySceneBackground` (Title `kswoks/bg0..bg7` y fallbacks) y del cargador `weoihxd` en `activateLobbyUIAndVideo` (`LobbyScene`) para usar `createCrispTextureFromBytes` junto con `applyCenterCoverTransform(memberRt, targetSize, targetSize)` (`1137.78 x 1137.78` sin márgenes laterales).
+- **Validación visual y métricas en tiempo real (BlueStacks `127.0.0.1:5555`):**
+  - **`TitleScene` (`bg2.i.bytes.png`):** `TITLE_BG tex=1024x1024 fm=1 wm=1 ani=8 riRect=1136.0x1136.0 canvasRect=1136.0x639.0`, sin recorte horizontal ni pixelación en vegetación ni sprites de miembros.
+  - **`LobbyScene` (`weoihxd/1007`):** `LOBBY_BG tex=1024x1024 fm=1 wm=1 ani=8` (`mipChain=false, Aniso=8`, `memberRt calibrated to: 1137.77783203125 x 1137.77783203125 in Canvas Units`).
+
 ### ✅ CHECKPOINT 41 — Avatares Distintos de Perfil de Chuu (`22002`/`22003`), Reactivación de Icono League en Lobby y Pop-ups Offline de League (2026-11-28)
 Siguiendo el plan aprobado [chuu_profiles_and_league_popup_plan.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/chuu_profiles_and_league_popup_plan.md) (evidencia visual en [walkthrough_chuu_profiles_and_league.md](file:///Users/ignaciorojas/.gemini/antigravity/brain/f613db8a-1096-4bce-9486-f32c466bd0a0/walkthrough_chuu_profiles_and_league.md)), se realizaron los dos ajustes solicitados:
 - **Avatares Circulares de Perfil para Chuu (`22002` Dance y `22003` Rhythm):**
