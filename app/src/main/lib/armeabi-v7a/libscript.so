@@ -2453,6 +2453,11 @@ function initIl2Cpp(module) {
 
             var pendingPopupConfirmFn = null;
             var pendingConfirmPopupPtr = NULL;
+            function triggerShopOfflinePopup(tag) {
+                log("[🛒 SHOP] " + tag + " -> opening Shop offline notice popup");
+                try { new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"])(createIl2CppString("btn_touch"), NULL); } catch (e) {}
+                return openOfflineNoticePopup("Shop (Offline Mode)", "The Shop is not available in offline standalone mode yet.");
+            }
             function openOfflineNoticePopup(title, message, okText) {
                 return openOfflineConfirmPopup(title, message, okText || "OK", null, null);
             }
@@ -4418,6 +4423,7 @@ function initIl2Cpp(module) {
                                 selectedFileName = officialBgFiles[randIdx];
                                 var primaryPath = "/sdcard/kswoks/" + selectedFileName;
                                 var altPath = "/storage/emulated/0/Android/data/com.dalcomsoft.sslo/files/asiudgasg/asodhsg/kswoks/" + selectedFileName;
+                                var altNoPngPath = altPath.replace(/\.i\.bytes\.png$/, ".i.bytes");
                                 log("[🎲 RANDOM TITLE BACKGROUND] Selected index " + randIdx + ": " + selectedFileName);
 
                                 var readAllBytesMethod = findMethod("mscorlib", "System.IO", "File", "ReadAllBytes", 1);
@@ -4430,6 +4436,13 @@ function initIl2Cpp(module) {
                                 if (!bytesObj || bytesObj.isNull()) {
                                     pathStr = createIl2CppString(altPath);
                                     args1.writePointer(pathStr);
+                                    exc.writePointer(NULL);
+                                    bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
+                                }
+                                if ((!bytesObj || bytesObj.isNull()) && altNoPngPath !== altPath) {
+                                    pathStr = createIl2CppString(altNoPngPath);
+                                    args1.writePointer(pathStr);
+                                    exc.writePointer(NULL);
                                     bytesObj = il2cpp_runtime_invoke(readAllBytesMethod, NULL, args1, exc);
                                 }
 
@@ -18988,8 +19001,7 @@ function initIl2Cpp(module) {
                 // Offline notice for StorePopup.Open (0xB6EE4C)
                 try {
                     Interceptor.replace(baseAddr.add(0xB6EE4C), keepCb(new NativeCallback(function (type, callback, loadedCallback, category, code, methodInfo) {
-                        log("[🛒 STORE POPUP] StorePopup.Open intercepted offline (type=" + type + ", category=" + category + ")");
-                        showOfflineToast("Shop is unavailable in offline standalone mode.", 2.2);
+                        triggerShopOfflinePopup("StorePopup.Open(type=" + type + ", category=" + category + ")");
                     }, "void", ["int", "pointer", "pointer", "int", "int", "pointer"])));
                     log("[+] Interceptor.replace installed on StorePopup.Open (0xB6EE4C)!");
                 } catch (eStore) {
@@ -20008,14 +20020,21 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         requestOfflineThemeExchange(sceneThis);
                     }, "void", ["pointer", "pointer"])));
 
-                    // Shop & Help clean offline notices (Inventory & CardBook)
+                    // Shop & Help clean offline notices (Lobby, SelectMusic, Inventory & CardBook)
+                    Interceptor.replace(baseAddr.add(0xCEEE40), keepCb(new NativeCallback(function(viewThis, go, methodInfo) {
+                        triggerShopOfflinePopup("LobbyView.OnStore");
+                    }, "void", ["pointer", "pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xB4C7F0), keepCb(new NativeCallback(function(sceneThis, methodInfo) {
+                        triggerShopOfflinePopup("LobbyScene.OnStore");
+                    }, "void", ["pointer", "pointer"])));
+                    Interceptor.replace(baseAddr.add(0xC2CEB4), keepCb(new NativeCallback(function(sceneThis, methodInfo) {
+                        triggerShopOfflinePopup("SelectMusicScene.OnStore");
+                    }, "void", ["pointer", "pointer"])));
                     Interceptor.replace(baseAddr.add(0x105DD24), keepCb(new NativeCallback(function(sceneThis, methodInfo) {
-                        try { new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"])(createIl2CppString("btn_touch"), NULL); } catch (e) {}
-                        openOfflineNoticePopup("Shop (Offline Mode)", "The Shop is not available in offline standalone mode yet.");
+                        triggerShopOfflinePopup("InventoryScene.OnStore");
                     }, "void", ["pointer", "pointer"])));
                     Interceptor.replace(baseAddr.add(0x11D2D14), keepCb(new NativeCallback(function(sceneThis, methodInfo) {
-                        try { new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"])(createIl2CppString("btn_touch"), NULL); } catch (e) {}
-                        openOfflineNoticePopup("Shop (Offline Mode)", "The Shop is not available in offline standalone mode yet.");
+                        triggerShopOfflinePopup("CardBookScene.OnStore");
                     }, "void", ["pointer", "pointer"])));
                     var helpNoticeCb = keepCb(new NativeCallback(function(thisPtr, methodInfo) {
                         try { new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"])(createIl2CppString("btn_touch"), NULL); } catch (e) {}
@@ -22854,10 +22873,9 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         commitProfileImageChange(code, cbPtr);
                     }, "void", ["pointer", "pointer", "pointer"])));
 
-                    // ProfilePurchaseAssist.Open (0xDEEFE8) -> Locked shop profiles notify cleanly until Shop task
+                    // ProfilePurchaseAssist.Open (0xDEEFE8) -> Locked shop profiles notify cleanly with Shop popup
                     Interceptor.replace(baseAddr.add(0xDEEFE8), keepCb(new NativeCallback(function (profileCode, cbPtr, methodInfo) {
-                        log("[🛒 PROFILE SHOP] Locked profile " + profileCode + " tapped -> Shop offline notice");
-                        showOfflineToast("Locked profiles will be purchasable in Offline Shop.", 2.2);
+                        triggerShopOfflinePopup("ProfilePurchaseAssist.Open(" + profileCode + ")");
                         if (cbPtr && !cbPtr.isNull()) {
                             try {
                                 var mPtr = cbPtr.add(Process.pointerSize * 2).readPointer();
@@ -22866,11 +22884,9 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                         }
                     }, "void", ["int", "pointer", "pointer"])));
 
-                    // EditAssist.OnEventBGEdit (0x12599A4) -> Keep EditPopup open and show offline shop notice (matches user decision #2)
+                    // EditAssist.OnEventBGEdit (0x12599A4) -> Keep EditPopup open and show Shop offline notice popup
                     Interceptor.replace(baseAddr.add(0x12599A4), keepCb(new NativeCallback(function (thisPtr, methodInfo) {
-                        try { new NativeFunction(baseAddr.add(0xD0A3B4), "void", ["pointer", "pointer"])(createIl2CppString("btn_touch"), NULL); } catch (eS) {}
-                        log("[🖼️ BG EDIT] Wallpaper shop unavailable in offline standalone mode.");
-                        showOfflineToast("Wallpaper Shop is unavailable in offline standalone mode.", 2.2);
+                        triggerShopOfflinePopup("EditAssist.OnEventBGEdit");
                     }, "void", ["pointer", "pointer"])));
 
                     // User Search (ENABLE_OFFLINE_SEARCH_MOCK = false -> clean offline toast; ready mock code preserved if enabled later)
@@ -23062,8 +23078,7 @@ var handleUnregisterPedestalSlot = function(sceneThis, goOrIdx) {
                     }, "void", ["pointer", "int", "bool", "pointer"])));
 
                     Interceptor.replace(baseAddr.add(0xFF5760), keepCb(new NativeCallback(function (cbPtr, code, methodInfo) {
-                        log("[🛒 LOBBY BG SHOP] buyLobbyBgItem(" + code + ") unavailable in offline standalone mode.");
-                        showOfflineToast("Wallpaper Shop is unavailable in offline standalone mode.", 2.2);
+                        triggerShopOfflinePopup("LobbyBgStore.buyLobbyBgItem(" + code + ")");
                         safeInvokeActionInt(cbPtr, 0);
                     }, "void", ["pointer", "int16", "pointer"])));
 

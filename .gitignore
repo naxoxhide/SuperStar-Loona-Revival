@@ -66,6 +66,8 @@ local.properties
 *.ap_
 *.aab
 *.dex
+app/src/standalone/assets/standalone_files.zip
+app/src/standalone/assets/standalone_pack_version.txt
 
 # Firmas digitales, certificados privados y keystores
 *.keystore

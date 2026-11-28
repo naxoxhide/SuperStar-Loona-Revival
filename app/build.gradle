@@ -14,6 +14,16 @@ android {
         versionName "3.12.4"
     }
 
+    flavorDimensions "distribution"
+    productFlavors {
+        dev {
+            dimension "distribution"
+        }
+        standalone {
+            dimension "distribution"
+        }
+    }
+
     signingConfigs {
         debug {
             storeFile file("${System.getProperty('user.home')}/.android/debug.keystore")
